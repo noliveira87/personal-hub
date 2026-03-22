@@ -16,7 +16,7 @@ import { AddWarrantyDialog } from "@/components/AddWarrantyDialog";
 import { WarrantyCard } from "@/components/WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Search, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Moon, Search, ShieldCheck, Sun } from "lucide-react";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -39,6 +39,16 @@ export function WarrantyApp() {
   const [categoryFilter, setCategoryFilter] = useState<WarrantyCategory | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleDark = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle("dark");
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -212,7 +222,12 @@ export function WarrantyApp() {
               </p>
             </div>
           </div>
-          <AddWarrantyDialog onAdd={addWarranty} />
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <AddWarrantyDialog onAdd={addWarranty} />
+          </div>
         </div>
 
         {/* Filters */}

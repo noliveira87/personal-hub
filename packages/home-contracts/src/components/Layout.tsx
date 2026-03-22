@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
+import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,16 +15,31 @@ const navItems = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'));
+  }, []);
+
+  const toggleDark = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+  };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-lg border-b px-4 h-14 flex items-center justify-between">
         <h1 className="text-base font-semibold text-foreground tracking-tight">D12 Contracts</h1>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-muted active:scale-95 transition-transform">
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={toggleDark} className="p-2 rounded-lg hover:bg-muted active:scale-95 transition-transform">
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-muted active:scale-95 transition-transform">
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
       {/* Mobile nav overlay */}
@@ -52,8 +67,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col border-r bg-card/50 backdrop-blur-sm z-30">
-        <div className="px-6 h-16 flex items-center border-b">
+        <div className="px-6 h-16 flex items-center justify-between border-b">
           <h1 className="text-lg font-semibold text-foreground tracking-tight">D12 Contracts</h1>
+          <button onClick={toggleDark} className="p-2 rounded-lg hover:bg-muted active:scale-95 transition-transform text-muted-foreground">
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map(item => (

@@ -1,17 +1,17 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChartLine, FileCheck2, House, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
+import { ChartLine, FileCheck2, House, Moon, ShieldCheck, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const projects = [
 	{
-		title: "D12 Warranties",
+		title: "Warranty Vault",
 		subtitle: "Warranties",
 		to: "/warranties",
 		icon: ShieldCheck,
 	},
 	{
-		title: "D12 Portfolio",
+		title: "Portfolio Tracker",
 		subtitle: "Investments",
 		to: "/portfolio-tracker",
 		icon: ChartLine,
@@ -23,7 +23,7 @@ const projects = [
 		icon: House,
 	},
 	{
-		title: "D12 Contracts",
+		title: "Home Contracts",
 		subtitle: "Contracts",
 		to: "/home-contracts",
 		icon: FileCheck2,
@@ -31,17 +31,41 @@ const projects = [
 ] as const;
 
 const Index = () => {
+	const [isDark, setIsDark] = useState(false);
+
 	useEffect(() => {
 		document.title = "D12 Hub";
+		setIsDark(document.documentElement.classList.contains("dark"));
 	}, []);
+
+	const toggleDark = () => {
+		setIsDark(!isDark);
+		document.documentElement.classList.toggle("dark");
+	};
 
 	return (
 	<main className="min-h-screen bg-background">
-		<section className="mx-auto flex min-h-screen max-w-4xl items-center px-4 py-8 sm:px-6 sm:py-12">
+		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
 			<div className="w-full">
-				<header className="mb-10 text-center sm:mb-12">
+				{/* D12 Couple Illustration */}
+				<div className="mb-8 flex justify-center sm:mb-10">
+					<img
+						src="/d12.jpg"
+						alt="D12 Couple"
+						className="h-auto w-full max-w-xs rounded-2xl shadow-lg sm:max-w-sm"
+					/>
+				</div>
+
+				<header className="mb-10 sm:mb-12">
+					<div className="mb-4 flex justify-end">
+						<Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
+							{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+						</Button>
+					</div>
+					<div className="text-center">
 					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">D12 Hub</h1>
 					<p className="mt-2 text-sm text-muted-foreground sm:text-base">App launcher</p>
+					</div>
 				</header>
 
 				<div className="mx-auto grid max-w-md grid-cols-2 gap-x-6 gap-y-8 sm:max-w-none sm:grid-cols-4 sm:gap-x-8 sm:gap-y-10">
