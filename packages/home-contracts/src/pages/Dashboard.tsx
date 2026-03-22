@@ -3,11 +3,13 @@ import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getAnnualEquivalent, formatCurrency } from '@/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowRight, ArrowLeft, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 export default function Dashboard() {
   const { contracts } = useContracts();
+  const { isDark, toggleDark } = useDarkMode();
 
   const active = contracts.filter(c => c.status === 'active');
   const expiringSoon = active
@@ -40,6 +42,9 @@ export default function Dashboard() {
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back to projects</span>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={toggleDark} className="hidden text-muted-foreground lg:inline-flex">
+            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           <Link
             to="/contracts/new"
