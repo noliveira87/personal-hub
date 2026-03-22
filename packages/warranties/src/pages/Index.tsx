@@ -34,7 +34,7 @@ const Index = () => (
 		<section className="mx-auto flex min-h-screen max-w-4xl items-center px-4 py-8 sm:px-6 sm:py-12">
 			<div className="w-full">
 				<header className="mb-10 text-center sm:mb-12">
-					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
+					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">D12 Hub</h1>
 					<p className="mt-2 text-sm text-muted-foreground sm:text-base">App launcher</p>
 				</header>
 
