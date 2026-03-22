@@ -41,10 +41,16 @@ const Index = () => {
 
 	return (
 	<main className="min-h-screen bg-background">
-		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
+		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8">
 			<div className="w-full">
+				<div className="mb-2 flex justify-end">
+					<Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
+						{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+					</Button>
+				</div>
+
 				{/* D12 Couple Illustration */}
-				<div className="mb-5 flex justify-center sm:mb-6">
+				<div className="mb-2 flex justify-center sm:mb-3">
 					<div className="relative flex w-full max-w-[360px] items-center justify-center px-2 py-2 sm:max-w-[480px] sm:px-4 sm:py-3">
 						<div className="pointer-events-none absolute bottom-2 h-14 w-48 rounded-full bg-primary/10 blur-3xl sm:bottom-4 sm:h-20 sm:w-64" />
 						<img
@@ -54,18 +60,6 @@ const Index = () => {
 						/>
 					</div>
 				</div>
-
-				<header className="mb-10 sm:mb-12">
-					<div className="mb-4 flex justify-end">
-						<Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
-							{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-						</Button>
-					</div>
-					<div className="text-center">
-					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">D12 Hub</h1>
-					<p className="mt-2 text-sm text-muted-foreground sm:text-base">App launcher</p>
-					</div>
-				</header>
 
 				<div className="mx-auto grid max-w-md grid-cols-2 gap-x-6 gap-y-8 sm:max-w-none sm:grid-cols-4 sm:gap-x-8 sm:gap-y-10">
 					{projects.map((project) => {
