@@ -206,7 +206,7 @@ export function WarrantyApp() {
               <ShieldCheck className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold leading-tight">Warranties</h1>
+              <h1 className="text-xl font-bold leading-tight">D12 Warranties</h1>
               <p className="text-sm text-muted-foreground">
                 {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
               </p>

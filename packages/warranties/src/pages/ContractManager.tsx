@@ -19,8 +19,8 @@ const ContractManager = () => {
             <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
               <FileCheck2 className="h-5 w-5 text-primary" />
             </div>
-            <CardTitle>Home Contracts</CardTitle>
-            <CardDescription>Opening Home Contracts...</CardDescription>
+            <CardTitle>D12 Contracts</CardTitle>
+            <CardDescription>Opening D12 Contracts...</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">

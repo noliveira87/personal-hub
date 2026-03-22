@@ -1,16 +1,17 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChartLine, FileCheck2, House, ShieldCheck } from "lucide-react";
+import { useEffect } from "react";
 
 const projects = [
 	{
-		title: "Warranty Vault",
+		title: "D12 Warranties",
 		subtitle: "Warranties",
 		to: "/warranties",
 		icon: ShieldCheck,
 	},
 	{
-		title: "Portfolio Tracker",
+		title: "D12 Portfolio",
 		subtitle: "Investments",
 		to: "/portfolio-tracker",
 		icon: ChartLine,
@@ -22,14 +23,19 @@ const projects = [
 		icon: House,
 	},
 	{
-		title: "Home Contracts",
+		title: "D12 Contracts",
 		subtitle: "Contracts",
 		to: "/home-contracts",
 		icon: FileCheck2,
 	},
 ] as const;
 
-const Index = () => (
+const Index = () => {
+	useEffect(() => {
+		document.title = "D12 Hub";
+	}, []);
+
+	return (
 	<main className="min-h-screen bg-background">
 		<section className="mx-auto flex min-h-screen max-w-4xl items-center px-4 py-8 sm:px-6 sm:py-12">
 			<div className="w-full">
@@ -64,5 +70,6 @@ const Index = () => (
 		</section>
 	</main>
 );
+};
 
 export default Index;

@@ -51,9 +51,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="container flex items-center justify-between h-16">
-          <h1 className="text-xl font-bold text-foreground tracking-tight">
-            💼 My Portfolio
-          </h1>
+          <h1 className="text-xl font-bold text-foreground tracking-tight">D12 Portfolio</h1>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
