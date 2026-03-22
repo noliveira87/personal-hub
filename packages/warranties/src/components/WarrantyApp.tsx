@@ -15,7 +15,8 @@ import {
 import { AddWarrantyDialog } from "@/components/AddWarrantyDialog";
 import { WarrantyCard } from "@/components/WarrantyCard";
 import { Input } from "@/components/ui/input";
-import { Search, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Search, ShieldCheck } from "lucide-react";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -188,6 +189,16 @@ export function WarrantyApp() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto px-4 py-8 pb-24">
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1.5 mb-4"
+          onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}:8081/`}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Back to projects</span>
+        </Button>
+
         {/* Header */}
         <div className="fade-in-up flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
