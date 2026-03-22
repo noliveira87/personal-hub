@@ -1,7 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,17 +16,7 @@ const navItems = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-  const location = useLocation();
-
-  useEffect(() => {
-    setIsDark(document.documentElement.classList.contains('dark'));
-  }, []);
-
-  const toggleDark = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
-  };
+  const { isDark, toggleDark } = useDarkMode();
 
   return (
     <div className="min-h-screen bg-background">

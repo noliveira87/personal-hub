@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChartLine, FileCheck2, House, Moon, ShieldCheck, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useDarkMode } from "@shared-ui/use-dark-mode";
 
 const projects = [
 	{
@@ -31,17 +32,11 @@ const projects = [
 ] as const;
 
 const Index = () => {
-	const [isDark, setIsDark] = useState(false);
+	const { isDark, toggleDark } = useDarkMode();
 
 	useEffect(() => {
 		document.title = "D12 Hub";
-		setIsDark(document.documentElement.classList.contains("dark"));
 	}, []);
-
-	const toggleDark = () => {
-		setIsDark(!isDark);
-		document.documentElement.classList.toggle("dark");
-	};
 
 	return (
 	<main className="min-h-screen bg-background">

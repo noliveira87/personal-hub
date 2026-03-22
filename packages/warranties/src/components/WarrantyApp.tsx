@@ -17,6 +17,7 @@ import { WarrantyCard } from "@/components/WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Moon, Search, ShieldCheck, Sun } from "lucide-react";
+import { useDarkMode } from "@shared-ui/use-dark-mode";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -39,16 +40,7 @@ export function WarrantyApp() {
   const [categoryFilter, setCategoryFilter] = useState<WarrantyCategory | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  const toggleDark = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("dark");
-  };
+  const { isDark, toggleDark } = useDarkMode();
 
   useEffect(() => {
     let isMounted = true;

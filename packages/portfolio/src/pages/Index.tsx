@@ -7,12 +7,13 @@ import { InvestmentDialog } from "@/components/InvestmentDialog";
 import { MonthlyInsights } from "@/components/MonthlyInsights";
 import { useInvestments } from "@/hooks/useInvestments";
 import { Investment, calculateSummary } from "@/types/investment";
+import { useDarkMode } from "@shared-ui/use-dark-mode";
 
 const Index = () => {
   const { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment } = useInvestments();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, toggleDark } = useDarkMode();
 
   const summary = calculateSummary(investments);
 
@@ -38,11 +39,6 @@ const Index = () => {
     if (window.confirm("Delete this investment?")) {
       deleteInvestment(id);
     }
-  };
-
-  const toggleDark = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("dark");
   };
 
   const launcherUrl = `${window.location.protocol}//${window.location.hostname}:8081`;
