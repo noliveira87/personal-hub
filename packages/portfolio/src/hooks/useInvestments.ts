@@ -1,5 +1,12 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Investment, MonthlySnapshot, calculateSummary } from "@/types/investment";
+import {
+  loadInvestmentsFromDb,
+  loadMonthlySnapshotsFromDb,
+  upsertInvestmentsInDb,
+  upsertMonthlySnapshotsInDb,
+} from "@/lib/investments";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const generateId = () => {
   const webCrypto = globalThis.crypto;
@@ -101,6 +108,10 @@ export function useInvestments() {
     }
   });
 
+  const [remoteHydrated, setRemoteHydrated] = useState(false);
+  const initialInvestmentsRef = useRef(investments);
+  const initialSnapshotsRef = useRef(monthlySnapshots);
+
   const getMonthKey = (date = new Date()) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -125,8 +136,52 @@ export function useInvestments() {
   }, []);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const hydrateFromSupabase = async () => {
+      if (!isSupabaseConfigured) {
+        setRemoteHydrated(true);
+        return;
+      }
+
+      const [remoteInvestments, remoteSnapshots] = await Promise.all([
+        loadInvestmentsFromDb(),
+        loadMonthlySnapshotsFromDb(),
+      ]);
+
+      if (isCancelled) return;
+
+      if (remoteInvestments && remoteInvestments.length > 0) {
+        setInvestments(remoteInvestments);
+      } else {
+        await upsertInvestmentsInDb(initialInvestmentsRef.current);
+      }
+
+      if (remoteSnapshots && remoteSnapshots.length > 0) {
+        setMonthlySnapshots(remoteSnapshots);
+      } else if (initialSnapshotsRef.current.length > 0) {
+        await upsertMonthlySnapshotsInDb(initialSnapshotsRef.current);
+      }
+
+      if (!isCancelled) {
+        setRemoteHydrated(true);
+      }
+    };
+
+    void hydrateFromSupabase();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem(INVESTMENTS_STORAGE_KEY, JSON.stringify(investments));
-  }, [investments]);
+
+    if (isSupabaseConfigured && remoteHydrated) {
+      void upsertInvestmentsInDb(investments);
+    }
+  }, [investments, remoteHydrated]);
 
   useEffect(() => {
     const summary = calculateSummary(investments);
@@ -168,7 +223,11 @@ export function useInvestments() {
 
   useEffect(() => {
     localStorage.setItem(SNAPSHOTS_STORAGE_KEY, JSON.stringify(monthlySnapshots));
-  }, [monthlySnapshots]);
+
+    if (isSupabaseConfigured && remoteHydrated) {
+      void upsertMonthlySnapshotsInDb(monthlySnapshots);
+    }
+  }, [monthlySnapshots, remoteHydrated]);
 
   const shortTerm = investments.filter(i => i.category === "short-term");
   const longTerm = investments.filter(i => i.category === "long-term");
