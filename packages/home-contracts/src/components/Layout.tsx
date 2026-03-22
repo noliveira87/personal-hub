@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 const navItems = [
@@ -46,13 +46,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {item.label}
             </NavLink>
           ))}
-          <button
-            onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}:8081/`}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mt-4 border-t pt-3"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Projects
-          </button>
         </nav>
         </div>
       )}
@@ -80,15 +73,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t space-y-3">
+        <div className="p-4 border-t">
           <p className="text-xs text-muted-foreground">Personal Dashboard</p>
-          <button
-            onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}:8081/`}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Projects
-          </button>
         </div>
       </aside>
 

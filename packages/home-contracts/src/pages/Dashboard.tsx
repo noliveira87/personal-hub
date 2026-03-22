@@ -3,7 +3,8 @@ import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getAnnualEquivalent, formatCurrency } from '@/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Plus, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const { contracts } = useContracts();
@@ -30,14 +31,25 @@ export default function Dashboard() {
             Your contracts & subscriptions at a glance
           </p>
         </div>
-        <Link
-          to="/contracts/new"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm animate-fade-up"
-          style={{ animationDelay: '100ms' }}
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Add Contract</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}:8081/`}
+            className="gap-1.5"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to projects</span>
+          </Button>
+          <Link
+            to="/contracts/new"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm animate-fade-up"
+            style={{ animationDelay: '100ms' }}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Contract</span>
+          </Link>
+        </div>
       </div>
 
       {/* Stats row */}
