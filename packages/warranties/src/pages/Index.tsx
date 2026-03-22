@@ -51,12 +51,12 @@ const Index = () => {
 
 				{/* D12 Couple Illustration */}
 				<div className="mb-2 flex justify-center sm:mb-3">
-					<div className="relative flex w-full max-w-[420px] items-center justify-center px-2 py-2 sm:max-w-[560px] sm:px-4 sm:py-3">
-						<div className="pointer-events-none absolute bottom-2 h-16 w-56 rounded-full bg-primary/10 blur-3xl sm:bottom-4 sm:h-24 sm:w-72" />
+					<div className="relative flex w-full max-w-[480px] items-center justify-center px-2 py-2 sm:max-w-[620px] sm:px-4 sm:py-3">
+						<div className="pointer-events-none absolute bottom-2 h-20 w-64 rounded-full bg-primary/10 blur-3xl sm:bottom-4 sm:h-28 sm:w-80" />
 						<img
 							src={d12NewImage}
 							alt="D12 couple illustration"
-							className="relative z-10 h-auto max-h-72 w-auto max-w-full object-contain drop-shadow-[0_18px_30px_hsl(var(--foreground)/0.14)] sm:max-h-[22rem]"
+							className="relative z-10 h-auto max-h-[21rem] w-auto max-w-full object-contain drop-shadow-[0_18px_30px_hsl(var(--foreground)/0.14)] sm:max-h-[26rem]"
 						/>
 					</div>
 				</div>
