@@ -100,7 +100,7 @@ export function AddWarrantyDialog({ onAdd }: Props) {
       }}
     >
       <DialogTrigger asChild>
-        <Button size="lg" className="gap-2 shadow-md shadow-primary/20 active:scale-[0.97] transition-transform">
+        <Button size="lg" className="shrink-0 gap-2 shadow-md shadow-primary/20 active:scale-[0.97] transition-transform">
           <Plus className="h-5 w-5" />
           Add product
         </Button>
