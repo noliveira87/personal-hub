@@ -25,14 +25,42 @@ create table if not exists public.portfolio_monthly_snapshots (
 alter table public.portfolio_investments enable row level security;
 alter table public.portfolio_monthly_snapshots enable row level security;
 
-create policy if not exists "portfolio public read" on public.portfolio_investments
+do $$
+begin
+  execute 'drop policy if exists "portfolio public read" on public.portfolio_investments cascade';
+  perform true;
+exception when others then null;
+end $$;
+
+create policy "portfolio public read" on public.portfolio_investments
 for select using (true);
 
-create policy if not exists "portfolio public write" on public.portfolio_investments
+do $$
+begin
+  execute 'drop policy if exists "portfolio public write" on public.portfolio_investments cascade';
+  perform true;
+exception when others then null;
+end $$;
+
+create policy "portfolio public write" on public.portfolio_investments
 for all using (true) with check (true);
 
-create policy if not exists "portfolio snapshots public read" on public.portfolio_monthly_snapshots
+do $$
+begin
+  execute 'drop policy if exists "portfolio snapshots public read" on public.portfolio_monthly_snapshots cascade';
+  perform true;
+exception when others then null;
+end $$;
+
+create policy "portfolio snapshots public read" on public.portfolio_monthly_snapshots
 for select using (true);
 
-create policy if not exists "portfolio snapshots public write" on public.portfolio_monthly_snapshots
+do $$
+begin
+  execute 'drop policy if exists "portfolio snapshots public write" on public.portfolio_monthly_snapshots cascade';
+  perform true;
+exception when others then null;
+end $$;
+
+create policy "portfolio snapshots public write" on public.portfolio_monthly_snapshots
 for all using (true) with check (true);
