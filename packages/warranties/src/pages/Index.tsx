@@ -48,11 +48,11 @@ const Index = () => {
 		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
 			<div className="w-full">
 				{/* D12 Couple Illustration */}
-				<div className="mb-8 flex justify-center sm:mb-10">
+				<div className="mb-6 flex justify-center sm:mb-8">
 					<img
 						src="/d12.jpg"
 						alt="D12 Couple"
-						className="h-auto w-full max-w-xs rounded-2xl shadow-lg sm:max-w-sm"
+						className="h-auto max-h-44 w-auto max-w-[70vw] rounded-2xl object-contain shadow-lg sm:max-h-64 sm:max-w-xs"
 					/>
 				</div>
 
