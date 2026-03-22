@@ -1,7 +1,16 @@
 import { useState, useCallback, useEffect } from "react";
 import { Investment, MonthlySnapshot, calculateSummary } from "@/types/investment";
 
-const generateId = () => crypto.randomUUID();
+const generateId = () => {
+  const webCrypto = globalThis.crypto;
+
+  if (webCrypto && typeof webCrypto.randomUUID === "function") {
+    return webCrypto.randomUUID();
+  }
+
+  const random = Math.random().toString(36).slice(2, 10);
+  return `id-${Date.now()}-${random}`;
+};
 const INVESTMENTS_STORAGE_KEY = "portfolio.investments.v1";
 const SNAPSHOTS_STORAGE_KEY = "portfolio.monthly-snapshots.v1";
 
