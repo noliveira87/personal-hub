@@ -4,9 +4,10 @@ Unified monorepo for personal management applications built with React, TypeScri
 
 ## 📦 Packages
 
-- **warranties** - Home Warranty Hub (warranty management + app launcher)
+- **warranties** - Home Warranty Hub (warranty management)
 - **portfolio** - Portfolio Tracker (investment tracking)
 - **home-contracts** - Contract management (renewals + alerts + Telegram test)
+- **libs/ui** - Shared UI, theme logic and hub launcher
 
 ## 🚀 Quick Start
 
@@ -76,7 +77,7 @@ npm run lint:home-contracts
 ```
 personal-hub/
 ├── packages/
-│   ├── warranties/         # Warranty management + launcher
+│   ├── warranties/         # Warranty management
 │   │   ├── src/
 │   │   ├── package.json
 │   │   └── ...
@@ -89,6 +90,10 @@ personal-hub/
 │   └── home-contracts/     # Contracts + alerts
 │       ├── src/
 │       ├── package.json
+│       └── ...
+│
+│   └── libs/ui/            # Shared UI + hub launcher
+│       ├── src/
 │       └── ...
 │
 ├── package.json            # Workspace root
