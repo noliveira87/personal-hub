@@ -44,13 +44,13 @@ const Index = () => {
 		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
 			<div className="w-full">
 				{/* D12 Couple Illustration */}
-				<div className="mb-6 flex justify-center sm:mb-8">
-					<div className="relative flex w-full max-w-[320px] items-center justify-center px-2 py-2 sm:max-w-[420px] sm:px-4 sm:py-3">
-						<div className="pointer-events-none absolute bottom-2 h-12 w-40 rounded-full bg-primary/10 blur-3xl sm:bottom-4 sm:h-16 sm:w-56" />
+				<div className="mb-5 flex justify-center sm:mb-6">
+					<div className="relative flex w-full max-w-[360px] items-center justify-center px-2 py-2 sm:max-w-[480px] sm:px-4 sm:py-3">
+						<div className="pointer-events-none absolute bottom-2 h-14 w-48 rounded-full bg-primary/10 blur-3xl sm:bottom-4 sm:h-20 sm:w-64" />
 						<img
 							src={d12NewImage}
 							alt="D12 couple illustration"
-							className="relative z-10 h-auto max-h-48 w-auto max-w-full object-contain drop-shadow-[0_18px_30px_hsl(var(--foreground)/0.14)] sm:max-h-64"
+							className="relative z-10 h-auto max-h-56 w-auto max-w-full object-contain drop-shadow-[0_18px_30px_hsl(var(--foreground)/0.14)] sm:max-h-72"
 						/>
 					</div>
 				</div>
@@ -62,7 +62,7 @@ const Index = () => {
 						</Button>
 					</div>
 					<div className="text-center">
-					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">D12 Hub</h1>
+					<h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">D12 Hub</h1>
 					<p className="mt-2 text-sm text-muted-foreground sm:text-base">App launcher</p>
 					</div>
 				</header>
