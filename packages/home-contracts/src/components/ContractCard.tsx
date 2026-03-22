@@ -1,0 +1,63 @@
+import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/types/contract';
+import { StatusBadge } from './StatusBadge';
+import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel } from '@/lib/contractUtils';
+import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { CalendarDays } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+
+export function ContractCard({ contract, index = 0 }: { contract: Contract; index?: number }) {
+  const navigate = useNavigate();
+  const daysLeft = getDaysUntilExpiry(contract);
+  const urgency = getUrgencyLevel(daysLeft);
+
+  return (
+    <div
+      onClick={() => navigate(`/contracts/${contract.id}`)}
+      className={cn(
+        'bg-card rounded-xl p-5 border cursor-pointer transition-all duration-300',
+        'hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]',
+        urgency === 'critical' && 'border-urgent/30 shadow-urgent/5',
+        urgency === 'warning' && 'border-warning/30 shadow-warning/5',
+      )}
+      style={{ animationDelay: `${index * 80}ms` }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-xl flex-shrink-0">{CATEGORY_ICONS[contract.category]}</span>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm text-foreground truncate">{contract.name}</h3>
+            <p className="text-xs text-muted-foreground truncate">{contract.provider}</p>
+          </div>
+        </div>
+        <StatusBadge status={contract.status} />
+      </div>
+
+      <div className="mt-4 flex items-end justify-between">
+        <div>
+          <p className="text-lg font-bold tabular-nums text-foreground">
+            {formatCurrency(contract.price, contract.currency)}
+            <span className="text-xs font-normal text-muted-foreground ml-1">/ {BILLING_LABELS[contract.billingFrequency].toLowerCase()}</span>
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <CalendarDays className="w-3 h-3" />
+            <span>{format(parseISO(contract.endDate), 'MMM d, yyyy')}</span>
+          </div>
+          {contract.status !== 'archived' && contract.status !== 'expired' && (
+            <p className={cn(
+              'text-xs font-medium mt-0.5',
+              urgency === 'critical' && 'text-urgent',
+              urgency === 'warning' && 'text-warning',
+              urgency === 'soon' && 'text-warning',
+              urgency === 'normal' && 'text-muted-foreground',
+            )}>
+              {daysLeft <= 0 ? 'Expired' : `${daysLeft}d left`}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

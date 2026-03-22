@@ -6,6 +6,7 @@ Unified monorepo for personal management applications built with React, TypeScri
 
 - **warranties** - Home Warranty Hub (warranty management + app launcher)
 - **portfolio** - Portfolio Tracker (investment tracking)
+- **home-contracts** - Contract management (renewals + alerts + Telegram test)
 
 ## 🚀 Quick Start
 
@@ -28,6 +29,9 @@ npm run dev:warranties
 # Run portfolio (port 8080)
 npm run dev:portfolio
 
+# Run home-contracts (port 8083)
+npm run dev:home-contracts
+
 # Run both in parallel (requires separate terminals)
 npm run dev:warranties
 npm run dev:portfolio
@@ -42,6 +46,9 @@ npm run build:warranties
 # Build portfolio
 npm run build:portfolio
 
+# Build home-contracts
+npm run build:home-contracts
+
 # Build all packages
 npm run build
 ```
@@ -52,6 +59,7 @@ npm run build
 # Test specific package
 npm run test:warranties
 npm run test:portfolio
+npm run test:home-contracts
 ```
 
 ### Linting
@@ -60,6 +68,7 @@ npm run test:portfolio
 # Lint all packages
 npm run lint:warranties
 npm run lint:portfolio
+npm run lint:home-contracts
 ```
 
 ## 📂 Project Structure
@@ -77,6 +86,11 @@ personal-hub/
 │       ├── package.json
 │       └── ...
 │
+│   └── home-contracts/     # Contracts + alerts
+│       ├── src/
+│       ├── package.json
+│       └── ...
+│
 ├── package.json            # Workspace root
 ├── README.md
 └── bun.lock
@@ -87,7 +101,7 @@ personal-hub/
 - **Warranties** (http://localhost:8081)
   - Home Warranty Vault
   - Portfolio Tracker → redirects to http://localhost:8080
-  - Home Contracts (placeholder)
+  - Home Contracts (redirects to http://localhost:8083)
   - Home Expenses (placeholder)
 
 - **Portfolio** (http://localhost:8080)
@@ -137,6 +151,7 @@ Deploy to your preferred hosting (Vercel, Netlify, etc.)
 
 - [Warranties README](packages/warranties/README.md)
 - [Portfolio README](packages/portfolio/README.md)
+- [Home Contracts README](packages/home-contracts/README.md)
 
 ## 🔄 Future Enhancements
 
