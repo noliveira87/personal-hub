@@ -5,11 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ChartLine } from "lucide-react";
 
 const PortfolioTracker = () => {
+  const portfolioUrl = `${window.location.protocol}//${window.location.hostname}:8080`;
+
   useEffect(() => {
-    // Redirect to portfolio immediately
-    // Note: Portfolio app runs on 8080, dashboard on 8081
-    window.location.replace("http://localhost:8080");
-  }, []);
+    window.location.replace(portfolioUrl);
+  }, [portfolioUrl]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,7 +25,7 @@ const PortfolioTracker = () => {
           <CardContent>
             <p className="mb-4 text-sm text-muted-foreground">
               If not redirected automatically,{" "}
-              <a href="http://localhost:8080" className="underline hover:text-primary">
+              <a href={portfolioUrl} className="underline hover:text-primary">
                 click here
               </a>
               .
