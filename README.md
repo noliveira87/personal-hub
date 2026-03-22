@@ -87,7 +87,7 @@ personal-hub/
 - **Warranties** (http://localhost:8081)
   - Home Warranty Vault
   - Portfolio Tracker → redirects to http://localhost:8080
-  - Contract Manager (placeholder)
+  - Home Contracts (placeholder)
   - Home Expenses (placeholder)
 
 - **Portfolio** (http://localhost:8080)
@@ -141,7 +141,7 @@ Deploy to your preferred hosting (Vercel, Netlify, etc.)
 ## 🔄 Future Enhancements
 
 - [ ] Shared UI component library (`packages/libs/ui`)
-- [ ] Contract Manager implementation
+- [ ] Home Contracts implementation
 - [ ] Home Expenses implementation
 - [ ] Supabase integration for portfolio
 - [ ] Multi-device sync

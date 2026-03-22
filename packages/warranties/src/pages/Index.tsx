@@ -22,9 +22,9 @@ const projects = [
 		icon: House,
 	},
 	{
-		title: "Contract Manager",
-		subtitle: "Renewals",
-		to: "/contract-manager",
+		title: "Home Contracts",
+		subtitle: "Contracts",
+		to: "/home-contracts",
 		icon: FileCheck2,
 	},
 ] as const;
