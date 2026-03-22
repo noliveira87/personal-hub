@@ -45,6 +45,8 @@ const Index = () => {
     document.documentElement.classList.toggle("dark");
   };
 
+  const launcherUrl = `${window.location.protocol}//${window.location.hostname}:8081`;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -56,7 +58,7 @@ const Index = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.location.href = "http://localhost:8081"}
+              onClick={() => window.location.href = launcherUrl}
               className="gap-1.5"
             >
               <ArrowLeft className="h-4 w-4" />
