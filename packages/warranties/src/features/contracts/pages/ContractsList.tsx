@@ -95,9 +95,14 @@ export default function ContractsList() {
 
       {/* Results */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((contract, i) => (
-          <ContractCard key={contract.id} contract={contract} index={i} />
-        ))}
+        {filtered.map((contract, i) => {
+          try {
+            return <ContractCard key={contract.id} contract={contract} index={i} />;
+          } catch (err) {
+            console.error('Error rendering contract card:', err, contract);
+            return null;
+          }
+        })}
       </div>
 
       {filtered.length === 0 && (

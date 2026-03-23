@@ -70,7 +70,7 @@ export default function ContractDetail() {
     { label: 'Type', value: TYPE_LABELS[contract.type] },
     { label: 'Billing', value: BILLING_LABELS[contract.billingFrequency] },
     { label: 'Renewal', value: RENEWAL_LABELS[contract.renewalType] },
-    { label: 'Start Date', value: format(parseISO(contract.startDate), 'MMM d, yyyy') },
+    { label: 'Start Date', value: contract.startDate ? format(parseISO(contract.startDate), 'MMM d, yyyy') : 'N/A' },
     { label: 'End Date', value: contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No end date' },
     { label: 'Currency', value: contract.currency },
     { label: 'Status', value: null },

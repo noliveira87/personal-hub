@@ -25,28 +25,43 @@ interface ContractRow {
 }
 
 function mapContractRow(row: ContractRow): Contract {
-  return {
-    id: row.id,
-    name: row.name,
-    category: row.category as any,
-    provider: row.provider,
-    type: row.type as any,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    noEndDate: row.no_end_date,
-    renewalType: row.renewal_type as any,
-    billingFrequency: row.billing_frequency as any,
-    price: row.price,
-    currency: row.currency,
-    notes: row.notes ?? '',
-    status: row.status as any,
-    alerts: row.alerts ?? [],
-    telegramAlertEnabled: row.telegram_alert_enabled,
-    documentLinks: row.document_links ?? [],
-    priceHistoryEnabled: row.price_history_enabled,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  try {
+    // Ensure alerts is an array
+    let alerts = [];
+    if (row.alerts) {
+      if (Array.isArray(row.alerts)) {
+        alerts = row.alerts;
+      } else if (typeof row.alerts === 'string') {
+        alerts = JSON.parse(row.alerts);
+      }
+    }
+
+    return {
+      id: row.id || '',
+      name: row.name || '',
+      category: (row.category || 'other') as any,
+      provider: row.provider || '',
+      type: (row.type || 'other') as any,
+      startDate: row.start_date || new Date().toISOString().split('T')[0],
+      endDate: row.end_date || null,
+      noEndDate: row.no_end_date ?? false,
+      renewalType: (row.renewal_type || 'auto-renew') as any,
+      billingFrequency: (row.billing_frequency || 'monthly') as any,
+      price: row.price ?? 0,
+      currency: row.currency || 'EUR',
+      notes: row.notes ?? '',
+      status: (row.status || 'active') as any,
+      alerts: alerts,
+      telegramAlertEnabled: row.telegram_alert_enabled ?? false,
+      documentLinks: row.document_links ?? [],
+      priceHistoryEnabled: row.price_history_enabled ?? false,
+      createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error('Error mapping contract row:', err, row);
+    throw err;
+  }
 }
 
 export async function loadContractsFromDb(): Promise<Contract[]> {
@@ -54,16 +69,27 @@ export async function loadContractsFromDb(): Promise<Contract[]> {
     throw new Error('Base de dados não disponível');
   }
 
-  const { data, error } = await supabase
-    .from('contracts')
-    .select('*')
-    .order('created_at', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select('*')
+      .order('created_at', { ascending: true });
 
-  if (error) {
-    throw new Error(`Erro ao carregar contratos: ${error.message}`);
+    if (error) {
+      throw new Error(`Erro ao carregar contratos: ${error.message}`);
+    }
+
+    console.log('Raw data from DB:', data);
+    const mapped = (data ?? []).map((row) => {
+      console.log('Mapping row:', row);
+      return mapContractRow(row as ContractRow);
+    });
+    console.log('Mapped contracts:', mapped);
+    return mapped;
+  } catch (err) {
+    console.error('Error in loadContractsFromDb:', err);
+    throw err;
   }
-
-  return (data ?? []).map((row) => mapContractRow(row as ContractRow));
 }
 
 export async function upsertContractsInDb(contracts: Contract[]): Promise<void> {
