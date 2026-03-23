@@ -55,7 +55,6 @@ const App = () => (
             <Route path="/contracts/calendar" element={<CalendarPage />} />
             <Route path="/contracts/alerts" element={<AlertsPage />} />
             <Route path="/contracts/insights" element={<InsightsPage />} />
-            <Route path="/contracts/settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
