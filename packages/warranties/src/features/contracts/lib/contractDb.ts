@@ -108,12 +108,17 @@ export async function deleteContractFromDb(contractId: string): Promise<void> {
     throw new Error('Base de dados não disponível');
   }
 
-  const { error } = await supabase
+  console.log('Deleting contract from DB:', contractId);
+  
+  const { error, count } = await supabase
     .from('contracts')
     .delete()
     .eq('id', contractId);
 
+  console.log('Delete result:', { error, count });
+
   if (error) {
+    console.error('Delete error:', error);
     throw new Error(`Erro ao eliminar contrato: ${error.message}`);
   }
 }

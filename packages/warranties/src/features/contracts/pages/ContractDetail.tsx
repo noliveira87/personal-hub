@@ -49,11 +49,15 @@ export default function ContractDetail() {
     if (window.confirm('Delete this contract?')) {
       setError(null);
       setIsDeleting(true);
+      console.log('handleDelete called for contract:', contract.id);
       try {
+        console.log('Calling deleteContract');
         await deleteContract(contract.id);
+        console.log('Delete completed, navigating to /contracts');
         // Navega imediatamente sem esperar
         navigate('/contracts');
       } catch (err) {
+        console.error('Delete failed:', err);
         setIsDeleting(false);
         const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
         setError(message);
@@ -67,7 +71,7 @@ export default function ContractDetail() {
     { label: 'Billing', value: BILLING_LABELS[contract.billingFrequency] },
     { label: 'Renewal', value: RENEWAL_LABELS[contract.renewalType] },
     { label: 'Start Date', value: format(parseISO(contract.startDate), 'MMM d, yyyy') },
-    { label: 'End Date', value: format(parseISO(contract.endDate), 'MMM d, yyyy') },
+    { label: 'End Date', value: contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No end date' },
     { label: 'Currency', value: contract.currency },
     { label: 'Status', value: null },
   ];

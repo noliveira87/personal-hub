@@ -61,13 +61,17 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
   const deleteContract = useCallback(async (id: string) => {
     const previousContracts = contracts;
     try {
+      console.log('DeleteContract called with id:', id);
       setError(null);
       // Remove imediatamente do estado local (otimista)
       setContracts(prev => prev.filter(c => c.id !== id));
+      console.log('Removed from local state, calling deleteContractFromDb');
       // Delete da BD
       await deleteContractFromDb(id);
+      console.log('Delete successful');
     } catch (err) {
       // Revert ao estado anterior se falhar
+      console.error('Delete error, reverting:', err);
       setContracts(previousContracts);
       const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
       setError(message);
