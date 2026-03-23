@@ -4,23 +4,17 @@ import { Button } from "./button";
 import { useDarkMode } from "./use-dark-mode";
 import d12NewImage from "./assets/d12-new.png";
 
-const getAppUrl = (port: number | null, path = "") => {
-	if (port === null) return path;
-	const { protocol, hostname } = window.location;
-	return `${protocol}//${hostname}:${port}${path}`;
-};
-
 const projects = [
 	{
 		title: "Warranty Vault",
 		subtitle: "Warranties",
-		href: getAppUrl(8081, "/warranties"),
+		href: "/warranties",
 		icon: ShieldCheck,
 	},
 	{
 		title: "Portfolio Tracker",
 		subtitle: "Investments",
-		href: getAppUrl(8080),
+		href: "/portfolio",
 		icon: ChartLine,
 	},
 	{
@@ -32,7 +26,7 @@ const projects = [
 	{
 		title: "Home Contracts",
 		subtitle: "Contracts",
-		href: getAppUrl(8083),
+		href: "/contracts",
 		icon: FileCheck2,
 	},
 ];
