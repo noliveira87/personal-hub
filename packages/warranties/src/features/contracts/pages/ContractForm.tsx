@@ -13,9 +13,11 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   name: '', category: 'other', provider: '', type: 'other',
   startDate: new Date().toISOString().split('T')[0],
   endDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+  noEndDate: false,
   renewalType: 'auto-renew', billingFrequency: 'monthly',
   price: 0, currency: 'EUR', notes: '', status: 'active',
   alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: [],
+  priceHistoryEnabled: false,
 });
 
 export default function ContractForm() {
@@ -110,9 +112,29 @@ export default function ContractForm() {
               <label className={labelClass}>Start Date</label>
               <input type="date" className={inputClass} value={form.startDate} onChange={e => set('startDate', e.target.value)} />
             </div>
-            <div>
-              <label className={labelClass}>End / Renewal Date</label>
-              <input type="date" className={inputClass} value={form.endDate} onChange={e => set('endDate', e.target.value)} />
+            {!form.noEndDate ? (
+              <div>
+                <label className={labelClass}>End / Renewal Date</label>
+                <input type="date" className={inputClass} value={form.endDate || ''} onChange={e => set('endDate', e.target.value)} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center bg-muted rounded-lg p-3 text-sm text-muted-foreground">
+                No end date (ongoing utility)
+              </div>
+            )}
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-3 text-sm font-medium text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.noEndDate}
+                  onChange={e => {
+                    set('noEndDate', e.target.checked);
+                    if (e.target.checked) set('endDate', null);
+                  }}
+                  className="w-4 h-4"
+                />
+                No end date (utilities like water, gas with no provider alternatives)
+              </label>
             </div>
             <div>
               <label className={labelClass}>Renewal Type</label>
@@ -138,6 +160,17 @@ export default function ContractForm() {
                 <option value="GBP">GBP</option>
                 <option value="CHF">CHF</option>
               </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-3 text-sm font-medium text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.priceHistoryEnabled}
+                  onChange={e => set('priceHistoryEnabled', e.target.checked)}
+                  className="w-4 h-4"
+                />
+                Track monthly prices (for utilities to monitor spending)
+              </label>
             </div>
           </div>
         </div>

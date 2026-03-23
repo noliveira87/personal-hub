@@ -101,7 +101,8 @@ create table if not exists public.contracts (
   provider text not null,
   type text not null,
   start_date text not null,
-  end_date text not null,
+  end_date text,
+  no_end_date boolean default false,
   renewal_type text not null,
   billing_frequency text not null,
   price numeric(12, 2) not null,
@@ -111,6 +112,7 @@ create table if not exists public.contracts (
   alerts jsonb default '[]'::jsonb,
   telegram_alert_enabled boolean default false,
   document_links text[],
+  price_history_enabled boolean default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -147,6 +149,44 @@ with check (true);
 
 create policy "Allow anon delete contracts"
 on public.contracts
+for delete
+to anon
+using (true);
+
+-- CONTRACT PRICE HISTORY TABLE
+create table if not exists public.contract_price_history (
+  id text primary key,
+  contract_id text not null references public.contracts(id) on delete cascade,
+  price numeric(12, 2) not null,
+  currency text not null default 'EUR',
+  date text not null,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists contract_price_history_contract_id_idx on public.contract_price_history (contract_id);
+create index if not exists contract_price_history_date_idx on public.contract_price_history (date desc);
+
+alter table public.contract_price_history enable row level security;
+
+drop policy if exists "Allow anon select price history" on public.contract_price_history;
+drop policy if exists "Allow anon insert price history" on public.contract_price_history;
+drop policy if exists "Allow anon delete price history" on public.contract_price_history;
+
+create policy "Allow anon select price history"
+on public.contract_price_history
+for select
+to anon
+using (true);
+
+create policy "Allow anon insert price history"
+on public.contract_price_history
+for insert
+to anon
+with check (true);
+
+create policy "Allow anon delete price history"
+on public.contract_price_history
 for delete
 to anon
 using (true);

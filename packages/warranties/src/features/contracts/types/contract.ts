@@ -23,6 +23,16 @@ export interface AlertSetting {
   telegramEnabled: boolean;
 }
 
+export interface PriceHistory {
+  id: string;
+  contractId: string;
+  price: number;
+  currency: string;
+  date: string; // ISO date
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Contract {
   id: string;
   name: string;
@@ -30,7 +40,8 @@ export interface Contract {
   provider: string;
   type: ContractType;
   startDate: string;
-  endDate: string;
+  endDate: string | null; // null for no end date (e.g., water, gas utilities)
+  noEndDate: boolean; // explicit flag for utilities without end dates
   renewalType: RenewalType;
   billingFrequency: BillingFrequency;
   price: number;
@@ -40,6 +51,7 @@ export interface Contract {
   alerts: AlertSetting[];
   telegramAlertEnabled: boolean;
   documentLinks: string[];
+  priceHistoryEnabled: boolean; // track price changes over time
   createdAt: string;
   updatedAt: string;
 }

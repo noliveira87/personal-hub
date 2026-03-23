@@ -2,6 +2,7 @@ import { Contract } from '@/features/contracts/types/contract';
 import { differenceInDays, parseISO } from 'date-fns';
 
 export function getDaysUntilExpiry(contract: Contract): number {
+  if (!contract.endDate || contract.noEndDate) return Infinity;
   return differenceInDays(parseISO(contract.endDate), new Date());
 }
 
