@@ -92,3 +92,62 @@ using (true);
 -- 8. Add DELETE policy: USING (bucket_id = 'receipts')
 -- 9. Done! Receipts can now be uploaded and deleted
 
+
+-- CONTRACTS TABLE
+create table if not exists public.contracts (
+  id text primary key,
+  name text not null,
+  category text not null,
+  provider text not null,
+  type text not null,
+  start_date text not null,
+  end_date text not null,
+  renewal_type text not null,
+  billing_frequency text not null,
+  price numeric(12, 2) not null,
+  currency text not null default 'EUR',
+  notes text,
+  status text not null default 'active',
+  alerts jsonb default '[]'::jsonb,
+  telegram_alert_enabled boolean default false,
+  document_links text[],
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists contracts_created_at_idx on public.contracts (created_at desc);
+create index if not exists contracts_end_date_idx on public.contracts (end_date);
+create index if not exists contracts_status_idx on public.contracts (status);
+
+alter table public.contracts enable row level security;
+
+drop policy if exists "Allow anon select contracts" on public.contracts;
+drop policy if exists "Allow anon insert contracts" on public.contracts;
+drop policy if exists "Allow anon update contracts" on public.contracts;
+drop policy if exists "Allow anon delete contracts" on public.contracts;
+
+create policy "Allow anon select contracts"
+on public.contracts
+for select
+to anon
+using (true);
+
+create policy "Allow anon insert contracts"
+on public.contracts
+for insert
+to anon
+with check (true);
+
+create policy "Allow anon update contracts"
+on public.contracts
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow anon delete contracts"
+on public.contracts
+for delete
+to anon
+using (true);
+

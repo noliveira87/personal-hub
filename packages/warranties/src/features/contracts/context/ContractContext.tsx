@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Contract } from '@/features/contracts/types/contract';
 import { sampleContracts } from '@/features/contracts/data/sampleContracts';
+import { loadContractsFromDb, upsertContractsInDb } from '@/features/contracts/lib/contractDb';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface ContractContextType {
   contracts: Contract[];
@@ -11,16 +13,36 @@ interface ContractContextType {
 }
 
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
+const CONTRACTS_STORAGE_KEY = 'contracts.v1';
 
 export function ContractProvider({ children }: { children: React.ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>(() => {
-    const saved = localStorage.getItem('contracts');
+    const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
     return saved ? JSON.parse(saved) : sampleContracts;
   });
 
+  // Load from Supabase on mount if configured
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      (async () => {
+        const dbContracts = await loadContractsFromDb();
+        if (dbContracts && dbContracts.length > 0) {
+          setContracts(dbContracts);
+          localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(dbContracts));
+        } else if (contracts.length > 0) {
+          // Seed DB with current local data
+          await upsertContractsInDb(contracts);
+        }
+      })();
+    }
+  }, []);
+
   const save = useCallback((updated: Contract[]) => {
     setContracts(updated);
-    localStorage.setItem('contracts', JSON.stringify(updated));
+    localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(updated));
+    if (isSupabaseConfigured) {
+      upsertContractsInDb(updated).catch(err => console.error('Failed to save to Supabase:', err));
+    }
   }, []);
 
   const addContract = useCallback((contract: Contract) => {
