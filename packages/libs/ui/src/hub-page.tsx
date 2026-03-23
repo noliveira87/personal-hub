@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ChartLine, FileCheck2, House, Moon, ShieldCheck, Sun } from "lucide-react";
+import { ChartLine, FileCheck2, House, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
 import { Button } from "./button";
 import { useDarkMode } from "./use-dark-mode";
 import d12NewImage from "./assets/d12-new.png";
@@ -43,7 +43,12 @@ export function HubPage() {
 		<main className="min-h-screen bg-background">
 			<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8">
 				<div className="w-full">
-					<div className="mb-2 flex justify-end">
+					<div className="mb-2 flex justify-end gap-1">
+						<Button variant="ghost" size="icon" asChild className="text-muted-foreground">
+							<Link to="/settings" aria-label="Settings">
+								<Settings className="h-4 w-4" />
+							</Link>
+						</Button>
 						<Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
 							{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
 						</Button>

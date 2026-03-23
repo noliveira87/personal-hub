@@ -5,12 +5,12 @@ import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/contracts', label: 'All Contracts', icon: FileText },
-  { to: '/contracts/new', label: 'Add Contract', icon: Plus },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/alerts', label: 'Alerts', icon: Bell },
-  { to: '/insights', label: 'Insights', icon: TrendingUp },
+  { to: '/contracts', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/contracts/list', label: 'All Contracts', icon: FileText },
+  { to: '/contracts/list/new', label: 'Add Contract', icon: Plus },
+  { to: '/contracts/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/contracts/alerts', label: 'Alerts', icon: Bell },
+  { to: '/contracts/insights', label: 'Insights', icon: TrendingUp },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -46,7 +46,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               key={item.to}
               to={item.to}
               end={item.to === '/contracts'}
-              onClick={() => setMobileOpen(false)}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
                 isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'

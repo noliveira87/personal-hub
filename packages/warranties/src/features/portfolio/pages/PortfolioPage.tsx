@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Moon, Sun, ArrowLeft } from "lucide-react";
+import { Plus, Moon, Sun, ArrowLeft, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KpiCards } from "@/features/portfolio/components/KpiCards";
 import { InvestmentSection } from "@/features/portfolio/components/InvestmentSection";
@@ -61,6 +61,9 @@ const Index = () => {
             </Button>
             <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="text-muted-foreground">
+              <Settings className="h-4 w-4" />
             </Button>
             <Button onClick={handleAdd} size="sm" className="gap-1.5">
               <Plus className="h-4 w-4" />

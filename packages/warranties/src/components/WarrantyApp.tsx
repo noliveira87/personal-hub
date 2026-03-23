@@ -17,8 +17,9 @@ import { AddWarrantyDialog } from "@/components/AddWarrantyDialog";
 import { WarrantyCard } from "@/components/WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Moon, Search, ShieldCheck, Sun } from "lucide-react";
+import { ArrowLeft, Moon, Search, Settings, ShieldCheck, Sun } from "lucide-react";
 import { useDarkMode } from "@shared-ui/use-dark-mode";
+import { getAlertSettings, isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -53,6 +54,32 @@ export function WarrantyApp() {
       if (!isMounted) return;
       setWarranties(data);
       setIsLoading(false);
+
+      // Send Telegram alerts for expiring warranties
+      const alertSettings = getAlertSettings();
+      if (alertSettings.warrantiesEnabled && isTelegramConfigured()) {
+        const SENT_KEY = 'd12-warranty-alerts-sent';
+        const sentToday = localStorage.getItem(SENT_KEY) === new Date().toDateString();
+        if (!sentToday) {
+          const expiring = data.filter(w => {
+            if (w.archivedAt) return false;
+            const status = getStatus(w);
+            if (status === 'expired') return false;
+            const days = Math.ceil((new Date(w.expiryDate).getTime() - Date.now()) / 86400000);
+            return days >= 0 && days <= alertSettings.warrantyAlertDays;
+          });
+          if (expiring.length > 0) {
+            const lines = expiring.map(w => {
+              const days = Math.ceil((new Date(w.expiryDate).getTime() - Date.now()) / 86400000);
+              return `• ${w.productName} — <b>${days}d</b> remaining`;
+            }).join('\n');
+            sendTelegramMessage(
+              `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n${lines}\n\n<i>Tap to open: hub.cafofo12.ddns.net/warranties</i>`
+            ).catch(() => null);
+            localStorage.setItem(SENT_KEY, new Date().toDateString());
+          }
+        }
+      }
     };
 
     void fetchWarranties();
@@ -219,6 +246,9 @@ export function WarrantyApp() {
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="text-muted-foreground">
+              <Settings className="h-4 w-4" />
             </Button>
             <AddWarrantyDialog onAdd={addWarranty} />
           </div>
