@@ -23,7 +23,6 @@ import ContractDetail from "./features/contracts/pages/ContractDetail.tsx";
 import CalendarPage from "./features/contracts/pages/CalendarPage.tsx";
 import AlertsPage from "./features/contracts/pages/AlertsPage.tsx";
 import InsightsPage from "./features/contracts/pages/InsightsPage.tsx";
-import SettingsPage from "./features/contracts/pages/SettingsPage.tsx";
 
 const queryClient = new QueryClient();
 
