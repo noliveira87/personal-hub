@@ -13,7 +13,7 @@ export function ContractCard({ contract, index = 0 }: { contract: Contract; inde
 
   return (
     <div
-      onClick={() => navigate(`/contracts/${contract.id}`)}
+      onClick={() => navigate(`/contracts/list/${contract.id}`)}
       className={cn(
         'bg-card rounded-xl p-5 border cursor-pointer transition-all duration-300',
         'hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]',

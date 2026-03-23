@@ -64,7 +64,7 @@ export default function CalendarPage() {
                     return (
                       <div
                         key={c.id}
-                        onClick={() => navigate(`/contracts/${c.id}`)}
+                        onClick={() => navigate(`/contracts/list/${c.id}`)}
                         className={cn(
                           'bg-card rounded-lg p-4 border flex items-center justify-between cursor-pointer',
                           'hover:shadow-md transition-all active:scale-[0.98]',

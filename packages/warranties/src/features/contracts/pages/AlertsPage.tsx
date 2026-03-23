@@ -50,7 +50,7 @@ export default function AlertsPage() {
             return (
               <div
                 key={`${item.contract.id}-${item.alertDay}-${i}`}
-                onClick={() => navigate(`/contracts/${item.contract.id}`)}
+                onClick={() => navigate(`/contracts/list/${item.contract.id}`)}
                 className={cn(
                   'bg-card rounded-xl p-4 border flex items-center gap-4 cursor-pointer',
                   'hover:shadow-md transition-all active:scale-[0.98] animate-fade-up',
