@@ -133,7 +133,7 @@ npm run build
 ### Data Persistence
 - **Warranties**: Supabase PostgreSQL + Storage (for receipts)
 - **Contracts**: Supabase PostgreSQL
-- **Portfolio**: localStorage (future: Supabase)
+- **Portfolio**: Supabase PostgreSQL
 - **Settings**: localStorage (Telegram config, alert preferences)
 
 ## 🔄 Future Enhancements
