@@ -33,7 +33,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
       const data = await loadPriceHistoryForContract(contract.id);
       setHistory(data || []);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao carregar histórico';
+      const message = err instanceof Error ? err.message : 'Error loading price history';
       setError(message);
       console.error('Error loading price history:', err);
     } finally {
@@ -48,7 +48,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
       const price = parseFloat(formData.price);
       
       if (!price || price <= 0) {
-        setError('Preço deve ser maior que 0');
+        setError('Price must be greater than 0');
         return;
       }
 
@@ -64,13 +64,13 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
 
       await addPriceHistory(newEntry);
       
-      // Atualiza o preço atual do contrato
+      // Update the current price of the contract
       onPriceUpdate(price);
       
-      // Recarrega o histórico
+      // Reload the history
       await loadHistory();
       
-      // Limpa o formulário
+      // Clear the form
       setFormData({
         date: new Date().toISOString().split('T')[0],
         price: price.toString(),
@@ -78,7 +78,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
       });
       setShowForm(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao adicionar preço';
+      const message = err instanceof Error ? err.message : 'Error adding price';
       setError(message);
       console.error('Error adding price:', err);
     }
@@ -91,12 +91,12 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
   return (
     <div className="bg-card rounded-xl p-6 border space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-foreground">Histórico de Preços</h2>
+        <h2 className="text-sm font-semibold text-foreground">Price History</h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="text-xs text-primary font-medium flex items-center gap-1 hover:underline"
         >
-          <Plus className="w-3 h-3" /> Adicionar Valor
+          <Plus className="w-3 h-3" /> Add Entry
         </button>
       </div>
 
@@ -110,7 +110,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
         <form onSubmit={handleAddPrice} className="space-y-3 p-4 bg-muted rounded-lg">
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-foreground block mb-1">Data *</label>
+              <label className="text-xs font-medium text-foreground block mb-1">Date *</label>
               <input
                 type="date"
                 value={formData.date}
@@ -120,7 +120,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-foreground block mb-1">Preço ({contract.currency}) *</label>
+              <label className="text-xs font-medium text-foreground block mb-1">Price ({contract.currency}) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -133,11 +133,11 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-foreground block mb-1">Notas (opcional)</label>
+            <label className="text-xs font-medium text-foreground block mb-1">Notes (optional)</label>
             <textarea
               value={formData.notes}
               onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Ex: leitura do contador, período de faturação..."
+              placeholder="e.g., meter reading, billing period..."
               className="w-full px-2.5 py-2 rounded border bg-card text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none"
               rows={2}
             />
@@ -148,13 +148,13 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
               onClick={() => setShowForm(false)}
               className="px-3 py-2 text-xs font-medium border rounded hover:bg-muted transition-colors"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
               className="px-3 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
             >
-              Guardar
+              Save
             </button>
           </div>
         </form>
@@ -162,11 +162,11 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
 
       {loading ? (
         <div className="text-center py-4">
-          <p className="text-xs text-muted-foreground">Carregando histórico...</p>
+          <p className="text-xs text-muted-foreground">Loading price history...</p>
         </div>
       ) : history.length === 0 ? (
         <div className="text-center py-4">
-          <p className="text-xs text-muted-foreground">Sem histórico de preços</p>
+          <p className="text-xs text-muted-foreground">No price history</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -177,7 +177,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
                   {formatCurrency(entry.price, entry.currency)}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(entry.date).toLocaleDateString('pt-PT', {
+                  {new Date(entry.date).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -192,7 +192,7 @@ export function ContractPriceHistory({ contract, onPriceUpdate }: ContractPriceH
 
       <div className="pt-3 border-t text-xs text-muted-foreground">
         <p>
-          <strong>Preço atual:</strong> {formatCurrency(contract.price, contract.currency)}
+          <strong>Current price:</strong> {formatCurrency(contract.price, contract.currency)}
         </p>
       </div>
     </div>

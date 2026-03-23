@@ -60,7 +60,7 @@ export default function ContractDetail() {
       } catch (err) {
         console.error('Delete failed:', err);
         setIsDeleting(false);
-        const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
+        const message = err instanceof Error ? err.message : 'Error deleting contract';
         setError(message);
       }
     }
@@ -73,7 +73,7 @@ export default function ContractDetail() {
         price: newPrice,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao atualizar preço';
+      const message = err instanceof Error ? err.message : 'Error updating price';
       setError(message);
       console.error('Error updating price:', err);
     }

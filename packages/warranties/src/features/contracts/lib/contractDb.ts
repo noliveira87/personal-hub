@@ -66,7 +66,7 @@ function mapContractRow(row: ContractRow): Contract {
 
 export async function loadContractsFromDb(): Promise<Contract[]> {
   if (!supabase) {
-    throw new Error('Base de dados não disponível');
+    throw new Error('Database not available');
   }
 
   try {
@@ -76,7 +76,7 @@ export async function loadContractsFromDb(): Promise<Contract[]> {
       .order('created_at', { ascending: true });
 
     if (error) {
-      throw new Error(`Erro ao carregar contratos: ${error.message}`);
+      throw new Error(`Error loading contracts: ${error.message}`);
     }
 
     console.log('Raw data from DB:', data);
@@ -94,7 +94,7 @@ export async function loadContractsFromDb(): Promise<Contract[]> {
 
 export async function upsertContractsInDb(contracts: Contract[]): Promise<void> {
   if (!supabase) {
-    throw new Error('Base de dados não disponível');
+    throw new Error('Database not available');
   }
 
   const payload = contracts.map((item) => ({
@@ -125,13 +125,13 @@ export async function upsertContractsInDb(contracts: Contract[]): Promise<void> 
     .upsert(payload, { onConflict: 'id' });
 
   if (error) {
-    throw new Error(`Erro ao guardar contratos: ${error.message}`);
+    throw new Error(`Error saving contracts: ${error.message}`);
   }
 }
 
 export async function deleteContractFromDb(contractId: string): Promise<void> {
   if (!supabase) {
-    throw new Error('Base de dados não disponível');
+    throw new Error('Database not available');
   }
 
   console.log('Deleting contract from DB:', contractId);
@@ -145,13 +145,13 @@ export async function deleteContractFromDb(contractId: string): Promise<void> {
 
   if (error) {
     console.error('Delete error:', error);
-    throw new Error(`Erro ao eliminar contrato: ${error.message}`);
+    throw new Error(`Error deleting contract: ${error.message}`);
   }
 }
 
 export async function loadPriceHistoryForContract(contractId: string): Promise<PriceHistory[]> {
   if (!supabase) {
-    throw new Error('Base de dados não disponível');
+    throw new Error('Database not available');
   }
 
   const { data, error } = await supabase
@@ -161,7 +161,7 @@ export async function loadPriceHistoryForContract(contractId: string): Promise<P
     .order('date', { ascending: false });
 
   if (error) {
-    throw new Error(`Erro ao carregar histórico de preços: ${error.message}`);
+    throw new Error(`Error loading price history: ${error.message}`);
   }
 
   return (data ?? []).map((row) => ({
@@ -177,7 +177,7 @@ export async function loadPriceHistoryForContract(contractId: string): Promise<P
 
 export async function addPriceHistory(priceHistory: PriceHistory): Promise<void> {
   if (!supabase) {
-    throw new Error('Base de dados não disponível');
+    throw new Error('Database not available');
   }
 
   const { error } = await supabase
@@ -193,13 +193,13 @@ export async function addPriceHistory(priceHistory: PriceHistory): Promise<void>
     });
 
   if (error) {
-    throw new Error(`Erro ao adicionar histórico de preços: ${error.message}`);
+    throw new Error(`Error adding price history: ${error.message}`);
   }
 }
 
 export async function deletePriceHistory(id: string): Promise<void> {
   if (!supabase) {
-    throw new Error('Base de dados não disponível');
+    throw new Error('Database not available');
   }
 
   const { error } = await supabase
@@ -208,6 +208,6 @@ export async function deletePriceHistory(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) {
-    throw new Error(`Erro ao eliminar histórico de preços: ${error.message}`);
+    throw new Error(`Error deleting price history: ${error.message}`);
   }
 }
