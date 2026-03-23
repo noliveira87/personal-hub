@@ -230,6 +230,34 @@ export async function deletePriceHistoryEntry(id: string): Promise<void> {
     throw new Error(`Failed to delete price history: ${error.message}`);
   }
 }
+
+export async function updatePriceHistoryEntry(
+  id: string,
+  price: number,
+  currency: string,
+  date: string,
+  notes?: string
+): Promise<PriceHistory> {
+  const { data, error } = await supabase
+    .from('contract_price_history')
+    .update({
+      price,
+      currency,
+      date,
+      notes: notes || null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating price history entry:', error);
+    throw new Error(`Failed to update price history: ${error.message}`);
+  }
+
+  return mapRowToPriceHistory(data);
+}
+
 export async function getLatestPriceForContract(contractId: string): Promise<PriceHistory | null> {
   const { data, error } = await supabase
     .from('contract_price_history')

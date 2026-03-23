@@ -54,5 +54,23 @@ export function usePriceHistory(contractId: string) {
     }
   }, []);
 
-  return { history, loading, error, addEntry, deleteEntry, refresh: loadHistory };
+  const updateEntry = useCallback(async (
+    entryId: string,
+    price: number,
+    currency: string,
+    date: string,
+    notes?: string
+  ) => {
+    try {
+      const updated = await contractsDB.updatePriceHistoryEntry(entryId, price, currency, date, notes);
+      setHistory(prev => prev.map(h => h.id === entryId ? updated : h));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update price history entry';
+      setError(message);
+      throw err;
+    }
+  }, []);
+
+  return { history, loading, error, addEntry, deleteEntry, updateEntry, refresh: loadHistory };
 }

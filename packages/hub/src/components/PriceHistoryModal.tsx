@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, X, Trash2 } from 'lucide-react';
+import { Plus, X, Trash2, Edit } from 'lucide-react';
 import { usePriceHistory } from '@/hooks/use-price-history';
 import { formatCurrency } from '@/lib/contractUtils';
 
@@ -18,8 +18,9 @@ export function PriceHistoryModal({
   currency,
   onClose,
 }: PriceHistoryModalProps) {
-  const { history, loading, error, addEntry, deleteEntry } = usePriceHistory(contractId);
+  const { history, loading, error, addEntry, deleteEntry, updateEntry } = usePriceHistory(contractId);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     price: currentPrice,
     date: new Date().toISOString().split('T')[0],
@@ -31,19 +32,46 @@ export function PriceHistoryModal({
     e.preventDefault();
     setSubmitting(true);
     try {
-      await addEntry(formData.price, currency, formData.date, formData.notes || undefined);
+      if (editingId) {
+        // Update existing entry
+        await updateEntry(editingId, formData.price, currency, formData.date, formData.notes || undefined);
+      } else {
+        // Add new entry
+        await addEntry(formData.price, currency, formData.date, formData.notes || undefined);
+      }
       setFormData({
         price: currentPrice,
         date: new Date().toISOString().split('T')[0],
         notes: '',
       });
+      setEditingId(null);
       setShowForm(false);
     } catch (err) {
-      console.error('Error adding price entry:', err);
-      alert('Failed to add price entry. Please try again.');
+      console.error('Error saving price entry:', err);
+      alert('Failed to save price entry. Please try again.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditEntry = (entry: any) => {
+    setEditingId(entry.id);
+    setFormData({
+      price: entry.price,
+      date: entry.date,
+      notes: entry.notes || '',
+    });
+    setShowForm(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({
+      price: currentPrice,
+      date: new Date().toISOString().split('T')[0],
+      notes: '',
+    });
+    setShowForm(false);
   };
 
   const handleDeleteEntry = async (entryId: string) => {
@@ -78,7 +106,9 @@ export function PriceHistoryModal({
           {/* Form */}
           {showForm && (
             <div className="bg-muted/50 rounded-lg p-4 space-y-3 border">
-              <h3 className="text-sm font-semibold text-foreground">Add Price Entry</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {editingId ? 'Edit Price Entry' : 'Add Price Entry'}
+              </h3>
               <form onSubmit={handleAddEntry} className="space-y-3">
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
@@ -118,7 +148,7 @@ export function PriceHistoryModal({
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => setShowForm(false)}
+                    onClick={handleCancelEdit}
                     disabled={submitting}
                     className="px-3 py-1.5 rounded border text-sm hover:bg-muted transition-colors disabled:opacity-50"
                   >
@@ -129,7 +159,7 @@ export function PriceHistoryModal({
                     disabled={submitting}
                     className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
                   >
-                    {submitting ? 'Saving...' : 'Save'}
+                    {submitting ? 'Saving...' : editingId ? 'Update' : 'Save'}
                   </button>
                 </div>
               </form>
@@ -169,12 +199,20 @@ export function PriceHistoryModal({
                       <p className="text-xs text-muted-foreground mt-1">{entry.notes}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDeleteEntry(entry.id)}
-                    className="p-1.5 hover:bg-destructive/10 rounded transition-colors ml-2"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleEditEntry(entry)}
+                      className="p-1.5 hover:bg-primary/10 rounded transition-colors"
+                    >
+                      <Edit className="w-4 h-4 text-primary" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteEntry(entry.id)}
+                      className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
