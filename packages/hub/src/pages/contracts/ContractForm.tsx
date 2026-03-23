@@ -17,7 +17,7 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   renewalType: 'auto-renew', billingFrequency: 'monthly',
   price: 0, currency: 'EUR', notes: null, status: 'active',
   alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: null,
-  priceHistoryEnabled: true,  // Always enabled for price tracking
+  priceHistoryEnabled: true,
 });
 
 export default function ContractForm() {
@@ -46,10 +46,12 @@ export default function ContractForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      // Always set price to 0 - prices are managed only through price history
+      const submitData = { ...form, price: 0 };
       if (isEdit) {
-        await updateContract({ ...form, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: new Date().toISOString() });
+        await updateContract({ ...submitData, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: new Date().toISOString() });
       } else {
-        await addContract(form);
+        await addContract(submitData);
       }
       navigate('/contracts');
     } catch (err) {
