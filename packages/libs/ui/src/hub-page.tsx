@@ -1,36 +1,41 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
 import { ChartLine, FileCheck2, House, Moon, ShieldCheck, Sun } from "lucide-react";
 import { Button } from "./button";
 import { useDarkMode } from "./use-dark-mode";
 import d12NewImage from "./assets/d12-new.png";
 
+const getAppUrl = (port: number | null, path = "") => {
+	if (port === null) return path;
+	const { protocol, hostname } = window.location;
+	return `${protocol}//${hostname}:${port}${path}`;
+};
+
 const projects = [
 	{
 		title: "Warranty Vault",
 		subtitle: "Warranties",
-		to: "/warranties",
+		href: getAppUrl(8081, "/warranties"),
 		icon: ShieldCheck,
 	},
 	{
 		title: "Portfolio Tracker",
 		subtitle: "Investments",
-		to: "/portfolio-tracker",
+		href: getAppUrl(8080),
 		icon: ChartLine,
 	},
 	{
 		title: "Home Expenses",
 		subtitle: "Expenses",
-		to: "/home-expenses",
+		href: "#",
 		icon: House,
 	},
 	{
 		title: "Home Contracts",
 		subtitle: "Contracts",
-		to: "/home-contracts",
+		href: getAppUrl(8083),
 		icon: FileCheck2,
 	},
-] as const;
+];
 
 export function HubPage() {
 	const { isDark, toggleDark } = useDarkMode();
@@ -72,9 +77,9 @@ export function HubPage() {
 										size="icon"
 										className="h-20 w-20 rounded-3xl border-border/70 bg-card text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:h-24 sm:w-24"
 									>
-										<Link to={project.to} aria-label={`Open ${project.title}`}>
+										<a href={project.href} aria-label={`Open ${project.title}`}>
 											<Icon className="h-8 w-8 sm:h-9 sm:w-9" />
-										</Link>
+										</a>
 									</Button>
 									<p className="mt-3 text-sm font-medium text-foreground">{project.title}</p>
 									<p className="text-xs text-muted-foreground">{project.subtitle}</p>
