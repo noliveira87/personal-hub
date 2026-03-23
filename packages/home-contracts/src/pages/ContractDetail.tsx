@@ -2,17 +2,20 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useContracts } from '@/context/ContractContext';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CategoryBadge } from '@/components/CategoryBadge';
+import { PriceHistoryModal } from '@/components/PriceHistoryModal';
 import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel } from '@/lib/contractUtils';
 import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS } from '@/types/contract';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, Edit, Trash2, CalendarDays, Bell, FileText } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 export default function ContractDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getContract, deleteContract } = useContracts();
   const contract = getContract(id!);
+  const [showPriceHistory, setShowPriceHistory] = useState(false);
 
   if (!contract) {
     return (
@@ -26,10 +29,15 @@ export default function ContractDetail() {
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Delete this contract?')) {
-      deleteContract(contract.id);
-      navigate('/contracts');
+      try {
+        await deleteContract(contract.id);
+        navigate('/contracts');
+      } catch (err) {
+        console.error('Error deleting contract:', err);
+        alert('Failed to delete contract. Please try again.');
+      }
     }
   };
 
@@ -39,7 +47,7 @@ export default function ContractDetail() {
     { label: 'Billing', value: BILLING_LABELS[contract.billingFrequency] },
     { label: 'Renewal', value: RENEWAL_LABELS[contract.renewalType] },
     { label: 'Start Date', value: format(parseISO(contract.startDate), 'MMM d, yyyy') },
-    { label: 'End Date', value: format(parseISO(contract.endDate), 'MMM d, yyyy') },
+    { label: 'End Date', value: contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No end date' },
     { label: 'Currency', value: contract.currency },
     { label: 'Status', value: null },
   ];
@@ -93,6 +101,17 @@ export default function ContractDetail() {
             </p>
           </div>
         </div>
+
+        {/* Price history button */}
+        {contract.priceHistoryEnabled && (
+          <button
+            onClick={() => setShowPriceHistory(true)}
+            className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+          >
+            <TrendingUp className="w-4 h-4" />
+            View Price History
+          </button>
+        )}
       </div>
 
       {/* Details grid */}
@@ -148,7 +167,7 @@ export default function ContractDetail() {
       </div>
 
       {/* Documents */}
-      {contract.documentLinks.length > 0 && (
+      {contract.documentLinks && contract.documentLinks.length > 0 && (
         <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '320ms' }}>
           <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
             <FileText className="w-4 h-4" /> Documents
@@ -161,6 +180,17 @@ export default function ContractDetail() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Price History Modal */}
+      {showPriceHistory && (
+        <PriceHistoryModal
+          contractId={contract.id}
+          contractName={contract.name}
+          currentPrice={contract.price}
+          currency={contract.currency}
+          onClose={() => setShowPriceHistory(false)}
+        />
       )}
     </div>
   );

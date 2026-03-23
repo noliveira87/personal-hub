@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { StatusBadge } from '@/features/contracts/components/StatusBadge';
 import { CategoryBadge } from '@/features/contracts/components/CategoryBadge';
+import { ContractPriceHistory } from '@/features/contracts/components/ContractPriceHistory';
 import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel } from '@/features/contracts/lib/contractUtils';
 import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS } from '@/features/contracts/types/contract';
 import { format, parseISO } from 'date-fns';
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils';
 export default function ContractDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getContract, deleteContract, loading, error: contextError } = useContracts();
+  const { getContract, updateContract, deleteContract, loading, error: contextError } = useContracts();
   const contract = getContract(id!);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -62,6 +63,19 @@ export default function ContractDetail() {
         const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
         setError(message);
       }
+    }
+  };
+
+  const handlePriceUpdate = async (newPrice: number) => {
+    try {
+      await updateContract({
+        ...contract,
+        price: newPrice,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao atualizar preço';
+      setError(message);
+      console.error('Error updating price:', err);
     }
   };
 
@@ -150,6 +164,11 @@ export default function ContractDetail() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Price History */}
+      <div style={{ animationDelay: '180ms' }} className="animate-fade-up">
+        <ContractPriceHistory contract={contract} onPriceUpdate={handlePriceUpdate} />
       </div>
 
       {/* Notes */}

@@ -30,18 +30,30 @@ export interface Contract {
   provider: string;
   type: ContractType;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
+  noEndDate: boolean;
   renewalType: RenewalType;
   billingFrequency: BillingFrequency;
   price: number;
   currency: string;
-  notes: string;
+  notes: string | null;
   status: ContractStatus;
   alerts: AlertSetting[];
   telegramAlertEnabled: boolean;
-  documentLinks: string[];
+  documentLinks: string[] | null;
+  priceHistoryEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PriceHistory {
+  id: string;
+  contractId: string;
+  price: number;
+  currency: string;
+  date: string;
+  notes: string | null;
+  createdAt: string;
 }
 
 export const CATEGORY_LABELS: Record<ContractCategory, string> = {

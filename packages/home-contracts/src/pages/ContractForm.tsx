@@ -5,7 +5,7 @@ import {
   Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus,
   CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting,
 } from '@/types/contract';
-import { ArrowLeft, Plus, X } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader } from 'lucide-react';
 
 const defaultAlert = (): AlertSetting => ({ daysBefore: 30, enabled: true, telegramEnabled: false });
 
@@ -13,9 +13,11 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   name: '', category: 'other', provider: '', type: 'other',
   startDate: new Date().toISOString().split('T')[0],
   endDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+  noEndDate: false,
   renewalType: 'auto-renew', billingFrequency: 'monthly',
-  price: 0, currency: 'EUR', notes: '', status: 'active',
-  alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: [],
+  price: 0, currency: 'EUR', notes: null, status: 'active',
+  alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: null,
+  priceHistoryEnabled: false,
 });
 
 export default function ContractForm() {
@@ -23,6 +25,7 @@ export default function ContractForm() {
   const navigate = useNavigate();
   const { addContract, updateContract, getContract } = useContracts();
   const isEdit = !!id;
+  const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState(emptyContract());
 
@@ -39,15 +42,22 @@ export default function ContractForm() {
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = new Date().toISOString();
-    if (isEdit) {
-      updateContract({ ...form, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: now });
-    } else {
-      addContract({ ...form, id: crypto.randomUUID(), createdAt: now, updatedAt: now });
+    setSubmitting(true);
+    try {
+      if (isEdit) {
+        await updateContract({ ...form, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: new Date().toISOString() });
+      } else {
+        await addContract(form);
+      }
+      navigate('/contracts');
+    } catch (err) {
+      console.error('Error saving contract:', err);
+      alert('Failed to save contract. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-    navigate('/contracts');
   };
 
   const addAlert = () => set('alerts', [...form.alerts, defaultAlert()]);
@@ -75,21 +85,21 @@ export default function ContractForm() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Name *</label>
-              <input className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} required placeholder="e.g. Home Insurance" />
+              <input className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} required placeholder="e.g. Home Insurance" disabled={submitting} />
             </div>
             <div>
               <label className={labelClass}>Provider *</label>
-              <input className={inputClass} value={form.provider} onChange={e => set('provider', e.target.value)} required placeholder="e.g. Allianz" />
+              <input className={inputClass} value={form.provider} onChange={e => set('provider', e.target.value)} required placeholder="e.g. Allianz" disabled={submitting} />
             </div>
             <div>
               <label className={labelClass}>Category</label>
-              <select className={inputClass} value={form.category} onChange={e => set('category', e.target.value as ContractCategory)}>
+              <select className={inputClass} value={form.category} onChange={e => set('category', e.target.value as ContractCategory)} disabled={submitting}>
                 {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
               <label className={labelClass}>Type</label>
-              <select className={inputClass} value={form.type} onChange={e => set('type', e.target.value as ContractType)}>
+              <select className={inputClass} value={form.type} onChange={e => set('type', e.target.value as ContractType)} disabled={submitting}>
                 {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
@@ -102,31 +112,37 @@ export default function ContractForm() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Start Date</label>
-              <input type="date" className={inputClass} value={form.startDate} onChange={e => set('startDate', e.target.value)} />
+              <input type="date" className={inputClass} value={form.startDate} onChange={e => set('startDate', e.target.value)} disabled={submitting} />
             </div>
-            <div>
-              <label className={labelClass}>End / Renewal Date</label>
-              <input type="date" className={inputClass} value={form.endDate} onChange={e => set('endDate', e.target.value)} />
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className={labelClass}>End Date</label>
+                <input type="date" className={inputClass} value={form.endDate ?? ''} onChange={e => set('endDate', e.target.value || null)} disabled={form.noEndDate || submitting} />
+              </div>
+              <label className="flex items-center gap-2 text-sm mb-2.5 cursor-pointer">
+                <input type="checkbox" checked={form.noEndDate} onChange={e => set('noEndDate', e.target.checked)} disabled={submitting} />
+                <span>No end date</span>
+              </label>
             </div>
             <div>
               <label className={labelClass}>Renewal Type</label>
-              <select className={inputClass} value={form.renewalType} onChange={e => set('renewalType', e.target.value as RenewalType)}>
+              <select className={inputClass} value={form.renewalType} onChange={e => set('renewalType', e.target.value as RenewalType)} disabled={submitting}>
                 {Object.entries(RENEWAL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
               <label className={labelClass}>Billing Frequency</label>
-              <select className={inputClass} value={form.billingFrequency} onChange={e => set('billingFrequency', e.target.value as BillingFrequency)}>
+              <select className={inputClass} value={form.billingFrequency} onChange={e => set('billingFrequency', e.target.value as BillingFrequency)} disabled={submitting}>
                 {Object.entries(BILLING_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
               <label className={labelClass}>Price</label>
-              <input type="number" step="0.01" min="0" className={inputClass} value={form.price} onChange={e => set('price', parseFloat(e.target.value) || 0)} />
+              <input type="number" step="0.01" min="0" className={inputClass} value={form.price} onChange={e => set('price', parseFloat(e.target.value) || 0)} disabled={submitting} />
             </div>
             <div>
               <label className={labelClass}>Currency</label>
-              <select className={inputClass} value={form.currency} onChange={e => set('currency', e.target.value)}>
+              <select className={inputClass} value={form.currency} onChange={e => set('currency', e.target.value)} disabled={submitting}>
                 <option value="EUR">EUR</option>
                 <option value="USD">USD</option>
                 <option value="GBP">GBP</option>
@@ -136,18 +152,34 @@ export default function ContractForm() {
           </div>
         </div>
 
+        {/* Price tracking */}
+        <div className="bg-card rounded-xl p-6 border space-y-4">
+          <h2 className="text-sm font-semibold text-foreground">Price Tracking</h2>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={form.priceHistoryEnabled} 
+              onChange={e => set('priceHistoryEnabled', e.target.checked)} 
+              disabled={submitting}
+              className="rounded"
+            />
+            <span className="text-sm text-foreground">Track monthly price history</span>
+          </label>
+          <p className="text-xs text-muted-foreground">Enable this to keep a record of price changes over time</p>
+        </div>
+
         {/* Status & notes */}
         <div className="bg-card rounded-xl p-6 border space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Status & Notes</h2>
           <div>
             <label className={labelClass}>Status</label>
-            <select className={inputClass} value={form.status} onChange={e => set('status', e.target.value as ContractStatus)}>
+            <select className={inputClass} value={form.status} onChange={e => set('status', e.target.value as ContractStatus)} disabled={submitting}>
               {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div>
             <label className={labelClass}>Notes</label>
-            <textarea className={inputClass + ' min-h-[80px] resize-y'} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes..." />
+            <textarea className={inputClass + ' min-h-[80px] resize-y'} value={form.notes ?? ''} onChange={e => set('notes', e.target.value || null)} placeholder="Optional notes..." disabled={submitting} />
           </div>
         </div>
 
@@ -155,12 +187,12 @@ export default function ContractForm() {
         <div className="bg-card rounded-xl p-6 border space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground">Alerts</h2>
-            <button type="button" onClick={addAlert} className="text-xs text-primary font-medium flex items-center gap-1 hover:underline">
+            <button type="button" onClick={addAlert} disabled={submitting} className="text-xs text-primary font-medium flex items-center gap-1 hover:underline disabled:opacity-50">
               <Plus className="w-3 h-3" /> Add Alert
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <input type="checkbox" checked={form.telegramAlertEnabled} onChange={e => set('telegramAlertEnabled', e.target.checked)} className="rounded" />
+            <input type="checkbox" checked={form.telegramAlertEnabled} onChange={e => set('telegramAlertEnabled', e.target.checked)} disabled={submitting} className="rounded" />
             <label className="text-sm text-foreground">Enable Telegram notifications</label>
           </div>
           {form.alerts.map((alert, i) => (
@@ -170,18 +202,19 @@ export default function ContractForm() {
                 min="1"
                 value={alert.daysBefore}
                 onChange={e => updateAlert(i, { daysBefore: parseInt(e.target.value) || 1 })}
+                disabled={submitting}
                 className="w-20 px-2 py-1.5 rounded border bg-card text-sm text-center"
               />
               <span className="text-sm text-muted-foreground">days before</span>
               <label className="flex items-center gap-1.5 text-xs ml-auto">
-                <input type="checkbox" checked={alert.enabled} onChange={e => updateAlert(i, { enabled: e.target.checked })} />
+                <input type="checkbox" checked={alert.enabled} onChange={e => updateAlert(i, { enabled: e.target.checked })} disabled={submitting} />
                 App
               </label>
               <label className="flex items-center gap-1.5 text-xs">
-                <input type="checkbox" checked={alert.telegramEnabled} onChange={e => updateAlert(i, { telegramEnabled: e.target.checked })} />
+                <input type="checkbox" checked={alert.telegramEnabled} onChange={e => updateAlert(i, { telegramEnabled: e.target.checked })} disabled={submitting} />
                 Telegram
               </label>
-              <button type="button" onClick={() => removeAlert(i)} className="p-1 hover:bg-muted rounded active:scale-95">
+              <button type="button" onClick={() => removeAlert(i)} disabled={submitting} className="p-1 hover:bg-muted rounded active:scale-95 disabled:opacity-50">
                 <X className="w-3 h-3 text-muted-foreground" />
               </button>
             </div>
@@ -190,9 +223,11 @@ export default function ContractForm() {
 
         <button
           type="submit"
-          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm"
+          disabled={submitting}
+          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {isEdit ? 'Update Contract' : 'Add Contract'}
+          {submitting && <Loader className="w-4 h-4 animate-spin" />}
+          {submitting ? 'Saving...' : isEdit ? 'Update Contract' : 'Add Contract'}
         </button>
       </form>
     </div>

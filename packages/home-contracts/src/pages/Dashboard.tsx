@@ -3,13 +3,36 @@ import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getAnnualEquivalent, formatCurrency } from '@/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, ArrowLeft, Moon, Sun } from 'lucide-react';
+import { Plus, ArrowRight, ArrowLeft, Moon, Sun, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 export default function Dashboard() {
-  const { contracts } = useContracts();
+  const { contracts, loading, error } = useContracts();
   const { isDark, toggleDark } = useDarkMode();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader className="w-4 h-4 animate-spin" />
+          <span className="text-sm">Loading contracts...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <p className="text-destructive font-medium">Error loading contracts</p>
+        <p className="text-muted-foreground text-sm">{error}</p>
+        <Button onClick={() => window.location.reload()} size="sm">
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   const active = contracts.filter(c => c.status === 'active');
   const expiringSoon = active

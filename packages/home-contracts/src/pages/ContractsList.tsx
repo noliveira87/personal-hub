@@ -4,15 +4,38 @@ import { ContractCard } from '@/components/ContractCard';
 import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/types/contract';
 import { getDaysUntilExpiry } from '@/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, Loader } from 'lucide-react';
 
 export default function ContractsList() {
-  const { contracts } = useContracts();
+  const { contracts, loading, error } = useContracts();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<ContractCategory | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<ContractStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'renewal' | 'price' | 'name'>('renewal');
   const [showFilters, setShowFilters] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader className="w-4 h-4 animate-spin" />
+          <span className="text-sm">Loading contracts...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <p className="text-destructive font-medium">Error loading contracts</p>
+        <p className="text-muted-foreground text-sm">{error}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors">
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   const filtered = useMemo(() => {
     let result = contracts.filter(c => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Send, Trash2 } from 'lucide-react';
+import { Bell, Send } from 'lucide-react';
 
 export default function SettingsPage() {
   const [telegramChatId, setTelegramChatId] = useState(() => localStorage.getItem('telegramChatId') || '');
@@ -13,13 +13,6 @@ export default function SettingsPage() {
     localStorage.setItem('telegramBotToken', telegramBotToken);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleReset = () => {
-    if (window.confirm('Reset all data to sample contracts?')) {
-      localStorage.removeItem('contracts');
-      window.location.reload();
-    }
   };
 
   const handleSendTest = async () => {
@@ -145,25 +138,6 @@ export default function SettingsPage() {
           ))}
         </div>
         <p className="text-xs text-muted-foreground">Alert timing can be customized per contract in the edit form.</p>
-      </div>
-
-      {/* Data */}
-      <div className="bg-card rounded-xl p-6 border space-y-4 animate-fade-up" style={{ animationDelay: '240ms' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Data Management</h2>
-            <p className="text-xs text-muted-foreground">Reset app data to sample contracts</p>
-          </div>
-        </div>
-        <button
-          onClick={handleReset}
-          className="px-4 py-2.5 rounded-lg border text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors active:scale-95"
-        >
-          Reset to Sample Data
-        </button>
       </div>
     </div>
   );

@@ -52,25 +52,32 @@ npm run test:watch
 
 ```
 personal-hub/
-├── packages/warranties/         # Main SPA application
-│   ├── src/
-│   │   ├── App.tsx              # Router config
-│   │   ├── components/          # Warranty components
-│   │   ├── features/            # Portfolio + Contracts features
-│   │   ├── lib/                 # Utilities (Telegram, Supabase, etc.)
-│   │   └── pages/               # Top-level pages
-│   ├── public/
-│   │   ├── favicon.png          # Custom favicon
-│   │   └── robots.txt
-│   ├── dist/                    # Build output
-│   └── package.json
+├── packages/
+│   ├── warranties/              # Warranty Vault SPA
+│   │   ├── src/
+│   │   ├── public/
+│   │   ├── supabase/schema.sql  # Database schema
+│   │   └── package.json
+│   │
+│   ├── home-contracts/          # Contracts Manager SPA
+│   │   ├── src/
+│   │   ├── public/
+│   │   └── package.json
+│   │
+│   ├── portfolio/               # Investment Tracker SPA
+│   │   ├── src/
+│   │   ├── public/
+│   │   └── package.json
+│   │
+│   └── libs/ui/                 # Shared UI components & hub page
+│       └── src/
 │
-├── packages/libs/ui/            # Shared UI components & hub page
-│   └── src/
-│
+├── .env.example                 # Environment variables template (shared by all packages)
 ├── package.json                 # Workspace root
 └── README.md
 ```
+
+All packages share the same `.env.local` configured in the root directory.
 
 ## 🔗 App Routes
 
@@ -98,15 +105,22 @@ personal-hub/
 
 ## 📝 Environment Variables
 
-Create `.env` file in `packages/warranties/`:
+All packages (warranties, portfolio, home-contracts) share a single `.env` file in the root:
 
 ```bash
-# Supabase
+# In the root of personal-hub/, create .env.local
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+
+```env
+# Supabase (shared by all packages)
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-For local development, create `.env.local` with the same variables.
+**Note**: This `.env.local` is automatically discovered by all Vite applications in the monorepo. Do not create separate `.env` files in individual packages.
 
 ## 🚢 Deployment
 
