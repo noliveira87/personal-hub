@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Contract } from '@/features/contracts/types/contract';
-import { sampleContracts } from '@/features/contracts/data/sampleContracts';
 import { loadContractsFromDb, upsertContractsInDb } from '@/features/contracts/lib/contractDb';
-import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface ContractContextType {
   contracts: Contract[];
   loading: boolean;
+  error: string | null;
   addContract: (contract: Contract) => void;
   updateContract: (contract: Contract) => void;
   deleteContract: (id: string) => void;
@@ -14,74 +13,53 @@ interface ContractContextType {
 }
 
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
-const CONTRACTS_STORAGE_KEY = 'contracts.v1';
 
 export function ContractProvider({ children }: { children: React.ReactNode }) {
-  const [contracts, setContracts] = useState<Contract[]>(() => {
-    // If Supabase is configured, start empty and load from DB in useEffect
-    if (isSupabaseConfigured) return [];
-    // Otherwise, load from localStorage or use samples
-    const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : sampleContracts;
-  });
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(isSupabaseConfigured);
-
-  // Load from Supabase on mount if configured
+  // Load from Supabase on mount
   useEffect(() => {
-    if (isSupabaseConfigured) {
-      (async () => {
-        try {
-          const dbContracts = await loadContractsFromDb();
-          if (dbContracts && dbContracts.length > 0) {
-            // Supabase has data - use it
-            setContracts(dbContracts);
-            localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(dbContracts));
-          } else {
-            // Supabase is empty, try localStorage
-            const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
-            if (saved) {
-              try {
-                const local = JSON.parse(saved);
-                setContracts(local);
-                // Seed Supabase with local data
-                if (local.length > 0) {
-                  await upsertContractsInDb(local);
-                }
-              } catch (e) {
-                console.error('Error parsing local contracts:', e);
-                setContracts([]);
-              }
-            } else {
-              // No local data either, use empty (no samples)
-              setContracts([]);
-            }
-          }
-        } finally {
-          setLoading(false);
-        }
-      })();
+    (async () => {
+      try {
+        setError(null);
+        const dbContracts = await loadContractsFromDb();
+        setContracts(dbContracts || []);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao carregar contratos da base de dados';
+        setError(message);
+        console.error('Error loading contracts:', err);
+        setContracts([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const save = useCallback(async (updated: Contract[]) => {
+    try {
+      setError(null);
+      setContracts(updated);
+      await upsertContractsInDb(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao guardar contratos';
+      setError(message);
+      console.error('Error saving contracts:', err);
+      throw err;
     }
   }, []);
 
-  const save = useCallback((updated: Contract[]) => {
-    setContracts(updated);
-    localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(updated));
-    if (isSupabaseConfigured) {
-      upsertContractsInDb(updated).catch(err => console.error('Failed to save to Supabase:', err));
-    }
-  }, []);
-
-  const addContract = useCallback((contract: Contract) => {
-    save([...contracts, contract]);
+  const addContract = useCallback(async (contract: Contract) => {
+    return save([...contracts, contract]);
   }, [contracts, save]);
 
-  const updateContract = useCallback((contract: Contract) => {
-    save(contracts.map(c => c.id === contract.id ? contract : c));
+  const updateContract = useCallback(async (contract: Contract) => {
+    return save(contracts.map(c => c.id === contract.id ? contract : c));
   }, [contracts, save]);
 
-  const deleteContract = useCallback((id: string) => {
-    save(contracts.filter(c => c.id !== id));
+  const deleteContract = useCallback(async (id: string) => {
+    return save(contracts.filter(c => c.id !== id));
   }, [contracts, save]);
 
   const getContract = useCallback((id: string) => {
@@ -89,7 +67,7 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
   }, [contracts]);
 
   return (
-    <ContractContext.Provider value={{ contracts, loading, addContract, updateContract, deleteContract, getContract }}>
+    <ContractContext.Provider value={{ contracts, loading, error, addContract, updateContract, deleteContract, getContract }}>
       {children}
     </ContractContext.Provider>
   );

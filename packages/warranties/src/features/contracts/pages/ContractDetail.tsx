@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { StatusBadge } from '@/features/contracts/components/StatusBadge';
 import { CategoryBadge } from '@/features/contracts/components/CategoryBadge';
@@ -11,8 +12,10 @@ import { cn } from '@/lib/utils';
 export default function ContractDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getContract, deleteContract, loading } = useContracts();
+  const { getContract, deleteContract, loading, error: contextError } = useContracts();
   const contract = getContract(id!);
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (loading) {
     return (
@@ -34,10 +37,19 @@ export default function ContractDetail() {
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Delete this contract?')) {
-      deleteContract(contract.id);
-      navigate('/contracts');
+      setError(null);
+      setIsDeleting(true);
+      try {
+        await deleteContract(contract.id);
+        navigate('/contracts');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
+        setError(message);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -58,6 +70,12 @@ export default function ContractDetail() {
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
+      {(contextError || error) && (
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive animate-fade-up">
+          <strong>Erro:</strong> {contextError || error}
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '60ms' }}>
         <div className="flex items-start justify-between gap-4">
@@ -76,7 +94,11 @@ export default function ContractDetail() {
             <Link to={`/contracts/list/edit/${contract.id}`} className="p-2 rounded-lg border hover:bg-muted transition-colors active:scale-95">
               <Edit className="w-4 h-4" />
             </Link>
-            <button onClick={handleDelete} className="p-2 rounded-lg border hover:bg-destructive/10 text-destructive transition-colors active:scale-95">
+            <button 
+              onClick={handleDelete} 
+              disabled={isDeleting}
+              className="p-2 rounded-lg border hover:bg-destructive/10 text-destructive transition-colors active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>

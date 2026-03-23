@@ -114,7 +114,11 @@ create table if not exists public.contracts (
   document_links text[],
   price_history_enabled boolean default false,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint end_date_consistency check (
+    (no_end_date = true AND end_date IS NULL) OR 
+    (no_end_date = false AND end_date IS NOT NULL)
+  )
 );
 
 create index if not exists contracts_created_at_idx on public.contracts (created_at desc);

@@ -23,10 +23,12 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
 export default function ContractForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addContract, updateContract, getContract, loading } = useContracts();
+  const { addContract, updateContract, getContract, loading, error: contextError } = useContracts();
   const isEdit = !!id;
 
   const [form, setForm] = useState(emptyContract());
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isEdit && !loading) {
@@ -41,15 +43,25 @@ export default function ContractForm() {
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = new Date().toISOString();
-    if (isEdit) {
-      updateContract({ ...form, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: now });
-    } else {
-      addContract({ ...form, id: crypto.randomUUID(), createdAt: now, updatedAt: now });
+    setError(null);
+    setIsSaving(true);
+    
+    try {
+      const now = new Date().toISOString();
+      if (isEdit) {
+        await updateContract({ ...form, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: now });
+      } else {
+        await addContract({ ...form, id: crypto.randomUUID(), createdAt: now, updatedAt: now });
+      }
+      navigate('/contracts');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao guardar contrato';
+      setError(message);
+    } finally {
+      setIsSaving(false);
     }
-    navigate('/contracts');
   };
 
   const addAlert = () => set('alerts', [...form.alerts, defaultAlert()]);
@@ -69,6 +81,12 @@ export default function ContractForm() {
       <h1 className="text-2xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '60ms' }}>
         {isEdit ? 'Edit Contract' : 'Add Contract'}
       </h1>
+
+      {(contextError || error) && (
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive animate-fade-up">
+          <strong>Erro:</strong> {contextError || error}
+        </div>
+      )}
 
       {loading && isEdit && (
         <div className="p-4 bg-muted rounded-lg text-center text-sm text-muted-foreground">
@@ -229,9 +247,10 @@ export default function ContractForm() {
 
         <button
           type="submit"
-          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm"
+          disabled={isSaving}
+          className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isEdit ? 'Update Contract' : 'Add Contract'}
+          {isSaving ? 'Guardando...' : (isEdit ? 'Update Contract' : 'Add Contract')}
         </button>
       </form>
     </div>
