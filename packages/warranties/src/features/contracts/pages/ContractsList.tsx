@@ -3,8 +3,7 @@ import { useContracts } from '@/features/contracts/context/ContractContext';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
 import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/features/contracts/types/contract';
 import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
-import { Link } from 'react-router-dom';
-import { Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
 
 export default function ContractsList() {
   const { contracts } = useContracts();
@@ -33,18 +32,9 @@ export default function ContractsList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between animate-fade-up">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">All Contracts</h1>
-          <p className="text-muted-foreground text-sm mt-1">{contracts.length} total</p>
-        </div>
-        <Link
-          to="/contracts/list/new"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Add Contract</span>
-        </Link>
+      <div className="animate-fade-up">
+        <h1 className="text-2xl font-bold text-foreground">All Contracts</h1>
+        <p className="text-muted-foreground text-sm mt-1">{contracts.length} total</p>
       </div>
 
       {/* Search + filter bar */}
