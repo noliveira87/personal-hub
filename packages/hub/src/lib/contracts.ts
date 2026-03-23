@@ -43,7 +43,7 @@ function mapRowToContract(row: ContractRow): Contract {
     alerts: Array.isArray(row.alerts) ? row.alerts as any : [],
     telegramAlertEnabled: row.telegram_alert_enabled,
     documentLinks: row.document_links,
-    priceHistoryEnabled: row.price_history_enabled,
+    priceHistoryEnabled: row.price_history_enabled ?? true, // Default to true if null
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

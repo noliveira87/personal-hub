@@ -19,10 +19,8 @@ export default function ContractDetail() {
   const [showPriceHistory, setShowPriceHistory] = useState(false);
 
   // Fetch latest price from history
-  console.log('ContractDetail rendering, contract:', contract?.id);
   const { priceMap } = usePriceHistoryMap(contract ? [contract.id] : []);
   const latestPrice = contract ? priceMap.get(contract.id) : null;
-  console.log('ContractDetail priceMap:', priceMap, 'latestPrice:', latestPrice);
 
   if (!contract) {
     return (
