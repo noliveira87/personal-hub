@@ -19,7 +19,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isDark, toggleDark } = useDarkMode();
   const navigate = useNavigate();
   const location = useLocation();
-  const showDesktopHeaderToggle = location.pathname !== '/contracts';
 
   return (
     <div className="min-h-screen bg-background">
@@ -91,16 +90,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {showDesktopHeaderToggle && (
-        <div className="hidden lg:flex fixed right-4 top-4 z-40 gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigate('/settings')} className="rounded-lg text-muted-foreground">
-            <Settings className="w-4 h-4" />
-          </Button>
-          <button onClick={toggleDark} className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95">
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-        </div>
-      )}
+      <div className="hidden lg:flex fixed right-4 top-4 z-40 gap-2">
+        <Button variant="outline" size="icon" onClick={() => navigate('/settings')} className="rounded-lg text-muted-foreground">
+          <Settings className="w-4 h-4" />
+        </Button>
+        <button onClick={toggleDark} className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95">
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+      </div>
 
       {/* Main content */}
       <main className="lg:pl-60 pt-14 lg:pt-0 min-h-screen">
