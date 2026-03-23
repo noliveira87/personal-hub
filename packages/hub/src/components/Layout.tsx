@@ -1,16 +1,18 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun, Briefcase, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/contracts', label: 'All Contracts', icon: FileText },
+  { to: '/contracts', label: 'Contracts', icon: FileText },
   { to: '/contracts/new', label: 'Add Contract', icon: Plus },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/insights', label: 'Insights', icon: TrendingUp },
+  { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
+  { to: '/warranties', label: 'Warranties', icon: Shield },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

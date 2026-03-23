@@ -5,11 +5,11 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/home-contracts",
+    "packages/hub",
     "packages/libs/ui"
   ],
   "scripts": {
-    "dev": "npm --prefix packages/home-contracts run dev -- --port 3000",
-    "build": "npm --prefix packages/home-contracts run build"
+    "dev": "npm --prefix packages/hub run dev -- --port 3000",
+    "build": "npm --prefix packages/hub run build"
   }
 }
