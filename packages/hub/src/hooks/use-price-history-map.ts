@@ -13,8 +13,10 @@ export function usePriceHistoryMap(contractIds: string[]) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  console.log('usePriceHistoryMap render - contractIds:', contractIds);
+
   useEffect(() => {
-    console.log('usePriceHistoryMap called with contractIds:', contractIds);
+    console.log('usePriceHistoryMap useEffect - contractIds:', contractIds);
     
     if (!contractIds.length) {
       console.log('No contract IDs provided, skipping load');
@@ -22,18 +24,30 @@ export function usePriceHistoryMap(contractIds: string[]) {
     }
 
     const loadPrices = async () => {
+      console.log('loadPrices starting for:', contractIds);
       setLoading(true);
       setError(null);
       try {
-        console.log('Fetching price history for contracts:', contractIds);
-        const { data, error: err } = await supabase
+        console.log('Fetching from supabase - contract_price_history table');
+        const query = supabase
           .from('contract_price_history')
           .select('id, contract_id, price, currency, date')
           .in('contract_id', contractIds);
 
+        console.log('Query created:', query);
+        const { data, error: err } = await query;
+
+        console.log('Supabase response - error:', err, 'data:', data);
+
         if (err) {
-          console.error('Error loading price history:', err);
+          console.error('Supabase error:', err);
           setError(err.message);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          console.log('No price history data returned from Supabase');
+          setPriceMap(new Map());
           return;
         }
 
@@ -51,7 +65,6 @@ export function usePriceHistoryMap(contractIds: string[]) {
         const seenContracts = new Set<string>();
 
         sortedData.forEach((entry: any) => {
-          // Since data is sorted by date DESC, first entry for each contract is the latest
           if (!seenContracts.has(entry.contract_id)) {
             const latestEntry: LatestPrice = {
               price: entry.price,
@@ -67,7 +80,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
         console.log('Final price map:', latestMap);
         setPriceMap(latestMap);
       } catch (err) {
-        console.error('Error in usePriceHistoryMap:', err);
+        console.error('Exception in usePriceHistoryMap:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setLoading(false);
