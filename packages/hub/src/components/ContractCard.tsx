@@ -59,7 +59,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
         <div className="text-right">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <CalendarDays className="w-3 h-3" />
-            <span>{format(parseISO(contract.endDate), 'MMM d, yyyy')}</span>
+            <span>{contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No date'}</span>
           </div>
           {contract.status !== 'archived' && contract.status !== 'expired' && (
             <p className={cn(

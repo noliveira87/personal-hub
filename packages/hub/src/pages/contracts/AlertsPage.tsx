@@ -79,7 +79,7 @@ export default function AlertsPage() {
                     {CATEGORY_ICONS[item.contract.category]} {item.contract.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {item.contract.provider} · Expires {format(parseISO(item.contract.endDate), 'MMM d, yyyy')}
+                    {item.contract.provider} · Expires {item.contract.endDate ? format(parseISO(item.contract.endDate), 'MMM d, yyyy') : 'No date'}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">

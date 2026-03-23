@@ -22,6 +22,7 @@ export default function CalendarPage() {
       const key = format(month, 'yyyy-MM');
       const end = endOfMonth(month);
       const matching = active.filter(c => {
+        if (!c.endDate) return false;
         const endDate = parseISO(c.endDate);
         return endDate >= month && endDate <= end;
       });
@@ -76,7 +77,7 @@ export default function CalendarPage() {
                           <span className="text-lg">{CATEGORY_ICONS[c.category]}</span>
                           <div>
                             <p className="text-sm font-medium text-foreground">{c.name}</p>
-                            <p className="text-xs text-muted-foreground">{c.provider} · {format(parseISO(c.endDate), 'MMM d')}</p>
+                            <p className="text-xs text-muted-foreground">{c.provider} · {c.endDate ? format(parseISO(c.endDate), 'MMM d') : 'No date'}</p>
                           </div>
                         </div>
                         <div className="text-right">
