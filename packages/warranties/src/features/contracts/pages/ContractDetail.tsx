@@ -25,6 +25,14 @@ export default function ContractDetail() {
     );
   }
 
+  if (isDeleting) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-muted-foreground">Deleting contract...</p>
+      </div>
+    );
+  }
+
   if (!contract) {
     return (
       <div className="text-center py-16">
@@ -43,12 +51,12 @@ export default function ContractDetail() {
       setIsDeleting(true);
       try {
         await deleteContract(contract.id);
+        // Navega imediatamente sem esperar
         navigate('/contracts');
       } catch (err) {
+        setIsDeleting(false);
         const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
         setError(message);
-      } finally {
-        setIsDeleting(false);
       }
     }
   };

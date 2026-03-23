@@ -71,17 +71,6 @@ export async function upsertContractsInDb(contracts: Contract[]): Promise<void> 
     throw new Error('Base de dados não disponível');
   }
 
-  if (!contracts.length) {
-    const { error } = await supabase
-      .from('contracts')
-      .delete()
-      .neq('id', '');
-    if (error) {
-      throw new Error(`Erro ao eliminar contratos: ${error.message}`);
-    }
-    return;
-  }
-
   const payload = contracts.map((item) => ({
     id: item.id,
     name: item.name,
@@ -111,6 +100,21 @@ export async function upsertContractsInDb(contracts: Contract[]): Promise<void> 
 
   if (error) {
     throw new Error(`Erro ao guardar contratos: ${error.message}`);
+  }
+}
+
+export async function deleteContractFromDb(contractId: string): Promise<void> {
+  if (!supabase) {
+    throw new Error('Base de dados não disponível');
+  }
+
+  const { error } = await supabase
+    .from('contracts')
+    .delete()
+    .eq('id', contractId);
+
+  if (error) {
+    throw new Error(`Erro ao eliminar contrato: ${error.message}`);
   }
 }
 

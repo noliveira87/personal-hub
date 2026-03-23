@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Contract } from '@/features/contracts/types/contract';
-import { loadContractsFromDb, upsertContractsInDb } from '@/features/contracts/lib/contractDb';
+import { loadContractsFromDb, upsertContractsInDb, deleteContractFromDb } from '@/features/contracts/lib/contractDb';
 
 interface ContractContextType {
   contracts: Contract[];
@@ -37,7 +37,7 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const save = useCallback(async (updated: Contract[]) => {
+  const saveToDb = useCallback(async (updated: Contract[]) => {
     try {
       setError(null);
       setContracts(updated);
@@ -51,16 +51,30 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addContract = useCallback(async (contract: Contract) => {
-    return save([...contracts, contract]);
-  }, [contracts, save]);
+    return saveToDb([...contracts, contract]);
+  }, [contracts, saveToDb]);
 
   const updateContract = useCallback(async (contract: Contract) => {
-    return save(contracts.map(c => c.id === contract.id ? contract : c));
-  }, [contracts, save]);
+    return saveToDb(contracts.map(c => c.id === contract.id ? contract : c));
+  }, [contracts, saveToDb]);
 
   const deleteContract = useCallback(async (id: string) => {
-    return save(contracts.filter(c => c.id !== id));
-  }, [contracts, save]);
+    const previousContracts = contracts;
+    try {
+      setError(null);
+      // Remove imediatamente do estado local (otimista)
+      setContracts(prev => prev.filter(c => c.id !== id));
+      // Delete da BD
+      await deleteContractFromDb(id);
+    } catch (err) {
+      // Revert ao estado anterior se falhar
+      setContracts(previousContracts);
+      const message = err instanceof Error ? err.message : 'Erro ao eliminar contrato';
+      setError(message);
+      console.error('Error deleting contract:', err);
+      throw err;
+    }
+  }, [contracts]);
 
   const getContract = useCallback((id: string) => {
     return contracts.find(c => c.id === id);
