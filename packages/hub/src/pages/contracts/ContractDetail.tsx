@@ -19,7 +19,13 @@ export default function ContractDetail() {
   const [showPriceHistory, setShowPriceHistory] = useState(false);
 
   // Fetch latest price from history
-  const { priceMap } = usePriceHistoryMap(useMemo(() => contract ? [contract.id] : [], [contract?.id]));
+  const contractIdArray = useMemo(() => {
+    console.log('ContractDetail: useMemo creating contractIdArray, contract:', contract?.id);
+    return contract ? [contract.id] : [];
+  }, [contract?.id]);
+  
+  const { priceMap } = usePriceHistoryMap(contractIdArray);
+  console.log('ContractDetail: priceMap:', priceMap, 'latestPrice:', priceMap.get(contract?.id || ''));
   const latestPrice = contract ? priceMap.get(contract.id) : null;
 
   if (!contract) {

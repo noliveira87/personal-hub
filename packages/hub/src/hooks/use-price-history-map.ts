@@ -14,12 +14,18 @@ export function usePriceHistoryMap(contractIds: string[]) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!contractIds.length) return;
+    console.log('usePriceHistoryMap called with contractIds:', contractIds);
+    
+    if (!contractIds.length) {
+      console.log('No contract IDs provided, skipping load');
+      return;
+    }
 
     const loadPrices = async () => {
       setLoading(true);
       setError(null);
       try {
+        console.log('Fetching price history for contracts:', contractIds);
         const { data, error: err } = await supabase
           .from('contract_price_history')
           .select('id, contract_id, price, currency, date')
@@ -30,6 +36,8 @@ export function usePriceHistoryMap(contractIds: string[]) {
           setError(err.message);
           return;
         }
+
+        console.log('Raw data from Supabase:', data);
 
         // Sort by date DESC to ensure latest prices come first
         const sortedData = (data || []).sort((a: any, b: any) => {
@@ -56,6 +64,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
           }
         });
 
+        console.log('Final price map:', latestMap);
         setPriceMap(latestMap);
       } catch (err) {
         console.error('Error in usePriceHistoryMap:', err);
