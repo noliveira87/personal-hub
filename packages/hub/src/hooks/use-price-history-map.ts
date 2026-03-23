@@ -23,9 +23,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
         const { data, error: err } = await supabase
           .from('contract_price_history')
           .select('id, contract_id, price, currency, date')
-          .in('contract_id', contractIds)
-          .order('contract_id', { ascending: true })
-          .order('date', { ascending: false });
+          .in('contract_id', contractIds);
 
         if (err) {
           console.error('Error loading price history:', err);
@@ -33,18 +31,19 @@ export function usePriceHistoryMap(contractIds: string[]) {
           return;
         }
 
-        // Get latest price for each contract
+        // Build map with latest price for each contract
         const latestMap = new Map<string, LatestPrice>();
-        const seenContracts = new Set<string>();
 
         (data || []).forEach((entry: any) => {
-          if (!seenContracts.has(entry.contract_id)) {
+          const existing = latestMap.get(entry.contract_id);
+          
+          // Compare dates and keep the most recent
+          if (!existing || new Date(entry.date) > new Date(existing.date)) {
             latestMap.set(entry.contract_id, {
               price: entry.price,
               date: entry.date,
               currency: entry.currency,
             });
-            seenContracts.add(entry.contract_id);
           }
         });
 
@@ -58,7 +57,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
     };
 
     loadPrices();
-  }, [contractIds.join(',')]);;
+  }, [contractIds.join(',')]);;;
 
   return { priceMap, loading, error };
 }
