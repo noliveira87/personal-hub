@@ -221,7 +221,7 @@ export function WarrantyApp() {
     <div className="min-h-screen bg-background">
       {/* Fixed header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="flex items-center justify-between h-16 px-4 lg:px-6 max-w-lg mx-auto w-full">
+        <div className="flex items-center justify-between h-16 px-4 lg:px-6">
           <Button
             size="sm"
             variant="outline"
@@ -231,15 +231,13 @@ export function WarrantyApp() {
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back to projects</span>
           </Button>
-          <div className="flex items-center gap-3 flex-1 justify-end">
-            <div className="hidden sm:flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <ShieldCheck className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold">D12 Warranties</h1>
-              </div>
+          <div className="hidden sm:flex items-center gap-3 flex-1 justify-center">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <ShieldCheck className="h-4 w-4 text-primary" />
             </div>
+            <h1 className="text-base font-bold">D12 Warranties</h1>
+          </div>
+          <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
