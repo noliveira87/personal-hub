@@ -1,21 +1,23 @@
 # Personal Hub
 
-A unified personal management dashboard built with React, TypeScript and Vite. Consolidates warranty management, investment tracking, and contract management into a single SPA with Telegram notifications and dark mode support.
+A unified personal management dashboard built with React, TypeScript and Vite. Single SPA with 4 main sections: Dashboard, Contracts, Portfolio, and Warranties. Features Supabase integration, price history tracking, and Telegram notifications.
 
 ## 🎯 Features
 
-- **Warranty Vault** - Manage product warranties with expiry alerts and Telegram notifications
-- **Portfolio Tracker** - Track investments and monitor performance
-- **Contracts Manager** - Manage contracts with calendar view, alerts, and performance insights
-- **Global Settings** - Centralized Telegram bot configuration and per-feature alert toggles
+- **Dashboard** - Central hub with overview and statistics
+- **Contracts** - CRUD management with calendar view, alerts, and performance insights
+- **Portfolio** - Investment tracking (coming soon)
+- **Warranties** - Warranty management (coming soon)
+- **Price History** - Track price changes over time for contracts
+- **Telegram Alerts** - Real-time notifications for contract events
 - **Dark Mode** - System-wide dark/light theme toggle
-- **Telegram Alerts** - Real-time notifications for warranty expiry and contract events
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js >= 18
 - npm or bun
+- Supabase account (for backend)
 
 ### Installation
 
@@ -24,10 +26,19 @@ A unified personal management dashboard built with React, TypeScript and Vite. C
 npm install
 ```
 
+### Environment Setup
+
+Create `.env.local` in the root directory:
+
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_key
+```
+
 ### Development
 
 ```bash
-# Start development server (http://localhost:5173)
+# Start development server (http://localhost:3000)
 npm run dev
 ```
 
@@ -38,46 +49,54 @@ npm run dev
 npm run build
 ```
 
-### Testing
-
-```bash
-# Run tests
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-```
-
 ## 📂 Project Structure
 
 ```
 personal-hub/
 ├── packages/
-│   ├── warranties/              # Warranty Vault SPA
+│   ├── hub/                     # Main app with 4 sections
 │   │   ├── src/
-│   │   ├── public/
-│   │   ├── supabase/schema.sql  # Database schema
+│   │   │   ├── pages/
+│   │   │   │   ├── hub/             # Dashboard section
+│   │   │   │   ├── contracts/       # Contracts section (CRUD, calendar, alerts, insights)
+│   │   │   │   ├── portfolio/       # Portfolio section
+│   │   │   │   └── warranties/      # Warranties section
+│   │   │   ├── components/          # Shared components
+│   │   │   ├── context/             # State management
+│   │   │   └── lib/                 # Utils and API layer
 │   │   └── package.json
 │   │
-│   ├── home-contracts/          # Contracts Manager SPA
-│   │   ├── src/
-│   │   ├── public/
-│   │   └── package.json
-│   │
-│   ├── portfolio/               # Investment Tracker SPA
-│   │   ├── src/
-│   │   ├── public/
-│   │   └── package.json
-│   │
-│   └── libs/ui/                 # Shared UI components & hub page
+│   └── libs/ui/                 # Shared UI components
 │       └── src/
 │
-├── .env.example                 # Environment variables template (shared by all packages)
+├── .env.example                 # Environment variables template
+├── .env.local                   # Shared environment (not in git)
 ├── package.json                 # Workspace root
 └── README.md
 ```
 
-All packages share the same `.env.local` configured in the root directory.
+## 🗄️ Database
+
+Supabase PostgreSQL schema includes:
+
+- `contracts` - Contract data with price tracking
+- `contract_price_history` - Historical price entries for contracts
+
+See [SUPABASE_SETUP.md](packages/hub/SUPABASE_SETUP.md) for detailed schema.
+
+## 📦 Deployment
+
+Single build command deploys the app to production:
+
+```bash
+deploy-hub
+```
+
+This runs:
+1. Git pull from origin/main
+2. npm run build
+3. PM2 restart
+
 
 ## 🔗 App Routes
 
