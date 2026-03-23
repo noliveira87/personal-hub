@@ -17,6 +17,9 @@ const CONTRACTS_STORAGE_KEY = 'contracts.v1';
 
 export function ContractProvider({ children }: { children: React.ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>(() => {
+    // If Supabase is configured, start empty and load from DB in useEffect
+    if (isSupabaseConfigured) return [];
+    // Otherwise, load from localStorage or use samples
     const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
     return saved ? JSON.parse(saved) : sampleContracts;
   });
@@ -27,11 +30,28 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
       (async () => {
         const dbContracts = await loadContractsFromDb();
         if (dbContracts && dbContracts.length > 0) {
+          // Supabase has data - use it
           setContracts(dbContracts);
           localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(dbContracts));
-        } else if (contracts.length > 0) {
-          // Seed DB with current local data
-          await upsertContractsInDb(contracts);
+        } else {
+          // Supabase is empty, try localStorage
+          const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
+          if (saved) {
+            try {
+              const local = JSON.parse(saved);
+              setContracts(local);
+              // Seed Supabase with local data
+              if (local.length > 0) {
+                await upsertContractsInDb(local);
+              }
+            } catch (e) {
+              console.error('Error parsing local contracts:', e);
+              setContracts([]);
+            }
+          } else {
+            // No local data either, use empty (no samples)
+            setContracts([]);
+          }
         }
       })();
     }
