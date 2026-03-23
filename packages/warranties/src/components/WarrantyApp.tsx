@@ -219,31 +219,27 @@ export function WarrantyApp() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-lg mx-auto px-4 py-8 pb-24">
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 mb-4"
-          onClick={() => navigate('/')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Back to projects</span>
-        </Button>
-
-        {/* Header */}
-        <div className="fade-in-up mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ShieldCheck className="h-5 w-5 text-primary" />
+      {/* Fixed header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+        <div className="flex items-center justify-between h-16 px-4 lg:px-6 max-w-lg mx-auto w-full">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => navigate('/')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to projects</span>
+          </Button>
+          <div className="flex items-center gap-3 flex-1 justify-end">
+            <div className="hidden sm:flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold">D12 Warranties</h1>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold leading-tight">D12 Warranties</h1>
-              <p className="text-sm text-muted-foreground">
-                {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
@@ -251,6 +247,21 @@ export function WarrantyApp() {
               <Settings className="h-4 w-4" />
             </Button>
             <AddWarrantyDialog onAdd={addWarranty} />
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-lg mx-auto px-4 pt-20 pb-24">
+        {/* Mobile title */}
+        <div className="flex items-center gap-3 mb-6 sm:hidden">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold leading-tight">D12 Warranties</h1>
+            <p className="text-sm text-muted-foreground">
+              {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
+            </p>
           </div>
         </div>
 
