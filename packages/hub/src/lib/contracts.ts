@@ -230,3 +230,21 @@ export async function deletePriceHistoryEntry(id: string): Promise<void> {
     throw new Error(`Failed to delete price history: ${error.message}`);
   }
 }
+export async function getLatestPriceForContract(contractId: string): Promise<PriceHistory | null> {
+  const { data, error } = await supabase
+    .from('contract_price_history')
+    .select('*')
+    .eq('contract_id', contractId)
+    .order('date', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error getting latest price:', error);
+    throw new Error(`Failed to get latest price: ${error.message}`);
+  }
+
+  if (!data) return null;
+
+  return mapRowToPriceHistory(data);
+}

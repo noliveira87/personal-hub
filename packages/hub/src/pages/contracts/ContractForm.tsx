@@ -17,7 +17,7 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   renewalType: 'auto-renew', billingFrequency: 'monthly',
   price: 0, currency: 'EUR', notes: null, status: 'active',
   alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: null,
-  priceHistoryEnabled: false,
+  priceHistoryEnabled: true,  // Always enabled for price tracking
 });
 
 export default function ContractForm() {
@@ -137,10 +137,6 @@ export default function ContractForm() {
               </select>
             </div>
             <div>
-              <label className={labelClass}>Price</label>
-              <input type="number" step="0.01" min="0" className={inputClass} value={form.price} onChange={e => set('price', parseFloat(e.target.value) || 0)} disabled={submitting} />
-            </div>
-            <div>
               <label className={labelClass}>Currency</label>
               <select className={inputClass} value={form.currency} onChange={e => set('currency', e.target.value)} disabled={submitting}>
                 <option value="EUR">EUR</option>
@@ -152,21 +148,7 @@ export default function ContractForm() {
           </div>
         </div>
 
-        {/* Price tracking */}
-        <div className="bg-card rounded-xl p-6 border space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Price Tracking</h2>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={form.priceHistoryEnabled} 
-              onChange={e => set('priceHistoryEnabled', e.target.checked)} 
-              disabled={submitting}
-              className="rounded"
-            />
-            <span className="text-sm text-foreground">Track monthly price history</span>
-          </label>
-          <p className="text-xs text-muted-foreground">Enable this to keep a record of price changes over time</p>
-        </div>
+        {/* Price History - now mandatory for all contracts */}
 
         {/* Status & notes */}
         <div className="bg-card rounded-xl p-6 border space-y-4">
@@ -180,6 +162,13 @@ export default function ContractForm() {
           <div>
             <label className={labelClass}>Notes</label>
             <textarea className={inputClass + ' min-h-[80px] resize-y'} value={form.notes ?? ''} onChange={e => set('notes', e.target.value || null)} placeholder="Optional notes..." disabled={submitting} />
+          </div>
+          
+          {/* Info about price */}
+          <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-400">
+              <strong>💡 Tip:</strong> After creating the contract, add the current price via the price history section. The latest price will display as the contract's current price.
+            </p>
           </div>
         </div>
 

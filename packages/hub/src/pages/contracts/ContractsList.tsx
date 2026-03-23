@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useContracts } from '@/context/ContractContext';
 import { ContractCard } from '@/components/ContractCard';
 import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/types/contract';
 import { getDaysUntilExpiry } from '@/lib/contractUtils';
+import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { Link } from 'react-router-dom';
 import { Plus, Search, SlidersHorizontal, Loader } from 'lucide-react';
 
@@ -13,6 +14,10 @@ export default function ContractsList() {
   const [statusFilter, setStatusFilter] = useState<ContractStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'renewal' | 'price' | 'name'>('renewal');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Get contract IDs for price history fetching
+  const contractIds = useMemo(() => contracts.map(c => c.id), [contracts]);
+  const { priceMap, loading: pricesLoading } = usePriceHistoryMap(contractIds);
 
   if (loading) {
     return (
@@ -129,7 +134,12 @@ export default function ContractsList() {
       {/* Results */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((contract, i) => (
-          <ContractCard key={contract.id} contract={contract} index={i} />
+          <ContractCard 
+            key={contract.id} 
+            contract={contract} 
+            index={i}
+            latestPrice={priceMap.get(contract.id)}
+          />
         ))}
       </div>
 

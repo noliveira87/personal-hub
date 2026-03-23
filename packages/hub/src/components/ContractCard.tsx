@@ -6,10 +6,21 @@ import { useNavigate } from 'react-router-dom';
 import { CalendarDays } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
-export function ContractCard({ contract, index = 0 }: { contract: Contract; index?: number }) {
+interface LatestPrice {
+  price: number;
+  date: string;
+  currency: string;
+}
+
+export function ContractCard({ contract, index = 0, latestPrice }: { contract: Contract; index?: number; latestPrice?: LatestPrice }) {
   const navigate = useNavigate();
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
+  
+  // Use latest price from history, fallback to contract price
+  const displayPrice = latestPrice?.price ?? contract.price;
+  const displayCurrency = latestPrice?.currency ?? contract.currency;
+  const priceDate = latestPrice?.date;
 
   return (
     <div
@@ -36,7 +47,12 @@ export function ContractCard({ contract, index = 0 }: { contract: Contract; inde
       <div className="mt-4 flex items-end justify-between">
         <div>
           <p className="text-lg font-bold tabular-nums text-foreground">
-            {formatCurrency(contract.price, contract.currency)}
+            {formatCurrency(displayPrice, displayCurrency)}
+            {priceDate && (
+              <span className="text-xs font-normal text-muted-foreground ml-2">
+                • {format(parseISO(priceDate), 'MMM d')}
+              </span>
+            )}
             <span className="text-xs font-normal text-muted-foreground ml-1">/ {BILLING_LABELS[contract.billingFrequency].toLowerCase()}</span>
           </p>
         </div>

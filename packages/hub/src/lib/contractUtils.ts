@@ -5,21 +5,23 @@ export function getDaysUntilExpiry(contract: Contract): number {
   return differenceInDays(parseISO(contract.endDate), new Date());
 }
 
-export function getMonthlyEquivalent(contract: Contract): number {
+export function getMonthlyEquivalent(contract: Contract, price?: number): number {
+  const contractPrice = price ?? contract.price;
   switch (contract.billingFrequency) {
-    case 'monthly': return contract.price;
-    case 'quarterly': return contract.price / 3;
-    case 'yearly': return contract.price / 12;
+    case 'monthly': return contractPrice;
+    case 'quarterly': return contractPrice / 3;
+    case 'yearly': return contractPrice / 12;
     case 'one-time': return 0;
   }
 }
 
-export function getAnnualEquivalent(contract: Contract): number {
+export function getAnnualEquivalent(contract: Contract, price?: number): number {
+  const contractPrice = price ?? contract.price;
   switch (contract.billingFrequency) {
-    case 'monthly': return contract.price * 12;
-    case 'quarterly': return contract.price * 4;
-    case 'yearly': return contract.price;
-    case 'one-time': return contract.price;
+    case 'monthly': return contractPrice * 12;
+    case 'quarterly': return contractPrice * 4;
+    case 'yearly': return contractPrice;
+    case 'one-time': return contractPrice;
   }
 }
 

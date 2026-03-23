@@ -4,11 +4,12 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { CategoryBadge } from '@/components/CategoryBadge';
 import { PriceHistoryModal } from '@/components/PriceHistoryModal';
 import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel } from '@/lib/contractUtils';
+import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS } from '@/types/contract';
 import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 export default function ContractDetail() {
   const { id } = useParams();
@@ -16,6 +17,10 @@ export default function ContractDetail() {
   const { getContract, deleteContract } = useContracts();
   const contract = getContract(id!);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
+
+  // Fetch latest price from history
+  const { priceMap } = usePriceHistoryMap(useMemo(() => contract ? [contract.id] : [], [contract?.id]));
+  const latestPrice = contract ? priceMap.get(contract.id) : null;
 
   if (!contract) {
     return (
@@ -86,7 +91,13 @@ export default function ContractDetail() {
         <div className="mt-6 flex flex-wrap gap-6">
           <div>
             <p className="text-sm text-muted-foreground">Price</p>
-            <p className="text-2xl font-bold tabular-nums">{formatCurrency(contract.price, contract.currency)}
+            <p className="text-2xl font-bold tabular-nums">
+              {latestPrice ? formatCurrency(latestPrice.price, latestPrice.currency) : 'No price'}
+              {latestPrice && (
+                <span className="text-xs font-normal text-muted-foreground ml-2">
+                  • {format(parseISO(latestPrice.date), 'MMM d')}
+                </span>
+              )}
               <span className="text-sm font-normal text-muted-foreground ml-1">/ {BILLING_LABELS[contract.billingFrequency].toLowerCase()}</span>
             </p>
           </div>
@@ -187,7 +198,7 @@ export default function ContractDetail() {
         <PriceHistoryModal
           contractId={contract.id}
           contractName={contract.name}
-          currentPrice={contract.price}
+          currentPrice={latestPrice?.price ?? 0}
           currency={contract.currency}
           onClose={() => setShowPriceHistory(false)}
         />
