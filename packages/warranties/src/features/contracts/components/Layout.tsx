@@ -8,7 +8,6 @@ import { useDarkMode } from '@shared-ui/use-dark-mode';
 const navItems = [
   { to: '/contracts', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/contracts/list', label: 'All Contracts', icon: FileText },
-  { to: '/contracts/list/new', label: 'Add Contract', icon: Plus },
   { to: '/contracts/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/contracts/alerts', label: 'Alerts', icon: Bell },
   { to: '/contracts/insights', label: 'Insights', icon: TrendingUp },
