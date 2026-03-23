@@ -24,6 +24,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
           .from('contract_price_history')
           .select('id, contract_id, price, currency, date')
           .in('contract_id', contractIds)
+          .order('contract_id', { ascending: true })
           .order('date', { ascending: false });
 
         if (err) {
@@ -57,7 +58,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
     };
 
     loadPrices();
-  }, [contractIds.join(',')]);
+  }, [contractIds.join(',')]);;
 
   return { priceMap, loading, error };
 }
