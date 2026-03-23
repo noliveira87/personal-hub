@@ -101,7 +101,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="lg:pl-60 pt-14 lg:pt-0 min-h-screen">
-        <div className="container py-6 lg:py-8 max-w-6xl">
+        <div className="hidden lg:flex container pt-6 pb-2 max-w-6xl items-center justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="text-muted-foreground">
+            <Settings className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
+        </div>
+        <div className="container py-6 lg:py-8 max-w-6xl lg:pt-2">
           {children}
         </div>
       </main>
