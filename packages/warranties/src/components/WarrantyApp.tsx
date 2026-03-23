@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   addWarrantyToDb,
   archiveWarrantyInDb,
@@ -41,6 +42,7 @@ export function WarrantyApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const { isDark, toggleDark } = useDarkMode();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
@@ -195,7 +197,7 @@ export function WarrantyApp() {
           size="sm"
           variant="outline"
           className="gap-1.5 mb-4"
-          onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}`}
+          onClick={() => navigate('/')}
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back to projects</span>

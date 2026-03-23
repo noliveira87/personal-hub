@@ -1,7 +1,7 @@
 {
   "name": "personal-hub-monorepo",
   "version": "1.0.0",
-  "description": "Unified personal management hub - Warranties & Portfolio",
+  "description": "Unified personal management hub",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -11,18 +11,12 @@
     "packages/libs/ui"
   ],
   "scripts": {
-    "dev:warranties": "npm --prefix packages/warranties run dev -- --port 8081",
+    "dev": "npm --prefix packages/warranties run dev -- --port 8081",
+    "build": "npm --prefix packages/warranties run build",
+    "build:all": "npm run build && npm --prefix packages/portfolio run build && npm --prefix packages/home-contracts run build",
+    "test": "npm --prefix packages/warranties run test",
+    "lint": "npm --prefix packages/warranties run lint",
     "dev:portfolio": "npm --prefix packages/portfolio run dev -- --port 8080",
-    "dev:home-contracts": "npm --prefix packages/home-contracts run dev -- --port 8083",
-    "build:warranties": "npm --prefix packages/warranties run build",
-    "build:portfolio": "npm --prefix packages/portfolio run build",
-    "build:home-contracts": "npm --prefix packages/home-contracts run build",
-    "build": "npm run build:warranties && npm run build:portfolio && npm run build:home-contracts",
-    "test:warranties": "npm --prefix packages/warranties run test",
-    "test:portfolio": "npm --prefix packages/portfolio run test",
-    "test:home-contracts": "npm --prefix packages/home-contracts run test",
-    "lint:warranties": "npm --prefix packages/warranties run lint",
-    "lint:portfolio": "npm --prefix packages/portfolio run lint",
-    "lint:home-contracts": "npm --prefix packages/home-contracts run lint"
+    "dev:home-contracts": "npm --prefix packages/home-contracts run dev -- --port 8083"
   }
 }

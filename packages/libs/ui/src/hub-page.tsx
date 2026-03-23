@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { ChartLine, FileCheck2, House, Moon, ShieldCheck, Sun } from "lucide-react";
 import { Button } from "./button";
 import { useDarkMode } from "./use-dark-mode";
@@ -8,28 +9,28 @@ const projects = [
 	{
 		title: "Warranty Vault",
 		subtitle: "Warranties",
-		href: "/warranties",
+		to: "/warranties",
 		icon: ShieldCheck,
 	},
 	{
 		title: "Portfolio Tracker",
 		subtitle: "Investments",
-		href: "/portfolio",
+		to: "/portfolio",
 		icon: ChartLine,
 	},
 	{
 		title: "Home Expenses",
 		subtitle: "Expenses",
-		href: "#",
+		to: "#",
 		icon: House,
 	},
 	{
 		title: "Home Contracts",
 		subtitle: "Contracts",
-		href: "/contracts",
+		to: "/contracts",
 		icon: FileCheck2,
 	},
-];
+] as const;
 
 export function HubPage() {
 	const { isDark, toggleDark } = useDarkMode();
@@ -71,9 +72,9 @@ export function HubPage() {
 										size="icon"
 										className="h-20 w-20 rounded-3xl border-border/70 bg-card text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:h-24 sm:w-24"
 									>
-										<a href={project.href} aria-label={`Open ${project.title}`}>
+										<Link to={project.to} aria-label={`Open ${project.title}`}>
 											<Icon className="h-8 w-8 sm:h-9 sm:w-9" />
-										</a>
+										</Link>
 									</Button>
 									<p className="mt-3 text-sm font-medium text-foreground">{project.title}</p>
 									<p className="text-xs text-muted-foreground">{project.subtitle}</p>
