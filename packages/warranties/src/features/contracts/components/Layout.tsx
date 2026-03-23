@@ -1,7 +1,8 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
@@ -11,12 +12,12 @@ const navItems = [
   { to: '/contracts/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/contracts/alerts', label: 'Alerts', icon: Bell },
   { to: '/contracts/insights', label: 'Insights', icon: TrendingUp },
-  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isDark, toggleDark } = useDarkMode();
+  const navigate = useNavigate();
   const location = useLocation();
   const showDesktopHeaderToggle = location.pathname !== '/contracts';
 
@@ -30,7 +31,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <h1 className="text-center text-base font-semibold tracking-tight text-foreground">D12 Contracts</h1>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="h-9 w-9 text-muted-foreground">
+            <Settings className="w-4 h-4" />
+          </Button>
           <button onClick={toggleDark} className="p-2 rounded-lg text-muted-foreground transition-transform hover:bg-muted active:scale-95">
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -88,7 +92,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {showDesktopHeaderToggle && (
-        <div className="hidden lg:flex fixed right-4 top-4 z-40">
+        <div className="hidden lg:flex fixed right-4 top-4 z-40 gap-2">
+          <Button variant="outline" size="icon" onClick={() => navigate('/settings')} className="rounded-lg text-muted-foreground">
+            <Settings className="w-4 h-4" />
+          </Button>
           <button onClick={toggleDark} className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95">
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
