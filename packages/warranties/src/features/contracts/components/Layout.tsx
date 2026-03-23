@@ -91,12 +91,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="hidden lg:flex fixed right-4 top-4 z-40 gap-2">
-        <Button variant="outline" size="icon" onClick={() => navigate('/settings')} className="rounded-lg text-muted-foreground">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="text-muted-foreground">
           <Settings className="w-4 h-4" />
         </Button>
-        <button onClick={toggleDark} className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95">
+        <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
+        </Button>
       </div>
 
       {/* Main content */}

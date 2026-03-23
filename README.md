@@ -1,117 +1,88 @@
-# Personal Hub - Monorepo
+# Personal Hub
 
-Unified monorepo for personal management applications built with React, TypeScript and Vite.
+A unified personal management dashboard built with React, TypeScript and Vite. Consolidates warranty management, investment tracking, and contract management into a single SPA with Telegram notifications and dark mode support.
 
-## 📦 Packages
+## 🎯 Features
 
-- **warranties** - Home Warranty Hub (warranty management)
-- **portfolio** - Portfolio Tracker (investment tracking)
-- **home-contracts** - Contract management (renewals + alerts + Telegram test)
-- **libs/ui** - Shared UI, theme logic and hub launcher
+- **Warranty Vault** - Manage product warranties with expiry alerts and Telegram notifications
+- **Portfolio Tracker** - Track investments and monitor performance
+- **Contracts Manager** - Manage contracts with calendar view, alerts, and performance insights
+- **Global Settings** - Centralized Telegram bot configuration and per-feature alert toggles
+- **Dark Mode** - System-wide dark/light theme toggle
+- **Telegram Alerts** - Real-time notifications for warranty expiry and contract events
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js >= 18
+- npm or bun
 
 ### Installation
 
 ```bash
-# Install workspace dependencies
+# Install dependencies
 npm install
 ```
 
 ### Development
 
 ```bash
-# Run warranties app (port 8081)
-npm run dev:warranties
-
-# Run portfolio (port 8080)
-npm run dev:portfolio
-
-# Run home-contracts (port 8083)
-npm run dev:home-contracts
-
-# Run both in parallel (requires separate terminals)
-npm run dev:warranties
-npm run dev:portfolio
+# Start development server (http://localhost:5173)
+npm run dev
 ```
 
 ### Build
 
 ```bash
-# Build warranties app
-npm run build:warranties
-
-# Build portfolio
-npm run build:portfolio
-
-# Build home-contracts
-npm run build:home-contracts
-
-# Build all packages
+# Build for production
 npm run build
 ```
 
 ### Testing
 
 ```bash
-# Test specific package
-npm run test:warranties
-npm run test:portfolio
-npm run test:home-contracts
-```
+# Run tests
+npm run test
 
-### Linting
-
-```bash
-# Lint all packages
-npm run lint:warranties
-npm run lint:portfolio
-npm run lint:home-contracts
+# Run tests in watch mode
+npm run test:watch
 ```
 
 ## 📂 Project Structure
 
 ```
 personal-hub/
-├── packages/
-│   ├── warranties/         # Warranty management
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── ...
-│   │
-│   └── portfolio/          # Investment tracking
-│       ├── src/
-│       ├── package.json
-│       └── ...
+├── packages/warranties/         # Main SPA application
+│   ├── src/
+│   │   ├── App.tsx              # Router config
+│   │   ├── components/          # Warranty components
+│   │   ├── features/            # Portfolio + Contracts features
+│   │   ├── lib/                 # Utilities (Telegram, Supabase, etc.)
+│   │   └── pages/               # Top-level pages
+│   ├── public/
+│   │   ├── favicon.png          # Custom favicon
+│   │   └── robots.txt
+│   ├── dist/                    # Build output
+│   └── package.json
 │
-│   └── home-contracts/     # Contracts + alerts
-│       ├── src/
-│       ├── package.json
-│       └── ...
+├── packages/libs/ui/            # Shared UI components & hub page
+│   └── src/
 │
-│   └── libs/ui/            # Shared UI + hub launcher
-│       ├── src/
-│       └── ...
-│
-├── package.json            # Workspace root
-├── README.md
-└── bun.lock
+├── package.json                 # Workspace root
+└── README.md
 ```
 
-## 🔗 App Navigation
+## 🔗 App Routes
 
-- **Warranties** (http://localhost:8081)
-  - Home Warranty Vault
-  - Portfolio Tracker → redirects to http://localhost:8080
-  - Home Contracts (redirects to http://localhost:8083)
-  - Home Expenses (placeholder)
-
-- **Portfolio** (http://localhost:8080)
-  - Investment tracking
-  - Back button → redirects to http://localhost:8081
+- `/` - Hub home page with project launcher
+- `/warranties` - Warranty Vault with management features
+- `/portfolio` - Investment tracking and performance
+- `/contracts` - Contracts dashboard
+  - `/contracts/list` - All contracts
+  - `/contracts/calendar` - Calendar view
+  - `/contracts/alerts` - Alerts overview
+  - `/contracts/insights` - Performance insights
+- `/settings` - Global Telegram & alert configuration
 
 ## 🛠️ Tech Stack
 
@@ -127,42 +98,48 @@ personal-hub/
 
 ## 📝 Environment Variables
 
-Each package should have its own `.env.local`. Check individual package READMEs.
+Create `.env` file in `packages/warranties/`:
 
-### Warranties (.env.local)
-```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
+```bash
+# Supabase
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-### Portfolio (.env.local)
-```
-# Currently uses localStorage, can be extended with Supabase
-```
+For local development, create `.env.local` with the same variables.
 
 ## 🚢 Deployment
 
-Each package can be built and deployed independently.
+Currently deployed on a personal NAS server via PM2.
 
 ```bash
-# Build outputs
-packages/warranties/dist/
-packages/portfolio/dist/
+# Build for production
+npm run build
+
+# Output: packages/warranties/dist/
+# Served via PM2: pm2 serve ~/projects/personal-hub/packages/warranties/dist 8081 --name hub --spa
 ```
 
-Deploy to your preferred hosting (Vercel, Netlify, etc.)
+**Domain**: `hub.cafofo12.ddns.net` (via Nginx Proxy Manager)
 
-## 📖 Individual Package Documentation
+## 🔒 Features
 
-- [Warranties README](packages/warranties/README.md)
-- [Portfolio README](packages/portfolio/README.md)
-- [Home Contracts README](packages/home-contracts/README.md)
+### Telegram Notifications
+- Configure bot token and chat ID in Settings
+- Per-feature alert toggles (Warranties, Contracts, Portfolio)
+- Customizable warranty expiry alert threshold (7/14/30/60/90 days)
+- Auto-sends alerts once per day on app load
+
+### Data Persistence
+- **Warranties**: Supabase PostgreSQL + Storage (for receipts)
+- **Contracts**: Supabase PostgreSQL
+- **Portfolio**: localStorage (future: Supabase)
+- **Settings**: localStorage (Telegram config, alert preferences)
 
 ## 🔄 Future Enhancements
 
-- [ ] Shared UI component library (`packages/libs/ui`)
-- [ ] Home Contracts implementation
+- [ ] Portfolio Telegram alerts
 - [ ] Home Expenses implementation
-- [ ] Supabase integration for portfolio
-- [ ] Multi-device sync
-- [ ] Dark mode persistence
+- [ ] Code-splitting for bundle optimization
+- [ ] Contract Telegram notifications on renewal dates
+- [ ] Dark mode persistence in DB
