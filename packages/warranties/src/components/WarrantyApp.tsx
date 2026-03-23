@@ -195,7 +195,7 @@ export function WarrantyApp() {
           size="sm"
           variant="outline"
           className="gap-1.5 mb-4"
-          onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}:8081/`}
+          onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}`}
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back to projects</span>

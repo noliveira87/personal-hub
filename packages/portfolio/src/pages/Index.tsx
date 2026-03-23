@@ -41,7 +41,7 @@ const Index = () => {
     }
   };
 
-  const launcherUrl = `${window.location.protocol}//${window.location.hostname}:8081`;
+  const launcherUrl = `${window.location.protocol}//${window.location.hostname}`;
 
   return (
     <div className="min-h-screen bg-background">

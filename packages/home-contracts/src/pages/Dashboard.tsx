@@ -37,7 +37,7 @@ export default function Dashboard() {
           <Button 
             variant="outline"
             size="sm"
-            onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}:8081/`}
+            onClick={() => window.location.href = `${window.location.protocol}//${window.location.hostname}`}
             className="gap-1.5"
           >
             <ArrowLeft className="h-4 w-4" />

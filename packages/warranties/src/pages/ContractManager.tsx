@@ -31,7 +31,7 @@ const ContractManager = () => {
               .
             </p>
             <Button asChild variant="outline">
-              <Link to="/">Back to projects</Link>
+              <a href={`${window.location.protocol}//${window.location.hostname}`}>Back to projects</a>
             </Button>
           </CardContent>
         </Card>
