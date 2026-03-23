@@ -21,20 +21,20 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
 export default function ContractForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addContract, updateContract, getContract } = useContracts();
+  const { addContract, updateContract, getContract, loading } = useContracts();
   const isEdit = !!id;
 
   const [form, setForm] = useState(emptyContract());
 
   useEffect(() => {
-    if (isEdit) {
+    if (isEdit && !loading) {
       const existing = getContract(id!);
       if (existing) {
         const { id: _, createdAt, updatedAt, ...rest } = existing;
         setForm(rest);
       }
     }
-  }, [id, isEdit, getContract]);
+  }, [id, isEdit, getContract, loading]);
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -67,6 +67,12 @@ export default function ContractForm() {
       <h1 className="text-2xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '60ms' }}>
         {isEdit ? 'Edit Contract' : 'Add Contract'}
       </h1>
+
+      {loading && isEdit && (
+        <div className="p-4 bg-muted rounded-lg text-center text-sm text-muted-foreground">
+          Loading contract details...
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6 animate-fade-up" style={{ animationDelay: '120ms' }}>
         {/* Basic info */}

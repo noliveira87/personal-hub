@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 
 interface ContractContextType {
   contracts: Contract[];
+  loading: boolean;
   addContract: (contract: Contract) => void;
   updateContract: (contract: Contract) => void;
   deleteContract: (id: string) => void;
@@ -24,34 +25,40 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : sampleContracts;
   });
 
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+
   // Load from Supabase on mount if configured
   useEffect(() => {
     if (isSupabaseConfigured) {
       (async () => {
-        const dbContracts = await loadContractsFromDb();
-        if (dbContracts && dbContracts.length > 0) {
-          // Supabase has data - use it
-          setContracts(dbContracts);
-          localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(dbContracts));
-        } else {
-          // Supabase is empty, try localStorage
-          const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
-          if (saved) {
-            try {
-              const local = JSON.parse(saved);
-              setContracts(local);
-              // Seed Supabase with local data
-              if (local.length > 0) {
-                await upsertContractsInDb(local);
+        try {
+          const dbContracts = await loadContractsFromDb();
+          if (dbContracts && dbContracts.length > 0) {
+            // Supabase has data - use it
+            setContracts(dbContracts);
+            localStorage.setItem(CONTRACTS_STORAGE_KEY, JSON.stringify(dbContracts));
+          } else {
+            // Supabase is empty, try localStorage
+            const saved = localStorage.getItem(CONTRACTS_STORAGE_KEY);
+            if (saved) {
+              try {
+                const local = JSON.parse(saved);
+                setContracts(local);
+                // Seed Supabase with local data
+                if (local.length > 0) {
+                  await upsertContractsInDb(local);
+                }
+              } catch (e) {
+                console.error('Error parsing local contracts:', e);
+                setContracts([]);
               }
-            } catch (e) {
-              console.error('Error parsing local contracts:', e);
+            } else {
+              // No local data either, use empty (no samples)
               setContracts([]);
             }
-          } else {
-            // No local data either, use empty (no samples)
-            setContracts([]);
           }
+        } finally {
+          setLoading(false);
         }
       })();
     }
@@ -82,7 +89,7 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
   }, [contracts]);
 
   return (
-    <ContractContext.Provider value={{ contracts, addContract, updateContract, deleteContract, getContract }}>
+    <ContractContext.Provider value={{ contracts, loading, addContract, updateContract, deleteContract, getContract }}>
       {children}
     </ContractContext.Provider>
   );

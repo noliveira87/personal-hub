@@ -11,8 +11,16 @@ import { cn } from '@/lib/utils';
 export default function ContractDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getContract, deleteContract } = useContracts();
+  const { getContract, deleteContract, loading } = useContracts();
   const contract = getContract(id!);
+
+  if (loading) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-muted-foreground">Loading contract...</p>
+      </div>
+    );
+  }
 
   if (!contract) {
     return (
