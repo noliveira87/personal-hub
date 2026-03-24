@@ -26,10 +26,10 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
     <div
       onClick={() => navigate(`/contracts/${contract.id}`)}
       className={cn(
-        'bg-card rounded-xl p-5 border cursor-pointer transition-all duration-300',
-        'hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]',
-        urgency === 'critical' && 'border-urgent/30 shadow-urgent/5',
-        urgency === 'warning' && 'border-warning/30 shadow-warning/5',
+        'bg-card rounded-xl p-5 border border-border/60 cursor-pointer transition-all duration-300',
+        'hover:shadow-lg hover:border-border hover:-translate-y-0.5 active:scale-[0.98]',
+        urgency === 'critical' && 'border-urgent/40 shadow-urgent/10',
+        urgency === 'warning' && 'border-warning/40 shadow-warning/10',
       )}
       style={{ animationDelay: `${index * 80}ms` }}
     >

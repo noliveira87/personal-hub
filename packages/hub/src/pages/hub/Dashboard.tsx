@@ -70,16 +70,18 @@ export default function Dashboard() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-up" style={{ animationDelay: '120ms' }}>
-        <StatsCard label="Active Contracts" value={active.length} sublabel={`${contracts.length} total`} />
-        <StatsCard label="Monthly Cost" value={formatCurrency(monthlyTotal)} sublabel="estimated" />
-        <StatsCard label="Annual Cost" value={formatCurrency(annualTotal)} sublabel="estimated" />
-        <StatsCard
-          label="Expiring ≤ 30 days"
-          value={within30}
-          variant={within7 > 0 ? 'urgent' : within15 > 0 ? 'warning' : 'default'}
-          sublabel={within7 > 0 ? `${within7} within 7 days!` : undefined}
-        />
+      <div className="rounded-2xl border border-border/60 bg-card/30 p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard label="Active Contracts" value={active.length} sublabel={`${contracts.length} total`} />
+          <StatsCard label="Monthly Cost" value={formatCurrency(monthlyTotal)} sublabel="estimated" />
+          <StatsCard label="Annual Cost" value={formatCurrency(annualTotal)} sublabel="estimated" />
+          <StatsCard
+            label="Expiring ≤ 30 days"
+            value={within30}
+            variant={within7 > 0 ? 'urgent' : within15 > 0 ? 'warning' : 'default'}
+            sublabel={within7 > 0 ? `${within7} within 7 days!` : undefined}
+          />
+        </div>
       </div>
 
       {/* Alert buckets */}
@@ -90,7 +92,7 @@ export default function Dashboard() {
           { label: '30 days', count: within30, variant: 'warning' as const },
           { label: '60 days', count: expiringSoon.length, variant: 'default' as const },
         ].map(bucket => (
-          <div key={bucket.label} className="bg-card rounded-lg p-3 border text-center">
+          <div key={bucket.label} className="bg-card rounded-lg p-3 border border-border/60 text-center shadow-sm">
             <p className="text-xs text-muted-foreground">Within {bucket.label}</p>
             <p className={`text-xl font-bold tabular-nums ${
               bucket.variant === 'urgent' && bucket.count > 0 ? 'text-urgent' :
@@ -104,7 +106,7 @@ export default function Dashboard() {
 
       {/* Expiring soon */}
       {expiringSoon.length > 0 && (
-        <section className="animate-fade-up" style={{ animationDelay: '280ms' }}>
+        <section className="rounded-2xl border border-border/60 bg-card/20 p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '280ms' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-foreground">Expiring Soon</h2>
             <Link to="/contracts" className="text-sm text-primary font-medium flex items-center gap-1 hover:underline">
@@ -120,7 +122,7 @@ export default function Dashboard() {
       )}
 
       {/* Recent */}
-      <section className="animate-fade-up" style={{ animationDelay: '360ms' }}>
+      <section className="rounded-2xl border border-border/60 bg-card/20 p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '360ms' }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">All Active</h2>
           <Link to="/contracts" className="text-sm text-primary font-medium flex items-center gap-1 hover:underline">

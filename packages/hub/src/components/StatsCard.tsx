@@ -12,9 +12,9 @@ export function StatsCard({ label, value, sublabel, variant = 'default', delay =
   return (
     <div
       className={cn(
-        'bg-card rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-300 border',
-        variant === 'urgent' && 'border-urgent/20',
-        variant === 'warning' && 'border-warning/20',
+        'bg-card rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 border border-border/60 hover:border-border',
+        variant === 'urgent' && 'border-urgent/35 shadow-urgent/5',
+        variant === 'warning' && 'border-warning/35 shadow-warning/5',
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
