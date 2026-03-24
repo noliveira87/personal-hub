@@ -7,6 +7,7 @@ import { ContractProvider } from "@/context/ContractContext";
 import Layout from "@/components/Layout";
 
 // Hub pages
+import Index from "@/pages/Index";
 import Dashboard from "@/pages/hub/Dashboard";
 
 // Contracts pages
@@ -38,7 +39,8 @@ const App = () => (
           <Layout>
             <Routes>
               {/* Hub */}
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Dashboard />} />
 
               {/* Contracts */}
               <Route path="/contracts" element={<ContractsList />} />

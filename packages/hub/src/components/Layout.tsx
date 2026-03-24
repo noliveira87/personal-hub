@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/contracts', label: 'Contracts', icon: FileText },
   { to: '/contracts/new', label: 'Add Contract', icon: Plus },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
@@ -19,9 +19,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const showDesktopHeaderToggle = location.pathname !== '/';
+  const isLandingPage = location.pathname === '/';
 
   return (
     <div className="min-h-screen bg-background">
+      {!isLandingPage && (
+        <>
       {/* Mobile header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 grid h-14 grid-cols-3 items-center border-b bg-card/80 px-4 backdrop-blur-lg">
         <div className="flex justify-start">
@@ -45,7 +48,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/dashboard'}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
@@ -70,7 +73,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/'}
+              end={item.to === '/dashboard'}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
                 isActive
@@ -95,12 +98,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       )}
+        </>
+      )}
 
       {/* Main content */}
-      <main className="lg:pl-60 pt-14 lg:pt-0 min-h-screen">
-        <div className="container py-6 lg:py-8 max-w-6xl">
-          {children}
-        </div>
+      <main className={cn("min-h-screen", !isLandingPage && "lg:pl-60 pt-14 lg:pt-0")}>
+        {isLandingPage ? (
+          <>{children}</>
+        ) : (
+          <div className="container py-6 lg:py-8 max-w-6xl">
+            {children}
+          </div>
+        )}
       </main>
     </div>
   );
