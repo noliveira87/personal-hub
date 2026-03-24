@@ -50,6 +50,8 @@ function mapRowToContract(row: ContractRow): Contract {
 }
 
 function mapContractToRow(contract: Contract) {
+  const normalizedEndDate = contract.noEndDate ? null : contract.endDate;
+
   return {
     id: contract.id,
     name: contract.name,
@@ -57,7 +59,7 @@ function mapContractToRow(contract: Contract) {
     provider: contract.provider,
     type: contract.type,
     start_date: contract.startDate,
-    end_date: contract.endDate,
+    end_date: normalizedEndDate,
     no_end_date: contract.noEndDate,
     renewal_type: contract.renewalType,
     billing_frequency: contract.billingFrequency,

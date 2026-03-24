@@ -29,6 +29,7 @@ export default function ContractForm() {
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState(emptyContract());
+  const defaultEndDate = useState(() => new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0])[0];
 
   useEffect(() => {
     if (isEdit) {
@@ -47,8 +48,25 @@ export default function ContractForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const normalizedEndDate = form.noEndDate ? null : form.endDate;
+
+      if (!form.noEndDate && !normalizedEndDate) {
+        alert('Please set an end date or enable "No end date".');
+        return;
+      }
+
+      if (normalizedEndDate && normalizedEndDate < form.startDate) {
+        alert('End date must be on or after the start date.');
+        return;
+      }
+
       // Always set price to 0 - prices are managed only through price history
-      const submitData = { ...form, price: 0 };
+      const submitData = {
+        ...form,
+        endDate: normalizedEndDate,
+        price: 0,
+      };
+
       if (isEdit) {
         await updateContract({ ...submitData, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: new Date().toISOString() });
       } else {
@@ -138,7 +156,19 @@ export default function ContractForm() {
             </div>
             <div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.noEndDate} onChange={e => set('noEndDate', e.target.checked)} disabled={submitting} />
+                <input
+                  type="checkbox"
+                  checked={form.noEndDate}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setForm(prev => ({
+                      ...prev,
+                      noEndDate: checked,
+                      endDate: checked ? null : prev.endDate ?? defaultEndDate,
+                    }));
+                  }}
+                  disabled={submitting}
+                />
                 <span>No end date</span>
               </label>
             </div>
