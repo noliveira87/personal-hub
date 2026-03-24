@@ -64,12 +64,12 @@ export function WarrantyApp() {
             if (w.archivedAt) return false;
             const status = getStatus(w);
             if (status === 'expired') return false;
-            const days = Math.ceil((new Date(w.expiryDate).getTime() - Date.now()) / 86400000);
+            const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
             return days >= 0 && days <= alertSettings.warrantyAlertDays;
           });
           if (expiring.length > 0) {
             const lines = expiring.map(w => {
-              const days = Math.ceil((new Date(w.expiryDate).getTime() - Date.now()) / 86400000);
+              const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
               return `• ${w.productName} — <b>${days}d</b> remaining`;
             }).join('\n');
 
