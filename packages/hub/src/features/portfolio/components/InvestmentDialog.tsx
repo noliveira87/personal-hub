@@ -12,10 +12,11 @@ interface InvestmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   investment?: Investment | null;
+  btcSpotEur?: number | null;
   onSave: (data: Omit<Investment, "id" | "createdAt" | "updatedAt">) => void;
 }
 
-export function InvestmentDialog({ open, onOpenChange, investment, onSave }: InvestmentDialogProps) {
+export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, onSave }: InvestmentDialogProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<InvestmentCategory>("short-term");
   const [type, setType] = useState<InvestmentType>("cash");
@@ -23,6 +24,14 @@ export function InvestmentDialog({ open, onOpenChange, investment, onSave }: Inv
   const [currentValue, setCurrentValue] = useState("");
   const [btcUnits, setBtcUnits] = useState("");
   const [notes, setNotes] = useState("");
+
+  const investedAmountValue = Number(investedAmount) || 0;
+  const enteredCurrentValue = Number(currentValue) || 0;
+  const btcUnitsValue = Number(btcUnits) || 0;
+  const hasLiveCryptoSync = type === "crypto" && btcUnitsValue > 0 && !!btcSpotEur;
+  const resolvedCurrentValue = hasLiveCryptoSync ? btcUnitsValue * Number(btcSpotEur) : enteredCurrentValue;
+  const profitLoss = resolvedCurrentValue - investedAmountValue;
+  const profitLossClass = profitLoss >= 0 ? "text-profit" : "text-loss";
 
   useEffect(() => {
     if (investment) {
@@ -54,7 +63,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, onSave }: Inv
       category,
       type,
       investedAmount: parseFloat(investedAmount) || 0,
-      currentValue: parseFloat(currentValue) || 0,
+      currentValue: hasLiveCryptoSync ? resolvedCurrentValue : parseFloat(currentValue) || 0,
       notes: serializeCryptoNotes(parsedBtcUnits, notes),
     });
     onOpenChange(false);
@@ -103,7 +112,21 @@ export function InvestmentDialog({ open, onOpenChange, investment, onSave }: Inv
             </div>
             <div>
               <Label htmlFor="current">Current Value (€)</Label>
-              <Input id="current" type="number" step="0.01" value={currentValue} onChange={e => setCurrentValue(e.target.value)} required />
+              <Input
+                id="current"
+                type="number"
+                step="0.01"
+                value={hasLiveCryptoSync ? resolvedCurrentValue.toFixed(2) : currentValue}
+                onChange={e => setCurrentValue(e.target.value)}
+                required
+                readOnly={hasLiveCryptoSync}
+                className={hasLiveCryptoSync ? `${profitLossClass} font-semibold` : undefined}
+              />
+              {hasLiveCryptoSync && (
+                <p className={`mt-1 text-xs ${profitLossClass}`}>
+                  Live BTC sync ativo · P&amp;L: {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
+                </p>
+              )}
             </div>
           </div>
           {type === "crypto" && (

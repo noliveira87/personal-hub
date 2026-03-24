@@ -30,7 +30,10 @@ const Index = () => {
   const summary = calculateSummary(resolvedInvestments);
 
   const handleEdit = (investment: Investment) => {
-    setEditingInvestment(investment);
+    setEditingInvestment({
+      ...investment,
+      currentValue: resolveInvestmentCurrentValue(investment, btcSpotEur),
+    });
     setDialogOpen(true);
   };
 
@@ -105,6 +108,7 @@ const Index = () => {
             open={dialogOpen}
             onOpenChange={setDialogOpen}
             investment={editingInvestment}
+            btcSpotEur={btcSpotEur}
             onSave={handleSave}
           />
         </Suspense>
