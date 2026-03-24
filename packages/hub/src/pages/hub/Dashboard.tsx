@@ -13,6 +13,10 @@ export default function Dashboard() {
   const { contracts, loading, error } = useContracts();
   const contractIds = useMemo(() => contracts.map((contract) => contract.id), [contracts]);
   const { priceMap } = usePriceHistoryMap(contractIds);
+  const currentMonthLabel = useMemo(
+    () => new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    []
+  );
 
   if (loading) {
     return (
@@ -65,11 +69,6 @@ export default function Dashboard() {
     return sum + getCurrentMonthCost(priceResolvedContract, new Date(), priceResolvedContract.price);
   }, 0);
 
-  const currentMonthLabel = useMemo(
-    () => new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
-    []
-  );
-
   const within7 = expiringSoon.filter(c => c.daysLeft <= 7).length;
   const within15 = expiringSoon.filter(c => c.daysLeft <= 15).length;
   const within30 = expiringSoon.filter(c => c.daysLeft <= 30).length;
@@ -108,6 +107,11 @@ export default function Dashboard() {
             variant={within7 > 0 ? 'urgent' : within15 > 0 ? 'warning' : 'default'}
             sublabel={within7 > 0 ? `${within7} within 7 days!` : undefined}
           />
+        </div>
+        <div className="mt-4 rounded-lg border border-border/70 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Monthly Baseline</span> = recurring normalized monthly average.
+          <span className="mx-1">•</span>
+          <span className="font-medium text-foreground">Current Month</span> = charges expected this month based on billing cycle.
         </div>
       </div>
 
