@@ -1,22 +1,34 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Send, Settings } from 'lucide-react';
+import { Send, Settings, Bell } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { useLocation } from 'react-router-dom';
 import {
   getSettingsPersistenceMode,
   loadTelegramConfig,
   persistTelegramConfig,
   sendTestMessage,
 } from '@/lib/telegram';
+import {
+  DEFAULT_WARRANTY_NOTIFICATION_SETTINGS,
+  loadWarrantyNotificationSettings,
+  persistWarrantyNotificationSettings,
+  type WarrantyNotificationSettings,
+} from '@/features/warranties/lib/notificationSettings';
 
 export default function SettingsPage() {
+  const location = useLocation();
+  const isFromWarranties = (location.state as { from?: string })?.from === 'warranties';
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramBotToken, setTelegramBotToken] = useState('');
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [warrantyNotificationSettings, setWarrantyNotificationSettings] = useState<WarrantyNotificationSettings>(DEFAULT_WARRANTY_NOTIFICATION_SETTINGS);
+  const [savingWarrantyNotificationSettings, setSavingWarrantyNotificationSettings] = useState(false);
+  const [warrantyNotificationSaved, setWarrantyNotificationSaved] = useState(false);
   const storageMode = useMemo(() => getSettingsPersistenceMode(), []);
 
   useEffect(() => {
@@ -30,6 +42,12 @@ export default function SettingsPage() {
 
         setTelegramBotToken(telegramConfig.botToken);
         setTelegramChatId(telegramConfig.chatId);
+
+        if (isFromWarranties) {
+          const warrantySettings = await loadWarrantyNotificationSettings();
+          if (cancelled) return;
+          setWarrantyNotificationSettings(warrantySettings);
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -42,7 +60,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isFromWarranties]);
 
   const handleSave = async () => {
     await persistTelegramConfig({
@@ -76,6 +94,17 @@ export default function SettingsPage() {
       setTestStatus({ type: 'error', message });
     } finally {
       setSendingTest(false);
+    }
+  };
+
+  const handleSaveWarrantyNotificationSettings = async () => {
+    setSavingWarrantyNotificationSettings(true);
+    try {
+      await persistWarrantyNotificationSettings(warrantyNotificationSettings);
+      setWarrantyNotificationSaved(true);
+      setTimeout(() => setWarrantyNotificationSaved(false), 2000);
+    } finally {
+      setSavingWarrantyNotificationSettings(false);
     }
   };
 
@@ -163,9 +192,59 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: '160ms' }}>
+        {isFromWarranties && (
+          <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '160ms' }}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Bell className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Warranty Notifications</h2>
+                <p className="text-xs text-muted-foreground">Configure alerts for expiring products</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Enable warranty alerts</p>
+                  <p className="text-xs text-muted-foreground">Send Telegram messages for products nearing expiry</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={warrantyNotificationSettings.enabled}
+                  onChange={(e) => setWarrantyNotificationSettings((prev) => ({ ...prev, enabled: e.target.checked }))}
+                  className="h-4 w-4 rounded"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="warranty-alert-days" className="mb-1.5 block">Alert lead time (days)</Label>
+                <Input
+                  id="warranty-alert-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={warrantyNotificationSettings.alertDays}
+                  onChange={(e) => setWarrantyNotificationSettings((prev) => ({ ...prev, alertDays: Math.max(1, Number(e.target.value) || 1) }))}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Controls how far ahead alerts are triggered (1-365 days)</p>
+              </div>
+
+              <button
+                onClick={() => void handleSaveWarrantyNotificationSettings()}
+                disabled={savingWarrantyNotificationSettings}
+                className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-60"
+              >
+                {savingWarrantyNotificationSettings ? 'Saving…' : warrantyNotificationSaved ? '✓ Saved!' : 'Save warranty settings'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: isFromWarranties ? '240ms' : '160ms' }}>
           <p className="text-sm font-medium text-foreground">Feature-level notifications</p>
-          <p className="mt-1 text-xs text-muted-foreground">Each module owns its own notification switches, thresholds and send history. Access feature-specific settings inside each module.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{isFromWarranties ? 'Warranty alerts are configured above.' : 'Each module owns its own notification switches, thresholds and send history.'}</p>
         </div>
       </div>
     </div>
