@@ -15,7 +15,7 @@ import {
 import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
-import { Search, ShieldCheck, Settings } from "lucide-react";
+import { Search, ShieldCheck } from "lucide-react";
 import { loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
 import {
   loadWarrantyAlertHistory,
@@ -23,7 +23,7 @@ import {
   persistWarrantyAlertHistory,
 } from "./lib/notificationSettings";
 import AppSectionHeader from "@/components/AppSectionHeader";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -88,7 +88,6 @@ function unique(values: string[]): string[] {
 
 export function WarrantyApp() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<WarrantyStatus | "all">(() => parseStatusFilter(searchParams.get('status')));
@@ -312,18 +311,7 @@ export function WarrantyApp() {
       <AppSectionHeader
         title="D12 Warranties"
         icon={ShieldCheck}
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate("/warranties/settings")}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:text-primary"
-              title="Warranty settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-            <AddWarrantyDialog onAdd={addWarranty} />
-          </div>
-        }
+        actions={<AddWarrantyDialog onAdd={addWarranty} />}
       />
 
       <div className="max-w-lg mx-auto px-4 pt-20 pb-24">

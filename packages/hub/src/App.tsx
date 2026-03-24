@@ -23,7 +23,6 @@ import PortfolioPage from "@/pages/portfolio/PortfolioPage";
 
 // Warranties pages
 import WarrantiesPage from "@/pages/warranties/WarrantiesPage";
-import WarrantySettingsPage from "@/pages/warranties/WarrantySettingsPage";
 
 import SettingsPage from "@/pages/SettingsPage";
 import WorkInProgress from "@/pages/WorkInProgress";
@@ -58,7 +57,6 @@ const App = () => (
 
               {/* Warranties */}
               <Route path="/warranties" element={<WarrantiesPage />} />
-              <Route path="/warranties/settings" element={<WarrantySettingsPage />} />
 
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
