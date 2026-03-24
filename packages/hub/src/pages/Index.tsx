@@ -40,7 +40,7 @@ const Index = () => {
 				{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
 			</Button>
 			<Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-lg bg-card/90">
-				<Link to="/settings" aria-label="Open settings">
+				<Link to="/settings" state={{ fromPath: '/' }} aria-label="Open settings">
 					<Settings className="h-4 w-4" />
 				</Link>
 			</Button>

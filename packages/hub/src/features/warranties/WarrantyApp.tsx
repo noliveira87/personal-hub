@@ -231,7 +231,7 @@ export function WarrantyApp() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/settings", { state: { from: "warranties" } })}
+              onClick={() => navigate("/settings", { state: { from: "warranties", fromPath: "/warranties" } })}
               className="text-muted-foreground"
               aria-label="Warranty settings"
             >

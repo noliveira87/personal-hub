@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
@@ -9,6 +9,7 @@ interface AppSectionHeaderProps {
   icon: LucideIcon;
   actions?: ReactNode;
   backTo?: string;
+  backLabel?: string;
   showSettings?: boolean;
 }
 
@@ -17,9 +18,11 @@ export default function AppSectionHeader({
   icon: Icon,
   actions,
   backTo = '/',
+  backLabel = 'Back to projects',
   showSettings = true,
 }: AppSectionHeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDark, toggleDark } = useDarkMode();
 
   return (
@@ -32,7 +35,7 @@ export default function AppSectionHeader({
           className="gap-1.5"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Back to projects</span>
+          <span className="hidden sm:inline">{backLabel}</span>
         </Button>
 
         <div className="hidden sm:flex items-center gap-3 flex-1 justify-center">
@@ -47,7 +50,12 @@ export default function AppSectionHeader({
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           {showSettings && (
-            <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/settings', { state: { fromPath: location.pathname } })}
+              className="text-muted-foreground"
+            >
               <Settings className="h-4 w-4" />
             </Button>
           )}

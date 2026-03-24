@@ -19,7 +19,9 @@ import {
 
 export default function SettingsPage() {
   const location = useLocation();
-  const isFromWarranties = (location.state as { from?: string })?.from === 'warranties';
+  const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
+  const isFromWarranties = locationState?.from === 'warranties';
+  const backToPath = locationState?.fromPath ?? (isFromWarranties ? '/warranties' : '/');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramBotToken, setTelegramBotToken] = useState('');
   const [loading, setLoading] = useState(true);
@@ -111,7 +113,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <AppSectionHeader title="Settings" icon={Settings} showSettings={false} />
+        <AppSectionHeader title="Settings" icon={Settings} showSettings={false} backTo={backToPath} backLabel="Back" />
         <div className="mx-auto max-w-2xl space-y-6 px-4 pt-20 sm:px-6 lg:px-0">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Settings</h1>
@@ -124,7 +126,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSectionHeader title="Settings" icon={Settings} showSettings={false} />
+      <AppSectionHeader title="Settings" icon={Settings} showSettings={false} backTo={backToPath} backLabel="Back" />
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-20 sm:px-6 lg:px-0">
         <div className="animate-fade-up">
