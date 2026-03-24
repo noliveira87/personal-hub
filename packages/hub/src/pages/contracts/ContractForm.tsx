@@ -119,19 +119,24 @@ export default function ContractForm() {
               <label className={labelClass}>Start Date</label>
               <input type="date" className={inputClass} value={form.startDate} onChange={e => set('startDate', e.target.value)} disabled={submitting} />
             </div>
-            {!form.noEndDate && (
-              <div>
-                <label className={labelClass}>End Date</label>
-                <input 
-                  type="date" 
-                  className={inputClass} 
-                  value={form.endDate ?? ''} 
-                  onChange={e => set('endDate', e.target.value || null)}
-                  disabled={submitting} 
-                />
-              </div>
-            )}
-            <div className={!form.noEndDate ? 'sm:col-span-2' : ''}>
+            <div className="relative">
+              <label className={labelClass}>End Date</label>
+              <input 
+                type="date" 
+                className={inputClass} 
+                value={form.endDate ?? ''} 
+                onChange={e => set('endDate', e.target.value || null)}
+                disabled={form.noEndDate || submitting} 
+              />
+              {form.noEndDate && (
+                <div className="absolute inset-0 bg-gradient-to-r from-muted/80 to-muted/60 backdrop-blur-sm rounded-lg flex items-center justify-center pointer-events-none">
+                  <div className="text-center">
+                    <p className="text-xs font-medium text-muted-foreground">No end date set</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.noEndDate} onChange={e => set('noEndDate', e.target.checked)} disabled={submitting} />
                 <span>No end date</span>
