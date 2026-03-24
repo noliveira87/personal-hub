@@ -76,40 +76,6 @@ const Index = () => {
       </header>
 
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8 lg:gap-10 lg:px-8 lg:py-10">
-        <section className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-sm">
-          <div className="flex flex-col gap-6 px-5 py-6 sm:px-7 sm:py-8 lg:flex-row lg:items-end lg:justify-between lg:px-8">
-            <div className="max-w-2xl space-y-3">
-              <span className="inline-flex w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                Portfolio overview
-              </span>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  A clear view of the household portfolio.
-                </h2>
-                <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  Follow short and long-term positions, monitor performance, and keep the overall financial picture organized in one place.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.location.href = launcherUrl}
-                className="gap-1.5 sm:hidden"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Projects</span>
-              </Button>
-              <Button onClick={handleAdd} className="gap-1.5 shadow-sm">
-                <Plus className="h-4 w-4" />
-                <span>Add investment</span>
-              </Button>
-            </div>
-          </div>
-        </section>
-
         <KpiCards summary={summary} />
         <MonthlyInsights snapshots={monthlySnapshots} />
 
