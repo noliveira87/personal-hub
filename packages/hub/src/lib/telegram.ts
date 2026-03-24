@@ -104,7 +104,9 @@ function readAlertSettingsFromLocalStorage(): AlertSettings {
     warrantiesEnabled: localStorage.getItem(STORAGE_KEYS.ALERTS_WARRANTIES) !== 'false',
     contractsEnabled: localStorage.getItem(STORAGE_KEYS.ALERTS_CONTRACTS) !== 'false',
     portfolioEnabled: localStorage.getItem(STORAGE_KEYS.ALERTS_PORTFOLIO) === 'true',
-    warrantyAlertDays: Number(localStorage.getItem(STORAGE_KEYS.WARRANTIES_DAYS) ?? DEFAULT_ALERT_SETTINGS.warrantyAlertDays),
+    warrantyAlertDays: normalizeWarrantyAlertDays(
+      Number(localStorage.getItem(STORAGE_KEYS.WARRANTIES_DAYS) ?? DEFAULT_ALERT_SETTINGS.warrantyAlertDays)
+    ),
   };
 }
 
@@ -335,7 +337,7 @@ export function isTelegramConfigured(): boolean {
 }
 
 export async function sendTelegramMessage(text: string): Promise<void> {
-  const { botToken, chatId } = getTelegramConfig();
+  const { botToken, chatId } = await loadTelegramConfig();
   if (!botToken.trim() || !chatId.trim()) {
     throw new Error('Telegram not configured. Go to Settings to set up your bot.');
   }
