@@ -18,7 +18,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
-  const isContractsPage = /^\/(contracts|calendar|alerts|insights)/.test(location.pathname);
+  const isContractsPage = /^\/(dashboard|contracts|calendar|alerts|insights)/.test(location.pathname);
   const showSidebar = isContractsPage;
   const showDesktopHeaderToggle = !isLandingPage;
 

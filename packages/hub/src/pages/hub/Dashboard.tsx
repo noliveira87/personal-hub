@@ -127,7 +127,7 @@ export default function Dashboard() {
       </div>
 
       {/* Alert buckets */}
-      {expiringSoon.length > 0 ? (
+      {expiringSoon.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-up" style={{ animationDelay: '200ms' }}>
           {[
             { label: '7 days', count: within7, variant: 'urgent' as const },
@@ -145,10 +145,6 @@ export default function Dashboard() {
               </p>
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border-2 border-border bg-card px-4 py-3 text-sm text-muted-foreground animate-fade-up" style={{ animationDelay: '200ms' }}>
-          No additional renewals due between 31–60 days ✅
         </div>
       )}
 
