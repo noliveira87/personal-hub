@@ -1,14 +1,16 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useContracts } from '@/context/ContractContext';
 import { ContractCard } from '@/components/ContractCard';
 import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/types/contract';
 import { getDaysUntilExpiry } from '@/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
-import { Link } from 'react-router-dom';
 import { Plus, Search, SlidersHorizontal, Loader, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function ContractsList() {
+  const navigate = useNavigate();
   const { contracts, loading, error } = useContracts();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<ContractCategory | 'all'>('all');
@@ -62,20 +64,22 @@ export default function ContractsList() {
 
   return (
     <div className="space-y-6 pt-16">
-      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+      <AppSectionHeader 
+        title="D12 Contracts" 
+        icon={FileText}
+        actions={
+          <Button size="sm" className="gap-1.5" onClick={() => navigate('/contracts/new')}>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Contract</span>
+          </Button>
+        }
+      />
 
-      <div className="flex items-center justify-between animate-fade-up">
+      <div className="animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-foreground">All Contracts</h1>
           <p className="text-muted-foreground text-sm mt-1">{contracts.length} total</p>
         </div>
-        <Link
-          to="/contracts/new"
-          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Add Contract</span>
-        </Link>
       </div>
 
       {/* Search + filter bar */}
