@@ -1,6 +1,6 @@
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarDays, Bell, Settings, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bell, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
@@ -9,7 +9,6 @@ const navItems = [
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/insights', label: 'Insights', icon: TrendingUp },
-  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
