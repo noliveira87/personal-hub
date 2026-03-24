@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useContracts } from '@/context/ContractContext';
 import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
-import { getDaysUntilExpiry, getMonthlyEquivalent, getAnnualEquivalent, formatCurrency } from '@/lib/contractUtils';
+import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost, formatCurrency } from '@/lib/contractUtils';
 import { Link } from 'react-router-dom';
 import { Plus, ArrowRight, LayoutDashboard, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -54,7 +54,7 @@ export default function Dashboard() {
     return sum + getMonthlyEquivalent(priceResolvedContract);
   }, 0);
 
-  const annualTotal = active.reduce((sum, contract) => {
+  const currentMonthTotal = active.reduce((sum, contract) => {
     const latestPrice = priceMap.get(contract.id);
     const priceResolvedContract = {
       ...contract,
@@ -62,8 +62,13 @@ export default function Dashboard() {
       currency: latestPrice?.currency ?? contract.currency,
     };
 
-    return sum + getAnnualEquivalent(priceResolvedContract);
+    return sum + getCurrentMonthCost(priceResolvedContract, new Date(), priceResolvedContract.price);
   }, 0);
+
+  const currentMonthLabel = useMemo(
+    () => new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    []
+  );
 
   const within7 = expiringSoon.filter(c => c.daysLeft <= 7).length;
   const within15 = expiringSoon.filter(c => c.daysLeft <= 15).length;
@@ -85,19 +90,18 @@ export default function Dashboard() {
         )}
       />
 
-      <div>
-        <h1 className="text-2xl font-bold text-foreground animate-fade-up">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1 animate-fade-up" style={{ animationDelay: '60ms' }}>
-          Your contracts & subscriptions at a glance
-        </p>
+      <div className="rounded-2xl border-2 border-border bg-card p-5 animate-fade-up">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">Contracts Overview</p>
+        <h1 className="mt-1 text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Clear monthly baseline and current-month spending in one place.</p>
       </div>
 
       {/* Stats row */}
       <div className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard label="Active Contracts" value={active.length} sublabel={`${contracts.length} total`} />
-          <StatsCard label="Monthly Cost" value={formatCurrency(monthlyTotal)} sublabel="estimated" />
-          <StatsCard label="Annual Cost" value={formatCurrency(annualTotal)} sublabel="estimated" />
+          <StatsCard label="Monthly Baseline" value={formatCurrency(monthlyTotal)} sublabel="normalized recurring cost" />
+          <StatsCard label="Current Month" value={formatCurrency(currentMonthTotal)} sublabel={currentMonthLabel} />
           <StatsCard
             label="Expiring ≤ 30 days"
             value={within30}

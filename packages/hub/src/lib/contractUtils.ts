@@ -26,6 +26,46 @@ export function getAnnualEquivalent(contract: Contract, price?: number): number 
   }
 }
 
+export function getCurrentMonthCost(contract: Contract, referenceDate: Date = new Date(), price?: number): number {
+  const contractPrice = price ?? contract.price;
+
+  if (contractPrice <= 0) return 0;
+
+  const startDate = parseISO(contract.startDate);
+  if (Number.isNaN(startDate.getTime())) return 0;
+
+  const monthStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+  const monthEnd = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+
+  if (startDate > monthEnd) return 0;
+
+  if (contract.endDate) {
+    const endDate = parseISO(contract.endDate);
+    if (!Number.isNaN(endDate.getTime()) && endDate < monthStart) {
+      return 0;
+    }
+  }
+
+  const monthsSinceStart =
+    (referenceDate.getFullYear() - startDate.getFullYear()) * 12 +
+    (referenceDate.getMonth() - startDate.getMonth());
+
+  if (monthsSinceStart < 0) return 0;
+
+  switch (contract.billingFrequency) {
+    case 'monthly':
+      return contractPrice;
+    case 'quarterly':
+      return monthsSinceStart % 3 === 0 ? contractPrice : 0;
+    case 'yearly':
+      return referenceDate.getMonth() === startDate.getMonth() ? contractPrice : 0;
+    case 'one-time':
+      return referenceDate.getMonth() === startDate.getMonth() && referenceDate.getFullYear() === startDate.getFullYear()
+        ? contractPrice
+        : 0;
+  }
+}
+
 export function getUrgencyLevel(daysLeft: number): 'critical' | 'warning' | 'soon' | 'normal' {
   if (daysLeft <= 7) return 'critical';
   if (daysLeft <= 15) return 'warning';
