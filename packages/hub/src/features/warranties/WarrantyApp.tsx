@@ -18,12 +18,6 @@ import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Settings, ShieldCheck } from "lucide-react";
-import { loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
-import {
-  loadWarrantyAlertHistory,
-  loadWarrantyNotificationSettings,
-  persistWarrantyAlertHistory,
-} from "./lib/notificationSettings";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
@@ -41,9 +35,6 @@ const CATEGORY_FILTERS: { label: string; value: WarrantyCategory | "all" }[] = [
   { label: "Others", value: "others" },
 ];
 
-const PENDING_ALERTS_KEY = 'd12-warranty-alerts-pending';
-const EXPIRING_WARRANTIES_URL = 'https://hub.cafofo12.ddns.net/warranties?status=expiring';
-
 function parseStatusFilter(value: string | null): WarrantyStatus | 'all' {
   if (value === 'active' || value === 'expiring' || value === 'expired') {
     return value;
@@ -58,34 +49,6 @@ function parseCategoryFilter(value: string | null): WarrantyCategory | 'all' {
   }
 
   return 'all';
-}
-
-function getTodayKey(): string {
-  return new Date().toDateString();
-}
-
-function getWarrantyAlertSignature(warranty: Warranty): string {
-  return `${warranty.id}:${warranty.expirationDate}`;
-}
-
-function loadPendingWarrantyAlerts(): Record<string, string[]> {
-  try {
-    const raw = localStorage.getItem(PENDING_ALERTS_KEY);
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw) as Record<string, string[]>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function savePendingWarrantyAlerts(pendingMap: Record<string, string[]>): void {
-  localStorage.setItem(PENDING_ALERTS_KEY, JSON.stringify(pendingMap));
-}
-
-function unique(values: string[]): string[] {
-  return Array.from(new Set(values));
 }
 
 export function WarrantyApp() {
@@ -107,71 +70,6 @@ export function WarrantyApp() {
       if (!isMounted) return;
       setWarranties(data);
       setIsLoading(false);
-
-      const loadedNotificationSettings = await loadWarrantyNotificationSettings();
-      if (!isMounted) return;
-      setNotificationSettings(loadedNotificationSettings);
-
-      // Send Telegram alerts for expiring warranties
-      const telegramConfig = await loadTelegramConfig();
-      const isTelegramReady = Boolean(telegramConfig.botToken.trim() && telegramConfig.chatId.trim());
-
-      if (loadedNotificationSettings.enabled && isTelegramReady) {
-        const todayKey = getTodayKey();
-        const sentMap = await loadWarrantyAlertHistory();
-        const pendingMap = loadPendingWarrantyAlerts();
-        const sentToday = new Set(sentMap[todayKey] ?? []);
-        const pendingToday = new Set(pendingMap[todayKey] ?? []);
-
-        const expiring = data.filter(w => {
-          if (w.archivedAt) return false;
-          const status = getStatus(w);
-          if (status === 'expired') return false;
-          const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
-          if (!(days >= 0 && days <= loadedNotificationSettings.alertDays)) return false;
-
-          const signature = getWarrantyAlertSignature(w);
-          return !sentToday.has(signature) && !pendingToday.has(signature);
-        });
-
-        if (expiring.length > 0) {
-          const reservedSignatures = expiring.map(getWarrantyAlertSignature);
-          pendingMap[todayKey] = [
-            ...pendingToday,
-            ...reservedSignatures,
-          ];
-          savePendingWarrantyAlerts(pendingMap);
-
-          try {
-            for (const warranty of expiring) {
-              const days = Math.ceil((new Date(warranty.expirationDate).getTime() - Date.now()) / 86400000);
-              const signature = getWarrantyAlertSignature(warranty);
-
-              await sendTelegramMessage(
-                `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n• ${warranty.productName} — <b>${days}d</b> remaining\n\n<a href="${EXPIRING_WARRANTIES_URL}">Open expiring warranties</a>`
-              );
-
-              sentMap[todayKey] = unique([
-                ...(sentMap[todayKey] ?? []),
-                signature,
-              ]);
-              await persistWarrantyAlertHistory(sentMap);
-
-              pendingMap[todayKey] = (pendingMap[todayKey] ?? []).filter(
-                (pendingSignature) => pendingSignature !== signature
-              );
-              savePendingWarrantyAlerts(pendingMap);
-            }
-          } catch (error) {
-            const nextPendingToday = (pendingMap[todayKey] ?? []).filter(
-              (signature) => !reservedSignatures.includes(signature)
-            );
-            pendingMap[todayKey] = nextPendingToday;
-            savePendingWarrantyAlerts(pendingMap);
-            console.error('Failed to send warranty Telegram alert:', error);
-          }
-        }
-      }
     };
 
     void fetchWarranties();
