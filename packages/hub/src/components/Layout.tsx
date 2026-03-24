@@ -19,11 +19,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
+  const isContractsPage = /^\/(contracts|calendar|alerts|insights)/.test(location.pathname);
+  const showSidebar = isContractsPage;
   const showDesktopHeaderToggle = !isLandingPage;
 
   return (
     <div className="min-h-screen bg-background">
-      {!isLandingPage && (
+      {showSidebar && (
         <>
       {/* Mobile header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 grid h-14 grid-cols-3 items-center border-b bg-card/80 px-4 backdrop-blur-lg">
@@ -109,8 +111,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <main className={cn("min-h-screen", !isLandingPage && "lg:pl-60 pt-14 lg:pt-0")}>
-        {isLandingPage ? (
+      <main className={cn("min-h-screen", showSidebar && "lg:pl-60 pt-14 lg:pt-0")}>
+        {!showSidebar ? (
           <>{children}</>
         ) : (
           <div className="container py-6 lg:py-8 max-w-6xl">
