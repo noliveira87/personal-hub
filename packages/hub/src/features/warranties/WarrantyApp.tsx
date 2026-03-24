@@ -4,6 +4,7 @@ import {
   archiveWarrantyInDb,
   deleteReceiptByUrl,
   deleteWarrantyFromDb,
+  getDaysLeft,
   getStatus,
   loadWarranties,
   type WarrantyCategory,
@@ -308,6 +309,20 @@ export function WarrantyApp() {
     return c;
   }, [warranties, showArchived]);
 
+  const nextExpiringWarranty = useMemo(() => {
+    const nonArchived = warranties.filter((w) => !w.archivedAt && getDaysLeft(w) >= 0);
+
+    if (nonArchived.length === 0) {
+      return null;
+    }
+
+    return [...nonArchived].sort(
+      (a, b) => new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime()
+    )[0];
+  }, [warranties]);
+
+  const nextExpiringDaysLeft = nextExpiringWarranty ? getDaysLeft(nextExpiringWarranty) : null;
+
   return (
     <div className="min-h-screen bg-background">
       <AppSectionHeader
@@ -341,6 +356,12 @@ export function WarrantyApp() {
               <p className="text-xl font-bold leading-tight">
                 {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
               </p>
+              {nextExpiringWarranty && nextExpiringDaysLeft !== null && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Next to expire: <span className="font-medium text-foreground">{nextExpiringWarranty.productName}</span>{" "}
+                  in {nextExpiringDaysLeft} day{nextExpiringDaysLeft !== 1 ? "s" : ""}
+                </p>
+              )}
             </div>
           </div>
         </div>
