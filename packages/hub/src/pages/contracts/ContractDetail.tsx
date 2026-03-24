@@ -3,7 +3,7 @@ import { useContracts } from '@/context/ContractContext';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CategoryBadge } from '@/components/CategoryBadge';
 import { PriceHistoryModal } from '@/components/PriceHistoryModal';
-import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel } from '@/lib/contractUtils';
+import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel, formatExpiryCountdown } from '@/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS } from '@/types/contract';
 import { format, parseISO } from 'date-fns';
@@ -111,7 +111,7 @@ export default function ContractDetail() {
               urgency === 'critical' && 'text-urgent',
               urgency === 'warning' && 'text-warning',
             )}>
-              {daysLeft <= 0 ? 'Expired' : `${daysLeft} days`}
+              {formatExpiryCountdown(contract)}
             </p>
           </div>
         </div>

@@ -73,6 +73,16 @@ export function getUrgencyLevel(daysLeft: number): 'critical' | 'warning' | 'soo
   return 'normal';
 }
 
+export function formatExpiryCountdown(contract: Contract, compact: boolean = false): string {
+  if (!contract.endDate) return 'No end date';
+
+  const daysLeft = getDaysUntilExpiry(contract);
+
+  if (daysLeft <= 0) return 'Expired';
+
+  return compact ? `${daysLeft}d left` : `${daysLeft} days`;
+}
+
 export function formatCurrency(amount: number, currency: string = 'EUR'): string {
   return new Intl.NumberFormat('en-EU', {
     style: 'currency',

@@ -1,6 +1,6 @@
 import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/types/contract';
 import { StatusBadge } from './StatusBadge';
-import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel } from '@/lib/contractUtils';
+import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel, formatExpiryCountdown } from '@/lib/contractUtils';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays } from 'lucide-react';
@@ -69,7 +69,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
               urgency === 'soon' && 'text-warning',
               urgency === 'normal' && 'text-muted-foreground',
             )}>
-              {daysLeft <= 0 ? 'Expired' : `${daysLeft}d left`}
+              {formatExpiryCountdown(contract, true)}
             </p>
           )}
         </div>
