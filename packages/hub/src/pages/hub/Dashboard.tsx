@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useContracts } from '@/context/ContractContext';
 import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
