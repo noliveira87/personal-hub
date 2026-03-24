@@ -119,12 +119,20 @@ export default function ContractForm() {
               <label className={labelClass}>Start Date</label>
               <input type="date" className={inputClass} value={form.startDate} onChange={e => set('startDate', e.target.value)} disabled={submitting} />
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
+            {!form.noEndDate && (
+              <div>
                 <label className={labelClass}>End Date</label>
-                <input type="date" className={inputClass} value={form.endDate ?? ''} onChange={e => set('endDate', e.target.value || null)} disabled={form.noEndDate || submitting} />
+                <input 
+                  type="date" 
+                  className={inputClass} 
+                  value={form.endDate ?? ''} 
+                  onChange={e => set('endDate', e.target.value || null)}
+                  disabled={submitting} 
+                />
               </div>
-              <label className="flex items-center gap-2 text-sm mb-2.5 cursor-pointer">
+            )}
+            <div className={!form.noEndDate ? 'sm:col-span-2' : ''}>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={form.noEndDate} onChange={e => set('noEndDate', e.target.checked)} disabled={submitting} />
                 <span>No end date</span>
               </label>
