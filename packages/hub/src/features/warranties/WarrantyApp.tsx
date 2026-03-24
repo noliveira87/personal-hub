@@ -15,18 +15,15 @@ import {
 import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
-import { Search, ShieldCheck, Bell } from "lucide-react";
+import { Search, ShieldCheck, Settings } from "lucide-react";
 import { loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
 import {
-  DEFAULT_WARRANTY_NOTIFICATION_SETTINGS,
   loadWarrantyAlertHistory,
   loadWarrantyNotificationSettings,
   persistWarrantyAlertHistory,
-  persistWarrantyNotificationSettings,
-  type WarrantyNotificationSettings,
 } from "./lib/notificationSettings";
 import AppSectionHeader from "@/components/AppSectionHeader";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -91,11 +88,9 @@ function unique(values: string[]): string[] {
 
 export function WarrantyApp() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [notificationSettings, setNotificationSettings] = useState<WarrantyNotificationSettings>(DEFAULT_WARRANTY_NOTIFICATION_SETTINGS);
-  const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
-  const [notificationSaved, setNotificationSaved] = useState(false);
   const [filter, setFilter] = useState<WarrantyStatus | "all">(() => parseStatusFilter(searchParams.get('status')));
   const [categoryFilter, setCategoryFilter] = useState<WarrantyCategory | "all">(() => parseCategoryFilter(searchParams.get('category')));
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? "");
@@ -312,85 +307,37 @@ export function WarrantyApp() {
     return c;
   }, [warranties, showArchived]);
 
-  const handleSaveNotificationSettings = async () => {
-    setSavingNotificationSettings(true);
-    try {
-      await persistWarrantyNotificationSettings(notificationSettings);
-      setNotificationSaved(true);
-      setTimeout(() => setNotificationSaved(false), 2000);
-    } finally {
-      setSavingNotificationSettings(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <AppSectionHeader
         title="D12 Warranties"
         icon={ShieldCheck}
-        actions={<AddWarrantyDialog onAdd={addWarranty} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate("/warranties/settings")}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:text-primary"
+              title="Warranty settings"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+            <AddWarrantyDialog onAdd={addWarranty} />
+          </div>
+        }
       />
 
       <div className="max-w-lg mx-auto px-4 pt-20 pb-24">
-        {/* Mobile title */}
-        <div className="flex items-center gap-3 mb-6 sm:hidden">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold leading-tight">D12 Warranties</h1>
-            <p className="text-sm text-muted-foreground">
-              {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
-            </p>
-          </div>
-        </div>
-
         <div className="fade-in-up mb-6 rounded-2xl border bg-card p-4 space-y-4" style={{ animationDelay: "80ms" }}>
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Bell className="h-5 w-5 text-primary" />
+              <ShieldCheck className="h-5 w-5 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-semibold text-foreground">Warranty notifications</h2>
-              <p className="text-xs text-muted-foreground">This module now owns its notification rules and send history.</p>
+              <h1 className="text-xl font-bold leading-tight">D12 Warranties</h1>
+              <p className="text-sm text-muted-foreground">
+                {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
+              </p>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">Enable warranty alerts</p>
-              <p className="text-xs text-muted-foreground">Send Telegram messages for products nearing expiry</p>
-            </div>
-            <input
-              type="checkbox"
-              checked={notificationSettings.enabled}
-              onChange={(e) => setNotificationSettings((prev) => ({ ...prev, enabled: e.target.checked }))}
-              className="h-4 w-4 rounded"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="warranty-alert-days" className="mb-1.5 block text-sm font-medium text-foreground">Alert lead time (days)</label>
-            <Input
-              id="warranty-alert-days"
-              type="number"
-              min={1}
-              max={365}
-              value={notificationSettings.alertDays}
-              onChange={(e) => setNotificationSettings((prev) => ({ ...prev, alertDays: Math.max(1, Number(e.target.value) || 1) }))}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">Controls how far ahead this feature starts notifying.</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => void handleSaveNotificationSettings()}
-              disabled={savingNotificationSettings}
-              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
-            >
-              {savingNotificationSettings ? 'Saving…' : notificationSaved ? '✓ Saved!' : 'Save warranty settings'}
-            </button>
-            <p className="text-xs text-muted-foreground">Stored separately from global Telegram credentials.</p>
           </div>
         </div>
 
