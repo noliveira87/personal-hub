@@ -21,6 +21,8 @@ declare
   v_today_key text;
   v_signature text;
   v_days_left integer;
+  v_expiration_text text;
+  v_price_text text;
   v_sent_today text[];
   v_item record;
 begin
@@ -62,6 +64,9 @@ begin
     select
       w.id,
       w.product_name,
+      w.category,
+      w.purchased_from,
+      w.price,
       w.expiration_date
     from public.warranties w
     where w.archived_at is null
@@ -75,6 +80,11 @@ begin
     end if;
 
     v_days_left := (v_item.expiration_date - current_date);
+    v_expiration_text := to_char(v_item.expiration_date, 'DD/MM/YYYY');
+    v_price_text := case
+      when v_item.price is null then '—'
+      else '€' || to_char(v_item.price, 'FM999999990.00')
+    end;
 
     perform net.http_post(
       url := format('https://api.telegram.org/bot%s/sendMessage', v_bot_token),
@@ -82,8 +92,13 @@ begin
       body := jsonb_build_object(
         'chat_id', v_chat_id,
         'text',
-          '🛡️ <b>Warranty Vault — Expiry Alert</b>' || E'\n\n' ||
-          '• ' || v_item.product_name || ' — <b>' || v_days_left || 'd</b> remaining' || E'\n\n' ||
+          '🛡️ <b>Warranty Expiry Alert</b>' || E'\n\n' ||
+          '📦 <b>Product:</b> ' || v_item.product_name || E'\n' ||
+          '⏳ <b>Remaining:</b> ' || v_days_left || ' day' || case when v_days_left <> 1 then 's' else '' end || E'\n' ||
+          '📅 <b>Expires on:</b> ' || v_expiration_text || E'\n' ||
+          '🏷️ <b>Category:</b> ' || coalesce(v_item.category, 'others') || E'\n' ||
+          '🏬 <b>Store:</b> ' || coalesce(nullif(v_item.purchased_from, ''), '—') || E'\n' ||
+          '💶 <b>Price:</b> ' || v_price_text || E'\n\n' ||
           '<a href="https://hub.cafofo12.ddns.net/warranties?status=expiring">Open expiring warranties</a>',
         'parse_mode', 'HTML',
         'disable_web_page_preview', true
