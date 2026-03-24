@@ -8,6 +8,7 @@ import { Plus, ArrowRight, LayoutDashboard, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
+import { parseISO } from 'date-fns';
 
 export default function Dashboard() {
   const { contracts, loading, error } = useContracts();
@@ -65,6 +66,16 @@ export default function Dashboard() {
       price: latestPrice?.price ?? contract.price,
       currency: latestPrice?.currency ?? contract.currency,
     };
+
+    if (latestPrice) {
+      const entryDate = parseISO(latestPrice.date);
+      const now = new Date();
+      const isCurrentMonthEntry =
+        entryDate.getFullYear() === now.getFullYear() &&
+        entryDate.getMonth() === now.getMonth();
+
+      return sum + (isCurrentMonthEntry ? latestPrice.price : 0);
+    }
 
     return sum + getCurrentMonthCost(priceResolvedContract, new Date(), priceResolvedContract.price);
   }, 0);
