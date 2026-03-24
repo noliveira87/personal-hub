@@ -140,6 +140,42 @@ Isso cria:
 
 > Nota: no modo atual (A), qualquer cliente com `anon key` pode ler/escrever essa configuração global. Quando quiseres multi-user com auth, trocamos para políticas por utilizador.
 
+## Alertas automáticos de Warranty (sem abrir a app)
+
+Se quiseres garantir envio de Telegram mesmo quando ninguém abre a página, ativa o job server-side no Supabase:
+
+1. Abre **SQL Editor** no Supabase
+2. Cria uma nova query
+3. Executa o ficheiro:
+
+`packages/hub/supabase/warranty_alerts_cron.sql`
+
+Isto cria:
+- função `public.send_warranty_expiry_alerts()`
+- agendamento diário via `pg_cron` (09:15 UTC)
+- envio direto para Telegram via `pg_net`
+
+### Como validar que está a funcionar
+
+1. Em **Settings**, guarda `Bot Token` e `Chat ID` válidos
+2. Em **Warranty settings**, ativa alerts e define `Alert lead time`
+3. No **SQL Editor**, executa manualmente:
+
+```sql
+select public.send_warranty_expiry_alerts();
+```
+
+4. Confirma receção da mensagem no Telegram
+5. Verifica se o cron está registado:
+
+```sql
+select jobid, jobname, schedule, active
+from cron.job
+where jobname = 'warranty-expiry-alerts';
+```
+
+> Nota: o horário do cron está em UTC. Se quiseres horário local, ajusta a expressão cron no ficheiro SQL.
+
 Todos os contratos e histórico de preços são armazenados exclusivamente no Supabase.
 
 ## Mensagens de Erro Comum
