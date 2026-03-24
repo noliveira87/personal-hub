@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useContracts } from '@/context/ContractContext';
 import { ContractCard } from '@/components/ContractCard';
 import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/types/contract';
@@ -21,6 +21,23 @@ export default function ContractsList() {
   // Get contract IDs for price history fetching
   const contractIds = useMemo(() => contracts.map(c => c.id), [contracts]);
   const { priceMap, loading: pricesLoading } = usePriceHistoryMap(contractIds);
+
+  const filtered = useMemo(() => {
+    let result = contracts.filter(c => {
+      const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.provider.toLowerCase().includes(search.toLowerCase());
+      const matchCategory = categoryFilter === 'all' || c.category === categoryFilter;
+      const matchStatus = statusFilter === 'all' || c.status === statusFilter;
+      return matchSearch && matchCategory && matchStatus;
+    });
+
+    result.sort((a, b) => {
+      if (sortBy === 'renewal') return getDaysUntilExpiry(a) - getDaysUntilExpiry(b);
+      if (sortBy === 'price') return b.price - a.price;
+      return a.name.localeCompare(b.name);
+    });
+
+    return result;
+  }, [contracts, search, categoryFilter, statusFilter, sortBy]);
 
   if (loading) {
     return (
@@ -44,23 +61,6 @@ export default function ContractsList() {
       </div>
     );
   }
-
-  const filtered = useMemo(() => {
-    let result = contracts.filter(c => {
-      const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.provider.toLowerCase().includes(search.toLowerCase());
-      const matchCategory = categoryFilter === 'all' || c.category === categoryFilter;
-      const matchStatus = statusFilter === 'all' || c.status === statusFilter;
-      return matchSearch && matchCategory && matchStatus;
-    });
-
-    result.sort((a, b) => {
-      if (sortBy === 'renewal') return getDaysUntilExpiry(a) - getDaysUntilExpiry(b);
-      if (sortBy === 'price') return b.price - a.price;
-      return a.name.localeCompare(b.name);
-    });
-
-    return result;
-  }, [contracts, search, categoryFilter, statusFilter, sortBy]);
 
   return (
     <div className="space-y-6 pt-16">
