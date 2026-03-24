@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { Plus, ChartLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KpiCards } from "@/features/portfolio/components/KpiCards";
@@ -7,6 +7,8 @@ import { MonthlyInsights } from "@/features/portfolio/components/MonthlyInsights
 import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
 import { Investment, calculateSummary } from "@/features/portfolio/types/investment";
 import AppSectionHeader from "@/components/AppSectionHeader";
+import { useBtcQuote } from "@/features/portfolio/hooks/use-btc-quote";
+import { resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 const InvestmentDialog = lazy(() =>
   import("@/features/portfolio/components/InvestmentDialog").then((module) => ({ default: module.InvestmentDialog })),
@@ -16,8 +18,16 @@ const Index = () => {
   const { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment } = useInvestments();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
+  const { priceEur: btcSpotEur, loading: btcQuoteLoading } = useBtcQuote();
 
-  const summary = calculateSummary(investments);
+  const resolvedInvestments = useMemo(() => {
+    return investments.map((investment) => ({
+      ...investment,
+      currentValue: resolveInvestmentCurrentValue(investment, btcSpotEur),
+    }));
+  }, [investments, btcSpotEur]);
+
+  const summary = calculateSummary(resolvedInvestments);
 
   const handleEdit = (investment: Investment) => {
     setEditingInvestment(investment);
@@ -74,12 +84,16 @@ const Index = () => {
               investments={shortTerm}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              btcSpotEur={btcSpotEur}
+              btcQuoteLoading={btcQuoteLoading}
             />
             <InvestmentSection
               title="Long-term Investments"
               investments={longTerm}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              btcSpotEur={btcSpotEur}
+              btcQuoteLoading={btcQuoteLoading}
             />
           </div>
         </div>
