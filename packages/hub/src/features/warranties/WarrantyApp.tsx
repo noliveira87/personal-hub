@@ -34,6 +34,7 @@ const CATEGORY_FILTERS: { label: string; value: WarrantyCategory | "all" }[] = [
 ];
 
 const SENT_ALERTS_KEY = 'd12-warranty-alerts-sent';
+const PENDING_ALERTS_KEY = 'd12-warranty-alerts-pending';
 
 function getTodayKey(): string {
   return new Date().toDateString();
@@ -57,6 +58,22 @@ function loadSentWarrantyAlerts(): Record<string, string[]> {
 
 function saveSentWarrantyAlerts(sentMap: Record<string, string[]>): void {
   localStorage.setItem(SENT_ALERTS_KEY, JSON.stringify(sentMap));
+}
+
+function loadPendingWarrantyAlerts(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(PENDING_ALERTS_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePendingWarrantyAlerts(pendingMap: Record<string, string[]>): void {
+  localStorage.setItem(PENDING_ALERTS_KEY, JSON.stringify(pendingMap));
 }
 
 export function WarrantyApp() {
@@ -85,7 +102,9 @@ export function WarrantyApp() {
       if (alertSettings.warrantiesEnabled && isTelegramReady) {
         const todayKey = getTodayKey();
         const sentMap = loadSentWarrantyAlerts();
+        const pendingMap = loadPendingWarrantyAlerts();
         const sentToday = new Set(sentMap[todayKey] ?? []);
+        const pendingToday = new Set(pendingMap[todayKey] ?? []);
 
         const expiring = data.filter(w => {
           if (w.archivedAt) return false;
@@ -94,10 +113,18 @@ export function WarrantyApp() {
           const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
           if (!(days >= 0 && days <= alertSettings.warrantyAlertDays)) return false;
 
-          return !sentToday.has(getWarrantyAlertSignature(w));
+          const signature = getWarrantyAlertSignature(w);
+          return !sentToday.has(signature) && !pendingToday.has(signature);
         });
 
         if (expiring.length > 0) {
+          const reservedSignatures = expiring.map(getWarrantyAlertSignature);
+          pendingMap[todayKey] = [
+            ...pendingToday,
+            ...reservedSignatures,
+          ];
+          savePendingWarrantyAlerts(pendingMap);
+
           const lines = expiring.map(w => {
             const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
             return `• ${w.productName} — <b>${days}d</b> remaining`;
@@ -110,10 +137,21 @@ export function WarrantyApp() {
 
             sentMap[todayKey] = [
               ...sentToday,
-              ...expiring.map(getWarrantyAlertSignature),
+              ...reservedSignatures,
             ];
             saveSentWarrantyAlerts(sentMap);
+
+            const nextPendingToday = (pendingMap[todayKey] ?? []).filter(
+              (signature) => !reservedSignatures.includes(signature)
+            );
+            pendingMap[todayKey] = nextPendingToday;
+            savePendingWarrantyAlerts(pendingMap);
           } catch (error) {
+            const nextPendingToday = (pendingMap[todayKey] ?? []).filter(
+              (signature) => !reservedSignatures.includes(signature)
+            );
+            pendingMap[todayKey] = nextPendingToday;
+            savePendingWarrantyAlerts(pendingMap);
             console.error('Failed to send warranty Telegram alert:', error);
           }
         }
