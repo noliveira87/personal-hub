@@ -36,7 +36,7 @@ const Index = () => (
 				{/* D12 Couple Illustration */}
 				<div className="mb-8 flex justify-center sm:mb-10">
 					<img
-						src="/d12.jpg"
+						src="/d12-new.png"
 						alt="D12 Couple"
 						className="h-auto w-full max-w-xs rounded-2xl shadow-lg dark:shadow-lg sm:max-w-sm"
 					/>
