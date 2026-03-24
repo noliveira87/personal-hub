@@ -65,8 +65,7 @@ begin
       w.expiration_date
     from public.warranties w
     where w.archived_at is null
-      and w.expiration_date >= current_date
-      and w.expiration_date <= (current_date + v_alert_days)
+      and w.expiration_date = (current_date + v_alert_days)
     order by w.expiration_date asc
   loop
     v_signature := v_item.id::text || ':' || v_item.expiration_date::text;

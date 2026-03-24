@@ -155,6 +155,10 @@ Isto cria:
 - agendamento diário via `pg_cron` (09:15 UTC)
 - envio direto para Telegram via `pg_net`
 
+Comportamento atual dos alertas de Warranty:
+- envia **1 vez** quando faltam exatamente `warranty_alert_days` dias para expirar
+- não envia diariamente dentro da janela
+
 ### Como validar que está a funcionar
 
 1. Em **Settings**, guarda `Bot Token` e `Chat ID` válidos
