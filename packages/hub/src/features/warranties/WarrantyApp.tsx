@@ -33,6 +33,32 @@ const CATEGORY_FILTERS: { label: string; value: WarrantyCategory | "all" }[] = [
   { label: "Others", value: "others" },
 ];
 
+const SENT_ALERTS_KEY = 'd12-warranty-alerts-sent';
+
+function getTodayKey(): string {
+  return new Date().toDateString();
+}
+
+function getWarrantyAlertSignature(warranty: Warranty): string {
+  return `${warranty.id}:${warranty.expirationDate}`;
+}
+
+function loadSentWarrantyAlerts(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(SENT_ALERTS_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as Record<string, string[]>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSentWarrantyAlerts(sentMap: Record<string, string[]>): void {
+  localStorage.setItem(SENT_ALERTS_KEY, JSON.stringify(sentMap));
+}
+
 export function WarrantyApp() {
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,30 +83,38 @@ export function WarrantyApp() {
       const isTelegramReady = Boolean(telegramConfig.botToken.trim() && telegramConfig.chatId.trim());
 
       if (alertSettings.warrantiesEnabled && isTelegramReady) {
-        const SENT_KEY = 'd12-warranty-alerts-sent';
-        const sentToday = localStorage.getItem(SENT_KEY) === new Date().toDateString();
-        if (!sentToday) {
-          const expiring = data.filter(w => {
-            if (w.archivedAt) return false;
-            const status = getStatus(w);
-            if (status === 'expired') return false;
-            const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
-            return days >= 0 && days <= alertSettings.warrantyAlertDays;
-          });
-          if (expiring.length > 0) {
-            const lines = expiring.map(w => {
-              const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
-              return `• ${w.productName} — <b>${days}d</b> remaining`;
-            }).join('\n');
+        const todayKey = getTodayKey();
+        const sentMap = loadSentWarrantyAlerts();
+        const sentToday = new Set(sentMap[todayKey] ?? []);
 
-            try {
-              await sendTelegramMessage(
-                `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n${lines}\n\n<i>Tap to open: hub.cafofo12.ddns.net/warranties</i>`
-              );
-              localStorage.setItem(SENT_KEY, new Date().toDateString());
-            } catch (error) {
-              console.error('Failed to send warranty Telegram alert:', error);
-            }
+        const expiring = data.filter(w => {
+          if (w.archivedAt) return false;
+          const status = getStatus(w);
+          if (status === 'expired') return false;
+          const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
+          if (!(days >= 0 && days <= alertSettings.warrantyAlertDays)) return false;
+
+          return !sentToday.has(getWarrantyAlertSignature(w));
+        });
+
+        if (expiring.length > 0) {
+          const lines = expiring.map(w => {
+            const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
+            return `• ${w.productName} — <b>${days}d</b> remaining`;
+          }).join('\n');
+
+          try {
+            await sendTelegramMessage(
+              `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n${lines}\n\n<i>Tap to open: hub.cafofo12.ddns.net/warranties</i>`
+            );
+
+            sentMap[todayKey] = [
+              ...sentToday,
+              ...expiring.map(getWarrantyAlertSignature),
+            ];
+            saveSentWarrantyAlerts(sentMap);
+          } catch (error) {
+            console.error('Failed to send warranty Telegram alert:', error);
           }
         }
       }
