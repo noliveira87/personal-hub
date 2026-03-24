@@ -12,7 +12,7 @@ const projects = [
 	{
 		title: "Portfolio Tracker",
 		subtitle: "Investments",
-		to: "/portfolio-tracker",
+		to: "/portfolio",
 		icon: ChartLine,
 	},
 	{
@@ -24,7 +24,7 @@ const projects = [
 	{
 		title: "Contract Manager",
 		subtitle: "Renewals",
-		to: "/contract-manager",
+		to: "/contracts",
 		icon: FileCheck2,
 	},
 ] as const;
