@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Investment, InvestmentCategory, InvestmentType } from "@/types/investment";
+import { parseCryptoNotes, serializeCryptoNotes } from "@/lib/crypto";
 
 interface InvestmentDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, onSave }: Inv
   const [type, setType] = useState<InvestmentType>("cash");
   const [investedAmount, setInvestedAmount] = useState("");
   const [currentValue, setCurrentValue] = useState("");
+  const [btcUnits, setBtcUnits] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -29,26 +31,31 @@ export function InvestmentDialog({ open, onOpenChange, investment, onSave }: Inv
       setType(investment.type);
       setInvestedAmount(investment.investedAmount.toString());
       setCurrentValue(investment.currentValue.toString());
-      setNotes(investment.notes || "");
+      const { btcUnits: parsedBtcUnits, userNotes } = parseCryptoNotes(investment.notes);
+      setBtcUnits(parsedBtcUnits ? parsedBtcUnits.toString() : "");
+      setNotes(userNotes || "");
     } else {
       setName("");
       setCategory("short-term");
       setType("cash");
       setInvestedAmount("");
       setCurrentValue("");
+      setBtcUnits("");
       setNotes("");
     }
   }, [investment, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedBtcUnits = type === "crypto" ? Number(btcUnits) || null : null;
+
     onSave({
       name,
       category,
       type,
       investedAmount: parseFloat(investedAmount) || 0,
       currentValue: parseFloat(currentValue) || 0,
-      notes: notes || undefined,
+      notes: serializeCryptoNotes(parsedBtcUnits, notes),
     });
     onOpenChange(false);
   };
@@ -99,6 +106,19 @@ export function InvestmentDialog({ open, onOpenChange, investment, onSave }: Inv
               <Input id="current" type="number" step="0.01" value={currentValue} onChange={e => setCurrentValue(e.target.value)} required />
             </div>
           </div>
+          {type === "crypto" && (
+            <div>
+              <Label htmlFor="btc-units">BTC amount (optional for live sync)</Label>
+              <Input
+                id="btc-units"
+                type="number"
+                step="0.00000001"
+                value={btcUnits}
+                onChange={e => setBtcUnits(e.target.value)}
+                placeholder="e.g. 0.052341"
+              />
+            </div>
+          )}
           <div>
             <Label htmlFor="notes">Notes (optional)</Label>
             <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />

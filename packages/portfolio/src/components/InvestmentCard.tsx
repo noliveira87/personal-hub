@@ -1,11 +1,14 @@
 import { Pencil, Trash2 } from "lucide-react";
-import { Investment, calculateProfitLoss, formatCurrency, formatPercentage } from "@/types/investment";
+import { Investment, formatCurrency, formatPercentage } from "@/types/investment";
+import { parseCryptoNotes, resolveInvestmentCurrentValue } from "@/lib/crypto";
 
 interface InvestmentCardProps {
   investment: Investment;
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
   index: number;
+  btcSpotEur?: number | null;
+  btcQuoteLoading?: boolean;
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -16,9 +19,13 @@ const TYPE_EMOJI: Record<string, string> = {
   ppr: "🏦",
 };
 
-export function InvestmentCard({ investment, onEdit, onDelete, index }: InvestmentCardProps) {
-  const { profitLoss, percentage } = calculateProfitLoss(investment);
+export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur, btcQuoteLoading }: InvestmentCardProps) {
+  const { btcUnits, userNotes } = parseCryptoNotes(investment.notes);
+  const displayCurrentValue = resolveInvestmentCurrentValue(investment, btcSpotEur);
+  const profitLoss = displayCurrentValue - investment.investedAmount;
+  const percentage = investment.investedAmount > 0 ? (profitLoss / investment.investedAmount) * 100 : 0;
   const isPositive = profitLoss >= 0;
+  const hasLiveCryptoQuote = investment.type === "crypto" && !!btcUnits && !!btcSpotEur;
 
   return (
     <div
@@ -30,7 +37,12 @@ export function InvestmentCard({ investment, onEdit, onDelete, index }: Investme
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl">{TYPE_EMOJI[investment.type] || "💰"}</span>
           <div className="min-w-0 space-y-1">
             <h3 className="truncate font-semibold text-foreground">{investment.name}</h3>
-            <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">{investment.type}</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">{investment.type}</span>
+              {hasLiveCryptoQuote && (
+                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">Live BTC</span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
@@ -56,7 +68,15 @@ export function InvestmentCard({ investment, onEdit, onDelete, index }: Investme
         </div>
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Current</p>
-          <p className="text-sm font-medium text-foreground">{formatCurrency(investment.currentValue)}</p>
+          <p className="text-sm font-medium text-foreground">{formatCurrency(displayCurrentValue)}</p>
+          {hasLiveCryptoQuote && (
+            <p className="text-[11px] text-muted-foreground">
+              {btcUnits!.toFixed(6)} BTC × {formatCurrency(btcSpotEur!)}
+            </p>
+          )}
+          {investment.type === "crypto" && btcQuoteLoading && !hasLiveCryptoQuote && (
+            <p className="text-[11px] text-muted-foreground">Fetching BTC quote…</p>
+          )}
         </div>
       </div>
 
@@ -76,8 +96,8 @@ export function InvestmentCard({ investment, onEdit, onDelete, index }: Investme
         </span>
       </div>
 
-      {investment.notes && (
-        <p className="mt-4 rounded-2xl bg-muted/40 px-3 py-2 text-xs italic leading-5 text-muted-foreground">{investment.notes}</p>
+      {userNotes && (
+        <p className="mt-4 rounded-2xl bg-muted/40 px-3 py-2 text-xs italic leading-5 text-muted-foreground">{userNotes}</p>
       )}
     </div>
   );

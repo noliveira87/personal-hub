@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { Plus, Moon, Sun, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KpiCards } from "@/components/KpiCards";
@@ -7,6 +7,8 @@ import { MonthlyInsights } from "@/components/MonthlyInsights";
 import { useInvestments } from "@/hooks/useInvestments";
 import { Investment, calculateSummary } from "@/types/investment";
 import { useDarkMode } from "@shared-ui/use-dark-mode";
+import { useBtcQuote } from "@/hooks/use-btc-quote";
+import { resolveInvestmentCurrentValue } from "@/lib/crypto";
 
 const InvestmentDialog = lazy(() =>
   import("@/components/InvestmentDialog").then((module) => ({ default: module.InvestmentDialog })),
@@ -17,8 +19,16 @@ const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
   const { isDark, toggleDark } = useDarkMode();
+  const { priceEur: btcSpotEur, loading: btcQuoteLoading } = useBtcQuote();
 
-  const summary = calculateSummary(investments);
+  const resolvedInvestments = useMemo(() => {
+    return investments.map((investment) => ({
+      ...investment,
+      currentValue: resolveInvestmentCurrentValue(investment, btcSpotEur),
+    }));
+  }, [investments, btcSpotEur]);
+
+  const summary = calculateSummary(resolvedInvestments);
 
   const handleEdit = (investment: Investment) => {
     setEditingInvestment(investment);
@@ -85,12 +95,16 @@ const Index = () => {
             investments={shortTerm}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            btcSpotEur={btcSpotEur}
+            btcQuoteLoading={btcQuoteLoading}
           />
           <InvestmentSection
             title="Long-term Investments"
             investments={longTerm}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            btcSpotEur={btcSpotEur}
+            btcQuoteLoading={btcQuoteLoading}
           />
         </div>
       </main>

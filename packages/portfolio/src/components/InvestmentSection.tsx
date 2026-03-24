@@ -1,15 +1,31 @@
-import { Investment, calculateSummary, formatCurrency, formatPercentage } from "@/types/investment";
+import { Investment, formatCurrency, formatPercentage } from "@/types/investment";
 import { InvestmentCard } from "./InvestmentCard";
+import { resolveInvestmentCurrentValue } from "@/lib/crypto";
 
 interface InvestmentSectionProps {
   title: string;
   investments: Investment[];
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
+  btcSpotEur?: number | null;
+  btcQuoteLoading?: boolean;
 }
 
-export function InvestmentSection({ title, investments, onEdit, onDelete }: InvestmentSectionProps) {
-  const summary = calculateSummary(investments);
+export function InvestmentSection({ title, investments, onEdit, onDelete, btcSpotEur, btcQuoteLoading }: InvestmentSectionProps) {
+  const totalInvested = investments.reduce((sum, inv) => sum + inv.investedAmount, 0);
+  const totalCurrentValue = investments.reduce(
+    (sum, inv) => sum + resolveInvestmentCurrentValue(inv, btcSpotEur),
+    0,
+  );
+  const totalProfitLoss = totalCurrentValue - totalInvested;
+  const percentageReturn = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
+
+  const summary = {
+    totalCurrentValue,
+    totalProfitLoss,
+    percentageReturn,
+  };
+
   const isPositive = summary.totalProfitLoss >= 0;
 
   if (investments.length === 0) return null;
@@ -40,6 +56,8 @@ export function InvestmentSection({ title, investments, onEdit, onDelete }: Inve
             onEdit={onEdit}
             onDelete={onDelete}
             index={i}
+            btcSpotEur={btcSpotEur}
+            btcQuoteLoading={btcQuoteLoading}
           />
         ))}
       </div>
