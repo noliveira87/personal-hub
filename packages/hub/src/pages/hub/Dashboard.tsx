@@ -127,24 +127,30 @@ export default function Dashboard() {
       </div>
 
       {/* Alert buckets */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-up" style={{ animationDelay: '200ms' }}>
-        {[
-          { label: '7 days', count: within7, variant: 'urgent' as const },
-          { label: '15 days', count: within15, variant: 'warning' as const },
-          { label: '30 days', count: within30, variant: 'warning' as const },
-          { label: '60 days', count: expiringSoon.length, variant: 'default' as const },
-        ].map(bucket => (
-          <div key={bucket.label} className="bg-card rounded-lg p-3 border-2 border-border text-center shadow-sm">
-            <p className="text-xs text-muted-foreground">Within {bucket.label}</p>
-            <p className={`text-xl font-bold tabular-nums ${
-              bucket.variant === 'urgent' && bucket.count > 0 ? 'text-urgent' :
-              bucket.variant === 'warning' && bucket.count > 0 ? 'text-warning' : 'text-foreground'
-            }`}>
-              {bucket.count}
-            </p>
-          </div>
-        ))}
-      </div>
+      {expiringSoon.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-up" style={{ animationDelay: '200ms' }}>
+          {[
+            { label: '7 days', count: within7, variant: 'urgent' as const },
+            { label: '15 days', count: within15, variant: 'warning' as const },
+            { label: '30 days', count: within30, variant: 'warning' as const },
+            { label: '60 days', count: expiringSoon.length, variant: 'default' as const },
+          ].map(bucket => (
+            <div key={bucket.label} className="bg-card rounded-lg p-3 border-2 border-border text-center shadow-sm">
+              <p className="text-xs text-muted-foreground">Within {bucket.label}</p>
+              <p className={`text-xl font-bold tabular-nums ${
+                bucket.variant === 'urgent' && bucket.count > 0 ? 'text-urgent' :
+                bucket.variant === 'warning' && bucket.count > 0 ? 'text-warning' : 'text-foreground'
+              }`}>
+                {bucket.count}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border-2 border-border bg-card px-4 py-3 text-sm text-muted-foreground animate-fade-up" style={{ animationDelay: '200ms' }}>
+          No renewals due in the next 60 days ✅
+        </div>
+      )}
 
       {/* Expiring soon */}
       {expiringSoon.length > 0 && (
