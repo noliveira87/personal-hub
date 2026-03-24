@@ -15,7 +15,7 @@ import {
 import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
-import { Search, ShieldCheck, Settings } from "lucide-react";
+import { Search, ShieldCheck } from "lucide-react";
 import { loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
 import {
   loadWarrantyAlertHistory,
@@ -312,18 +312,8 @@ export function WarrantyApp() {
       <AppSectionHeader
         title="D12 Warranties"
         icon={ShieldCheck}
-        actions={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate("/settings", { state: { from: 'warranties' } })}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors hover:text-primary"
-              title="Warranty settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-            <AddWarrantyDialog onAdd={addWarranty} />
-          </div>
-        }
+        actions={<AddWarrantyDialog onAdd={addWarranty} />}
+        showSettings={false}
       />
 
       <div className="max-w-lg mx-auto px-4 pt-20 pb-24">
@@ -337,6 +327,12 @@ export function WarrantyApp() {
               <p className="text-sm text-muted-foreground">
                 {warranties.length} product{warranties.length !== 1 ? "s" : ""} tracked
               </p>
+              <button
+                onClick={() => navigate("/settings", { state: { from: "warranties" } })}
+                className="mt-2 text-xs text-primary hover:text-primary/80 underline transition-colors"
+              >
+                Configure notifications →
+              </button>
             </div>
           </div>
         </div>
