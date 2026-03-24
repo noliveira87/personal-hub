@@ -114,8 +114,31 @@ Os dados são salvos automaticamente no Supabase.
 
 ### Remover Dados Locais
 
-O localStorage agora é usado **apenas** para:
-- Configurações de Telegram (salvo localmente no navegador)
+As configurações agora usam um modo híbrido:
+- **Primário:** tabela `app_settings` no Supabase (global para a família)
+- **Fallback:** localStorage no navegador (se a tabela não existir ou houver erro)
+
+## Settings Globais (Family Mode)
+
+Para persistir Settings na base de dados, execute também:
+
+1. Abra **SQL Editor** no Supabase
+2. Crie uma nova query
+3. Execute o conteúdo de:
+
+`packages/hub/supabase/settings.sql`
+
+Isso cria:
+- tabela `public.app_settings` (singleton com `id = 'global'`)
+- políticas RLS para o modo A (family/shared, sem login)
+- linha inicial default
+
+### Campos persistidos em `app_settings`
+
+- Telegram: `telegram_bot_token`, `telegram_chat_id`
+- Alertas: `warranties_enabled`, `contracts_enabled`, `portfolio_enabled`, `warranty_alert_days`
+
+> Nota: no modo atual (A), qualquer cliente com `anon key` pode ler/escrever essa configuração global. Quando quiseres multi-user com auth, trocamos para políticas por utilizador.
 
 Todos os contratos e histórico de preços são armazenados exclusivamente no Supabase.
 

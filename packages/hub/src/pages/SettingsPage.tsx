@@ -1,16 +1,73 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bell, Send } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import {
+  type AlertSettings,
+  getSettingsPersistenceMode,
+  loadAlertSettings,
+  loadTelegramConfig,
+  persistAlertSettings,
+  persistTelegramConfig,
+  sendTestMessage,
+} from '@/lib/telegram';
+
+const DEFAULT_ALERT_SETTINGS: AlertSettings = {
+  warrantiesEnabled: true,
+  contractsEnabled: true,
+  portfolioEnabled: false,
+  warrantyAlertDays: 30,
+};
 
 export default function SettingsPage() {
-  const [telegramChatId, setTelegramChatId] = useState(() => localStorage.getItem('telegramChatId') || '');
-  const [telegramBotToken, setTelegramBotToken] = useState(() => localStorage.getItem('telegramBotToken') || '');
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramBotToken, setTelegramBotToken] = useState('');
+  const [alertSettings, setAlertSettings] = useState<AlertSettings>(DEFAULT_ALERT_SETTINGS);
+  const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const storageMode = useMemo(() => getSettingsPersistenceMode(), []);
 
-  const handleSave = () => {
-    localStorage.setItem('telegramChatId', telegramChatId);
-    localStorage.setItem('telegramBotToken', telegramBotToken);
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSettings = async () => {
+      try {
+        const [telegramConfig, alerts] = await Promise.all([
+          loadTelegramConfig(),
+          loadAlertSettings(),
+        ]);
+
+        if (cancelled) return;
+
+        setTelegramBotToken(telegramConfig.botToken);
+        setTelegramChatId(telegramConfig.chatId);
+        setAlertSettings(alerts);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await Promise.all([
+      persistTelegramConfig({
+        botToken: telegramBotToken,
+        chatId: telegramChatId,
+      }),
+      persistAlertSettings(alertSettings),
+    ]);
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -28,23 +85,8 @@ export default function SettingsPage() {
     setTestStatus(null);
 
     try {
-      const text = `🧪 Test notification from Home Contracts\n${new Date().toLocaleString()}`;
-      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          disable_web_page_preview: true,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result?.ok) {
-        const description = result?.description || 'Failed to send test message.';
-        throw new Error(description);
-      }
+      await persistTelegramConfig({ botToken: token, chatId });
+      await sendTestMessage();
 
       setTestStatus({ type: 'success', message: 'Test message sent successfully ✅' });
     } catch (error) {
@@ -55,20 +97,36 @@ export default function SettingsPage() {
     }
   };
 
-  const inputClass = 'w-full px-3 py-2.5 rounded-lg border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow';
+  const updateAlertSetting = <K extends keyof AlertSettings>(key: K, value: AlertSettings[K]) => {
+    setAlertSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Loading your preferences…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div className="animate-fade-up">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Configure your preferences and integrations</p>
+        <p className="mt-1 text-sm text-muted-foreground">Configure your preferences and integrations</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Storage mode: <span className="font-medium text-foreground">{storageMode === 'local' ? 'Local browser storage' : 'Database sync'}</span>
+        </p>
       </div>
 
       {/* Telegram */}
-      <div className="bg-card rounded-xl p-6 border space-y-4 animate-fade-up" style={{ animationDelay: '80ms' }}>
+      <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '80ms' }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Send className="w-4 h-4 text-primary" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+            <Send className="h-4 w-4 text-primary" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-foreground">Telegram Integration</h2>
@@ -78,39 +136,41 @@ export default function SettingsPage() {
 
         <div className="space-y-3">
           <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Bot Token</label>
-            <input
-              className={inputClass}
+            <Label htmlFor="telegram-bot-token" className="mb-1.5 block">Bot Token</Label>
+            <Input
+              id="telegram-bot-token"
               value={telegramBotToken}
               onChange={e => setTelegramBotToken(e.target.value)}
               placeholder="123456:ABC-DEF..."
               type="password"
             />
-            <p className="text-xs text-muted-foreground mt-1">Get from @BotFather on Telegram</p>
+            <p className="mt-1 text-xs text-muted-foreground">Get from @BotFather on Telegram</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Chat ID</label>
-            <input
-              className={inputClass}
+            <Label htmlFor="telegram-chat-id" className="mb-1.5 block">Chat ID</Label>
+            <Input
+              id="telegram-chat-id"
               value={telegramChatId}
               onChange={e => setTelegramChatId(e.target.value)}
               placeholder="Your chat ID"
             />
-            <p className="text-xs text-muted-foreground mt-1">Send /start to @userinfobot to get your ID</p>
+            <p className="mt-1 text-xs text-muted-foreground">Send /start to @userinfobot to get your ID</p>
           </div>
-          <button
-            onClick={handleSave}
-            className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95"
-          >
-            {saved ? '✓ Saved!' : 'Save Telegram Settings'}
-          </button>
-          <button
-            onClick={handleSendTest}
-            disabled={sendingTest}
-            className="ml-2 px-4 py-2.5 rounded-lg text-sm font-medium border hover:bg-muted transition-colors active:scale-95 disabled:opacity-60"
-          >
-            {sendingTest ? 'Sending…' : 'Send Test Message'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void handleSave()}
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
+            >
+              {saved ? '✓ Saved!' : 'Save Settings'}
+            </button>
+            <button
+              onClick={() => void handleSendTest()}
+              disabled={sendingTest}
+              className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted active:scale-95 disabled:opacity-60"
+            >
+              {sendingTest ? 'Sending…' : 'Send Test Message'}
+            </button>
+          </div>
           {testStatus && (
             <p className={`text-xs mt-2 ${testStatus.type === 'success' ? 'text-emerald-600' : 'text-destructive'}`}>
               {testStatus.message}
@@ -120,16 +180,65 @@ export default function SettingsPage() {
       </div>
 
       {/* Alerts defaults */}
-      <div className="bg-card rounded-xl p-6 border space-y-4 animate-fade-up" style={{ animationDelay: '160ms' }}>
+      <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '160ms' }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
-            <Bell className="w-4 h-4 text-warning" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
+            <Bell className="h-4 w-4 text-warning" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Default Alert Timing</h2>
-            <p className="text-xs text-muted-foreground">These are the default reminder windows for new contracts</p>
+            <h2 className="text-sm font-semibold text-foreground">Alerts & defaults</h2>
+            <p className="text-xs text-muted-foreground">Consistent app-level settings, ready to move into a database later</p>
           </div>
         </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Warranty alerts</p>
+              <p className="text-xs text-muted-foreground">Send Telegram alerts for warranties nearing expiry</p>
+            </div>
+            <Switch
+              checked={alertSettings.warrantiesEnabled}
+              onCheckedChange={(checked) => updateAlertSetting('warrantiesEnabled', checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Contract alerts</p>
+              <p className="text-xs text-muted-foreground">Enable Telegram reminders for contracts and renewals</p>
+            </div>
+            <Switch
+              checked={alertSettings.contractsEnabled}
+              onCheckedChange={(checked) => updateAlertSetting('contractsEnabled', checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Portfolio alerts</p>
+              <p className="text-xs text-muted-foreground">Reserve a toggle for future portfolio notifications</p>
+            </div>
+            <Switch
+              checked={alertSettings.portfolioEnabled}
+              onCheckedChange={(checked) => updateAlertSetting('portfolioEnabled', checked)}
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="warranty-alert-days" className="mb-1.5 block">Default warranty alert lead time</Label>
+          <Input
+            id="warranty-alert-days"
+            type="number"
+            min={1}
+            max={365}
+            value={alertSettings.warrantyAlertDays}
+            onChange={(e) => updateAlertSetting('warrantyAlertDays', Math.max(1, Number(e.target.value) || 1))}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">Used as the default threshold before expiry for warranty reminders.</p>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           {[90, 60, 30, 15, 7, 3, 1].map(d => (
             <span key={d} className="px-3 py-1.5 rounded-full bg-muted text-xs font-medium text-muted-foreground">
@@ -137,7 +246,7 @@ export default function SettingsPage() {
             </span>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">Alert timing can be customized per contract in the edit form.</p>
+        <p className="text-xs text-muted-foreground">Alert timing can still be customized per contract in the edit form.</p>
       </div>
     </div>
   );
