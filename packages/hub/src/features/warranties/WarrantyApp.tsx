@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Search, ShieldCheck } from "lucide-react";
 import { loadAlertSettings, loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
 import AppSectionHeader from "@/components/AppSectionHeader";
+import { useSearchParams } from "react-router-dom";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -35,6 +36,23 @@ const CATEGORY_FILTERS: { label: string; value: WarrantyCategory | "all" }[] = [
 
 const SENT_ALERTS_KEY = 'd12-warranty-alerts-sent';
 const PENDING_ALERTS_KEY = 'd12-warranty-alerts-pending';
+const EXPIRING_WARRANTIES_URL = 'https://hub.cafofo12.ddns.net/warranties?status=expiring';
+
+function parseStatusFilter(value: string | null): WarrantyStatus | 'all' {
+  if (value === 'active' || value === 'expiring' || value === 'expired') {
+    return value;
+  }
+
+  return 'all';
+}
+
+function parseCategoryFilter(value: string | null): WarrantyCategory | 'all' {
+  if (value === 'tech' || value === 'appliances' || value === 'others') {
+    return value;
+  }
+
+  return 'all';
+}
 
 function getTodayKey(): string {
   return new Date().toDateString();
@@ -77,12 +95,13 @@ function savePendingWarrantyAlerts(pendingMap: Record<string, string[]>): void {
 }
 
 export function WarrantyApp() {
+  const [searchParams] = useSearchParams();
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<WarrantyStatus | "all">("all");
-  const [categoryFilter, setCategoryFilter] = useState<WarrantyCategory | "all">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
+  const [filter, setFilter] = useState<WarrantyStatus | "all">(() => parseStatusFilter(searchParams.get('status')));
+  const [categoryFilter, setCategoryFilter] = useState<WarrantyCategory | "all">(() => parseCategoryFilter(searchParams.get('category')));
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? "");
+  const [showArchived, setShowArchived] = useState(() => searchParams.get('archived') === 'true');
 
   useEffect(() => {
     let isMounted = true;
@@ -125,15 +144,14 @@ export function WarrantyApp() {
           ];
           savePendingWarrantyAlerts(pendingMap);
 
-          const lines = expiring.map(w => {
-            const days = Math.ceil((new Date(w.expirationDate).getTime() - Date.now()) / 86400000);
-            return `• ${w.productName} — <b>${days}d</b> remaining`;
-          }).join('\n');
-
           try {
-            await sendTelegramMessage(
-              `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n${lines}\n\n<i>Tap to open: hub.cafofo12.ddns.net/warranties</i>`
-            );
+            for (const warranty of expiring) {
+              const days = Math.ceil((new Date(warranty.expirationDate).getTime() - Date.now()) / 86400000);
+
+              await sendTelegramMessage(
+                `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n• ${warranty.productName} — <b>${days}d</b> remaining\n\n<i>Tap to open: ${EXPIRING_WARRANTIES_URL}</i>`
+              );
+            }
 
             sentMap[todayKey] = [
               ...sentToday,
