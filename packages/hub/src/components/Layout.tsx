@@ -1,11 +1,10 @@
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { FileText, CalendarDays, Bell, Settings, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/contracts', label: 'Contracts', icon: FileText },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/alerts', label: 'Alerts', icon: Bell },
@@ -18,7 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
-  const isContractsPage = /^\/(dashboard|contracts|calendar|alerts|insights)/.test(location.pathname);
+  const isContractsPage = /^\/(contracts|calendar|alerts|insights)/.test(location.pathname);
   const showSidebar = isContractsPage;
   const showDesktopHeaderToggle = !isLandingPage;
 
@@ -49,7 +48,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/dashboard'}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
@@ -78,7 +76,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/dashboard'}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
                 isActive
