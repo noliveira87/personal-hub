@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChartLine, FileCheck2, House, ShieldCheck } from "lucide-react";
+import { ChartLine, FileCheck2, House, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
+import { useDarkMode } from "@shared-ui/use-dark-mode";
 
 const projects = [
 	{
@@ -29,8 +30,22 @@ const projects = [
 	},
 ] as const;
 
-const Index = () => (
+const Index = () => {
+	const { isDark, toggleDark } = useDarkMode();
+
+	return (
 	<main className="min-h-screen bg-background">
+		<div className="fixed right-4 top-4 z-40 flex items-center gap-2">
+			<Button variant="outline" size="icon" onClick={toggleDark} className="h-9 w-9 rounded-lg bg-card/90">
+				{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+			</Button>
+			<Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-lg bg-card/90">
+				<Link to="/settings" aria-label="Open settings">
+					<Settings className="h-4 w-4" />
+				</Link>
+			</Button>
+		</div>
+
 		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
 			<div className="w-full">
 				{/* D12 Couple Illustration */}
@@ -72,6 +87,7 @@ const Index = () => (
 			</div>
 		</section>
 	</main>
-);
+	);
+};
 
 export default Index;
