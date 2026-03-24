@@ -1,9 +1,7 @@
-import { useMemo } from 'react';
 import { useContracts } from '@/context/ContractContext';
 import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getAnnualEquivalent, formatCurrency } from '@/lib/contractUtils';
-import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { Link } from 'react-router-dom';
 import { Plus, ArrowRight, ArrowLeft, Moon, Sun, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,10 +10,6 @@ import { useDarkMode } from '@shared-ui/use-dark-mode';
 export default function Dashboard() {
   const { contracts, loading, error } = useContracts();
   const { isDark, toggleDark } = useDarkMode();
-
-  // Get contract IDs for price history fetching
-  const contractIds = useMemo(() => contracts.map(c => c.id), [contracts]);
-  const { priceMap } = usePriceHistoryMap(contractIds);
 
   if (loading) {
     return (
@@ -46,14 +40,8 @@ export default function Dashboard() {
     .filter(c => c.daysLeft >= 0 && c.daysLeft <= 60)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  const monthlyTotal = active.reduce((sum, c) => {
-    const price = priceMap.get(c.id)?.price ?? c.price;
-    return sum + getMonthlyEquivalent(c, price);
-  }, 0);
-  const annualTotal = active.reduce((sum, c) => {
-    const price = priceMap.get(c.id)?.price ?? c.price;
-    return sum + getAnnualEquivalent(c, price);
-  }, 0);
+  const monthlyTotal = active.reduce((sum, c) => sum + getMonthlyEquivalent(c), 0);
+  const annualTotal = active.reduce((sum, c) => sum + getAnnualEquivalent(c), 0);
 
   const within7 = expiringSoon.filter(c => c.daysLeft <= 7).length;
   const within15 = expiringSoon.filter(c => c.daysLeft <= 15).length;
@@ -136,12 +124,7 @@ export default function Dashboard() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {expiringSoon.slice(0, 6).map((contract, i) => (
-              <ContractCard 
-                key={contract.id} 
-                contract={contract} 
-                index={i}
-                latestPrice={priceMap.get(contract.id)}
-              />
+              <ContractCard key={contract.id} contract={contract} index={i} />
             ))}
           </div>
         </section>
@@ -157,12 +140,7 @@ export default function Dashboard() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {active.slice(0, 6).map((contract, i) => (
-            <ContractCard 
-              key={contract.id} 
-              contract={contract} 
-              index={i}
-              latestPrice={priceMap.get(contract.id)}
-            />
+            <ContractCard key={contract.id} contract={contract} index={i} />
           ))}
         </div>
       </section>
