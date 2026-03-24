@@ -94,6 +94,10 @@ function savePendingWarrantyAlerts(pendingMap: Record<string, string[]>): void {
   localStorage.setItem(PENDING_ALERTS_KEY, JSON.stringify(pendingMap));
 }
 
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
 export function WarrantyApp() {
   const [searchParams] = useSearchParams();
   const [warranties, setWarranties] = useState<Warranty[]>([]);
@@ -147,23 +151,23 @@ export function WarrantyApp() {
           try {
             for (const warranty of expiring) {
               const days = Math.ceil((new Date(warranty.expirationDate).getTime() - Date.now()) / 86400000);
+              const signature = getWarrantyAlertSignature(warranty);
 
               await sendTelegramMessage(
-                `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n• ${warranty.productName} — <b>${days}d</b> remaining\n\n<i>Tap to open: ${EXPIRING_WARRANTIES_URL}</i>`
+                `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n• ${warranty.productName} — <b>${days}d</b> remaining\n\n<a href="${EXPIRING_WARRANTIES_URL}">Open expiring warranties</a>`
               );
+
+              sentMap[todayKey] = unique([
+                ...(sentMap[todayKey] ?? []),
+                signature,
+              ]);
+              saveSentWarrantyAlerts(sentMap);
+
+              pendingMap[todayKey] = (pendingMap[todayKey] ?? []).filter(
+                (pendingSignature) => pendingSignature !== signature
+              );
+              savePendingWarrantyAlerts(pendingMap);
             }
-
-            sentMap[todayKey] = [
-              ...sentToday,
-              ...reservedSignatures,
-            ];
-            saveSentWarrantyAlerts(sentMap);
-
-            const nextPendingToday = (pendingMap[todayKey] ?? []).filter(
-              (signature) => !reservedSignatures.includes(signature)
-            );
-            pendingMap[todayKey] = nextPendingToday;
-            savePendingWarrantyAlerts(pendingMap);
           } catch (error) {
             const nextPendingToday = (pendingMap[todayKey] ?? []).filter(
               (signature) => !reservedSignatures.includes(signature)
