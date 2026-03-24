@@ -95,11 +95,8 @@ begin
         'text',
           '🛡️ <b>Warranty Expiry Alert</b>' || E'\n\n' ||
           '📦 <b>Product:</b> ' || v_item.product_name || E'\n' ||
-          '⏳ <b>Remaining:</b> ' || v_days_left || ' day' || case when v_days_left <> 1 then 's' else '' end || E'\n' ||
           '📅 <b>Expires on:</b> ' || v_expiration_text || E'\n' ||
-          '🏷️ <b>Category:</b> ' || coalesce(v_item.category, 'others') || E'\n' ||
           '🏬 <b>Store:</b> ' || coalesce(nullif(v_item.purchased_from, ''), '—') || E'\n' ||
-          '💶 <b>Price:</b> ' || v_price_text || E'\n\n' ||
           '<a href="https://hub.cafofo12.ddns.net/warranties?status=expiring">Open expiring warranties</a>',
         'parse_mode', 'HTML',
         'disable_web_page_preview', true
