@@ -16,7 +16,7 @@ import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Search, ShieldCheck } from "lucide-react";
-import { getAlertSettings, isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
+import { loadAlertSettings, loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
 import AppSectionHeader from "@/components/AppSectionHeader";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
@@ -52,8 +52,11 @@ export function WarrantyApp() {
       setIsLoading(false);
 
       // Send Telegram alerts for expiring warranties
-      const alertSettings = getAlertSettings();
-      if (alertSettings.warrantiesEnabled && isTelegramConfigured()) {
+      const alertSettings = await loadAlertSettings();
+      const telegramConfig = await loadTelegramConfig();
+      const isTelegramReady = Boolean(telegramConfig.botToken.trim() && telegramConfig.chatId.trim());
+
+      if (alertSettings.warrantiesEnabled && isTelegramReady) {
         const SENT_KEY = 'd12-warranty-alerts-sent';
         const sentToday = localStorage.getItem(SENT_KEY) === new Date().toDateString();
         if (!sentToday) {
@@ -69,10 +72,15 @@ export function WarrantyApp() {
               const days = Math.ceil((new Date(w.expiryDate).getTime() - Date.now()) / 86400000);
               return `• ${w.productName} — <b>${days}d</b> remaining`;
             }).join('\n');
-            sendTelegramMessage(
-              `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n${lines}\n\n<i>Tap to open: hub.cafofo12.ddns.net/warranties</i>`
-            ).catch(() => null);
-            localStorage.setItem(SENT_KEY, new Date().toDateString());
+
+            try {
+              await sendTelegramMessage(
+                `🛡️ <b>Warranty Vault — Expiry Alert</b>\n\n${lines}\n\n<i>Tap to open: hub.cafofo12.ddns.net/warranties</i>`
+              );
+              localStorage.setItem(SENT_KEY, new Date().toDateString());
+            } catch (error) {
+              console.error('Failed to send warranty Telegram alert:', error);
+            }
           }
         }
       }
