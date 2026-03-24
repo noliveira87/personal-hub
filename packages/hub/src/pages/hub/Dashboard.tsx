@@ -148,7 +148,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="rounded-lg border-2 border-border bg-card px-4 py-3 text-sm text-muted-foreground animate-fade-up" style={{ animationDelay: '200ms' }}>
-          No renewals due in the next 60 days ✅
+          No additional renewals due between 31–60 days ✅
         </div>
       )}
 
