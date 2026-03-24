@@ -36,19 +36,19 @@ export function KpiCards({ summary }: KpiCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
       {cards.map((card, i) => (
         <div
           key={card.label}
-          className="rounded-xl bg-card p-5 shadow-sm border border-border animate-fade-in"
+          className="animate-fade-in rounded-2xl border border-border/80 bg-card p-5 shadow-sm sm:p-6"
           style={{ animationDelay: `${i * 80}ms` }}
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
               {card.label}
             </span>
             <div
-              className={`p-2 rounded-lg ${
+              className={`rounded-xl p-2.5 ${
                 card.accent === "profit"
                   ? "bg-profit\/10 text-profit"
                   : card.accent === "loss"
@@ -60,7 +60,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
             </div>
           </div>
           <p
-            className={`text-xl font-bold tracking-tight ${
+            className={`text-2xl font-bold tracking-tight sm:text-[1.75rem] ${
               card.accent === "profit"
                 ? "text-profit"
                 : card.accent === "loss"

@@ -1,5 +1,5 @@
 import { Investment, InvestmentCategory, InvestmentType, MonthlySnapshot } from "@/types/investment";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 
 type InvestmentRow = {
   id: string;
@@ -66,6 +66,7 @@ function mapSnapshotRow(row: MonthlySnapshotRow): MonthlySnapshot {
 }
 
 export async function loadInvestmentsFromDb(): Promise<Investment[] | null> {
+  const supabase = await getSupabaseClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
@@ -82,6 +83,7 @@ export async function loadInvestmentsFromDb(): Promise<Investment[] | null> {
 }
 
 export async function upsertInvestmentsInDb(investments: Investment[]): Promise<void> {
+  const supabase = await getSupabaseClient();
   if (!supabase) return;
 
   if (!investments.length) {
@@ -119,6 +121,7 @@ export async function upsertInvestmentsInDb(investments: Investment[]): Promise<
 }
 
 export async function loadMonthlySnapshotsFromDb(): Promise<MonthlySnapshot[] | null> {
+  const supabase = await getSupabaseClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
@@ -135,6 +138,7 @@ export async function loadMonthlySnapshotsFromDb(): Promise<MonthlySnapshot[] | 
 }
 
 export async function upsertMonthlySnapshotsInDb(snapshots: MonthlySnapshot[]): Promise<void> {
+  const supabase = await getSupabaseClient();
   if (!supabase) return;
 
   if (!snapshots.length) return;

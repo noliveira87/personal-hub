@@ -1,12 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Investment, MonthlySnapshot, calculateSummary } from "@/types/investment";
-import {
-  loadInvestmentsFromDb,
-  loadMonthlySnapshotsFromDb,
-  upsertInvestmentsInDb,
-  upsertMonthlySnapshotsInDb,
-} from "@/lib/investments";
-import { isSupabaseConfigured } from "@/lib/supabase";
+
+const isSupabaseConfigured = Boolean(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
+);
+
+const loadInvestmentDbModule = () => import("@/lib/investments");
 
 const generateId = () => {
   const webCrypto = globalThis.crypto;
@@ -144,9 +143,11 @@ export function useInvestments() {
         return;
       }
 
+      const db = await loadInvestmentDbModule();
+
       const [remoteInvestments, remoteSnapshots] = await Promise.all([
-        loadInvestmentsFromDb(),
-        loadMonthlySnapshotsFromDb(),
+        db.loadInvestmentsFromDb(),
+        db.loadMonthlySnapshotsFromDb(),
       ]);
 
       if (isCancelled) return;
@@ -154,13 +155,13 @@ export function useInvestments() {
       if (remoteInvestments && remoteInvestments.length > 0) {
         setInvestments(remoteInvestments);
       } else {
-        await upsertInvestmentsInDb(initialInvestmentsRef.current);
+        await db.upsertInvestmentsInDb(initialInvestmentsRef.current);
       }
 
       if (remoteSnapshots && remoteSnapshots.length > 0) {
         setMonthlySnapshots(remoteSnapshots);
       } else if (initialSnapshotsRef.current.length > 0) {
-        await upsertMonthlySnapshotsInDb(initialSnapshotsRef.current);
+        await db.upsertMonthlySnapshotsInDb(initialSnapshotsRef.current);
       }
 
       if (!isCancelled) {
@@ -179,7 +180,10 @@ export function useInvestments() {
     localStorage.setItem(INVESTMENTS_STORAGE_KEY, JSON.stringify(investments));
 
     if (isSupabaseConfigured && remoteHydrated) {
-      void upsertInvestmentsInDb(investments);
+      void (async () => {
+        const db = await loadInvestmentDbModule();
+        await db.upsertInvestmentsInDb(investments);
+      })();
     }
   }, [investments, remoteHydrated]);
 
@@ -225,7 +229,10 @@ export function useInvestments() {
     localStorage.setItem(SNAPSHOTS_STORAGE_KEY, JSON.stringify(monthlySnapshots));
 
     if (isSupabaseConfigured && remoteHydrated) {
-      void upsertMonthlySnapshotsInDb(monthlySnapshots);
+      void (async () => {
+        const db = await loadInvestmentDbModule();
+        await db.upsertMonthlySnapshotsInDb(monthlySnapshots);
+      })();
     }
   }, [monthlySnapshots, remoteHydrated]);
 

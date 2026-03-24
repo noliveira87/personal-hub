@@ -15,19 +15,24 @@ export function InvestmentSection({ title, investments, onEdit, onDelete }: Inve
   if (investments.length === 0) return null;
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-foreground">{title}</h2>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-muted-foreground">
+    <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-col gap-3 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-lg font-bold text-foreground sm:text-xl">{title}</h2>
+          <p className="text-sm text-muted-foreground">
+            {investments.length} {investments.length === 1 ? "position" : "positions"}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="rounded-full bg-muted px-3 py-1.5 text-muted-foreground">
             {formatCurrency(summary.totalCurrentValue)}
           </span>
-          <span className={`font-semibold ${isPositive ? "text-profit" : "text-loss"}`}>
+          <span className={`rounded-full px-3 py-1.5 font-semibold ${isPositive ? "bg-profit\/10 text-profit" : "bg-loss\/10 text-loss"}`}>
             {formatPercentage(summary.percentageReturn)}
           </span>
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {investments.map((inv, i) => (
           <InvestmentCard
             key={inv.id}

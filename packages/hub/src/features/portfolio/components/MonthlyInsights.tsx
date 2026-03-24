@@ -26,24 +26,24 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
   const maxAbsPerformance = Math.max(...recent.map(m => Math.abs(m.monthlyPerformance)), 1);
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
+      <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
         <CardTitle>Monthly insights</CardTitle>
         <CardDescription>Track monthly inflows vs market performance and evolution trends.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg border p-4">
+      <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month return</p>
             <p className={`mt-2 text-xl font-semibold ${latest.monthlyReturnPct >= 0 ? "text-profit" : "text-loss"}`}>
               {formatPercentage(latest.monthlyReturnPct)}
             </p>
           </div>
-          <div className="rounded-lg border p-4">
+          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month inflow</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(latest.monthlyInflow)}</p>
           </div>
-          <div className="rounded-lg border p-4">
+          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month performance</p>
             <p className={`mt-2 text-xl font-semibold ${latest.monthlyPerformance >= 0 ? "text-profit" : "text-loss"}`}>
               {formatCurrency(latest.monthlyPerformance)}
@@ -51,8 +51,8 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-lg border p-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
             <div className="mt-2 flex items-center gap-2 text-profit">
               <TrendingUp className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
             <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(bestMonth.monthlyPerformance)}</p>
           </div>
 
-          <div className="rounded-lg border p-4">
+          <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
             <div className="mt-2 flex items-center gap-2 text-loss">
               <TrendingDown className="h-4 w-4" />
@@ -71,14 +71,14 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
           <p className="text-sm font-medium text-foreground">Monthly evolution (last 6 months)</p>
           {recent.map((snapshot) => {
             const ratio = Math.max(3, (Math.abs(snapshot.monthlyPerformance) / maxAbsPerformance) * 100);
             const isPositive = snapshot.monthlyPerformance >= 0;
 
             return (
-              <div key={snapshot.month} className="space-y-1">
+              <div key={snapshot.month} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{formatMonthLabel(snapshot.month)}</span>
                   <span className={isPositive ? "text-profit" : "text-loss"}>
