@@ -46,18 +46,18 @@ const Index = () => {
 			</Button>
 		</div>
 
-		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
+		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
 			<div className="w-full">
 				{/* D12 Couple Illustration */}
-				<div className="mb-8 flex justify-center sm:mb-10">
+				<div className="mb-4 flex justify-center sm:mb-6">
 					<img
 						src="/d12-new.png"
 						alt="D12 Couple"
-						className="h-auto w-full max-w-xs rounded-2xl shadow-lg dark:shadow-lg sm:max-w-sm"
+						className="h-auto w-full max-w-xs sm:max-w-sm"
 					/>
 				</div>
 
-				<header className="mb-10 text-center sm:mb-12">
+				<header className="mb-6 text-center sm:mb-8">
 					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
 					<p className="mt-2 text-sm text-muted-foreground sm:text-base">App launcher</p>
 				</header>
