@@ -16,7 +16,7 @@ import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Search, ShieldCheck } from "lucide-react";
-import { loadAlertSettings, loadTelegramConfig, sendTelegramMessage } from "@/lib/telegram";
+import { loadAlertSettings, loadTelegramConfig, loadWarrantyAlertHistory, persistWarrantyAlertHistory, sendTelegramMessage } from "@/lib/telegram";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useSearchParams } from "react-router-dom";
 
@@ -34,7 +34,6 @@ const CATEGORY_FILTERS: { label: string; value: WarrantyCategory | "all" }[] = [
   { label: "Others", value: "others" },
 ];
 
-const SENT_ALERTS_KEY = 'd12-warranty-alerts-sent';
 const PENDING_ALERTS_KEY = 'd12-warranty-alerts-pending';
 const EXPIRING_WARRANTIES_URL = 'https://hub.cafofo12.ddns.net/warranties?status=expiring';
 
@@ -60,22 +59,6 @@ function getTodayKey(): string {
 
 function getWarrantyAlertSignature(warranty: Warranty): string {
   return `${warranty.id}:${warranty.expirationDate}`;
-}
-
-function loadSentWarrantyAlerts(): Record<string, string[]> {
-  try {
-    const raw = localStorage.getItem(SENT_ALERTS_KEY);
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw) as Record<string, string[]>;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveSentWarrantyAlerts(sentMap: Record<string, string[]>): void {
-  localStorage.setItem(SENT_ALERTS_KEY, JSON.stringify(sentMap));
 }
 
 function loadPendingWarrantyAlerts(): Record<string, string[]> {
@@ -124,7 +107,7 @@ export function WarrantyApp() {
 
       if (alertSettings.warrantiesEnabled && isTelegramReady) {
         const todayKey = getTodayKey();
-        const sentMap = loadSentWarrantyAlerts();
+        const sentMap = await loadWarrantyAlertHistory();
         const pendingMap = loadPendingWarrantyAlerts();
         const sentToday = new Set(sentMap[todayKey] ?? []);
         const pendingToday = new Set(pendingMap[todayKey] ?? []);
@@ -161,7 +144,7 @@ export function WarrantyApp() {
                 ...(sentMap[todayKey] ?? []),
                 signature,
               ]);
-              saveSentWarrantyAlerts(sentMap);
+              await persistWarrantyAlertHistory(sentMap);
 
               pendingMap[todayKey] = (pendingMap[todayKey] ?? []).filter(
                 (pendingSignature) => pendingSignature !== signature

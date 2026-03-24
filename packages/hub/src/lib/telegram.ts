@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   ALERTS_CONTRACTS: 'd12-alerts-contracts',
   ALERTS_PORTFOLIO: 'd12-alerts-portfolio',
   WARRANTIES_DAYS: 'd12-warranties-alert-days',
+  WARRANTY_ALERT_HISTORY: 'd12-warranty-alerts-sent',
 } as const;
 
 const LEGACY_STORAGE_KEYS = {
@@ -54,8 +55,11 @@ type AppSettingsRow = {
   contracts_enabled: boolean | null;
   portfolio_enabled: boolean | null;
   warranty_alert_days: number | null;
+  warranty_alerts_sent: unknown;
   updated_at: string;
 };
+
+export type WarrantyAlertHistory = Record<string, string[]>;
 
 let legacyMigrated = false;
 
@@ -117,6 +121,33 @@ function writeAlertSettingsToLocalStorage(settings: AlertSettings): void {
   localStorage.setItem(STORAGE_KEYS.WARRANTIES_DAYS, String(settings.warrantyAlertDays));
 }
 
+function normalizeWarrantyAlertHistory(value: unknown): WarrantyAlertHistory {
+  if (!value || typeof value !== 'object') return {};
+
+  const result: WarrantyAlertHistory = {};
+
+  for (const [key, rawEntries] of Object.entries(value as Record<string, unknown>)) {
+    if (!Array.isArray(rawEntries)) continue;
+    result[key] = rawEntries.filter((entry): entry is string => typeof entry === 'string');
+  }
+
+  return result;
+}
+
+function readWarrantyAlertHistoryFromLocalStorage(): WarrantyAlertHistory {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.WARRANTY_ALERT_HISTORY);
+    if (!raw) return {};
+    return normalizeWarrantyAlertHistory(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function writeWarrantyAlertHistoryToLocalStorage(history: WarrantyAlertHistory): void {
+  localStorage.setItem(STORAGE_KEYS.WARRANTY_ALERT_HISTORY, JSON.stringify(history));
+}
+
 function mapRowToTelegramConfig(row: AppSettingsRow | null): TelegramConfig {
   if (!row) {
     return {
@@ -152,7 +183,7 @@ function mapRowToAlertSettings(row: AppSettingsRow | null): AlertSettings {
 async function loadSettingsRowFromDatabase(): Promise<AppSettingsRow | null> {
   const { data, error } = await supabase
     .from(SETTINGS_TABLE)
-    .select('id, telegram_bot_token, telegram_chat_id, warranties_enabled, contracts_enabled, portfolio_enabled, warranty_alert_days, updated_at')
+    .select('id, telegram_bot_token, telegram_chat_id, warranties_enabled, contracts_enabled, portfolio_enabled, warranty_alert_days, warranty_alerts_sent, updated_at')
     .eq('id', GLOBAL_SETTINGS_ID)
     .maybeSingle();
 
@@ -175,6 +206,7 @@ async function upsertSettingsRowToDatabase(partial: Partial<AppSettingsRow>): Pr
   if (partial.contracts_enabled !== undefined) payload.contracts_enabled = partial.contracts_enabled;
   if (partial.portfolio_enabled !== undefined) payload.portfolio_enabled = partial.portfolio_enabled;
   if (partial.warranty_alert_days !== undefined) payload.warranty_alert_days = partial.warranty_alert_days;
+  if (partial.warranty_alerts_sent !== undefined) payload.warranty_alerts_sent = partial.warranty_alerts_sent;
 
   const { error } = await supabase
     .from(SETTINGS_TABLE)
@@ -313,6 +345,45 @@ export async function loadAlertSettings(): Promise<AlertSettings> {
 
 export async function persistAlertSettings(settings: AlertSettings): Promise<void> {
   await settingsStore.saveAlertSettings(settings);
+}
+
+export async function loadWarrantyAlertHistory(): Promise<WarrantyAlertHistory> {
+  const localHistory = readWarrantyAlertHistoryFromLocalStorage();
+
+  if (!isSupabaseConfigured) {
+    return localHistory;
+  }
+
+  try {
+    const row = await loadSettingsRowFromDatabase();
+
+    if (!row) {
+      return localHistory;
+    }
+
+    const history = normalizeWarrantyAlertHistory(row.warranty_alerts_sent);
+    writeWarrantyAlertHistoryToLocalStorage(history);
+    return history;
+  } catch (error) {
+    console.error('Failed to load warranty alert history from database, using local fallback:', error);
+    return localHistory;
+  }
+}
+
+export async function persistWarrantyAlertHistory(history: WarrantyAlertHistory): Promise<void> {
+  writeWarrantyAlertHistoryToLocalStorage(history);
+
+  if (!isSupabaseConfigured) {
+    return;
+  }
+
+  try {
+    await upsertSettingsRowToDatabase({
+      warranty_alerts_sent: history,
+    });
+  } catch (error) {
+    console.error('Failed to persist warranty alert history to database, kept local fallback:', error);
+  }
 }
 
 export function getTelegramConfig(): TelegramConfig {
