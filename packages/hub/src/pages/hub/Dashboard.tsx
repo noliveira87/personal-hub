@@ -100,12 +100,6 @@ export default function Dashboard() {
         )}
       />
 
-      <div className="rounded-2xl border-2 border-border bg-card p-5 animate-fade-up">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Contracts Overview</p>
-        <h1 className="mt-1 text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Clear monthly baseline and current-month spending in one place.</p>
-      </div>
-
       {/* Stats row */}
       <div className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
