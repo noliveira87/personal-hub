@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
   const isFromWarranties = locationState?.from === 'warranties';
-  const backToPath = locationState?.fromPath ?? (isFromWarranties ? '/warranties' : '/');
+  const backToPath: string | number = locationState?.fromPath ?? (window.history.length > 1 ? -1 : '/');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramBotToken, setTelegramBotToken] = useState('');
   const [loading, setLoading] = useState(true);

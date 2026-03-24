@@ -8,7 +8,7 @@ interface AppSectionHeaderProps {
   title: string;
   icon: LucideIcon;
   actions?: ReactNode;
-  backTo?: string;
+  backTo?: string | number;
   backLabel?: string;
   showSettings?: boolean;
 }

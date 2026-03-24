@@ -25,7 +25,7 @@ const projects = [
 	{
 		title: "Contract Manager",
 		subtitle: "Renewals",
-		to: "/contracts",
+		to: "/dashboard",
 		icon: FileCheck2,
 	},
 ] as const;
