@@ -1,11 +1,11 @@
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { FileText, CalendarDays, Bell, Settings, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bell, Settings, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
-  { to: '/contracts', label: 'Contracts', icon: FileText },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/alerts', label: 'Alerts', icon: Bell },
   { to: '/insights', label: 'Insights', icon: TrendingUp },
@@ -17,7 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
-  const isContractsPage = /^\/(contracts|calendar|alerts|insights)/.test(location.pathname);
+  const isContractsPage = /^\/(dashboard|contracts|calendar|alerts|insights)/.test(location.pathname);
   const showSidebar = isContractsPage;
   const showDesktopHeaderToggle = !isLandingPage;
 
