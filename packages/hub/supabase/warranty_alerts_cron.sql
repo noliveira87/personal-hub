@@ -83,7 +83,8 @@ begin
     v_expiration_text := to_char(v_item.expiration_date, 'DD/MM/YYYY');
     v_price_text := case
       when v_item.price is null then '—'
-      else '€' || to_char(v_item.price, 'FM999999990.00')
+      when v_item.price = trunc(v_item.price) then '€' || to_char(v_item.price, 'FM9999999990')
+      else '€' || replace(to_char(v_item.price, 'FM9999999990D00'), ',', '.')
     end;
 
     perform net.http_post(
