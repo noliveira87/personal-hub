@@ -5,6 +5,7 @@ import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/types/contr
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 
 const COLORS = ['#3b8574', '#4a9e8a', '#5ab89f', '#6bd1b5', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'];
 
@@ -12,12 +13,27 @@ export default function InsightsPage() {
   const { contracts } = useContracts();
 
   const active = contracts.filter(c => c.status === 'active');
-  const monthlyTotal = active.reduce((s, c) => s + getMonthlyEquivalent(c), 0);
-  const annualTotal = active.reduce((s, c) => s + getAnnualEquivalent(c), 0);
+  const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
+  const { priceMap } = usePriceHistoryMap(contractIds);
+
+  const activeWithResolvedPrices = useMemo(() => {
+    return active.map((contract) => {
+      const latestPrice = priceMap.get(contract.id);
+
+      return {
+        ...contract,
+        price: latestPrice?.price ?? contract.price,
+        currency: latestPrice?.currency ?? contract.currency,
+      };
+    });
+  }, [active, priceMap]);
+
+  const monthlyTotal = activeWithResolvedPrices.reduce((s, c) => s + getMonthlyEquivalent(c), 0);
+  const annualTotal = activeWithResolvedPrices.reduce((s, c) => s + getAnnualEquivalent(c), 0);
 
   const byCategory = useMemo(() => {
     const map = new Map<ContractCategory, number>();
-    active.forEach(c => {
+    activeWithResolvedPrices.forEach(c => {
       const current = map.get(c.category) || 0;
       map.set(c.category, current + getMonthlyEquivalent(c));
     });
@@ -29,13 +45,13 @@ export default function InsightsPage() {
         amount: Math.round(amount * 100) / 100,
       }))
       .sort((a, b) => b.amount - a.amount);
-  }, [active]);
+  }, [activeWithResolvedPrices]);
 
   const topExpensive = useMemo(() => {
-    return [...active]
+    return [...activeWithResolvedPrices]
       .sort((a, b) => getAnnualEquivalent(b) - getAnnualEquivalent(a))
       .slice(0, 5);
-  }, [active]);
+  }, [activeWithResolvedPrices]);
 
   return (
     <div className="space-y-8 pt-16">
