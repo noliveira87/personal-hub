@@ -39,6 +39,7 @@ const Index = () => {
         {/* Header */}
         <div className="text-center mb-16 animate-fade-up">
           <div className="inline-block mb-6">
+            <img src="/d12.png" alt="D12 Logo" className="h-24 w-24 mx-auto mb-4 drop-shadow-lg" />
             <div className="text-6xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               D12
             </div>
