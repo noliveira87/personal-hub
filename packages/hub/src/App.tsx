@@ -25,6 +25,7 @@ import PortfolioPage from "@/pages/portfolio/PortfolioPage";
 import WarrantiesPage from "@/pages/warranties/WarrantiesPage";
 
 import SettingsPage from "@/pages/SettingsPage";
+import WorkInProgress from "@/pages/WorkInProgress";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,9 @@ const App = () => (
 
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
+
+              {/* Work in Progress */}
+              <Route path="/home-expenses" element={<WorkInProgress />} />
 
               {/* Not found */}
               <Route path="*" element={<NotFound />} />

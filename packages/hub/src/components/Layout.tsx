@@ -1,6 +1,6 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, FileText, CalendarDays, Bell, Settings, Plus, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
@@ -18,8 +18,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
-  const showDesktopHeaderToggle = location.pathname !== '/';
-  const isLandingPage = location.pathname === '/';
+  const showDesktopHeaderToggle = !isLandingPage;
+  const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
 
   return (
     <div className="min-h-screen bg-background">
@@ -65,8 +65,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col border-r bg-card/50 backdrop-blur-sm z-30">
-        <div className="px-6 h-16 flex items-center border-b">
+        <div className="px-6 h-16 flex items-center justify-between border-b">
           <h1 className="text-lg font-semibold text-foreground tracking-tight">D12 Contracts</h1>
+          <Link to="/" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-3 h-3" />
+            <span>Projects</span>
+          </Link>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map(item => (
@@ -87,7 +91,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="p-4 border-t">
-          <p className="text-xs text-muted-foreground">Personal Dashboard</p>
+          <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to projects
+          </Link>
         </div>
       </aside>
 
