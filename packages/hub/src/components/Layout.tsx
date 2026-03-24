@@ -18,8 +18,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
-  const showDesktopHeaderToggle = !isLandingPage;
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
+  const showDesktopHeaderToggle = !isLandingPage;
 
   return (
     <div className="min-h-screen bg-background">

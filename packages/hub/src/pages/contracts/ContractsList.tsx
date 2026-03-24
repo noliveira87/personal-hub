@@ -5,7 +5,8 @@ import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LAB
 import { getDaysUntilExpiry } from '@/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { Link } from 'react-router-dom';
-import { Plus, Search, SlidersHorizontal, Loader } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, Loader, FileText } from 'lucide-react';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function ContractsList() {
   const { contracts, loading, error } = useContracts();
@@ -60,7 +61,9 @@ export default function ContractsList() {
   }, [contracts, search, categoryFilter, statusFilter, sortBy]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-16">
+      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+
       <div className="flex items-center justify-between animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-foreground">All Contracts</h1>

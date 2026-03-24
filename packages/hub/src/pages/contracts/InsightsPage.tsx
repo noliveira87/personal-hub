@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useContracts } from '@/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent, formatCurrency } from '@/lib/contractUtils';
 import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/types/contract';
+import AppSectionHeader from '@/components/AppSectionHeader';
+import { FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const COLORS = ['#3b8574', '#4a9e8a', '#5ab89f', '#6bd1b5', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'];
@@ -36,7 +38,9 @@ export default function InsightsPage() {
   }, [active]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pt-16">
+      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+
       <div className="animate-fade-up">
         <h1 className="text-2xl font-bold text-foreground">Insights</h1>
         <p className="text-muted-foreground text-sm mt-1">Spending overview and analysis</p>

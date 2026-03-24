@@ -5,7 +5,8 @@ import {
   Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus,
   CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting,
 } from '@/types/contract';
-import { ArrowLeft, Plus, X, Loader } from 'lucide-react';
+import { ArrowLeft, Plus, X, Loader, FileText } from 'lucide-react';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 const defaultAlert = (): AlertSetting => ({ daysBefore: 30, enabled: true, telegramEnabled: false });
 
@@ -71,7 +72,9 @@ export default function ContractForm() {
   const labelClass = 'text-sm font-medium text-foreground mb-1.5 block';
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pt-16">
+      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors animate-fade-up">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>

@@ -3,13 +3,12 @@ import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getAnnualEquivalent, formatCurrency } from '@/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, ArrowLeft, Moon, Sun, Loader } from 'lucide-react';
+import { Plus, ArrowRight, LayoutDashboard, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useDarkMode } from '@shared-ui/use-dark-mode';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function Dashboard() {
   const { contracts, loading, error } = useContracts();
-  const { isDark, toggleDark } = useDarkMode();
 
   if (loading) {
     return (
@@ -48,36 +47,26 @@ export default function Dashboard() {
   const within30 = expiringSoon.filter(c => c.daysLeft <= 30).length;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground animate-fade-up">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1 animate-fade-up" style={{ animationDelay: '60ms' }}>
-            Your contracts & subscriptions at a glance
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline"
-            size="sm"
-            onClick={() => window.history.back()}
-            className="gap-1.5"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to projects</span>
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggleDark} className="hidden text-muted-foreground lg:inline-flex">
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+    <div className="space-y-8 pt-16">
+      <AppSectionHeader
+        title="D12 Contracts"
+        icon={LayoutDashboard}
+        actions={(
           <Link
             to="/contracts/new"
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm animate-fade-up"
-            style={{ animationDelay: '100ms' }}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Add Contract</span>
           </Link>
-        </div>
+        )}
+      />
+
+      <div>
+        <h1 className="text-2xl font-bold text-foreground animate-fade-up">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1 animate-fade-up" style={{ animationDelay: '60ms' }}>
+          Your contracts & subscriptions at a glance
+        </p>
       </div>
 
       {/* Stats row */}

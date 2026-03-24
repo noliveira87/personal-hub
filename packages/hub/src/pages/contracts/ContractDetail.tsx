@@ -10,6 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { ArrowLeft, Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function ContractDetail() {
   const { id } = useParams();
@@ -58,7 +59,9 @@ export default function ContractDetail() {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 pt-16">
+      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+
       <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors animate-fade-up">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>

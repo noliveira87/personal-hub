@@ -248,14 +248,64 @@ export async function updatePriceHistoryEntry(
     })
     .eq('id', id)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error updating price history entry:', error);
     throw new Error(`Failed to update price history: ${error.message}`);
   }
 
-  return mapRowToPriceHistory(data);
+  if (data) {
+    return mapRowToPriceHistory(data);
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('contract_price_history')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error('Error loading existing price history entry for fallback:', existingError);
+    throw new Error(`Failed to update price history: ${existingError.message}`);
+  }
+
+  if (!existing) {
+    throw new Error('Failed to update price history: entry not found or not accessible');
+  }
+
+  const { error: deleteError } = await supabase
+    .from('contract_price_history')
+    .delete()
+    .eq('id', id);
+
+  if (deleteError) {
+    console.error('Error deleting price history entry during fallback update:', deleteError);
+    throw new Error(`Failed to update price history: ${deleteError.message}`);
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('contract_price_history')
+    .insert([
+      {
+        id,
+        contract_id: existing.contract_id,
+        price,
+        currency,
+        date,
+        notes: notes || null,
+        created_at: existing.created_at,
+      },
+    ])
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('Error inserting price history entry during fallback update:', insertError);
+    throw new Error(`Failed to update price history: ${insertError.message}`);
+  }
+
+  return mapRowToPriceHistory(inserted);
 }
 
 export async function getLatestPriceForContract(contractId: string): Promise<PriceHistory | null> {

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   addWarrantyToDb,
   archiveWarrantyInDb,
@@ -16,10 +15,9 @@ import {
 import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Moon, Search, Settings, ShieldCheck, Sun } from "lucide-react";
-import { useDarkMode } from "@shared-ui/use-dark-mode";
+import { Search, ShieldCheck } from "lucide-react";
 import { getAlertSettings, isTelegramConfigured, sendTelegramMessage } from "@/lib/telegram";
+import AppSectionHeader from "@/components/AppSectionHeader";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -42,8 +40,6 @@ export function WarrantyApp() {
   const [categoryFilter, setCategoryFilter] = useState<WarrantyCategory | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const { isDark, toggleDark } = useDarkMode();
-  const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
@@ -219,35 +215,11 @@ export function WarrantyApp() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Fixed header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => navigate('/')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to projects</span>
-          </Button>
-          <div className="hidden sm:flex items-center gap-3 flex-1 justify-center">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-            </div>
-            <h1 className="text-base font-bold">D12 Warranties</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="text-muted-foreground">
-              <Settings className="h-4 w-4" />
-            </Button>
-            <AddWarrantyDialog onAdd={addWarranty} />
-          </div>
-        </div>
-      </header>
+      <AppSectionHeader
+        title="D12 Warranties"
+        icon={ShieldCheck}
+        actions={<AddWarrantyDialog onAdd={addWarranty} />}
+      />
 
       <div className="max-w-lg mx-auto px-4 pt-20 pb-24">
         {/* Mobile title */}

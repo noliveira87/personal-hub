@@ -5,7 +5,8 @@ import { CATEGORY_ICONS } from '@/types/contract';
 import { format, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Bell, BellRing } from 'lucide-react';
+import { Bell, BellRing, FileText } from 'lucide-react';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function AlertsPage() {
   const { contracts } = useContracts();
@@ -32,7 +33,9 @@ export default function AlertsPage() {
   }, [contracts]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-16">
+      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+
       <div className="animate-fade-up">
         <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
         <p className="text-muted-foreground text-sm mt-1">{alerts.length} active alerts</p>

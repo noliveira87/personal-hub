@@ -5,6 +5,8 @@ import { CATEGORY_ICONS } from '@/types/contract';
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, addMonths } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { FileText } from 'lucide-react';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function CalendarPage() {
   const { contracts } = useContracts();
@@ -32,7 +34,9 @@ export default function CalendarPage() {
   }, [contracts, months]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-16">
+      <AppSectionHeader title="D12 Contracts" icon={FileText} />
+
       <div className="animate-fade-up">
         <h1 className="text-2xl font-bold text-foreground">Renewal Calendar</h1>
         <p className="text-muted-foreground text-sm mt-1">Upcoming renewals over the next 12 months</p>
