@@ -1,30 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, Send, Settings } from 'lucide-react';
+import { Send, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import {
-  type AlertSettings,
   getSettingsPersistenceMode,
-  loadAlertSettings,
   loadTelegramConfig,
-  persistAlertSettings,
   persistTelegramConfig,
   sendTestMessage,
 } from '@/lib/telegram';
 
-const DEFAULT_ALERT_SETTINGS: AlertSettings = {
-  warrantiesEnabled: true,
-  contractsEnabled: true,
-  portfolioEnabled: false,
-  warrantyAlertDays: 30,
-};
-
 export default function SettingsPage() {
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramBotToken, setTelegramBotToken] = useState('');
-  const [alertSettings, setAlertSettings] = useState<AlertSettings>(DEFAULT_ALERT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
@@ -36,16 +24,12 @@ export default function SettingsPage() {
 
     const loadSettings = async () => {
       try {
-        const [telegramConfig, alerts] = await Promise.all([
-          loadTelegramConfig(),
-          loadAlertSettings(),
-        ]);
+        const telegramConfig = await loadTelegramConfig();
 
         if (cancelled) return;
 
         setTelegramBotToken(telegramConfig.botToken);
         setTelegramChatId(telegramConfig.chatId);
-        setAlertSettings(alerts);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -61,13 +45,10 @@ export default function SettingsPage() {
   }, []);
 
   const handleSave = async () => {
-    await Promise.all([
-      persistTelegramConfig({
-        botToken: telegramBotToken,
-        chatId: telegramChatId,
-      }),
-      persistAlertSettings(alertSettings),
-    ]);
+    await persistTelegramConfig({
+      botToken: telegramBotToken,
+      chatId: telegramChatId,
+    });
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -98,10 +79,6 @@ export default function SettingsPage() {
     }
   };
 
-  const updateAlertSetting = <K extends keyof AlertSettings>(key: K, value: AlertSettings[K]) => {
-    setAlertSettings(prev => ({ ...prev, [key]: value }));
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -123,7 +100,7 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-20 sm:px-6 lg:px-0">
         <div className="animate-fade-up">
           <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Configure your preferences and integrations</p>
+          <p className="mt-1 text-sm text-muted-foreground">Configure the shared Telegram integration used by feature-level notification modules</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Storage mode: <span className="font-medium text-foreground">{storageMode === 'local' ? 'Local browser storage' : 'Database sync'}</span>
           </p>
@@ -137,7 +114,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-sm font-semibold text-foreground">Telegram Integration</h2>
-              <p className="text-xs text-muted-foreground">Receive alerts via Telegram before contracts expire</p>
+              <p className="text-xs text-muted-foreground">Shared bot credentials used by notifications inside each feature</p>
             </div>
           </div>
 
@@ -186,74 +163,9 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Alerts defaults */}
-        <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '160ms' }}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-              <Bell className="h-4 w-4 text-warning" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Alerts & defaults</h2>
-              <p className="text-xs text-muted-foreground">Consistent app-level settings, ready to move into a database later</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Warranty alerts</p>
-                <p className="text-xs text-muted-foreground">Send Telegram alerts for warranties nearing expiry</p>
-              </div>
-              <Switch
-                checked={alertSettings.warrantiesEnabled}
-                onCheckedChange={(checked) => updateAlertSetting('warrantiesEnabled', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Contract alerts</p>
-                <p className="text-xs text-muted-foreground">Enable Telegram reminders for contracts and renewals</p>
-              </div>
-              <Switch
-                checked={alertSettings.contractsEnabled}
-                onCheckedChange={(checked) => updateAlertSetting('contractsEnabled', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Portfolio alerts</p>
-                <p className="text-xs text-muted-foreground">Reserve a toggle for future portfolio notifications</p>
-              </div>
-              <Switch
-                checked={alertSettings.portfolioEnabled}
-                onCheckedChange={(checked) => updateAlertSetting('portfolioEnabled', checked)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="warranty-alert-days" className="mb-1.5 block">Default warranty alert lead time</Label>
-            <Input
-              id="warranty-alert-days"
-              type="number"
-              min={1}
-              max={365}
-              value={alertSettings.warrantyAlertDays}
-              onChange={(e) => updateAlertSetting('warrantyAlertDays', Math.max(1, Number(e.target.value) || 1))}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">Used as the default threshold before expiry for warranty reminders.</p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {[90, 60, 30, 15, 7, 3, 1].map(d => (
-              <span key={d} className="px-3 py-1.5 rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                {d} days
-              </span>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">Alert timing can still be customized per contract in the edit form.</p>
+        <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: '160ms' }}>
+          <p className="text-sm font-medium text-foreground">Feature-level notifications</p>
+          <p className="mt-1 text-sm text-muted-foreground">Each module now owns its own notification switches, thresholds and send history. Adjust warranty behaviour directly inside the warranties page.</p>
         </div>
       </div>
     </div>
