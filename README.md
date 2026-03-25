@@ -86,16 +86,29 @@ See [SUPABASE_SETUP.md](packages/hub/SUPABASE_SETUP.md) for detailed schema.
 
 ## 📦 Deployment
 
-Single build command deploys the app to production:
+Production deploy is done over SSH on the NAS server:
 
 ```bash
-deploy-hub
+ssh tracker@192.168.1.172
+cd ~/projects
+./deploy.sh
 ```
 
-This runs:
+Or in a single command from the local machine:
+
+```bash
+ssh tracker@192.168.1.172 'cd ~/projects && ./deploy.sh'
+```
+
+The remote script runs:
 1. Git pull from origin/main
 2. npm run build
 3. PM2 restart
+
+Notes:
+- the repository lives at `~/projects/personal-hub` on the server
+- the deploy script lives at `~/projects/deploy.sh`
+- if SSH asks for a password, complete the login interactively and then run `./deploy.sh`
 
 ## 🏷️ Versioning
 
