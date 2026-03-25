@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Investment, InvestmentCategory, InvestmentType } from "@/features/portfolio/types/investment";
-import { CryptoAsset, CryptoQuoteMap, parseCryptoNotes, serializeCryptoNotes } from "@/features/portfolio/lib/crypto";
+import { Investment, InvestmentCategory, InvestmentMovement, InvestmentType } from "@/features/portfolio/types/investment";
+import { CryptoAsset, CryptoQuoteMap, parseCryptoNotes, parseInvestmentMovements, serializeInvestmentNotes } from "@/features/portfolio/lib/crypto";
 
 interface InvestmentDialogProps {
   open: boolean;
@@ -30,6 +30,9 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
   const [cashbackUnits, setCashbackUnits] = useState("");
   const [cashbackDate, setCashbackDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [movements, setMovements] = useState<InvestmentMovement[]>([]);
+  // Track whether currentValue was manually edited by the user
+  const [currentValueEditedByUser, setCurrentValueEditedByUser] = useState(false);
 
   const investedAmountValue = Number(investedAmount) || 0;
   const enteredCurrentValue = Number(currentValue) || 0;
@@ -61,6 +64,8 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
       setCashbackUnits(parsedCashbackUnits ? parsedCashbackUnits.toString() : "");
       setCashbackDate(parsedCashbackDate ?? "");
       setNotes(userNotes || "");
+      setMovements(parseInvestmentMovements(investment.notes));
+      setCurrentValueEditedByUser(false);
     } else {
       setName("");
       setCategory("short-term");
@@ -74,8 +79,40 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
       setCashbackUnits("");
       setCashbackDate("");
       setNotes("");
+      setMovements([]);
+      setCurrentValueEditedByUser(false);
     }
   }, [investment, open]);
+
+  const handleRemoveMovement = (id: string) => {
+    setMovements((prev) => {
+      const removed = prev.find(m => m.id === id);
+      if (removed && !(type === "crypto" && hasCashback)) {
+        if (removed.kind === "contribution") {
+          // Always adjust investedAmount
+          setInvestedAmount(v => (Number(v) - removed.amount).toFixed(2));
+          // Adjust cryptoUnits if stored in movement
+          if (removed.units) setCryptoUnits(v => parseFloat((Math.max(0, Number(v) - removed.units!)).toFixed(8)).toString());
+          // Only adjust currentValue if not live crypto (live crypto derives value from units × spot)
+          if (!hasLiveCryptoSync && !currentValueEditedByUser) {
+            setCurrentValue(v => (Number(v) - removed.amount).toFixed(2));
+          }
+        } else if (removed.kind === "withdrawal") {
+          setInvestedAmount(v => (Number(v) + removed.amount).toFixed(2));
+          if (removed.units) setCryptoUnits(v => parseFloat((Number(v) + removed.units!).toFixed(8)).toString());
+          if (!hasLiveCryptoSync && !currentValueEditedByUser) {
+            setCurrentValue(v => (Number(v) + removed.amount).toFixed(2));
+          }
+        } else if (removed.kind === "adjustment" || removed.kind === "cashback") {
+          // Profit movements don't affect investedAmount
+          if (!hasLiveCryptoSync && !currentValueEditedByUser) {
+            setCurrentValue(v => (Number(v) - removed.amount).toFixed(2));
+          }
+        }
+      }
+      return prev.filter(m => m.id !== id);
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,22 +125,32 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
         ? resolvedCurrentValue
         : parseFloat(currentValue) || 0;
 
+    // investedAmount is updated in real-time via handleRemoveMovement delta adjustments.
+    // Trust what's in the field.
+    const finalInvestedAmount = normalizedInvestedAmount;
+
+    // If movements were edited by user, don't auto-recalculate currentValue
+    // currentValue is updated in real-time via handleRemoveMovement delta adjustments
+    // or by the user editing the field directly. Trust what's in the field.
+    const finalCurrentValue = normalizedCurrentValue;
+
+    const allMovements = movements;
+
     onSave({
       name,
       category,
       type,
-      investedAmount: normalizedInvestedAmount,
-      currentValue: normalizedCurrentValue,
-      notes: type === "crypto"
-        ? serializeCryptoNotes(
-          cryptoAsset,
-          parsedCryptoUnits,
-          notes,
-          cashbackAsset,
-          parsedCashbackUnits,
-          hasCashback ? cashbackDate || null : null,
-        )
-        : notes || undefined,
+      investedAmount: finalInvestedAmount,
+      currentValue: finalCurrentValue,
+      notes: serializeInvestmentNotes({
+        asset: type === "crypto" ? cryptoAsset : undefined,
+        units: type === "crypto" ? parsedCryptoUnits : null,
+        cashbackAsset: type === "crypto" ? cashbackAsset : undefined,
+        cashbackUnits: type === "crypto" ? parsedCashbackUnits : null,
+        cashbackDate: type === "crypto" && hasCashback ? cashbackDate || null : null,
+        movements: allMovements,
+        userNotes: notes,
+      }),
     });
     onOpenChange(false);
   };
@@ -237,7 +284,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                   type="number"
                   step="0.01"
                   value={currentValue}
-                  onChange={e => setCurrentValue(e.target.value)}
+                  onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
                   required
                 />
               </div>
@@ -261,7 +308,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                     type="number"
                     step="0.01"
                     value={currentValue}
-                    onChange={e => setCurrentValue(e.target.value)}
+                    onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
                     required
                     className={hasCryptoValues ? `${profitLossClass} font-semibold` : undefined}
                   />
@@ -281,6 +328,51 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
           <div>
             <Label htmlFor="notes">Notes (optional)</Label>
             <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+          </div>
+          <div className="space-y-3 rounded-lg border border-border/70 p-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Movement history</p>
+              <p className="text-xs text-muted-foreground">Record of contributions and withdrawals. Use the + button on each card to add new entries.</p>
+            </div>
+
+            {movements.length ? (
+              <div className="space-y-2 rounded-lg bg-muted/30 p-3">
+                {movements
+                  .slice()
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map((movement) => {
+                    const kindLabel: Record<string, string> = {
+                      contribution: "Contribution",
+                      withdrawal: "Withdrawal",
+                      cashback: "Cashback",
+                      adjustment: "Adjustment",
+                    };
+                    const kindColor: Record<string, string> = {
+                      contribution: "text-primary",
+                      withdrawal: "text-urgent",
+                      cashback: "text-success",
+                      adjustment: "text-muted-foreground",
+                    };
+                    return (
+                      <div key={movement.id} className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground">
+                            {movement.date}
+                            <span className={`ml-2 text-xs font-semibold ${kindColor[movement.kind] ?? "text-muted-foreground"}`}>
+                              {kindLabel[movement.kind] ?? movement.kind}
+                            </span>
+                            <span className="ml-2 text-foreground">€{movement.amount.toFixed(2)}</span>
+                          </p>
+                          {movement.note ? <p className="text-xs text-muted-foreground truncate">{movement.note}</p> : null}
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveMovement(movement.id)}>Remove</Button>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No movements yet. Use the + button on each card to register contributions.</p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

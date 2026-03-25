@@ -1,5 +1,15 @@
 export type InvestmentCategory = "short-term" | "long-term";
 export type InvestmentType = "cash" | "etf" | "crypto" | "p2p" | "ppr";
+export type InvestmentMovementKind = "contribution" | "withdrawal" | "cashback" | "adjustment";
+
+export interface InvestmentMovement {
+  id: string;
+  date: string;
+  kind: InvestmentMovementKind;
+  amount: number;
+  units?: number; // crypto units bought/sold, if applicable
+  note?: string;
+}
 
 export interface Investment {
   id: string;
@@ -55,6 +65,21 @@ export function calculateSummary(investments: Investment[]): InvestmentSummary {
   const totalProfitLoss = totalCurrentValue - totalInvested;
   const percentageReturn = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
   return { totalInvested, totalCurrentValue, totalProfitLoss, percentageReturn };
+}
+
+export function calculateInvestedFromMovements(movements: InvestmentMovement[]) {
+  return movements.reduce((total, movement) => {
+    switch (movement.kind) {
+      case "contribution":
+      case "adjustment":
+        return total + movement.amount;
+      case "withdrawal":
+        return total - movement.amount;
+      case "cashback":
+      default:
+        return total;
+    }
+  }, 0);
 }
 
 export function formatCurrency(value: number): string {

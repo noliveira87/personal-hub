@@ -1,13 +1,12 @@
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { useContracts } from '@/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent, formatCurrency } from '@/lib/contractUtils';
 import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/types/contract';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { FileText } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 
-const COLORS = ['#3b8574', '#4a9e8a', '#5ab89f', '#6bd1b5', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'];
+const InsightsCategoryChart = lazy(() => import('@/pages/contracts/InsightsCategoryChart'));
 
 export default function InsightsPage() {
   const { contracts } = useContracts();
@@ -79,20 +78,9 @@ export default function InsightsPage() {
       {/* By category chart */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '160ms' }}>
         <h2 className="text-sm font-semibold text-foreground mb-4">Monthly Spending by Category</h2>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={byCategory} layout="vertical" margin={{ left: 8, right: 24 }}>
-              <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={v => `€${v}`} />
-              <YAxis type="category" dataKey="label" tick={{ fontSize: 12 }} width={110} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} />
-              <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                {byCategory.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <Suspense fallback={<div className="h-64 rounded-lg bg-muted/30 animate-pulse" />}>
+          <InsightsCategoryChart data={byCategory} />
+        </Suspense>
       </div>
 
       {/* Category breakdown list */}

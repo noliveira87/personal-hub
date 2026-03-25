@@ -1,4 +1,4 @@
-import { Investment } from "@/features/portfolio/types/investment";
+import { Investment, InvestmentMovement } from "@/features/portfolio/types/investment";
 
 const LEGACY_BTC_UNITS_PREFIX = "BTC_UNITS:";
 const CRYPTO_ASSET_PREFIX = "CRYPTO_ASSET:";
@@ -6,6 +6,7 @@ const CRYPTO_UNITS_PREFIX = "CRYPTO_UNITS:";
 const CRYPTO_CASHBACK_ASSET_PREFIX = "CRYPTO_CASHBACK_ASSET:";
 const CRYPTO_CASHBACK_UNITS_PREFIX = "CRYPTO_CASHBACK_UNITS:";
 const CRYPTO_CASHBACK_DATE_PREFIX = "CRYPTO_CASHBACK_DATE:";
+const MOVEMENTS_PREFIX = "PORTFOLIO_MOVEMENTS:";
 
 export type CryptoAsset = "BTC" | "ETH";
 export type CryptoQuoteMap = Partial<Record<CryptoAsset, number>>;
@@ -22,6 +23,16 @@ export interface CryptoNoteMeta {
 export interface CryptoQuotes {
   pricesEur: CryptoQuoteMap;
   lastUpdatedAt: string;
+}
+
+export interface SerializeInvestmentNotesInput {
+  asset?: CryptoAsset;
+  units?: number | null;
+  cashbackAsset?: CryptoAsset;
+  cashbackUnits?: number | null;
+  cashbackDate?: string | null;
+  movements?: InvestmentMovement[];
+  userNotes?: string;
 }
 
 export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
@@ -102,6 +113,10 @@ export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
       continue;
     }
 
+    if (line.startsWith(MOVEMENTS_PREFIX)) {
+      continue;
+    }
+
     userNoteLines.push(rawLine);
   }
 
@@ -115,32 +130,71 @@ export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
   };
 }
 
-export function serializeCryptoNotes(
-  asset: CryptoAsset,
-  units: number | null,
-  userNotes?: string,
-  cashbackAsset?: CryptoAsset,
-  cashbackUnits?: number | null,
-  cashbackDate?: string | null,
-): string | undefined {
-  const cleanNotes = (userNotes ?? "").trim();
+export function parseInvestmentMovements(notes?: string): InvestmentMovement[] {
+  if (!notes) {
+    return [];
+  }
 
+  const lines = notes.trim().split("\n");
+  const rawLine = lines.find((line) => line.trim().startsWith(MOVEMENTS_PREFIX));
+
+  if (!rawLine) {
+    return [];
+  }
+
+  const payload = rawLine.trim().slice(MOVEMENTS_PREFIX.length).trim();
+
+  try {
+    const parsed = JSON.parse(payload) as InvestmentMovement[];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        id: String(item.id),
+        date: String(item.date),
+        kind: item.kind,
+        amount: Number(item.amount) || 0,
+        units: item.units != null ? Number(item.units) : undefined,
+        note: item.note ? String(item.note) : undefined,
+      }))
+      .filter((item) => item.id && item.date && Number.isFinite(item.amount));
+  } catch {
+    return [];
+  }
+}
+
+export function serializeInvestmentNotes({
+  asset,
+  units,
+  cashbackAsset,
+  cashbackUnits,
+  cashbackDate,
+  movements,
+  userNotes,
+}: SerializeInvestmentNotesInput): string | undefined {
+  const cleanNotes = (userNotes ?? "").trim();
+  const cleanMovements = (movements ?? []).filter((movement) => 
+    movement && 
+    movement.date && 
+    typeof movement.amount === "number" && 
+    Number.isFinite(movement.amount)
+  );
   const hasMainUnits = !!units && units > 0;
   const hasCashbackUnits = !!cashbackUnits && cashbackUnits > 0;
 
-  if (!hasMainUnits && !hasCashbackUnits) {
-    return cleanNotes || undefined;
-  }
-
   const headers: string[] = [];
 
-  if (hasMainUnits) {
+  if (hasMainUnits && asset) {
     headers.push(`${CRYPTO_ASSET_PREFIX}${asset}`, `${CRYPTO_UNITS_PREFIX}${units}`);
   }
 
   if (hasCashbackUnits) {
     headers.push(
-      `${CRYPTO_CASHBACK_ASSET_PREFIX}${cashbackAsset ?? asset}`,
+      `${CRYPTO_CASHBACK_ASSET_PREFIX}${cashbackAsset ?? asset ?? "BTC"}`,
       `${CRYPTO_CASHBACK_UNITS_PREFIX}${cashbackUnits}`,
     );
 
@@ -149,7 +203,33 @@ export function serializeCryptoNotes(
     }
   }
 
-  return cleanNotes ? `${headers.join("\n")}\n${cleanNotes}` : headers.join("\n");
+  if (cleanMovements.length > 0) {
+    headers.push(`${MOVEMENTS_PREFIX}${JSON.stringify(cleanMovements)}`);
+  }
+
+  if (!headers.length && !cleanNotes) {
+    return undefined;
+  }
+
+  return cleanNotes ? `${headers.join("\n")}\n${cleanNotes}` : headers.join("\n") || undefined;
+}
+
+export function serializeCryptoNotes(
+  asset: CryptoAsset,
+  units: number | null,
+  userNotes?: string,
+  cashbackAsset?: CryptoAsset,
+  cashbackUnits?: number | null,
+  cashbackDate?: string | null,
+): string | undefined {
+  return serializeInvestmentNotes({
+    asset,
+    units,
+    cashbackAsset,
+    cashbackUnits,
+    cashbackDate,
+    userNotes,
+  });
 }
 
 export function resolveInvestmentCurrentValue(investment: Investment, cryptoSpotEur?: CryptoQuoteMap | null): number {

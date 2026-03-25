@@ -5,10 +5,10 @@ import { KpiCards } from "@/features/portfolio/components/KpiCards";
 import { InvestmentSection } from "@/features/portfolio/components/InvestmentSection";
 import { MonthlyInsights } from "@/features/portfolio/components/MonthlyInsights";
 import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
-import { Investment, calculateSummary } from "@/features/portfolio/types/investment";
+import { Investment, InvestmentMovementKind, calculateSummary } from "@/features/portfolio/types/investment";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useCryptoQuotes } from "@/features/portfolio/hooks/use-btc-quote";
-import { resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { parseCryptoNotes, parseInvestmentMovements, resolveInvestmentCurrentValue, serializeInvestmentNotes } from "@/features/portfolio/lib/crypto";
 
 const InvestmentDialog = lazy(() =>
   import("@/features/portfolio/components/InvestmentDialog").then((module) => ({ default: module.InvestmentDialog })),
@@ -28,6 +28,12 @@ const Index = () => {
   }, [investments, cryptoSpotEur]);
 
   const summary = calculateSummary(resolvedInvestments);
+
+  // Keep editingInvestment in sync with investments when they change
+  // This ensures the dialog always shows the latest data
+  const syncedEditingInvestment = editingInvestment
+    ? resolvedInvestments.find((inv) => inv.id === editingInvestment.id) || editingInvestment
+    : null;
 
   const handleEdit = (investment: Investment) => {
     setEditingInvestment({
@@ -56,6 +62,83 @@ const Index = () => {
     }
   };
 
+  const handleQuickContribution = (
+    investment: Investment,
+    payload: { amount: number; date: string; mode: "contribution" | "value_update"; unitsBought?: number | null },
+  ) => {
+    const { asset, units, cashbackAsset, cashbackUnits, cashbackDate, userNotes: rawUserNotes } = parseCryptoNotes(investment.notes);
+    const existingMovements = parseInvestmentMovements(investment.notes);
+    const userNotes = rawUserNotes || "";
+
+    if (payload.mode === "value_update") {
+      // Profit / interest / market gain — only current value changes, invested stays the same.
+      // Still record as an "adjustment" movement for historical tracking.
+      const profitMovements = [
+        ...existingMovements,
+        {
+          id: globalThis.crypto?.randomUUID?.() ?? `movement-${Date.now()}`,
+          date: payload.date,
+          kind: "adjustment" as InvestmentMovementKind,
+          amount: payload.amount,
+          note: "Profit / Return",
+        },
+      ].sort((a, b) => a.date.localeCompare(b.date));
+
+      const nextUnitsProfit = investment.type === "crypto"
+        ? (units ?? 0) + (payload.unitsBought ?? 0)
+        : null;
+
+      updateInvestment(investment.id, {
+        currentValue: investment.currentValue + payload.amount,
+        notes: serializeInvestmentNotes({
+          asset: investment.type === "crypto" ? asset : undefined,
+          units: investment.type === "crypto" ? nextUnitsProfit : null,
+          cashbackAsset: investment.type === "crypto" ? cashbackAsset : undefined,
+          cashbackUnits: investment.type === "crypto" ? cashbackUnits : null,
+          cashbackDate: investment.type === "crypto" ? cashbackDate : null,
+          movements: profitMovements,
+          userNotes,
+        }),
+      });
+      return;
+    }
+
+    // Contribution — new money in
+    const nextMovements = [
+      ...existingMovements,
+      {
+        id: globalThis.crypto?.randomUUID?.() ?? `movement-${Date.now()}`,
+        date: payload.date,
+        kind: "contribution" as InvestmentMovementKind,
+        amount: payload.amount,
+        ...(investment.type === "crypto" && payload.unitsBought ? { units: payload.unitsBought } : {}),
+      },
+    ].sort((a, b) => a.date.localeCompare(b.date));
+
+    const nextInvestedAmount = investment.investedAmount + payload.amount;
+    const nextUnits = investment.type === "crypto"
+      ? (units ?? 0) + (payload.unitsBought ?? 0)
+      : null;
+
+    const serializedNotes = serializeInvestmentNotes({
+      asset: investment.type === "crypto" ? asset : undefined,
+      units: investment.type === "crypto" ? nextUnits : null,
+      cashbackAsset: investment.type === "crypto" ? cashbackAsset : undefined,
+      cashbackUnits: investment.type === "crypto" ? cashbackUnits : null,
+      cashbackDate: investment.type === "crypto" ? cashbackDate : null,
+      movements: nextMovements,
+      userNotes,
+    });
+
+    updateInvestment(investment.id, {
+      investedAmount: nextInvestedAmount,
+      currentValue: investment.type === "crypto"
+        ? investment.currentValue
+        : investment.currentValue + payload.amount,
+      notes: serializedNotes,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AppSectionHeader
@@ -79,7 +162,7 @@ const Index = () => {
           </div>
 
           <KpiCards summary={summary} />
-          <MonthlyInsights snapshots={monthlySnapshots} />
+          <MonthlyInsights snapshots={monthlySnapshots} investments={investments} />
 
           <div className="grid grid-cols-1 gap-6">
             <InvestmentSection
@@ -87,6 +170,7 @@ const Index = () => {
               investments={shortTerm}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onQuickContribution={handleQuickContribution}
               cryptoSpotEur={cryptoSpotEur}
               cryptoQuoteLoading={cryptoQuoteLoading}
             />
@@ -95,6 +179,7 @@ const Index = () => {
               investments={longTerm}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onQuickContribution={handleQuickContribution}
               cryptoSpotEur={cryptoSpotEur}
               cryptoQuoteLoading={cryptoQuoteLoading}
             />
@@ -107,7 +192,7 @@ const Index = () => {
           <InvestmentDialog
             open={dialogOpen}
             onOpenChange={setDialogOpen}
-            investment={editingInvestment}
+            investment={syncedEditingInvestment}
             cryptoSpotEur={cryptoSpotEur}
             onSave={handleSave}
           />

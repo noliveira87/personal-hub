@@ -7,11 +7,12 @@ interface InvestmentSectionProps {
   investments: Investment[];
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
+  onQuickContribution: (investment: Investment, payload: { amount: number; date: string; mode: "contribution" | "value_update"; unitsBought?: number | null }) => void;
   cryptoSpotEur?: CryptoQuoteMap | null;
   cryptoQuoteLoading?: boolean;
 }
 
-export function InvestmentSection({ title, investments, onEdit, onDelete, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
+export function InvestmentSection({ title, investments, onEdit, onDelete, onQuickContribution, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
   const totalInvested = investments.reduce((sum, inv) => sum + inv.investedAmount, 0);
   const totalCurrentValue = investments.reduce(
     (sum, inv) => sum + resolveInvestmentCurrentValue(inv, cryptoSpotEur),
@@ -40,6 +41,7 @@ export function InvestmentSection({ title, investments, onEdit, onDelete, crypto
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-full bg-muted px-3 py-1.5 text-muted-foreground">
+            <span className="mr-1 text-xs uppercase tracking-wide opacity-60">Current</span>
             {formatCurrency(summary.totalCurrentValue)}
           </span>
           <span className={`rounded-full px-3 py-1.5 font-semibold ${isPositive ? "bg-success/10 text-success" : "bg-urgent/10 text-urgent"}`}>
@@ -54,6 +56,7 @@ export function InvestmentSection({ title, investments, onEdit, onDelete, crypto
             investment={inv}
             onEdit={onEdit}
             onDelete={onDelete}
+            onQuickContribution={onQuickContribution}
             index={i}
             cryptoSpotEur={cryptoSpotEur}
             cryptoQuoteLoading={cryptoQuoteLoading}

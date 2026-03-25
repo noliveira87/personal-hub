@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { Investment, MonthlySnapshot, calculateSummary } from "@/features/portfolio/types/investment";
+import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 import {
   deleteInvestmentFromDb,
   loadInvestmentsFromDb,
-  loadMonthlySnapshotsFromDb,
   upsertInvestmentsInDb,
   upsertMonthlySnapshotsInDb,
 } from "@/features/portfolio/lib/investments";
@@ -32,6 +32,13 @@ export function useInvestments() {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     return `${year}-${month}`;
+  };
+
+  const getPreviousMonthKey = (monthKey: string) => {
+    const [yearRaw, monthRaw] = monthKey.split("-").map(Number);
+    const date = new Date((yearRaw || new Date().getFullYear()), (monthRaw || 1) - 1, 1);
+    date.setMonth(date.getMonth() - 1);
+    return getMonthKey(date);
   };
 
   const addInvestment = useCallback((data: Omit<Investment, "id" | "createdAt" | "updatedAt">) => {
@@ -73,15 +80,16 @@ export function useInvestments() {
         return;
       }
 
-      const [remoteInvestments, remoteSnapshots] = await Promise.all([
+      const [remoteInvestments] = await Promise.all([
         loadInvestmentsFromDb(),
-        loadMonthlySnapshotsFromDb(),
       ]);
 
       if (isCancelled) return;
 
       setInvestments(remoteInvestments ?? []);
-      setMonthlySnapshots(remoteSnapshots ?? []);
+      // Snapshots are always derived live — never loaded from DB.
+      // This avoids stale baselines for live-priced assets (crypto).
+      setMonthlySnapshots([]);
 
       if (!isCancelled) {
         setRemoteHydrated(true);
@@ -104,9 +112,46 @@ export function useInvestments() {
   useEffect(() => {
     const summary = calculateSummary(investments);
     const currentMonth = getMonthKey();
+    const baselineMonth = getPreviousMonthKey(currentMonth);
+
+    // Compute total contribution/withdrawal inflows for this month from movement history.
+    // Used to reconstruct the baseline value (portfolio at start of month before any contributions).
+    const thisMonthInflow = investments.reduce((total, inv) => {
+      const movements = parseInvestmentMovements(inv.notes);
+      return total + movements
+        .filter(m => m.date.startsWith(currentMonth) && (m.kind === "contribution" || m.kind === "withdrawal"))
+        .reduce((s, m) => s + (m.kind === "withdrawal" ? -m.amount : m.amount), 0);
+    }, 0);
 
     setMonthlySnapshots(prev => {
       const sorted = [...prev].sort((a, b) => a.month.localeCompare(b.month));
+
+      if (!sorted.length) {
+        // Reconstruct baseline by subtracting this month's inflows so it represents
+        // the portfolio state at the START of the month (before contributions).
+        sorted.push({
+          month: baselineMonth,
+          totalInvested: summary.totalInvested - thisMonthInflow,
+          totalCurrentValue: summary.totalCurrentValue - thisMonthInflow,
+          totalProfitLoss: summary.totalProfitLoss,
+          overallReturnPct: summary.percentageReturn,
+          monthlyInflow: 0,
+          monthlyPerformance: 0,
+          monthlyReturnPct: 0,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      if (sorted.length === 1 && sorted[0].month === currentMonth) {
+        sorted.unshift({
+          ...sorted[0],
+          month: baselineMonth,
+          monthlyInflow: 0,
+          monthlyPerformance: 0,
+          monthlyReturnPct: 0,
+        });
+      }
+
       const existingIndex = sorted.findIndex(s => s.month === currentMonth);
       const previousSnapshot = existingIndex > 0 ? sorted[existingIndex - 1] : sorted[sorted.length - 1];
 
