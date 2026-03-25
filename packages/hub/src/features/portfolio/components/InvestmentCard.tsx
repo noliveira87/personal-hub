@@ -1,6 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
-import { CryptoQuoteMap, parseCryptoNotes, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { CryptoQuoteMap, parseCryptoNotes, resolveCashbackCurrentValue, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 interface InvestmentCardProps {
   investment: Investment;
@@ -20,13 +20,19 @@ const TYPE_EMOJI: Record<string, string> = {
 };
 
 export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
-  const { asset, units, userNotes } = parseCryptoNotes(investment.notes);
+  const { asset, units, cashbackAsset, cashbackUnits, cashbackDate, userNotes } = parseCryptoNotes(investment.notes);
   const displayCurrentValue = resolveInvestmentCurrentValue(investment, cryptoSpotEur);
+  const cashbackCurrentValue = resolveCashbackCurrentValue(investment, cryptoSpotEur);
   const profitLoss = displayCurrentValue - investment.investedAmount;
   const percentage = investment.investedAmount > 0 ? (profitLoss / investment.investedAmount) * 100 : 0;
+  const showPercentage = investment.investedAmount > 0;
   const isPositive = profitLoss >= 0;
   const spotEur = cryptoSpotEur?.[asset] ?? null;
+  const cashbackSpotEur = cryptoSpotEur?.[cashbackAsset] ?? null;
   const hasLiveCryptoQuote = investment.type === "crypto" && !!units && !!spotEur;
+  const hasCashback = investment.type === "crypto" && !!cashbackUnits;
+  const isCashbackOnly = investment.type === "crypto" && investment.investedAmount === 0 && !units && !!cashbackUnits;
+  const cashbackDisplayValue = cashbackCurrentValue ?? displayCurrentValue;
 
   return (
     <div
@@ -40,6 +46,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpot
             <h3 className="truncate font-semibold text-foreground">{investment.name}</h3>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">{investment.type}</span>
+              {hasCashback && (
+                <span className="inline-flex rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success">Cashback</span>
+              )}
               {hasLiveCryptoQuote && (
                 <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">Live {asset}</span>
               )}
@@ -65,13 +74,15 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpot
       <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/40 p-3 sm:p-4">
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Current</p>
-          <p className="text-sm font-medium text-foreground">{formatCurrency(displayCurrentValue)}</p>
-          {hasLiveCryptoQuote && (
+          <p className={`text-sm font-medium ${isCashbackOnly ? "text-success" : "text-foreground"}`}>
+            {formatCurrency(isCashbackOnly ? cashbackDisplayValue : displayCurrentValue)}
+          </p>
+          {!isCashbackOnly && hasLiveCryptoQuote && (
             <p className="text-[11px] text-muted-foreground">
               {units!.toFixed(6)} {asset} × {formatCurrency(spotEur!)}
             </p>
           )}
-          {investment.type === "crypto" && cryptoQuoteLoading && !hasLiveCryptoQuote && (
+          {!isCashbackOnly && investment.type === "crypto" && cryptoQuoteLoading && !hasLiveCryptoQuote && (
             <p className="text-[11px] text-muted-foreground">Fetching crypto quote…</p>
           )}
         </div>
@@ -81,21 +92,49 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpot
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Profit/Loss</p>
-          <p className={`text-sm font-bold ${isPositive ? "text-success" : "text-urgent"}`}>
-            {formatCurrency(profitLoss)}
+      {!isCashbackOnly && (
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Profit/Loss</p>
+            <p className={`text-sm font-bold ${isPositive ? "text-success" : "text-urgent"}`}>
+              {formatCurrency(profitLoss)}
+            </p>
+          </div>
+          {showPercentage && (
+            <span
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                isPositive ? "bg-success/10 text-success" : "bg-urgent/10 text-urgent"
+              }`}
+            >
+              {formatPercentage(percentage)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {hasCashback && !isCashbackOnly && (
+        <div className="mt-4 rounded-2xl bg-muted/40 p-3 sm:p-4">
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {cashbackCurrentValue !== null ? formatCurrency(cashbackCurrentValue) : "—"}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {cashbackUnits!.toFixed(6)} {cashbackAsset}
+            {cashbackSpotEur ? ` × ${formatCurrency(cashbackSpotEur)}` : ""}
+            {cashbackDate ? ` • ${cashbackDate}` : ""}
           </p>
         </div>
-        <span
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            isPositive ? "bg-success/10 text-success" : "bg-urgent/10 text-urgent"
-          }`}
-        >
-          {formatPercentage(percentage)}
-        </span>
-      </div>
+      )}
+
+      {hasCashback && isCashbackOnly && (
+        <div className="mt-4 rounded-2xl bg-muted/40 p-3 sm:p-4">
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {cashbackSpotEur
+              ? `Calculation: ${cashbackUnits!.toFixed(6)} ${cashbackAsset} × ${formatCurrency(cashbackSpotEur)} = ${formatCurrency(cashbackDisplayValue)}`
+              : `Calculation: ${cashbackUnits!.toFixed(6)} ${cashbackAsset} × live spot price`}
+          </p>
+          {cashbackDate ? <p className="text-[11px] text-muted-foreground">Date: {cashbackDate}</p> : null}
+        </div>
+      )}
 
       {userNotes && (
         <p className="mt-4 rounded-2xl bg-muted/40 px-3 py-2 text-xs italic leading-5 text-muted-foreground">{userNotes}</p>
