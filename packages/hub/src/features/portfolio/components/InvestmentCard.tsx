@@ -1,6 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
-import { parseCryptoNotes, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { parseCryptoNotes, parseCryptoTableNotes, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 interface InvestmentCardProps {
   investment: Investment;
@@ -21,11 +21,13 @@ const TYPE_EMOJI: Record<string, string> = {
 
 export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur, btcQuoteLoading }: InvestmentCardProps) {
   const { btcUnits, userNotes } = parseCryptoNotes(investment.notes);
+  const { positions } = parseCryptoTableNotes(investment.notes);
   const displayCurrentValue = resolveInvestmentCurrentValue(investment, btcSpotEur);
   const profitLoss = displayCurrentValue - investment.investedAmount;
   const percentage = investment.investedAmount > 0 ? (profitLoss / investment.investedAmount) * 100 : 0;
   const isPositive = profitLoss >= 0;
   const hasLiveCryptoQuote = investment.type === "crypto" && !!btcUnits && !!btcSpotEur;
+  const hasCryptoTable = investment.type === "crypto" && positions.length > 0;
 
   return (
     <div
@@ -39,6 +41,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
             <h3 className="truncate font-semibold text-foreground">{investment.name}</h3>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">{investment.type}</span>
+              {hasCryptoTable && (
+                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                  {positions.length} assets
+                </span>
+              )}
               {hasLiveCryptoQuote && (
                 <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">Live BTC</span>
               )}
