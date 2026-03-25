@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Investment, MonthlySnapshot, calculateSummary } from "@/features/portfolio/types/investment";
 import {
+  deleteInvestmentFromDb,
   loadInvestmentsFromDb,
   loadMonthlySnapshotsFromDb,
   upsertInvestmentsInDb,
@@ -48,6 +49,10 @@ export function useInvestments() {
 
   const deleteInvestment = useCallback((id: string) => {
     setInvestments(prev => prev.filter(inv => inv.id !== id));
+
+    if (isSupabaseConfigured) {
+      void deleteInvestmentFromDb(id);
+    }
   }, []);
 
   useEffect(() => {

@@ -118,6 +118,19 @@ export async function upsertInvestmentsInDb(investments: Investment[]): Promise<
   }
 }
 
+export async function deleteInvestmentFromDb(id: string): Promise<void> {
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from("portfolio_investments")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting investment:", error);
+  }
+}
+
 export async function loadMonthlySnapshotsFromDb(): Promise<MonthlySnapshot[] | null> {
   if (!supabase) return null;
 
