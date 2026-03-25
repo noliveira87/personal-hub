@@ -28,10 +28,12 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
   const investedAmountValue = Number(investedAmount) || 0;
   const enteredCurrentValue = Number(currentValue) || 0;
   const btcUnitsValue = Number(btcUnits) || 0;
+  const isCrypto = type === "crypto";
   const hasLiveCryptoSync = type === "crypto" && btcUnitsValue > 0 && !!btcSpotEur;
   const resolvedCurrentValue = hasLiveCryptoSync ? btcUnitsValue * Number(btcSpotEur) : enteredCurrentValue;
   const profitLoss = resolvedCurrentValue - investedAmountValue;
   const profitLossClass = profitLoss >= 0 ? "text-profit" : "text-loss";
+  const hasCryptoValues = isCrypto && investedAmount.trim() !== "" && (hasLiveCryptoSync || currentValue.trim() !== "");
 
   useEffect(() => {
     if (investment) {
@@ -120,11 +122,11 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
                 onChange={e => setCurrentValue(e.target.value)}
                 required
                 readOnly={hasLiveCryptoSync}
-                className={hasLiveCryptoSync ? `${profitLossClass} font-semibold` : undefined}
+                className={hasCryptoValues ? `${profitLossClass} font-semibold` : undefined}
               />
-              {hasLiveCryptoSync && (
+              {hasCryptoValues && (
                 <p className={`mt-1 text-xs ${profitLossClass}`}>
-                  Live BTC sync ativo · P&amp;L: {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
+                  {hasLiveCryptoSync ? "Live BTC sync ativo" : "P&amp;L"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
                 </p>
               )}
             </div>
