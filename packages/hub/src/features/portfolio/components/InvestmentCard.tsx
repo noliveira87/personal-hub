@@ -1,14 +1,14 @@
 import { Pencil, Trash2 } from "lucide-react";
 import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
-import { parseCryptoNotes, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { CryptoQuoteMap, parseCryptoNotes, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 interface InvestmentCardProps {
   investment: Investment;
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
   index: number;
-  btcSpotEur?: number | null;
-  btcQuoteLoading?: boolean;
+  cryptoSpotEur?: CryptoQuoteMap | null;
+  cryptoQuoteLoading?: boolean;
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -19,13 +19,14 @@ const TYPE_EMOJI: Record<string, string> = {
   ppr: "🏦",
 };
 
-export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur, btcQuoteLoading }: InvestmentCardProps) {
-  const { btcUnits, userNotes } = parseCryptoNotes(investment.notes);
-  const displayCurrentValue = resolveInvestmentCurrentValue(investment, btcSpotEur);
+export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
+  const { asset, units, userNotes } = parseCryptoNotes(investment.notes);
+  const displayCurrentValue = resolveInvestmentCurrentValue(investment, cryptoSpotEur);
   const profitLoss = displayCurrentValue - investment.investedAmount;
   const percentage = investment.investedAmount > 0 ? (profitLoss / investment.investedAmount) * 100 : 0;
   const isPositive = profitLoss >= 0;
-  const hasLiveCryptoQuote = investment.type === "crypto" && !!btcUnits && !!btcSpotEur;
+  const spotEur = cryptoSpotEur?.[asset] ?? null;
+  const hasLiveCryptoQuote = investment.type === "crypto" && !!units && !!spotEur;
 
   return (
     <div
@@ -40,7 +41,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium capitalize text-muted-foreground">{investment.type}</span>
               {hasLiveCryptoQuote && (
-                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">Live BTC</span>
+                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">Live {asset}</span>
               )}
             </div>
           </div>
@@ -67,11 +68,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
           <p className="text-sm font-medium text-foreground">{formatCurrency(displayCurrentValue)}</p>
           {hasLiveCryptoQuote && (
             <p className="text-[11px] text-muted-foreground">
-              {btcUnits!.toFixed(6)} BTC × {formatCurrency(btcSpotEur!)}
+              {units!.toFixed(6)} {asset} × {formatCurrency(spotEur!)}
             </p>
           )}
-          {investment.type === "crypto" && btcQuoteLoading && !hasLiveCryptoQuote && (
-            <p className="text-[11px] text-muted-foreground">Fetching BTC quote…</p>
+          {investment.type === "crypto" && cryptoQuoteLoading && !hasLiveCryptoQuote && (
+            <p className="text-[11px] text-muted-foreground">Fetching crypto quote…</p>
           )}
         </div>
         <div className="space-y-1">
@@ -82,7 +83,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">P&amp;L</p>
+          <p className="text-xs text-muted-foreground">Profit/Loss</p>
           <p className={`text-sm font-bold ${isPositive ? "text-success" : "text-urgent"}`}>
             {formatCurrency(profitLoss)}
           </p>

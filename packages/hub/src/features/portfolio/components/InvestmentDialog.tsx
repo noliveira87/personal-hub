@@ -6,31 +6,33 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Investment, InvestmentCategory, InvestmentType } from "@/features/portfolio/types/investment";
-import { parseCryptoNotes, serializeCryptoNotes } from "@/features/portfolio/lib/crypto";
+import { CryptoAsset, CryptoQuoteMap, parseCryptoNotes, serializeCryptoNotes } from "@/features/portfolio/lib/crypto";
 
 interface InvestmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   investment?: Investment | null;
-  btcSpotEur?: number | null;
+  cryptoSpotEur?: CryptoQuoteMap | null;
   onSave: (data: Omit<Investment, "id" | "createdAt" | "updatedAt">) => void;
 }
 
-export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, onSave }: InvestmentDialogProps) {
+export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur, onSave }: InvestmentDialogProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<InvestmentCategory>("short-term");
   const [type, setType] = useState<InvestmentType>("cash");
+  const [cryptoAsset, setCryptoAsset] = useState<CryptoAsset>("BTC");
   const [investedAmount, setInvestedAmount] = useState("");
   const [currentValue, setCurrentValue] = useState("");
-  const [btcUnits, setBtcUnits] = useState("");
+  const [cryptoUnits, setCryptoUnits] = useState("");
   const [notes, setNotes] = useState("");
 
   const investedAmountValue = Number(investedAmount) || 0;
   const enteredCurrentValue = Number(currentValue) || 0;
-  const btcUnitsValue = Number(btcUnits) || 0;
+  const cryptoUnitsValue = Number(cryptoUnits) || 0;
+  const selectedAssetSpotEur = cryptoSpotEur?.[cryptoAsset] ?? null;
   const isCrypto = type === "crypto";
-  const hasLiveCryptoSync = type === "crypto" && btcUnitsValue > 0 && !!btcSpotEur;
-  const resolvedCurrentValue = hasLiveCryptoSync ? btcUnitsValue * Number(btcSpotEur) : enteredCurrentValue;
+  const hasLiveCryptoSync = type === "crypto" && cryptoUnitsValue > 0 && !!selectedAssetSpotEur;
+  const resolvedCurrentValue = hasLiveCryptoSync ? cryptoUnitsValue * Number(selectedAssetSpotEur) : enteredCurrentValue;
   const profitLoss = resolvedCurrentValue - investedAmountValue;
   const profitLossClass = profitLoss >= 0 ? "text-success" : "text-urgent";
   const hasCryptoValues = isCrypto && investedAmount.trim() !== "" && (hasLiveCryptoSync || currentValue.trim() !== "");
@@ -42,23 +44,25 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
       setType(investment.type);
       setInvestedAmount(investment.investedAmount.toString());
       setCurrentValue(investment.currentValue.toString());
-      const { btcUnits: parsedBtcUnits, userNotes } = parseCryptoNotes(investment.notes);
-      setBtcUnits(parsedBtcUnits ? parsedBtcUnits.toString() : "");
+      const { asset, units, userNotes } = parseCryptoNotes(investment.notes);
+      setCryptoAsset(asset);
+      setCryptoUnits(units ? units.toString() : "");
       setNotes(userNotes || "");
     } else {
       setName("");
       setCategory("short-term");
       setType("cash");
+      setCryptoAsset("BTC");
       setInvestedAmount("");
       setCurrentValue("");
-      setBtcUnits("");
+      setCryptoUnits("");
       setNotes("");
     }
   }, [investment, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedBtcUnits = type === "crypto" ? Number(btcUnits) || null : null;
+    const parsedCryptoUnits = type === "crypto" ? Number(cryptoUnits) || null : null;
 
     onSave({
       name,
@@ -66,7 +70,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
       type,
       investedAmount: parseFloat(investedAmount) || 0,
       currentValue: hasLiveCryptoSync ? resolvedCurrentValue : parseFloat(currentValue) || 0,
-      notes: serializeCryptoNotes(parsedBtcUnits, notes),
+      notes: type === "crypto" ? serializeCryptoNotes(cryptoAsset, parsedCryptoUnits, notes) : notes || undefined,
     });
     onOpenChange(false);
   };
@@ -127,7 +131,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
               )}
               {hasCryptoValues && (
                 <p className={`mt-1 text-xs ${profitLossClass}`}>
-                  {hasLiveCryptoSync ? "Live BTC sync ativo" : "P&L"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
+                  {hasLiveCryptoSync ? `Live ${cryptoAsset} sync active` : "Profit/Loss"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
                 </p>
               )}
             </div>
@@ -137,16 +141,28 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
             </div>
           </div>
           {type === "crypto" && (
-            <div>
-              <Label htmlFor="btc-units">BTC amount (optional for live sync)</Label>
-              <Input
-                id="btc-units"
-                type="number"
-                step="0.00000001"
-                value={btcUnits}
-                onChange={e => setBtcUnits(e.target.value)}
-                placeholder="e.g. 0.052341"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Asset</Label>
+                <Select value={cryptoAsset} onValueChange={v => setCryptoAsset(v as CryptoAsset)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BTC">BTC</SelectItem>
+                    <SelectItem value="ETH">ETH</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="crypto-units">{cryptoAsset} amount (optional for live sync)</Label>
+                <Input
+                  id="crypto-units"
+                  type="number"
+                  step="0.00000001"
+                  value={cryptoUnits}
+                  onChange={e => setCryptoUnits(e.target.value)}
+                  placeholder={cryptoAsset === "BTC" ? "e.g. 0.052341" : "e.g. 1.245"}
+                />
+              </div>
             </div>
           )}
           <div>

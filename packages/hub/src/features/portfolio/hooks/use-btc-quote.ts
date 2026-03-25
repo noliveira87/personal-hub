@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { fetchBtcEurQuote } from "@/features/portfolio/lib/crypto";
+import { CryptoQuoteMap, fetchCryptoEurQuotes } from "@/features/portfolio/lib/crypto";
 
 const REFRESH_INTERVAL_MS = 60_000;
 
-export function useBtcQuote() {
-  const [priceEur, setPriceEur] = useState<number | null>(null);
+export function useCryptoQuotes() {
+  const [pricesEur, setPricesEur] = useState<CryptoQuoteMap>({});
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,15 +16,15 @@ export function useBtcQuote() {
     const load = async () => {
       try {
         setError(null);
-        const quote = await fetchBtcEurQuote(controller.signal);
+        const quote = await fetchCryptoEurQuotes(controller.signal);
         if (!mounted) return;
 
-        setPriceEur(quote.eur);
+        setPricesEur(quote.pricesEur);
         setLastUpdatedAt(quote.lastUpdatedAt);
       } catch (err) {
         if (!mounted) return;
         if (err instanceof Error && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : "Failed to fetch BTC quote");
+        setError(err instanceof Error ? err.message : "Failed to fetch crypto quotes");
       } finally {
         if (mounted) {
           setLoading(false);
@@ -44,5 +44,16 @@ export function useBtcQuote() {
     };
   }, []);
 
-  return { priceEur, lastUpdatedAt, loading, error };
+  return { pricesEur, lastUpdatedAt, loading, error };
+}
+
+export function useBtcQuote() {
+  const { pricesEur, lastUpdatedAt, loading, error } = useCryptoQuotes();
+
+  return {
+    priceEur: pricesEur.BTC ?? null,
+    lastUpdatedAt,
+    loading,
+    error,
+  };
 }

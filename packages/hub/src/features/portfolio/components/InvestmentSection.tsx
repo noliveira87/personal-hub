@@ -1,20 +1,20 @@
 import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
 import { InvestmentCard } from "./InvestmentCard";
-import { resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { CryptoQuoteMap, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 interface InvestmentSectionProps {
   title: string;
   investments: Investment[];
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
-  btcSpotEur?: number | null;
-  btcQuoteLoading?: boolean;
+  cryptoSpotEur?: CryptoQuoteMap | null;
+  cryptoQuoteLoading?: boolean;
 }
 
-export function InvestmentSection({ title, investments, onEdit, onDelete, btcSpotEur, btcQuoteLoading }: InvestmentSectionProps) {
+export function InvestmentSection({ title, investments, onEdit, onDelete, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
   const totalInvested = investments.reduce((sum, inv) => sum + inv.investedAmount, 0);
   const totalCurrentValue = investments.reduce(
-    (sum, inv) => sum + resolveInvestmentCurrentValue(inv, btcSpotEur),
+    (sum, inv) => sum + resolveInvestmentCurrentValue(inv, cryptoSpotEur),
     0,
   );
   const totalProfitLoss = totalCurrentValue - totalInvested;
@@ -42,7 +42,7 @@ export function InvestmentSection({ title, investments, onEdit, onDelete, btcSpo
           <span className="rounded-full bg-muted px-3 py-1.5 text-muted-foreground">
             {formatCurrency(summary.totalCurrentValue)}
           </span>
-          <span className={`rounded-full px-3 py-1.5 font-semibold ${isPositive ? "bg-profit\/10 text-profit" : "bg-loss\/10 text-loss"}`}>
+          <span className={`rounded-full px-3 py-1.5 font-semibold ${isPositive ? "bg-success/10 text-success" : "bg-urgent/10 text-urgent"}`}>
             {formatPercentage(summary.percentageReturn)}
           </span>
         </div>
@@ -55,8 +55,8 @@ export function InvestmentSection({ title, investments, onEdit, onDelete, btcSpo
             onEdit={onEdit}
             onDelete={onDelete}
             index={i}
-            btcSpotEur={btcSpotEur}
-            btcQuoteLoading={btcQuoteLoading}
+            cryptoSpotEur={cryptoSpotEur}
+            cryptoQuoteLoading={cryptoQuoteLoading}
           />
         ))}
       </div>

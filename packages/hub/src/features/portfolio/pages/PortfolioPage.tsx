@@ -7,7 +7,7 @@ import { MonthlyInsights } from "@/features/portfolio/components/MonthlyInsights
 import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
 import { Investment, calculateSummary } from "@/features/portfolio/types/investment";
 import AppSectionHeader from "@/components/AppSectionHeader";
-import { useBtcQuote } from "@/features/portfolio/hooks/use-btc-quote";
+import { useCryptoQuotes } from "@/features/portfolio/hooks/use-btc-quote";
 import { resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 const InvestmentDialog = lazy(() =>
@@ -18,21 +18,21 @@ const Index = () => {
   const { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment } = useInvestments();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
-  const { priceEur: btcSpotEur, loading: btcQuoteLoading } = useBtcQuote();
+  const { pricesEur: cryptoSpotEur, loading: cryptoQuoteLoading } = useCryptoQuotes();
 
   const resolvedInvestments = useMemo(() => {
     return investments.map((investment) => ({
       ...investment,
-      currentValue: resolveInvestmentCurrentValue(investment, btcSpotEur),
+      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
     }));
-  }, [investments, btcSpotEur]);
+  }, [investments, cryptoSpotEur]);
 
   const summary = calculateSummary(resolvedInvestments);
 
   const handleEdit = (investment: Investment) => {
     setEditingInvestment({
       ...investment,
-      currentValue: resolveInvestmentCurrentValue(investment, btcSpotEur),
+      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
     });
     setDialogOpen(true);
   };
@@ -87,16 +87,16 @@ const Index = () => {
               investments={shortTerm}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              btcSpotEur={btcSpotEur}
-              btcQuoteLoading={btcQuoteLoading}
+              cryptoSpotEur={cryptoSpotEur}
+              cryptoQuoteLoading={cryptoQuoteLoading}
             />
             <InvestmentSection
               title="Long-term Investments"
               investments={longTerm}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              btcSpotEur={btcSpotEur}
-              btcQuoteLoading={btcQuoteLoading}
+              cryptoSpotEur={cryptoSpotEur}
+              cryptoQuoteLoading={cryptoQuoteLoading}
             />
           </div>
         </div>
@@ -108,7 +108,7 @@ const Index = () => {
             open={dialogOpen}
             onOpenChange={setDialogOpen}
             investment={editingInvestment}
-            btcSpotEur={btcSpotEur}
+            cryptoSpotEur={cryptoSpotEur}
             onSave={handleSave}
           />
         </Suspense>
