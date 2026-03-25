@@ -97,6 +97,23 @@ This runs:
 2. npm run build
 3. PM2 restart
 
+## 🏷️ Versioning
+
+This repository uses a simple release flow:
+
+- `main` contains the latest production-ready code
+- changes are documented in [CHANGELOG.md](CHANGELOG.md)
+- stable deployments can be tagged with semantic-style versions such as `hub-v0.2.1`
+- each tag should have a matching GitHub Release note summarizing the version
+
+Recommended workflow:
+
+1. Merge validated work into `main`
+2. Deploy and confirm production is stable
+3. Update [CHANGELOG.md](CHANGELOG.md)
+4. Create a new tag
+5. Publish the GitHub Release
+
 
 ## 🔗 App Routes
 
