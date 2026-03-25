@@ -78,7 +78,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpot
             {formatCurrency(isCashbackOnly ? cashbackDisplayValue : displayCurrentValue)}
           </p>
           {!isCashbackOnly && hasLiveCryptoQuote && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground whitespace-nowrap">
               {units!.toFixed(6)} {asset} × {formatCurrency(spotEur!)}
             </p>
           )}
@@ -117,7 +117,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpot
           <p className="mt-1 text-sm font-semibold text-foreground">
             {cashbackCurrentValue !== null ? formatCurrency(cashbackCurrentValue) : "—"}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
             {cashbackUnits!.toFixed(6)} {cashbackAsset}
             {cashbackSpotEur ? ` × ${formatCurrency(cashbackSpotEur)}` : ""}
             {cashbackDate ? ` • ${cashbackDate}` : ""}
@@ -127,12 +127,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, cryptoSpot
 
       {hasCashback && isCashbackOnly && (
         <div className="mt-4 rounded-2xl bg-muted/40 p-3 sm:p-4">
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
             {cashbackSpotEur
-              ? `Calculation: ${cashbackUnits!.toFixed(6)} ${cashbackAsset} × ${formatCurrency(cashbackSpotEur)} = ${formatCurrency(cashbackDisplayValue)}`
-              : `Calculation: ${cashbackUnits!.toFixed(6)} ${cashbackAsset} × live spot price`}
+              ? `${cashbackUnits!.toFixed(6)} ${cashbackAsset} × ${formatCurrency(cashbackSpotEur)} = ${formatCurrency(cashbackDisplayValue)}`
+              : `${cashbackUnits!.toFixed(6)} ${cashbackAsset} × live spot price`}
           </p>
-          {cashbackDate ? <p className="text-[11px] text-muted-foreground">Date: {cashbackDate}</p> : null}
         </div>
       )}
 
