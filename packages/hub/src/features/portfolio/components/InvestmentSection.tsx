@@ -4,15 +4,17 @@ import { CryptoQuoteMap, resolveInvestmentCurrentValue } from "@/features/portfo
 
 interface InvestmentSectionProps {
   title: string;
+  category: "short-term" | "long-term";
   investments: Investment[];
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
   onQuickContribution: (investment: Investment, payload: { amount: number; date: string; mode: "contribution" | "value_update"; unitsBought?: number | null }) => void;
+  onMoveInvestment: (category: "short-term" | "long-term", id: string, direction: "up" | "down") => void;
   cryptoSpotEur?: CryptoQuoteMap | null;
   cryptoQuoteLoading?: boolean;
 }
 
-export function InvestmentSection({ title, investments, onEdit, onDelete, onQuickContribution, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
+export function InvestmentSection({ title, category, investments, onEdit, onDelete, onQuickContribution, onMoveInvestment, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
   const totalInvested = investments.reduce((sum, inv) => sum + inv.investedAmount, 0);
   const totalCurrentValue = investments.reduce(
     (sum, inv) => sum + resolveInvestmentCurrentValue(inv, cryptoSpotEur),
@@ -57,6 +59,9 @@ export function InvestmentSection({ title, investments, onEdit, onDelete, onQuic
             onEdit={onEdit}
             onDelete={onDelete}
             onQuickContribution={onQuickContribution}
+            onMove={(id, direction) => onMoveInvestment(category, id, direction)}
+            canMoveUp={i > 0}
+            canMoveDown={i < investments.length - 1}
             index={i}
             cryptoSpotEur={cryptoSpotEur}
             cryptoQuoteLoading={cryptoQuoteLoading}

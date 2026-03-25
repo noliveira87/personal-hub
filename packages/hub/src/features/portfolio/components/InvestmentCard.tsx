@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,9 @@ interface InvestmentCardProps {
   onEdit: (investment: Investment) => void;
   onDelete: (id: string) => void;
   onQuickContribution: (investment: Investment, payload: { amount: number; date: string; mode: "contribution" | "value_update"; unitsBought?: number | null }) => void;
+  onMove: (id: string, direction: "up" | "down") => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   index: number;
   cryptoSpotEur?: CryptoQuoteMap | null;
   cryptoQuoteLoading?: boolean;
@@ -20,12 +23,17 @@ interface InvestmentCardProps {
 const TYPE_EMOJI: Record<string, string> = {
   cash: "💰",
   etf: "📈",
-  crypto: "₿",
+  crypto: "🪙",
   p2p: "🤝",
   ppr: "🏦",
 };
 
-export function InvestmentCard({ investment, onEdit, onDelete, onQuickContribution, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
+const CRYPTO_SYMBOL: Record<string, string> = {
+  BTC: "₿",
+  ETH: "Ξ",
+};
+
+export function InvestmentCard({ investment, onEdit, onDelete, onQuickContribution, onMove, canMoveUp, canMoveDown, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickMode, setQuickMode] = useState<"contribution" | "value_update">("contribution");
   const [quickAmount, setQuickAmount] = useState("");
@@ -44,6 +52,8 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const hasCashback = investment.type === "crypto" && !!cashbackUnits;
   const isCashbackOnly = investment.type === "crypto" && investment.investedAmount === 0 && !units && !!cashbackUnits;
   const cashbackDisplayValue = cashbackCurrentValue ?? displayCurrentValue;
+  const cryptoDisplayAsset = investment.type === "crypto" ? (asset || cashbackAsset || "BTC") : null;
+  const cardIcon = investment.type === "crypto" ? (CRYPTO_SYMBOL[cryptoDisplayAsset ?? "BTC"] ?? TYPE_EMOJI.crypto) : (TYPE_EMOJI[investment.type] || "💰");
 
   const handleQuickSave = () => {
     const amount = Number(quickAmount);
@@ -82,7 +92,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl">{TYPE_EMOJI[investment.type] || "💰"}</span>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl">{cardIcon}</span>
           <div className="min-w-0 space-y-1">
             <h3 className="truncate font-semibold text-foreground">{investment.name}</h3>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -91,12 +101,30 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 <span className="inline-flex rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success">Cashback</span>
               )}
               {hasLiveCryptoQuote && (
-                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">Live {asset}</span>
+                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                  Live {CRYPTO_SYMBOL[asset] ?? ""} {asset}
+                </span>
               )}
             </div>
           </div>
         </div>
         <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+          <button
+            onClick={() => onMove(investment.id, "up")}
+            disabled={!canMoveUp}
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Move up"
+          >
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => onMove(investment.id, "down")}
+            disabled={!canMoveDown}
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Move down"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
           <button
             onClick={() => setQuickAddOpen(true)}
             className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"

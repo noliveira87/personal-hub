@@ -21,10 +21,50 @@ const generateId = () => {
 };
 const INVESTMENTS_STORAGE_KEY = "portfolio.investments.v1";
 const SNAPSHOTS_STORAGE_KEY = "portfolio.monthly-snapshots.v1";
+const SHORT_TERM_ORDER_KEY = "portfolio.short-term-order.v1";
+const LONG_TERM_ORDER_KEY = "portfolio.long-term-order.v1";
+
+const readOrder = (key: string): string[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeOrder = (key: string, value: string[]) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // no-op
+  }
+};
+
+const normalizeOrder = (order: string[], ids: string[]) => {
+  const idSet = new Set(ids);
+  const uniqueOrdered = order.filter((id, index) => idSet.has(id) && order.indexOf(id) === index);
+  const missing = ids.filter((id) => !uniqueOrdered.includes(id));
+  return [...uniqueOrdered, ...missing];
+};
+
+const sameOrder = (a: string[], b: string[]) => a.length === b.length && a.every((item, index) => item === b[index]);
+
+const sortByOrder = (items: Investment[], order: string[]) => {
+  const indexMap = new Map(order.map((id, index) => [id, index]));
+  return [...items].sort((a, b) => {
+    const aIndex = indexMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+    const bIndex = indexMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+    return aIndex - bIndex;
+  });
+};
 
 export function useInvestments() {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [monthlySnapshots, setMonthlySnapshots] = useState<MonthlySnapshot[]>([]);
+  const [shortTermOrder, setShortTermOrder] = useState<string[]>(() => readOrder(SHORT_TERM_ORDER_KEY));
+  const [longTermOrder, setLongTermOrder] = useState<string[]>(() => readOrder(LONG_TERM_ORDER_KEY));
 
   const [remoteHydrated, setRemoteHydrated] = useState(false);
 
@@ -190,8 +230,55 @@ export function useInvestments() {
     }
   }, [monthlySnapshots, remoteHydrated]);
 
-  const shortTerm = investments.filter(i => i.category === "short-term");
-  const longTerm = investments.filter(i => i.category === "long-term");
+  useEffect(() => {
+    const shortIds = investments.filter((investment) => investment.category === "short-term").map((investment) => investment.id);
+    const longIds = investments.filter((investment) => investment.category === "long-term").map((investment) => investment.id);
 
-  return { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment };
+    setShortTermOrder((prev) => {
+      const next = normalizeOrder(prev, shortIds);
+      return sameOrder(prev, next) ? prev : next;
+    });
+
+    setLongTermOrder((prev) => {
+      const next = normalizeOrder(prev, longIds);
+      return sameOrder(prev, next) ? prev : next;
+    });
+  }, [investments]);
+
+  useEffect(() => {
+    writeOrder(SHORT_TERM_ORDER_KEY, shortTermOrder);
+  }, [shortTermOrder]);
+
+  useEffect(() => {
+    writeOrder(LONG_TERM_ORDER_KEY, longTermOrder);
+  }, [longTermOrder]);
+
+  const moveInvestment = useCallback(
+    (category: "short-term" | "long-term", id: string, direction: "up" | "down") => {
+      const categoryIds = investments
+        .filter((investment) => investment.category === category)
+        .map((investment) => investment.id);
+
+      const setOrder = category === "short-term" ? setShortTermOrder : setLongTermOrder;
+
+      setOrder((prev) => {
+        const current = normalizeOrder(prev, categoryIds);
+        const fromIndex = current.indexOf(id);
+        if (fromIndex === -1) return current;
+
+        const targetIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
+        if (targetIndex < 0 || targetIndex >= current.length) return current;
+
+        const next = [...current];
+        [next[fromIndex], next[targetIndex]] = [next[targetIndex], next[fromIndex]];
+        return next;
+      });
+    },
+    [investments],
+  );
+
+  const shortTerm = sortByOrder(investments.filter(i => i.category === "short-term"), shortTermOrder);
+  const longTerm = sortByOrder(investments.filter(i => i.category === "long-term"), longTermOrder);
+
+  return { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment, moveInvestment };
 }

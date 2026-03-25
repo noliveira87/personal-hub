@@ -15,7 +15,7 @@ const InvestmentDialog = lazy(() =>
 );
 
 const Index = () => {
-  const { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment } = useInvestments();
+  const { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment, moveInvestment } = useInvestments();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
   const { pricesEur: cryptoSpotEur, loading: cryptoQuoteLoading } = useCryptoQuotes();
@@ -162,24 +162,28 @@ const Index = () => {
           </div>
 
           <KpiCards summary={summary} />
-          <MonthlyInsights snapshots={monthlySnapshots} investments={investments} />
+          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} />
 
           <div className="grid grid-cols-1 gap-6">
             <InvestmentSection
               title="Short-term Investments"
               investments={shortTerm}
+              category="short-term"
               onEdit={handleEdit}
               onDelete={handleDelete}
               onQuickContribution={handleQuickContribution}
+              onMoveInvestment={moveInvestment}
               cryptoSpotEur={cryptoSpotEur}
               cryptoQuoteLoading={cryptoQuoteLoading}
             />
             <InvestmentSection
               title="Long-term Investments"
               investments={longTerm}
+              category="long-term"
               onEdit={handleEdit}
               onDelete={handleDelete}
               onQuickContribution={handleQuickContribution}
+              onMoveInvestment={moveInvestment}
               cryptoSpotEur={cryptoSpotEur}
               cryptoQuoteLoading={cryptoQuoteLoading}
             />

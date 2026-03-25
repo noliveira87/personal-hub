@@ -1,6 +1,6 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Investment, MonthlySnapshot, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
+import { Investment, MonthlySnapshot, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 
 interface MonthlyInsightsProps {
@@ -13,59 +13,54 @@ export function MonthlyInsights({ snapshots, investments }: MonthlyInsightsProps
     return null;
   }
 
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const movementInflowByMonth = investments.reduce((acc, investment) => {
-    const movements = parseInvestmentMovements(investment.notes);
+  const currentMonthInflow = investments.reduce((total, inv) => {
+    const movements = parseInvestmentMovements(inv.notes);
+    const inflow = movements
+      .filter((m) => m.date.startsWith(currentMonth) && (m.kind === "contribution" || m.kind === "withdrawal"))
+      .reduce((sum, m) => sum + (m.kind === "withdrawal" ? -m.amount : m.amount), 0);
+    return total + inflow;
+  }, 0);
 
-    movements.forEach((movement) => {
-      if (movement.note === "Initial position") {
-        return;
-      }
-
-      if (movement.kind !== "contribution" && movement.kind !== "withdrawal") {
-        return;
-      }
-
-      const month = movement.date.slice(0, 7);
-      const signedAmount = movement.kind === "withdrawal" ? -movement.amount : movement.amount;
-      acc.set(month, (acc.get(month) ?? 0) + signedAmount);
-    });
-
-    return acc;
-  }, new Map<string, number>());
-
-  // Performance by month = sum of adjustment + cashback movements only
-  const movementPerformanceByMonth = investments.reduce((acc, investment) => {
-    const movements = parseInvestmentMovements(investment.notes);
-
-    movements.forEach((movement) => {
-      if (movement.kind !== "adjustment" && movement.kind !== "cashback") {
-        return;
-      }
-
-      const month = movement.date.slice(0, 7);
-      acc.set(month, (acc.get(month) ?? 0) + movement.amount);
-    });
-
-    return acc;
-  }, new Map<string, number>());
+  const liveSummary = calculateSummary(investments);
 
   const sorted = [...snapshots]
     .sort((a, b) => a.month.localeCompare(b.month))
     .map((snapshot, index, arr) => {
       const previousSnapshot = index > 0 ? arr[index - 1] : null;
-      const monthlyInflow = movementInflowByMonth.get(snapshot.month) ?? 0;
-      // Performance is based on adjustment + cashback movements added this month
-      // not the change in portfolio value (which includes pre-existing gains)
-      const monthlyPerformance = movementPerformanceByMonth.get(snapshot.month) ?? 0;
+      const isCurrentMonth = snapshot.month === currentMonth;
+
+      const monthlyInflow = Number.isFinite(snapshot.monthlyInflow)
+        ? snapshot.monthlyInflow
+        : previousSnapshot
+          ? snapshot.totalInvested - previousSnapshot.totalInvested
+          : snapshot.totalInvested;
+      const monthlyPerformance = Number.isFinite(snapshot.monthlyPerformance)
+        ? snapshot.monthlyPerformance
+        : previousSnapshot
+          ? snapshot.totalCurrentValue - previousSnapshot.totalCurrentValue - monthlyInflow
+          : snapshot.totalProfitLoss;
       const monthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + monthlyInflow : monthlyInflow;
-      const monthlyReturnPct = monthlyBase > 0 ? (monthlyPerformance / monthlyBase) * 100 : 0;
+      const monthlyReturnPct = Number.isFinite(snapshot.monthlyReturnPct)
+        ? snapshot.monthlyReturnPct
+        : monthlyBase > 0
+          ? (monthlyPerformance / monthlyBase) * 100
+          : 0;
+
+      const liveMonthlyInflow = previousSnapshot ? currentMonthInflow : liveSummary.totalInvested;
+      const liveMonthlyPerformance = previousSnapshot
+        ? liveSummary.totalCurrentValue - previousSnapshot.totalCurrentValue - liveMonthlyInflow
+        : liveSummary.totalProfitLoss;
+      const liveMonthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + liveMonthlyInflow : liveSummary.totalInvested;
+      const liveMonthlyReturnPct = liveMonthlyBase > 0 ? (liveMonthlyPerformance / liveMonthlyBase) * 100 : 0;
 
       return {
         ...snapshot,
-        monthlyInflow,
-        monthlyPerformance,
-        monthlyReturnPct,
+        monthlyInflow: isCurrentMonth ? liveMonthlyInflow : monthlyInflow,
+        monthlyPerformance: isCurrentMonth ? liveMonthlyPerformance : monthlyPerformance,
+        monthlyReturnPct: isCurrentMonth ? liveMonthlyReturnPct : monthlyReturnPct,
       };
     });
 
@@ -77,6 +72,39 @@ export function MonthlyInsights({ snapshots, investments }: MonthlyInsightsProps
 
   const recent = activeSorted.slice(-6);
   const latest = activeSorted[activeSorted.length - 1];
+  const latestMonth = latest.month;
+
+  const nonCryptoMonthlyPerformance = investments
+    .filter((investment) => investment.type !== "crypto")
+    .reduce((total, investment) => {
+      const movements = parseInvestmentMovements(investment.notes);
+      const monthPerformance = movements
+        .filter(
+          (movement) =>
+            movement.date.startsWith(latestMonth) &&
+            movement.note !== "Initial position" &&
+            (movement.kind === "adjustment" || movement.kind === "cashback"),
+        )
+        .reduce((sum, movement) => sum + movement.amount, 0);
+      return total + monthPerformance;
+    }, 0);
+
+  const cryptoMonthlyPerformance = latest.monthlyPerformance - nonCryptoMonthlyPerformance;
+  const cryptoManualMonthlyPerformance = investments
+    .filter((investment) => investment.type === "crypto")
+    .reduce((total, investment) => {
+      const movements = parseInvestmentMovements(investment.notes);
+      const monthPerformance = movements
+        .filter(
+          (movement) =>
+            movement.date.startsWith(latestMonth) &&
+            movement.note !== "Initial position" &&
+            (movement.kind === "adjustment" || movement.kind === "cashback"),
+        )
+        .reduce((sum, movement) => sum + movement.amount, 0);
+      return total + monthPerformance;
+    }, 0);
+  const cryptoMarketMonthlyPerformance = cryptoMonthlyPerformance - cryptoManualMonthlyPerformance;
 
   type AnnualInsight = {
     year: string;
@@ -176,10 +204,10 @@ export function MonthlyInsights({ snapshots, investments }: MonthlyInsightsProps
     <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
       <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
         <CardTitle>Monthly insights</CardTitle>
-        <CardDescription>Track monthly and yearly invested capital, performance and return trends over time.</CardDescription>
+        <CardDescription>Track monthly and yearly invested capital, market performance and return trends over time.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month return</p>
             <p className={`mt-2 text-xl font-semibold ${latest.monthlyReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
@@ -194,6 +222,21 @@ export function MonthlyInsights({ snapshots, investments }: MonthlyInsightsProps
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month performance</p>
             <p className={`mt-2 text-xl font-semibold ${latest.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
               {formatCurrency(latest.monthlyPerformance)}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Crypto P/L this month</p>
+            <p className={`mt-2 text-xl font-semibold ${cryptoMonthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
+              {formatCurrency(cryptoMonthlyPerformance)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {`Market move: ${formatCurrency(cryptoMarketMonthlyPerformance)}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {`Manual adj/cashback: ${formatCurrency(cryptoManualMonthlyPerformance)}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {`${formatCurrency(cryptoMarketMonthlyPerformance)} + ${formatCurrency(cryptoManualMonthlyPerformance)} = ${formatCurrency(cryptoMonthlyPerformance)}`}
             </p>
           </div>
         </div>

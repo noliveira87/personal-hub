@@ -10,15 +10,15 @@ export function KpiCards({ summary }: KpiCardsProps) {
 
   const cards = [
     {
-      label: "Total Invested",
-      value: formatCurrency(summary.totalInvested),
-      icon: Wallet,
-      accent: "primary" as const,
-    },
-    {
       label: "Current Value",
       value: formatCurrency(summary.totalCurrentValue),
       icon: PiggyBank,
+      accent: "primary" as const,
+    },
+    {
+      label: "Total Invested",
+      value: formatCurrency(summary.totalInvested),
+      icon: Wallet,
       accent: "primary" as const,
     },
     {
