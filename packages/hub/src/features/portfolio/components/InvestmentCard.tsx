@@ -63,10 +63,6 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
 
       <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/40 p-3 sm:p-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Invested</p>
-          <p className="text-sm font-medium text-foreground">{formatCurrency(investment.investedAmount)}</p>
-        </div>
-        <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Current</p>
           <p className="text-sm font-medium text-foreground">{formatCurrency(displayCurrentValue)}</p>
           {hasLiveCryptoQuote && (
@@ -77,6 +73,10 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
           {investment.type === "crypto" && btcQuoteLoading && !hasLiveCryptoQuote && (
             <p className="text-[11px] text-muted-foreground">Fetching BTC quote…</p>
           )}
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Invested</p>
+          <p className="text-sm font-medium text-foreground">{formatCurrency(investment.investedAmount)}</p>
         </div>
       </div>
 

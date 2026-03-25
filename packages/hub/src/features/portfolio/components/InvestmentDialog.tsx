@@ -109,10 +109,6 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="invested">Invested (€)</Label>
-              <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
-            </div>
-            <div>
               <Label>Current Value (€)</Label>
               {hasLiveCryptoSync ? (
                 <p className={`mt-2 text-lg font-semibold tabular-nums ${profitLossClass}`}>
@@ -134,6 +130,10 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
                   {hasLiveCryptoSync ? "Live BTC sync ativo" : "P&L"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
                 </p>
               )}
+            </div>
+            <div>
+              <Label htmlFor="invested">Invested (€)</Label>
+              <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
             </div>
           </div>
           {type === "crypto" && (
