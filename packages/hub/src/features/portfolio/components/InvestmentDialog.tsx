@@ -113,11 +113,11 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
               <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
             </div>
             <div>
-              <Label htmlFor="current">Current Value (€)</Label>
+              <Label>Current Value (€)</Label>
               {hasLiveCryptoSync ? (
-                <div className={`flex h-10 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold tabular-nums ${profitLossClass}`}>
+                <p className={`mt-2 text-lg font-semibold tabular-nums ${profitLossClass}`}>
                   {resolvedCurrentValue.toFixed(2)} €
-                </div>
+                </p>
               ) : (
                 <Input
                   id="current"
