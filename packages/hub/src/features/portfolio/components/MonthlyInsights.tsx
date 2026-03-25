@@ -35,7 +35,7 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month return</p>
-            <p className={`mt-2 text-xl font-semibold ${latest.monthlyReturnPct >= 0 ? "text-profit" : "text-loss"}`}>
+            <p className={`mt-2 text-xl font-semibold ${latest.monthlyReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
               {formatPercentage(latest.monthlyReturnPct)}
             </p>
           </div>
@@ -45,7 +45,7 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
           </div>
           <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">This month performance</p>
-            <p className={`mt-2 text-xl font-semibold ${latest.monthlyPerformance >= 0 ? "text-profit" : "text-loss"}`}>
+            <p className={`mt-2 text-xl font-semibold ${latest.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
               {formatCurrency(latest.monthlyPerformance)}
             </p>
           </div>
@@ -54,7 +54,7 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
-            <div className="mt-2 flex items-center gap-2 text-profit">
+            <div className="mt-2 flex items-center gap-2 text-success">
               <TrendingUp className="h-4 w-4" />
               <span className="font-medium">{formatMonthLabel(bestMonth.month)}</span>
             </div>
@@ -63,7 +63,7 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
 
           <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
-            <div className="mt-2 flex items-center gap-2 text-loss">
+            <div className="mt-2 flex items-center gap-2 text-urgent">
               <TrendingDown className="h-4 w-4" />
               <span className="font-medium">{formatMonthLabel(worstMonth.month)}</span>
             </div>
@@ -81,13 +81,13 @@ export function MonthlyInsights({ snapshots }: MonthlyInsightsProps) {
               <div key={snapshot.month} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{formatMonthLabel(snapshot.month)}</span>
-                  <span className={isPositive ? "text-profit" : "text-loss"}>
+                  <span className={isPositive ? "text-success" : "text-urgent"}>
                     {formatCurrency(snapshot.monthlyPerformance)} ({formatPercentage(snapshot.monthlyReturnPct)})
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-muted">
                   <div
-                    className={`h-2 rounded-full ${isPositive ? "bg-profit" : "bg-loss"}`}
+                    className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`}
                     style={{ width: `${ratio}%` }}
                   />
                 </div>

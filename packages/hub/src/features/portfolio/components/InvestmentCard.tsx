@@ -83,13 +83,13 @@ export function InvestmentCard({ investment, onEdit, onDelete, index, btcSpotEur
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">P&amp;L</p>
-          <p className={`text-sm font-bold ${isPositive ? "text-profit" : "text-loss"}`}>
+          <p className={`text-sm font-bold ${isPositive ? "text-success" : "text-urgent"}`}>
             {formatCurrency(profitLoss)}
           </p>
         </div>
         <span
           className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            isPositive ? "bg-profit\/10 text-profit" : "bg-loss\/10 text-loss"
+            isPositive ? "bg-success/10 text-success" : "bg-urgent/10 text-urgent"
           }`}
         >
           {formatPercentage(percentage)}

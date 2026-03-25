@@ -50,9 +50,9 @@ export function KpiCards({ summary }: KpiCardsProps) {
             <div
               className={`rounded-xl p-2.5 ${
                 card.accent === "profit"
-                  ? "bg-profit\/10 text-profit"
+                  ? "bg-success/10 text-success"
                   : card.accent === "loss"
-                  ? "bg-loss\/10 text-loss"
+                  ? "bg-urgent/10 text-urgent"
                   : "bg-primary/10 text-primary"
               }`}
             >
@@ -62,9 +62,9 @@ export function KpiCards({ summary }: KpiCardsProps) {
           <p
             className={`text-2xl font-bold tracking-tight sm:text-[1.75rem] ${
               card.accent === "profit"
-                ? "text-profit"
+                ? "text-success"
                 : card.accent === "loss"
-                ? "text-loss"
+                ? "text-urgent"
                 : "text-foreground"
             }`}
           >

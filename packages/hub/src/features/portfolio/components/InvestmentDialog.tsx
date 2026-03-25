@@ -32,7 +32,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
   const hasLiveCryptoSync = type === "crypto" && btcUnitsValue > 0 && !!btcSpotEur;
   const resolvedCurrentValue = hasLiveCryptoSync ? btcUnitsValue * Number(btcSpotEur) : enteredCurrentValue;
   const profitLoss = resolvedCurrentValue - investedAmountValue;
-  const profitLossClass = profitLoss >= 0 ? "text-profit" : "text-loss";
+  const profitLossClass = profitLoss >= 0 ? "text-success" : "text-urgent";
   const hasCryptoValues = isCrypto && investedAmount.trim() !== "" && (hasLiveCryptoSync || currentValue.trim() !== "");
 
   useEffect(() => {
@@ -114,19 +114,24 @@ export function InvestmentDialog({ open, onOpenChange, investment, btcSpotEur, o
             </div>
             <div>
               <Label htmlFor="current">Current Value (€)</Label>
-              <Input
-                id="current"
-                type="number"
-                step="0.01"
-                value={hasLiveCryptoSync ? resolvedCurrentValue.toFixed(2) : currentValue}
-                onChange={e => setCurrentValue(e.target.value)}
-                required
-                readOnly={hasLiveCryptoSync}
-                className={hasCryptoValues ? `${profitLossClass} font-semibold` : undefined}
-              />
+              {hasLiveCryptoSync ? (
+                <div className={`flex h-10 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-semibold tabular-nums ${profitLossClass}`}>
+                  {resolvedCurrentValue.toFixed(2)} €
+                </div>
+              ) : (
+                <Input
+                  id="current"
+                  type="number"
+                  step="0.01"
+                  value={currentValue}
+                  onChange={e => setCurrentValue(e.target.value)}
+                  required
+                  className={hasCryptoValues ? `${profitLossClass} font-semibold` : undefined}
+                />
+              )}
               {hasCryptoValues && (
                 <p className={`mt-1 text-xs ${profitLossClass}`}>
-                  {hasLiveCryptoSync ? "Live BTC sync ativo" : "P&amp;L"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
+                  {hasLiveCryptoSync ? "Live BTC sync ativo" : "P&L"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
                 </p>
               )}
             </div>
