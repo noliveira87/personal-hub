@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Investment, MonthlySnapshot, calculateSummary } from "@/features/portfolio/types/investment";
 import {
   loadInvestmentsFromDb,
@@ -21,96 +21,11 @@ const generateId = () => {
 const INVESTMENTS_STORAGE_KEY = "portfolio.investments.v1";
 const SNAPSHOTS_STORAGE_KEY = "portfolio.monthly-snapshots.v1";
 
-const INITIAL_INVESTMENTS: Investment[] = [
-  {
-    id: generateId(),
-    name: "Trading 212",
-    category: "short-term",
-    type: "cash",
-    investedAmount: 0,
-    currentValue: 379.26,
-    notes: "Interest earnings only",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: generateId(),
-    name: "Revolut",
-    category: "short-term",
-    type: "cash",
-    investedAmount: 112777.40,
-    currentValue: 112781.80,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: generateId(),
-    name: "ETFs",
-    category: "long-term",
-    type: "etf",
-    investedAmount: 33621.01,
-    currentValue: 42021.85,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: generateId(),
-    name: "PPR",
-    category: "long-term",
-    type: "ppr",
-    investedAmount: 3850.00,
-    currentValue: 3974.00,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: generateId(),
-    name: "Crypto",
-    category: "long-term",
-    type: "crypto",
-    investedAmount: 1774.00,
-    currentValue: 1599.50,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: generateId(),
-    name: "P2P",
-    category: "long-term",
-    type: "p2p",
-    investedAmount: 505.00,
-    currentValue: 543.12,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 export function useInvestments() {
-  const [investments, setInvestments] = useState<Investment[]>(() => {
-    try {
-      const raw = localStorage.getItem(INVESTMENTS_STORAGE_KEY);
-      if (!raw) return INITIAL_INVESTMENTS;
-      const parsed = JSON.parse(raw) as Investment[];
-      return Array.isArray(parsed) && parsed.length ? parsed : INITIAL_INVESTMENTS;
-    } catch {
-      return INITIAL_INVESTMENTS;
-    }
-  });
-
-  const [monthlySnapshots, setMonthlySnapshots] = useState<MonthlySnapshot[]>(() => {
-    try {
-      const raw = localStorage.getItem(SNAPSHOTS_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw) as MonthlySnapshot[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [monthlySnapshots, setMonthlySnapshots] = useState<MonthlySnapshot[]>([]);
 
   const [remoteHydrated, setRemoteHydrated] = useState(false);
-  const initialInvestmentsRef = useRef(investments);
-  const initialSnapshotsRef = useRef(monthlySnapshots);
 
   const getMonthKey = (date = new Date()) => {
     const year = date.getFullYear();
@@ -136,6 +51,15 @@ export function useInvestments() {
   }, []);
 
   useEffect(() => {
+    try {
+      localStorage.removeItem(INVESTMENTS_STORAGE_KEY);
+      localStorage.removeItem(SNAPSHOTS_STORAGE_KEY);
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  useEffect(() => {
     let isCancelled = false;
 
     const hydrateFromSupabase = async () => {
@@ -151,17 +75,8 @@ export function useInvestments() {
 
       if (isCancelled) return;
 
-      if (remoteInvestments && remoteInvestments.length > 0) {
-        setInvestments(remoteInvestments);
-      } else {
-        await upsertInvestmentsInDb(initialInvestmentsRef.current);
-      }
-
-      if (remoteSnapshots && remoteSnapshots.length > 0) {
-        setMonthlySnapshots(remoteSnapshots);
-      } else if (initialSnapshotsRef.current.length > 0) {
-        await upsertMonthlySnapshotsInDb(initialSnapshotsRef.current);
-      }
+      setInvestments(remoteInvestments ?? []);
+      setMonthlySnapshots(remoteSnapshots ?? []);
 
       if (!isCancelled) {
         setRemoteHydrated(true);
@@ -176,8 +91,6 @@ export function useInvestments() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(INVESTMENTS_STORAGE_KEY, JSON.stringify(investments));
-
     if (isSupabaseConfigured && remoteHydrated) {
       void upsertInvestmentsInDb(investments);
     }
@@ -222,8 +135,6 @@ export function useInvestments() {
   }, [investments]);
 
   useEffect(() => {
-    localStorage.setItem(SNAPSHOTS_STORAGE_KEY, JSON.stringify(monthlySnapshots));
-
     if (isSupabaseConfigured && remoteHydrated) {
       void upsertMonthlySnapshotsInDb(monthlySnapshots);
     }
