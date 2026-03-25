@@ -81,7 +81,7 @@ const Index = () => {
           <KpiCards summary={summary} />
           <MonthlyInsights snapshots={monthlySnapshots} />
 
-          <div className="grid gap-6 xl:grid-cols-2 xl:gap-8">
+          <div className="grid grid-cols-1 gap-6">
             <InvestmentSection
               title="Short-term Investments"
               investments={shortTerm}
