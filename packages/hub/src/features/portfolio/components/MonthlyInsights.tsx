@@ -9,9 +9,12 @@ interface MonthlyInsightsProps {
   snapshots: MonthlySnapshot[];
   investments: Investment[];
   earnings: PortfolioEarning[];
+  netInvestedFlow?: number;
+  monthlyPerformanceTotal?: number;
+  monthEarnings?: number;
 }
 
-export function MonthlyInsights({ snapshots, investments, earnings }: MonthlyInsightsProps) {
+export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0 }: MonthlyInsightsProps) {
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
 
@@ -557,6 +560,22 @@ export function MonthlyInsights({ snapshots, investments, earnings }: MonthlyIns
               </div>
             </div>
           )}
+
+          {/* Summary metrics grid */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Net invested flow</p>
+              <p className={`mt-2 text-xl font-semibold ${netInvestedFlow >= 0 ? "text-success" : "text-urgent"}`}>{formatCurrency(netInvestedFlow)}</p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Total performance</p>
+              <p className={`mt-2 text-xl font-semibold ${monthlyPerformanceTotal >= 0 ? "text-success" : "text-urgent"}`}>{formatCurrency(monthlyPerformanceTotal)}</p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Rewards earned</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(monthEarnings)}</p>
+            </div>
+          </div>
 
         </CardContent>
       </Card>

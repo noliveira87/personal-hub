@@ -160,22 +160,7 @@ export default function PortfolioInsightsPage() {
             </div>
           </div>
 
-          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={earnings} />
-
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Net invested flow</p>
-              <p className={`mt-2 text-xl font-semibold ${netInvestedFlow >= 0 ? "text-success" : "text-urgent"}`}>{formatCurrency(netInvestedFlow)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Monthly performance</p>
-              <p className={`mt-2 text-xl font-semibold ${performanceTotal >= 0 ? "text-success" : "text-urgent"}`}>{formatCurrency(performanceTotal)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Rewards earned</p>
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(monthEarnings)}</p>
-            </div>
-          </div>
+          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={earnings} netInvestedFlow={netInvestedFlow} monthlyPerformanceTotal={performanceTotal} monthEarnings={monthEarnings} />
         </div>
       </main>
     </div>
