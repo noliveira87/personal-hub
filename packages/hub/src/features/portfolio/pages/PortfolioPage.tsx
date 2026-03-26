@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { KpiCards } from "@/features/portfolio/components/KpiCards";
 import { EarningsSection } from "@/features/portfolio/components/EarningsSection";
 import { InvestmentSection } from "@/features/portfolio/components/InvestmentSection";
-import { MonthlyInsights } from "@/features/portfolio/components/MonthlyInsights";
 import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
 import { Investment, InvestmentMovementKind, PortfolioEarning, calculateSummary } from "@/features/portfolio/types/investment";
 import AppSectionHeader from "@/components/AppSectionHeader";
@@ -214,7 +213,7 @@ const Index = () => {
         actions={(
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/portfolio/monthly-insights">Monthly insights</Link>
+              <Link to="/portfolio/insights">Insights</Link>
             </Button>
             <Button onClick={handleAdd} size="sm" className="gap-1.5">
               <Plus className="h-4 w-4" />
@@ -267,19 +266,16 @@ const Index = () => {
             </div>
 
             <div className="space-y-1 px-1">
-              <h2 className="text-lg font-semibold text-foreground">Activity</h2>
-              <p className="text-sm text-muted-foreground">Recent monthly behavior, performance and rewards in one place.</p>
+              <h2 className="text-lg font-semibold text-foreground">Earnings</h2>
+              <p className="text-sm text-muted-foreground">Track cashback, rewards, and dividends.</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-              <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={earnings} />
-              <EarningsSection
-                earnings={earnings}
-                onAdd={handleAddEarning}
-                onEdit={handleEditEarning}
-                onDelete={handleDeleteEarning}
-              />
-            </div>
+            <EarningsSection
+              earnings={earnings}
+              onAdd={handleAddEarning}
+              onEdit={handleEditEarning}
+              onDelete={handleDeleteEarning}
+            />
           </div>
         </div>
       </main>
