@@ -91,38 +91,41 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
         <DialogHeader>
           <DialogTitle>{earning ? "Edit earning" : "Add earning"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="earning-title">Title</Label>
-              <Input id="earning-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Amazon, MEO, WhatYouExpect" required />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-3 rounded-lg border border-border/70 p-3">
+            <p className="text-sm font-medium text-foreground">Earning details</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="earning-title">Title</Label>
+                <Input id="earning-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Amazon, MEO, WhatYouExpect" required />
+              </div>
+              <div>
+                <Label htmlFor="earning-provider">Provider</Label>
+                <Input id="earning-provider" value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="Curve, LetyShops, PayPal" />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="earning-provider">Provider</Label>
-              <Input id="earning-provider" value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="Curve, LetyShops, PayPal" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label>Type</Label>
-              <Select value={kind} onValueChange={(value) => setKind(value as PortfolioEarningKind)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cashback">Cashback</SelectItem>
-                  <SelectItem value="survey">Survey</SelectItem>
-                  <SelectItem value="crypto_cashback">Crypto cashback</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="earning-date">Date</Label>
-              <Input id="earning-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Type</Label>
+                <Select value={kind} onValueChange={(value) => setKind(value as PortfolioEarningKind)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cashback">Cashback</SelectItem>
+                    <SelectItem value="survey">Survey</SelectItem>
+                    <SelectItem value="crypto_cashback">Crypto cashback</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="earning-date">Date</Label>
+                <Input id="earning-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              </div>
             </div>
           </div>
 
           {kind === "crypto_cashback" ? (
             <div className="space-y-3 rounded-lg border border-border/70 p-3">
+              <p className="text-sm font-medium text-foreground">Amount & conversion</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Crypto asset</Label>
@@ -146,15 +149,21 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
               </p>
             </div>
           ) : (
-            <div>
-              <Label htmlFor="earning-amount">Amount (€)</Label>
-              <Input id="earning-amount" type="number" step="0.01" value={amountEur} onChange={(e) => setAmountEur(e.target.value)} required />
+            <div className="space-y-2 rounded-lg border border-border/70 p-3">
+              <p className="text-sm font-medium text-foreground">Amount</p>
+              <div>
+                <Label htmlFor="earning-amount">Amount (€)</Label>
+                <Input id="earning-amount" type="number" step="0.01" value={amountEur} onChange={(e) => setAmountEur(e.target.value)} required />
+              </div>
             </div>
           )}
 
-          <div>
-            <Label htmlFor="earning-notes">Notes (optional)</Label>
-            <Textarea id="earning-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+          <div className="space-y-2 rounded-lg border border-border/70 p-3">
+            <p className="text-sm font-medium text-foreground">Additional notes</p>
+            <div>
+              <Label htmlFor="earning-notes">Notes (optional)</Label>
+              <Textarea id="earning-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">

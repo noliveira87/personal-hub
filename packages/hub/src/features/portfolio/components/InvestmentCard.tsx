@@ -154,42 +154,49 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 opacity-100 transition-opacity sm:ml-auto sm:opacity-0 sm:group-hover:opacity-100">
-          <button
-            onClick={() => onMove(investment.id, "up")}
-            disabled={!canMoveUp}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Move up"
-          >
-            <ChevronUp className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => onMove(investment.id, "down")}
-            disabled={!canMoveDown}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Move down"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setQuickAddOpen(true)}
-            className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-            title="Add contribution"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => onEdit(investment)}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => onDelete(investment.id)}
-            className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+        <div className="flex w-full shrink-0 items-center justify-between rounded-xl border border-border/70 bg-muted/40 p-1.5 opacity-100 transition-opacity sm:ml-auto sm:w-auto sm:justify-start sm:opacity-0 sm:group-hover:opacity-100">
+          <div className="flex items-center gap-1 pr-1.5">
+            <button
+              onClick={() => onMove(investment.id, "up")}
+              disabled={!canMoveUp}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
+              title="Move up"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onMove(investment.id, "down")}
+              disabled={!canMoveDown}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
+              title="Move down"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="h-6 w-px bg-border/80" />
+          <div className="flex items-center gap-1 pl-1.5">
+            <button
+              onClick={() => setQuickAddOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:h-8 sm:w-8"
+              title="Add contribution"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onEdit(investment)}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
+              title="Edit investment"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(investment.id)}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8"
+              title="Delete investment"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -268,57 +275,63 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               {isCashbackOnlyQuickAdd ? "Update cashback value" : quickMode === "contribution" ? "Add contribution" : "Record value update"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {!isCashbackOnlyQuickAdd && (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setQuickMode("contribution")}
-                  className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                    quickMode === "contribution"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40"
-                  }`}
-                >
-                  💸 Contribution
-                </button>
-                <button
-                  type="button"
-                  onClick={() => !hasLiveCryptoQuote && setQuickMode("value_update")}
-                  disabled={hasLiveCryptoQuote}
-                  title={hasLiveCryptoQuote ? "Not available for live-priced crypto — value is derived from units × spot price" : undefined}
-                  className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                    hasLiveCryptoQuote
-                      ? "border-border text-muted-foreground/40 cursor-not-allowed"
-                      : quickMode === "value_update"
-                        ? Number(quickAmount) < 0
-                          ? "border-urgent bg-urgent/10 text-urgent"
-                          : "border-success bg-success/10 text-success"
-                      : "border-border text-muted-foreground hover:border-success/40"
-                  }`}
-                >
-                  📈 Profit / Return
-                </button>
+              <div className="space-y-3 rounded-lg border border-border/70 p-3">
+                <p className="text-sm font-medium text-foreground">Update type</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickMode("contribution")}
+                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                      quickMode === "contribution"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    💸 Contribution
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => !hasLiveCryptoQuote && setQuickMode("value_update")}
+                    disabled={hasLiveCryptoQuote}
+                    title={hasLiveCryptoQuote ? "Not available for live-priced crypto — value is derived from units × spot price" : undefined}
+                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                      hasLiveCryptoQuote
+                        ? "border-border text-muted-foreground/40 cursor-not-allowed"
+                        : quickMode === "value_update"
+                          ? Number(quickAmount) < 0
+                            ? "border-urgent bg-urgent/10 text-urgent"
+                            : "border-success bg-success/10 text-success"
+                        : "border-border text-muted-foreground hover:border-success/40"
+                    }`}
+                  >
+                    📈 Profit / Return
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isCashbackOnlyQuickAdd
+                    ? "Register cashback units earned. EUR value is calculated from units × live spot. This updates Current and monthly P/L only — Invested does not change."
+                    : quickMode === "contribution"
+                      ? "New money you're putting in — increases both Invested and Current value."
+                      : hasLiveCryptoQuote
+                        ? "Profit / Return not available — current value is derived from live price."
+                        : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
+                </p>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              {isCashbackOnlyQuickAdd
-                ? "Register cashback units earned. EUR value is calculated from units × live spot. This updates Current and monthly P/L only — Invested does not change."
-                : quickMode === "contribution"
-                  ? "New money you're putting in — increases both Invested and Current value."
-                  : hasLiveCryptoQuote
-                    ? "Profit / Return not available — current value is derived from live price."
-                    : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
-            </p>
-            <div>
-              <Label htmlFor={`quick-date-${investment.id}`}>Date</Label>
-              <Input
-                id={`quick-date-${investment.id}`}
-                type="date"
-                value={quickDate}
-                onChange={(e) => setQuickDate(e.target.value)}
-              />
-            </div>
+
+            <div className="space-y-3 rounded-lg border border-border/70 p-3">
+              <p className="text-sm font-medium text-foreground">Entry details</p>
+              <div>
+                <Label htmlFor={`quick-date-${investment.id}`}>Date</Label>
+                <Input
+                  id={`quick-date-${investment.id}`}
+                  type="date"
+                  value={quickDate}
+                  onChange={(e) => setQuickDate(e.target.value)}
+                />
+              </div>
             {isCashbackOnlyQuickAdd ? (
               <div>
                 <Label htmlFor={`quick-units-${investment.id}`}>Cashback units ({cashbackQuickAsset})</Label>
@@ -368,6 +381,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 ) : null}
               </div>
             ) : null}
+            </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)} className="w-full sm:w-auto">Cancel</Button>
               <Button type="button" onClick={handleQuickSave} className="w-full sm:w-auto">Save</Button>

@@ -266,39 +266,45 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
         <DialogHeader>
           <DialogTitle>{investment ? "Edit Investment" : "Add Investment"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-3 rounded-lg border border-border/70 p-3">
+            <p className="text-sm font-medium text-foreground">Investment details</p>
             <div>
-              <Label>Category</Label>
-              <Select value={category} onValueChange={v => setCategory(v as InvestmentCategory)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="short-term">Short-term</SelectItem>
-                  <SelectItem value="long-term">Long-term</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
             </div>
-            <div>
-              <Label>Type</Label>
-              <Select value={type} onValueChange={v => setType(v as InvestmentType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="aforro">Aforro</SelectItem>
-                  <SelectItem value="etf">ETF</SelectItem>
-                  <SelectItem value="crypto">Crypto</SelectItem>
-                  <SelectItem value="p2p">P2P</SelectItem>
-                  <SelectItem value="ppr">PPR</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Category</Label>
+                <Select value={category} onValueChange={v => setCategory(v as InvestmentCategory)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="short-term">Short-term</SelectItem>
+                    <SelectItem value="long-term">Long-term</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Type</Label>
+                <Select value={type} onValueChange={v => setType(v as InvestmentType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="aforro">Aforro</SelectItem>
+                    <SelectItem value="etf">ETF</SelectItem>
+                    <SelectItem value="crypto">Crypto</SelectItem>
+                    <SelectItem value="p2p">P2P</SelectItem>
+                    <SelectItem value="ppr">PPR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          {type === "crypto" && (
-            <div className="space-y-4 rounded-lg border border-border/70 p-3">
+
+          <div className="space-y-3 rounded-lg border border-border/70 p-3">
+            <p className="text-sm font-medium text-foreground">Position & value</p>
+            {type === "crypto" && (
+              <div className="space-y-4 rounded-lg border border-border/70 p-3">
               <label className="flex items-center gap-2 text-sm text-foreground">
                 <Checkbox
                   checked={hasCashback}
@@ -379,36 +385,12 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                   </div>
                 </div>
               )}
-            </div>
-          )}
-          {type !== "crypto" && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Current Value (€)</Label>
-                <Input
-                  id="current"
-                  type="number"
-                  step="0.01"
-                  value={currentValue}
-                  onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
-                  required
-                />
               </div>
-              <div>
-                <Label htmlFor="invested">Invested (€)</Label>
-                <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
-              </div>
-            </div>
-          )}
-          {type === "crypto" && !hasCashback && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <Label>Current Value (€)</Label>
-                {hasLiveCryptoSync ? (
-                  <p className={`mt-2 text-lg font-semibold tabular-nums ${profitLossClass}`}>
-                    {resolvedCurrentValue.toFixed(2)} €
-                  </p>
-                ) : (
+            )}
+            {type !== "crypto" && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Current Value (€)</Label>
                   <Input
                     id="current"
                     type="number"
@@ -416,24 +398,53 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                     value={currentValue}
                     onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
                     required
-                    className={hasCryptoValues ? `${profitLossClass} font-semibold` : undefined}
                   />
-                )}
-                {hasCryptoValues && (
-                  <p className={`mt-1 text-xs ${profitLossClass}`}>
-                    {hasLiveCryptoSync ? `Live ${cryptoAsset} sync active` : "Profit/Loss"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
-                  </p>
-                )}
+                </div>
+                <div>
+                  <Label htmlFor="invested">Invested (€)</Label>
+                  <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="invested">Invested (€)</Label>
-                <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
+            )}
+            {type === "crypto" && !hasCashback && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Current Value (€)</Label>
+                  {hasLiveCryptoSync ? (
+                    <p className={`mt-2 text-lg font-semibold tabular-nums ${profitLossClass}`}>
+                      {resolvedCurrentValue.toFixed(2)} €
+                    </p>
+                  ) : (
+                    <Input
+                      id="current"
+                      type="number"
+                      step="0.01"
+                      value={currentValue}
+                      onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
+                      required
+                      className={hasCryptoValues ? `${profitLossClass} font-semibold` : undefined}
+                    />
+                  )}
+                  {hasCryptoValues && (
+                    <p className={`mt-1 text-xs ${profitLossClass}`}>
+                      {hasLiveCryptoSync ? `Live ${cryptoAsset} sync active` : "Profit/Loss"} · {profitLoss >= 0 ? "+" : ""}{profitLoss.toFixed(2)} €
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="invested">Invested (€)</Label>
+                  <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
+                </div>
               </div>
+            )}
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border/70 p-3">
+            <p className="text-sm font-medium text-foreground">Additional notes</p>
+            <div>
+              <Label htmlFor="notes">Notes (optional)</Label>
+              <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
             </div>
-          )}
-          <div>
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
           </div>
           <div className="space-y-3 rounded-lg border border-border/70 p-3">
             <div>
