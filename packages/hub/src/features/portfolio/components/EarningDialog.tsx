@@ -87,12 +87,12 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:max-w-md sm:p-6">
         <DialogHeader>
           <DialogTitle>{earning ? "Edit earning" : "Add earning"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="earning-title">Title</Label>
               <Input id="earning-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Amazon, MEO, WhatYouExpect" required />
@@ -103,7 +103,7 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label>Type</Label>
               <Select value={kind} onValueChange={(value) => setKind(value as PortfolioEarningKind)}>
@@ -123,7 +123,7 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
 
           {kind === "crypto_cashback" ? (
             <div className="space-y-3 rounded-lg border border-border/70 p-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label>Crypto asset</Label>
                   <Select value={cryptoAsset} onValueChange={(value) => setCryptoAsset(value as CryptoAsset)}>
@@ -157,9 +157,9 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
             <Textarea id="earning-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">{earning ? "Save changes" : "Add earning"}</Button>
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancel</Button>
+            <Button type="submit" className="w-full sm:w-auto">{earning ? "Save changes" : "Add earning"}</Button>
           </div>
         </form>
       </DialogContent>

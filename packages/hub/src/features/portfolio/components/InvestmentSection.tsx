@@ -51,7 +51,7 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
           </span>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
         {investments.map((inv, i) => (
           <InvestmentCard
             key={inv.id}

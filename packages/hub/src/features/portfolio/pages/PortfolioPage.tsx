@@ -49,13 +49,19 @@ const Index = () => {
   }, [investments, cryptoSpotEur]);
 
   const resolvedShortTerm = useMemo(
-    () => resolvedInvestments.filter((investment) => investment.category === "short-term"),
-    [resolvedInvestments],
+    () => shortTerm.map((investment) => ({
+      ...investment,
+      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
+    })),
+    [shortTerm, cryptoSpotEur],
   );
 
   const resolvedLongTerm = useMemo(
-    () => resolvedInvestments.filter((investment) => investment.category === "long-term"),
-    [resolvedInvestments],
+    () => longTerm.map((investment) => ({
+      ...investment,
+      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
+    })),
+    [longTerm, cryptoSpotEur],
   );
 
   const summary = calculateSummary(resolvedInvestments);

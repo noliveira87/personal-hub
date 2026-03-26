@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
 import { CryptoQuoteMap, parseCryptoNotes, resolveCashbackCurrentValue, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { cn } from "@/lib/utils";
 
 interface InvestmentCardProps {
   investment: Investment;
@@ -128,11 +129,15 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
 
   return (
     <div
-      className="group animate-fade-in rounded-2xl border border-border/80 bg-background p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-5"
+      className={cn(
+        "group w-full min-w-0 overflow-hidden animate-fade-in rounded-xl border-2 border-border bg-card p-5 shadow-sm transition-all duration-300",
+        "hover:-translate-y-0.5 hover:border-border hover:shadow-lg active:scale-[0.98]",
+        isPositive ? "shadow-success/5" : "shadow-urgent/5",
+      )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl">{cardIcon}</span>
           <div className="min-w-0 space-y-1">
             <h3 className="truncate font-semibold text-foreground">{investment.name}</h3>
@@ -149,7 +154,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 opacity-100 transition-opacity sm:ml-auto sm:opacity-0 sm:group-hover:opacity-100">
           <button
             onClick={() => onMove(investment.id, "up")}
             disabled={!canMoveUp}
@@ -188,14 +193,14 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/40 p-3 sm:p-4">
+      <div className="grid grid-cols-1 gap-3 rounded-2xl bg-muted/40 p-3 sm:grid-cols-2 sm:p-4">
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Current</p>
           <p className={`text-sm font-medium ${isCashbackOnly ? "text-success" : "text-foreground"}`}>
             {formatCurrency(isCashbackOnly ? cashbackDisplayValue : displayCurrentValue)}
           </p>
-          {!isCashbackOnly && hasLiveCryptoQuote && (
-            <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+          {!isCashbackOnly && hasLiveCryptoQuote && asset && (
+            <p className="text-[10px] text-muted-foreground break-words sm:whitespace-nowrap">
               {units!.toFixed(6)} {asset} × {formatCurrency(spotEur!)}
             </p>
           )}
@@ -210,7 +215,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       </div>
 
       {!isCashbackOnly && (
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
+        <div className="mt-4 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Profit/Loss</p>
             <p className={`text-sm font-bold ${isPositive ? "text-success" : "text-urgent"}`}>
@@ -234,7 +239,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
           <p className="mt-1 text-sm font-semibold text-foreground">
             {cashbackCurrentValue !== null ? formatCurrency(cashbackCurrentValue) : "—"}
           </p>
-          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+          <p className="text-[10px] text-muted-foreground break-words sm:whitespace-nowrap">
             {cashbackUnits!.toFixed(6)} {cashbackAsset}
             {cashbackSpotEur ? ` × ${formatCurrency(cashbackSpotEur)}` : ""}
             {cashbackDate ? ` • ${cashbackDate}` : ""}
@@ -244,7 +249,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
 
       {hasCashback && isCashbackOnly && (
         <div className="mt-4 rounded-2xl bg-muted/40 p-3 sm:p-4">
-          <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+          <p className="text-[10px] text-muted-foreground break-words sm:whitespace-nowrap">
             {cashbackSpotEur
               ? `${cashbackUnits!.toFixed(6)} ${cashbackAsset} × ${formatCurrency(cashbackSpotEur)} = ${formatCurrency(cashbackDisplayValue)}`
               : `${cashbackUnits!.toFixed(6)} ${cashbackAsset} × live spot price`}
@@ -253,11 +258,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       )}
 
       {userNotes && (
-        <p className="mt-4 rounded-2xl bg-muted/40 px-3 py-2 text-xs italic leading-5 text-muted-foreground">{userNotes}</p>
+        <p className="mt-4 rounded-2xl bg-muted/40 px-3 py-2 text-xs italic leading-5 text-muted-foreground break-words">{userNotes}</p>
       )}
 
       <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:max-w-sm sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {isCashbackOnlyQuickAdd ? "Update cashback value" : quickMode === "contribution" ? "Add contribution" : "Record value update"}
@@ -363,9 +368,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 ) : null}
               </div>
             ) : null}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
-              <Button type="button" onClick={handleQuickSave}>Save</Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+              <Button type="button" onClick={handleQuickSave} className="w-full sm:w-auto">Save</Button>
             </div>
           </div>
         </DialogContent>
