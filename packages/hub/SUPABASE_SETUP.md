@@ -133,6 +133,36 @@ Isso cria:
 - políticas RLS para o modo A (family/shared, sem login)
 - linha inicial default
 
+## Ledger de Rewards / Surveys do Portfolio
+
+Para que cashback, surveys e crypto cashback contem para a evolução mensal do portfolio, executa também:
+
+1. Abra **SQL Editor** no Supabase
+2. Crie uma nova query
+3. Execute o conteúdo de:
+
+`packages/hub/supabase/portfolio_earnings.sql`
+
+Isto cria:
+- tabela `public.portfolio_earnings`
+- suporte para `cashback`, `survey` e `crypto_cashback`
+- políticas RLS para leitura/escrita com a anon key atual
+
+## Persistência da ordem dos cards de investimento
+
+Para manter a ordem de cards de `Short-term` e `Long-term` entre sessões/dispositivos, executa também:
+
+1. Abra **SQL Editor** no Supabase
+2. Crie uma nova query
+3. Execute o conteúdo de:
+
+`packages/hub/supabase/portfolio_card_order.sql`
+
+Isto cria:
+- tabela `public.portfolio_card_order`
+- persistência da ordem por categoria (`short-term`, `long-term`)
+- políticas RLS para leitura/escrita com a anon key atual
+
 ### Campos persistidos em `app_settings`
 
 - Telegram: `telegram_bot_token`, `telegram_chat_id`

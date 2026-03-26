@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,11 @@ interface InvestmentDialogProps {
 }
 
 export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur, onSave }: InvestmentDialogProps) {
+  const formatUnitInput = (value: number | null) => {
+    if (!value || !Number.isFinite(value)) return "";
+    return value.toFixed(8).replace(/\.?0+$/, "");
+  };
+
   const [name, setName] = useState("");
   const [category, setCategory] = useState<InvestmentCategory>("short-term");
   const [type, setType] = useState<InvestmentType>("cash");
@@ -31,6 +37,13 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
   const [cashbackDate, setCashbackDate] = useState("");
   const [notes, setNotes] = useState("");
   const [movements, setMovements] = useState<InvestmentMovement[]>([]);
+  const [historyMonth, setHistoryMonth] = useState<string | null>(null);
+  const [editingMovementId, setEditingMovementId] = useState<string | null>(null);
+  const [editingMovementDate, setEditingMovementDate] = useState("");
+  const [editingMovementKind, setEditingMovementKind] = useState<InvestmentMovement["kind"]>("adjustment");
+  const [editingMovementAmount, setEditingMovementAmount] = useState("");
+  const [editingMovementUnits, setEditingMovementUnits] = useState("");
+  const [editingMovementNote, setEditingMovementNote] = useState("");
   // Track whether currentValue was manually edited by the user
   const [currentValueEditedByUser, setCurrentValueEditedByUser] = useState(false);
 
@@ -59,12 +72,16 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
         && investment.investedAmount === 0;
       setHasCashback(isCashbackEntry);
       setCryptoAsset(asset);
-      setCryptoUnits(units ? units.toString() : "");
+      setCryptoUnits(formatUnitInput(units));
       setCashbackAsset(parsedCashbackAsset);
-      setCashbackUnits(parsedCashbackUnits ? parsedCashbackUnits.toString() : "");
+      setCashbackUnits(formatUnitInput(parsedCashbackUnits));
       setCashbackDate(parsedCashbackDate ?? "");
       setNotes(userNotes || "");
-      setMovements(parseInvestmentMovements(investment.notes));
+      const parsed = parseInvestmentMovements(investment.notes);
+      setMovements(parsed);
+      const months = Array.from(new Set(parsed.map((m) => m.date.slice(0, 7)))).sort();
+      setHistoryMonth(months.length ? months[months.length - 1] : null);
+      setEditingMovementId(null);
       setCurrentValueEditedByUser(false);
     } else {
       setName("");
@@ -80,38 +97,104 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
       setCashbackDate("");
       setNotes("");
       setMovements([]);
+      setEditingMovementId(null);
       setCurrentValueEditedByUser(false);
     }
   }, [investment, open]);
 
-  const handleRemoveMovement = (id: string) => {
-    setMovements((prev) => {
-      const removed = prev.find(m => m.id === id);
-      if (removed && !(type === "crypto" && hasCashback)) {
-        if (removed.kind === "contribution") {
-          // Always adjust investedAmount
-          setInvestedAmount(v => (Number(v) - removed.amount).toFixed(2));
-          // Adjust cryptoUnits if stored in movement
-          if (removed.units) setCryptoUnits(v => parseFloat((Math.max(0, Number(v) - removed.units!)).toFixed(8)).toString());
-          // Only adjust currentValue if not live crypto (live crypto derives value from units × spot)
-          if (!hasLiveCryptoSync && !currentValueEditedByUser) {
-            setCurrentValue(v => (Number(v) - removed.amount).toFixed(2));
-          }
-        } else if (removed.kind === "withdrawal") {
-          setInvestedAmount(v => (Number(v) + removed.amount).toFixed(2));
-          if (removed.units) setCryptoUnits(v => parseFloat((Number(v) + removed.units!).toFixed(8)).toString());
-          if (!hasLiveCryptoSync && !currentValueEditedByUser) {
-            setCurrentValue(v => (Number(v) + removed.amount).toFixed(2));
-          }
-        } else if (removed.kind === "adjustment" || removed.kind === "cashback") {
-          // Profit movements don't affect investedAmount
-          if (!hasLiveCryptoSync && !currentValueEditedByUser) {
-            setCurrentValue(v => (Number(v) - removed.amount).toFixed(2));
-          }
-        }
+  const applyMovementImpact = (movement: InvestmentMovement, direction: 1 | -1) => {
+    const investedDeltaBase = movement.kind === "contribution"
+      ? movement.amount
+      : movement.kind === "withdrawal"
+        ? -movement.amount
+        : 0;
+
+    const currentDeltaBase = movement.kind === "contribution"
+      ? movement.amount
+      : movement.kind === "withdrawal"
+        ? -movement.amount
+        : (movement.kind === "adjustment" || movement.kind === "cashback")
+          ? movement.amount
+          : 0;
+
+    const investedDelta = investedDeltaBase * direction;
+    const currentDelta = currentDeltaBase * direction;
+
+    if (investedDelta !== 0) {
+      setInvestedAmount((value) => (Number(value) + investedDelta).toFixed(2));
+    }
+
+    if (!hasLiveCryptoSync && currentDelta !== 0) {
+      setCurrentValue((value) => (Number(value) + currentDelta).toFixed(2));
+    }
+
+    const effectiveUnits = movement.units;
+
+    if (effectiveUnits) {
+      if (!hasCashback && (movement.kind === "contribution" || movement.kind === "withdrawal")) {
+        const unitsDelta = (movement.kind === "contribution" ? effectiveUnits : -effectiveUnits) * direction;
+        setCryptoUnits((value) => parseFloat((Math.max(0, Number(value) + unitsDelta)).toFixed(8)).toString());
       }
-      return prev.filter(m => m.id !== id);
-    });
+
+      if (type === "crypto" && hasCashback && (movement.kind === "adjustment" || movement.kind === "cashback")) {
+        const cashbackDelta = effectiveUnits * direction;
+        setCashbackUnits((value) => parseFloat((Math.max(0, Number(value) + cashbackDelta)).toFixed(8)).toString());
+      }
+    }
+  };
+
+  const handleRemoveMovement = (id: string) => {
+    const removed = movements.find((m) => m.id === id);
+    if (!removed) return;
+
+    applyMovementImpact(removed, -1);
+    if (editingMovementId === id) setEditingMovementId(null);
+    setMovements((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const startEditMovement = (movement: InvestmentMovement) => {
+    setEditingMovementId(movement.id);
+    setEditingMovementDate(movement.date);
+    setEditingMovementKind(movement.kind);
+    setEditingMovementAmount(String(movement.amount));
+    setEditingMovementUnits(movement.units != null ? String(movement.units) : "");
+    setEditingMovementNote(movement.note ?? "");
+  };
+
+  const cancelEditMovement = () => {
+    setEditingMovementId(null);
+    setEditingMovementDate("");
+    setEditingMovementAmount("");
+    setEditingMovementUnits("");
+    setEditingMovementNote("");
+  };
+
+  const saveMovementEdit = () => {
+    if (!editingMovementId) return;
+
+    const nextAmount = Number(editingMovementAmount);
+    if (!Number.isFinite(nextAmount)) return;
+    const parsedUnits = editingMovementUnits.trim() === "" ? undefined : Number(editingMovementUnits);
+    if (editingMovementUnits.trim() !== "" && !Number.isFinite(parsedUnits)) return;
+
+    const current = movements.find((m) => m.id === editingMovementId);
+    if (!current) return;
+
+    const nextMovement: InvestmentMovement = {
+      ...current,
+      date: editingMovementDate,
+      kind: editingMovementKind,
+      amount: nextAmount,
+      units: parsedUnits,
+      note: editingMovementNote.trim() ? editingMovementNote.trim() : undefined,
+    };
+
+    applyMovementImpact(current, -1);
+    applyMovementImpact(nextMovement, 1);
+
+    setMovements((prev) => prev.map((movement) => movement.id === editingMovementId ? nextMovement : movement));
+
+    cancelEditMovement();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -155,9 +238,31 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
     onOpenChange(false);
   };
 
+  const historyMonths = useMemo(() => {
+    return Array.from(new Set(movements.map((m) => m.date.slice(0, 7)))).sort();
+  }, [movements]);
+
+  // Keep historyMonth pointing to a valid month; fall back to last when one disappears
+  useEffect(() => {
+    if (historyMonths.length === 0) { setHistoryMonth(null); return; }
+    if (historyMonth && historyMonths.includes(historyMonth)) return;
+    setHistoryMonth(historyMonths[historyMonths.length - 1]);
+  }, [historyMonths, historyMonth]);
+
+  const activeHistoryMonth = historyMonth ?? historyMonths[historyMonths.length - 1] ?? null;
+  const historyMonthIdx = activeHistoryMonth ? historyMonths.indexOf(activeHistoryMonth) : -1;
+  const visibleMovements = activeHistoryMonth
+    ? movements.filter((m) => m.date.startsWith(activeHistoryMonth)).sort((a, b) => b.date.localeCompare(a.date))
+    : [];
+
+  const formatMonthNav = (key: string) => {
+    const [y, m] = key.split("-").map(Number);
+    return new Intl.DateTimeFormat("pt-PT", { month: "short", year: "numeric" }).format(new Date(y, (m || 1) - 1, 1));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{investment ? "Edit Investment" : "Add Investment"}</DialogTitle>
         </DialogHeader>
@@ -166,7 +271,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
             <Label htmlFor="name">Name</Label>
             <Input id="name" value={name} onChange={e => setName(e.target.value)} required />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label>Category</Label>
               <Select value={category} onValueChange={v => setCategory(v as InvestmentCategory)}>
@@ -183,6 +288,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="aforro">Aforro</SelectItem>
                   <SelectItem value="etf">ETF</SelectItem>
                   <SelectItem value="crypto">Crypto</SelectItem>
                   <SelectItem value="p2p">P2P</SelectItem>
@@ -210,7 +316,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
               {!hasCashback && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Crypto Position</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <Label>Position Asset</Label>
                       <Select value={cryptoAsset} onValueChange={v => setCryptoAsset(v as CryptoAsset)}>
@@ -238,8 +344,8 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
 
               {hasCashback && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">Crypto Cashback</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <p className="text-sm font-medium text-foreground">Cashback details</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <Label>Cashback Asset</Label>
                       <Select value={cashbackAsset} onValueChange={v => setCashbackAsset(v as CryptoAsset)}>
@@ -276,7 +382,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
             </div>
           )}
           {type !== "crypto" && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <Label>Current Value (€)</Label>
                 <Input
@@ -295,7 +401,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
             </div>
           )}
           {type === "crypto" && !hasCashback && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <Label>Current Value (€)</Label>
                 {hasLiveCryptoSync ? (
@@ -332,46 +438,118 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
           <div className="space-y-3 rounded-lg border border-border/70 p-3">
             <div>
               <p className="text-sm font-medium text-foreground">Movement history</p>
-              <p className="text-xs text-muted-foreground">Record of contributions and withdrawals. Use the + button on each card to add new entries.</p>
+              <p className="text-xs text-muted-foreground">
+                {hasCashback
+                  ? "Record of cashback and manual adjustments. Use the + button on each card to add new entries."
+                  : "Record of contributions and withdrawals. Use the + button on each card to add new entries."}
+              </p>
             </div>
 
             {movements.length ? (
-              <div className="space-y-2 rounded-lg bg-muted/30 p-3">
-                {movements
-                  .slice()
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map((movement) => {
-                    const kindLabel: Record<string, string> = {
-                      contribution: "Contribution",
-                      withdrawal: "Withdrawal",
-                      cashback: "Cashback",
-                      adjustment: "Adjustment",
-                    };
-                    const kindColor: Record<string, string> = {
-                      contribution: "text-primary",
-                      withdrawal: "text-urgent",
-                      cashback: "text-success",
-                      adjustment: "text-muted-foreground",
-                    };
-                    return (
-                      <div key={movement.id} className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 text-sm">
-                        <div className="min-w-0">
-                          <p className="font-medium text-foreground">
-                            {movement.date}
-                            <span className={`ml-2 text-xs font-semibold ${kindColor[movement.kind] ?? "text-muted-foreground"}`}>
-                              {kindLabel[movement.kind] ?? movement.kind}
-                            </span>
-                            <span className="ml-2 text-foreground">€{movement.amount.toFixed(2)}</span>
-                          </p>
-                          {movement.note ? <p className="text-xs text-muted-foreground truncate">{movement.note}</p> : null}
+              <div className="space-y-2">
+                {/* Month navigator */}
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button" variant="ghost" size="icon"
+                    disabled={historyMonthIdx <= 0}
+                    onClick={() => setHistoryMonth(historyMonths[historyMonthIdx - 1])}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-foreground">
+                      {activeHistoryMonth ? formatMonthNav(activeHistoryMonth) : "—"}
+                    </span>
+                    {historyMonthIdx >= 0 && historyMonthIdx < historyMonths.length - 1 ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => setHistoryMonth(historyMonths[historyMonths.length - 1])}>
+                        Latest
+                      </Button>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button" variant="ghost" size="icon"
+                    disabled={historyMonthIdx >= historyMonths.length - 1}
+                    onClick={() => setHistoryMonth(historyMonths[historyMonthIdx + 1])}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {visibleMovements.length ? (
+                  <div className="space-y-2 rounded-lg bg-muted/30 p-3">
+                    {visibleMovements.map((movement) => {
+                      const kindLabel: Record<string, string> = {
+                        contribution: "Contribution",
+                        withdrawal: "Withdrawal",
+                        cashback: "Cashback",
+                        adjustment: "Adjustment",
+                      };
+                      const kindColor: Record<string, string> = {
+                        contribution: "text-primary",
+                        withdrawal: "text-urgent",
+                        cashback: "text-success",
+                        adjustment: "text-muted-foreground",
+                      };
+                      return (
+                        <div key={movement.id} className="space-y-2 rounded-md border border-border/60 px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-foreground">
+                              <span className="whitespace-nowrap">{movement.date}</span>
+                              <span className={`whitespace-nowrap text-xs font-semibold ${kindColor[movement.kind] ?? "text-muted-foreground"}`}>
+                                {kindLabel[movement.kind] ?? movement.kind}
+                              </span>
+                              <span className="whitespace-nowrap text-foreground">€{movement.amount.toFixed(2)}</span>
+                              {movement.units ? (
+                                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                                  {`${movement.units.toFixed(8)} ${hasCashback ? cashbackAsset : cryptoAsset}`}
+                                </span>
+                              ) : null}
+                            </p>
+                            {movement.note ? <p className="text-xs text-muted-foreground truncate">{movement.note}</p> : null}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button type="button" variant="ghost" size="sm" onClick={() => startEditMovement(movement)}>Edit</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveMovement(movement.id)}>Remove</Button>
+                          </div>
+                          </div>
+                          {editingMovementId === movement.id ? (
+                            <div className={`grid grid-cols-1 gap-2 rounded-md bg-muted/40 p-2 ${type === "crypto" ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+                              <Input type="date" value={editingMovementDate} onChange={(e) => setEditingMovementDate(e.target.value)} />
+                              <Select value={editingMovementKind} onValueChange={(value) => setEditingMovementKind(value as InvestmentMovement["kind"])}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="contribution">Contribution</SelectItem>
+                                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                                  <SelectItem value="adjustment">Adjustment</SelectItem>
+                                  <SelectItem value="cashback">Cashback</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input type="number" step="0.01" value={editingMovementAmount} onChange={(e) => setEditingMovementAmount(e.target.value)} placeholder="Amount" />
+                              {type === "crypto" ? (
+                                <Input type="number" step="0.00000001" value={editingMovementUnits} onChange={(e) => setEditingMovementUnits(e.target.value)} placeholder="Units" />
+                              ) : null}
+                              <Input value={editingMovementNote} onChange={(e) => setEditingMovementNote(e.target.value)} placeholder="Note" />
+                              <div className={`${type === "crypto" ? "sm:col-span-5" : "sm:col-span-4"} flex justify-end gap-2`}>
+                                <Button type="button" variant="outline" size="sm" onClick={cancelEditMovement}>Cancel</Button>
+                                <Button type="button" size="sm" onClick={saveMovementEdit}>Save movement</Button>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveMovement(movement.id)}>Remove</Button>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No movements recorded in this month.</p>
+                )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No movements yet. Use the + button on each card to register contributions.</p>
+              <p className="text-xs text-muted-foreground">
+                {hasCashback
+                  ? "No movements yet. Use the + button on each card to register cashback/adjustment entries."
+                  : "No movements yet. Use the + button on each card to register contributions."}
+              </p>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-2">

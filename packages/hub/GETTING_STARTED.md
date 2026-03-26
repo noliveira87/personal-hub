@@ -19,6 +19,21 @@
   - Ir para Supabase Dashboard → SQL Editor
   - Novo Query → Colar → Run
 
+- [ ] **Executar SQL de settings do hub**
+  - Copiar `packages/hub/supabase/settings.sql`
+  - Ir para Supabase Dashboard → SQL Editor
+  - Novo Query → Colar → Run
+
+- [ ] **Executar SQL de earnings do portfolio**
+  - Copiar `packages/hub/supabase/portfolio_earnings.sql`
+  - Ir para Supabase Dashboard → SQL Editor
+  - Novo Query → Colar → Run
+
+- [ ] **Executar SQL da ordem dos cards do portfolio**
+  - Copiar `packages/hub/supabase/portfolio_card_order.sql`
+  - Ir para Supabase Dashboard → SQL Editor
+  - Novo Query → Colar → Run
+
 - [ ] **Reiniciar servidor de desenvolvimento**
   - Parar servidor atual (Ctrl+C)
   - Rodar `npm run dev` de novo

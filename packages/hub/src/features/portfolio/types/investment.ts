@@ -1,6 +1,7 @@
 export type InvestmentCategory = "short-term" | "long-term";
-export type InvestmentType = "cash" | "etf" | "crypto" | "p2p" | "ppr";
+export type InvestmentType = "cash" | "aforro" | "etf" | "crypto" | "p2p" | "ppr";
 export type InvestmentMovementKind = "contribution" | "withdrawal" | "cashback" | "adjustment";
+export type PortfolioEarningKind = "cashback" | "survey" | "crypto_cashback";
 
 export interface InvestmentMovement {
   id: string;
@@ -18,6 +19,21 @@ export interface Investment {
   type: InvestmentType;
   investedAmount: number;
   currentValue: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortfolioEarning {
+  id: string;
+  title: string;
+  provider?: string;
+  kind: PortfolioEarningKind;
+  date: string;
+  amountEur: number;
+  cryptoAsset?: "BTC" | "ETH";
+  cryptoUnits?: number | null;
+  spotEurAtEarned?: number | null;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -45,6 +61,7 @@ export interface MonthlySnapshot {
 export const PREDEFINED_INVESTMENTS: { name: string; category: InvestmentCategory; type: InvestmentType }[] = [
   { name: "Trading 212", category: "short-term", type: "cash" },
   { name: "Revolut", category: "short-term", type: "cash" },
+  { name: "Aforro", category: "long-term", type: "aforro" },
   { name: "ETFs", category: "long-term", type: "etf" },
   { name: "PPR", category: "long-term", type: "ppr" },
   { name: "Crypto", category: "long-term", type: "crypto" },

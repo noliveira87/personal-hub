@@ -1,10 +1,16 @@
 import { useState, useCallback, useEffect } from "react";
-import { Investment, MonthlySnapshot, calculateSummary } from "@/features/portfolio/types/investment";
+import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary } from "@/features/portfolio/types/investment";
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 import {
   deleteInvestmentFromDb,
+  deletePortfolioEarningFromDb,
+  loadPortfolioCardOrderFromDb,
   loadInvestmentsFromDb,
+  loadMonthlySnapshotsFromDb,
+  loadPortfolioEarningsFromDb,
+  upsertPortfolioCardOrderInDb,
   upsertInvestmentsInDb,
+  upsertPortfolioEarningsInDb,
   upsertMonthlySnapshotsInDb,
 } from "@/features/portfolio/lib/investments";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -63,6 +69,7 @@ const sortByOrder = (items: Investment[], order: string[]) => {
 export function useInvestments() {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [monthlySnapshots, setMonthlySnapshots] = useState<MonthlySnapshot[]>([]);
+  const [earnings, setEarnings] = useState<PortfolioEarning[]>([]);
   const [shortTermOrder, setShortTermOrder] = useState<string[]>(() => readOrder(SHORT_TERM_ORDER_KEY));
   const [longTermOrder, setLongTermOrder] = useState<string[]>(() => readOrder(LONG_TERM_ORDER_KEY));
 
@@ -102,6 +109,35 @@ export function useInvestments() {
     }
   }, []);
 
+  const addEarning = useCallback((data: Omit<PortfolioEarning, "id" | "createdAt" | "updatedAt">) => {
+    const now = new Date().toISOString();
+    setEarnings((prev) => [
+      {
+        ...data,
+        id: generateId(),
+        createdAt: now,
+        updatedAt: now,
+      },
+      ...prev,
+    ]);
+  }, []);
+
+  const updateEarning = useCallback((id: string, data: Partial<Omit<PortfolioEarning, "id" | "createdAt" | "updatedAt">>) => {
+    setEarnings((prev) => prev.map((item) => (
+      item.id === id
+        ? { ...item, ...data, updatedAt: new Date().toISOString() }
+        : item
+    )));
+  }, []);
+
+  const deleteEarning = useCallback((id: string) => {
+    setEarnings((prev) => prev.filter((item) => item.id !== id));
+
+    if (isSupabaseConfigured) {
+      void deletePortfolioEarningFromDb(id);
+    }
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.removeItem(INVESTMENTS_STORAGE_KEY);
@@ -120,16 +156,49 @@ export function useInvestments() {
         return;
       }
 
-      const [remoteInvestments] = await Promise.all([
+      const [remoteInvestments, remoteSnapshots, remoteEarnings, remoteCardOrder] = await Promise.all([
         loadInvestmentsFromDb(),
+        loadMonthlySnapshotsFromDb(),
+        loadPortfolioEarningsFromDb(),
+        loadPortfolioCardOrderFromDb(),
       ]);
 
       if (isCancelled) return;
 
-      setInvestments(remoteInvestments ?? []);
-      // Snapshots are always derived live — never loaded from DB.
-      // This avoids stale baselines for live-priced assets (crypto).
-      setMonthlySnapshots([]);
+      const normalizedInvestments = (remoteInvestments ?? []).map((investment) => {
+        const normalizedName = investment.name.trim().toLowerCase();
+        if (normalizedName === "aforro" && investment.category !== "long-term") {
+          return { ...investment, category: "long-term" as const };
+        }
+        return investment;
+      });
+
+      const hasAforro = normalizedInvestments.some((investment) => investment.name.trim().toLowerCase() === "aforro");
+      const hydratedInvestments = hasAforro
+        ? normalizedInvestments
+        : [
+            ...normalizedInvestments,
+            {
+              id: generateId(),
+              name: "Aforro",
+              category: "long-term",
+              type: "cash",
+              investedAmount: 0,
+              currentValue: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ];
+
+      setInvestments(hydratedInvestments);
+      // Keep historical monthly snapshots from DB so month records are preserved
+      // across month transitions. Current month is recalculated live below.
+      setMonthlySnapshots((remoteSnapshots ?? []).sort((a, b) => a.month.localeCompare(b.month)));
+      setEarnings((remoteEarnings ?? []).sort((a, b) => b.date.localeCompare(a.date)));
+      if (remoteCardOrder) {
+        setShortTermOrder(remoteCardOrder.shortTermOrder);
+        setLongTermOrder(remoteCardOrder.longTermOrder);
+      }
 
       if (!isCancelled) {
         setRemoteHydrated(true);
@@ -148,6 +217,18 @@ export function useInvestments() {
       void upsertInvestmentsInDb(investments);
     }
   }, [investments, remoteHydrated]);
+
+  useEffect(() => {
+    if (isSupabaseConfigured && remoteHydrated) {
+      void upsertPortfolioEarningsInDb(earnings);
+    }
+  }, [earnings, remoteHydrated]);
+
+  useEffect(() => {
+    if (isSupabaseConfigured && remoteHydrated) {
+      void upsertPortfolioCardOrderInDb(shortTermOrder, longTermOrder);
+    }
+  }, [shortTermOrder, longTermOrder, remoteHydrated]);
 
   useEffect(() => {
     const summary = calculateSummary(investments);
@@ -280,5 +361,18 @@ export function useInvestments() {
   const shortTerm = sortByOrder(investments.filter(i => i.category === "short-term"), shortTermOrder);
   const longTerm = sortByOrder(investments.filter(i => i.category === "long-term"), longTermOrder);
 
-  return { investments, monthlySnapshots, shortTerm, longTerm, addInvestment, updateInvestment, deleteInvestment, moveInvestment };
+  return {
+    investments,
+    monthlySnapshots,
+    earnings,
+    shortTerm,
+    longTerm,
+    addInvestment,
+    updateInvestment,
+    deleteInvestment,
+    addEarning,
+    updateEarning,
+    deleteEarning,
+    moveInvestment,
+  };
 }

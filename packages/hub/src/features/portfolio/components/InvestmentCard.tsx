@@ -46,36 +46,77 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const percentage = investment.investedAmount > 0 ? (profitLoss / investment.investedAmount) * 100 : 0;
   const showPercentage = investment.investedAmount > 0;
   const isPositive = profitLoss >= 0;
-  const spotEur = cryptoSpotEur?.[asset] ?? null;
+  const previewAsset = asset || cashbackAsset || "BTC";
+  const spotEur = cryptoSpotEur?.[previewAsset] ?? null;
   const cashbackSpotEur = cryptoSpotEur?.[cashbackAsset] ?? null;
   const hasLiveCryptoQuote = investment.type === "crypto" && !!units && !!spotEur;
   const hasCashback = investment.type === "crypto" && !!cashbackUnits;
   const isCashbackOnly = investment.type === "crypto" && investment.investedAmount === 0 && !units && !!cashbackUnits;
+  const isCashbackOnlyQuickAdd = isCashbackOnly;
   const cashbackDisplayValue = cashbackCurrentValue ?? displayCurrentValue;
+  const cashbackQuickAsset = cashbackAsset || asset || "BTC";
+  const cashbackQuickSpotEur = cryptoSpotEur?.[cashbackQuickAsset] ?? null;
   const cryptoDisplayAsset = investment.type === "crypto" ? (asset || cashbackAsset || "BTC") : null;
   const cardIcon = investment.type === "crypto" ? (CRYPTO_SYMBOL[cryptoDisplayAsset ?? "BTC"] ?? TYPE_EMOJI.crypto) : (TYPE_EMOJI[investment.type] || "💰");
 
+  const parseDecimalInput = (value: string) => {
+    const normalized = value.replace(/\s/g, "").replace(",", ".");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
+
+  const quickAmountValue = parseDecimalInput(quickAmount);
+  const quickUnitsValue = parseDecimalInput(quickUnits);
+  const hasQuickUnitsPreview = investment.type === "crypto"
+    && quickMode === "contribution"
+    && !isCashbackOnlyQuickAdd
+    && Number.isFinite(quickUnitsValue)
+    && quickUnitsValue > 0
+    && Number.isFinite(spotEur);
+  const quickUnitsPreviewValue = hasQuickUnitsPreview
+    ? quickUnitsValue * Number(spotEur)
+    : null;
+
   const handleQuickSave = () => {
-    const amount = Number(quickAmount);
-    const unitsBought = Number(quickUnits);
+    const rawAmount = parseDecimalInput(quickAmount);
+    const rawUnits = parseDecimalInput(quickUnits);
+    const effectiveMode: "contribution" | "value_update" = isCashbackOnlyQuickAdd ? "value_update" : quickMode;
+    const amount = isCashbackOnlyQuickAdd
+      ? (Number.isFinite(rawUnits) && Number.isFinite(cashbackQuickSpotEur)
+          ? rawUnits * Number(cashbackQuickSpotEur)
+          : NaN)
+      : rawAmount;
+    const unitsBought = isCashbackOnlyQuickAdd ? rawUnits : rawUnits;
 
     // Contributions must be positive. Profit/loss (value_update) can be negative.
     if (!quickDate || !Number.isFinite(amount) || amount === 0) {
       return;
     }
-    if (quickMode === "contribution" && amount < 0) {
+
+    if (isCashbackOnlyQuickAdd && (!Number.isFinite(unitsBought) || unitsBought === 0 || !Number.isFinite(cashbackQuickSpotEur))) {
       return;
     }
 
-    if (investment.type === "crypto" && quickMode === "contribution" && (!Number.isFinite(unitsBought) || unitsBought <= 0)) {
+    if (effectiveMode === "contribution" && amount < 0) {
+      return;
+    }
+
+    if (
+      investment.type === "crypto" &&
+      effectiveMode === "contribution" &&
+      (!Number.isFinite(unitsBought) || unitsBought <= 0)
+    ) {
       return;
     }
 
     onQuickContribution(investment, {
       amount,
       date: quickDate,
-      mode: quickMode,
-      unitsBought: investment.type === "crypto" ? unitsBought : null,
+      mode: effectiveMode,
+      unitsBought:
+        investment.type === "crypto" && (effectiveMode === "contribution" || isCashbackOnlyQuickAdd)
+          ? unitsBought
+          : null,
     });
 
     setQuickAmount("");
@@ -218,45 +259,51 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{quickMode === "contribution" ? "Add contribution" : "Record value update"}</DialogTitle>
+            <DialogTitle>
+              {isCashbackOnlyQuickAdd ? "Update cashback value" : quickMode === "contribution" ? "Add contribution" : "Record value update"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setQuickMode("contribution")}
-                className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                  quickMode === "contribution"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/40"
-                }`}
-              >
-                💸 Contribution
-              </button>
-              <button
-                type="button"
-                onClick={() => !hasLiveCryptoQuote && setQuickMode("value_update")}
-                disabled={hasLiveCryptoQuote}
-                title={hasLiveCryptoQuote ? "Not available for live-priced crypto — value is derived from units × spot price" : undefined}
-                className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
-                  hasLiveCryptoQuote
-                    ? "border-border text-muted-foreground/40 cursor-not-allowed"
-                    : quickMode === "value_update"
-                      ? Number(quickAmount) < 0
-                        ? "border-urgent bg-urgent/10 text-urgent"
-                        : "border-success bg-success/10 text-success"
-                    : "border-border text-muted-foreground hover:border-success/40"
-                }`}
-              >
-                📈 Profit / Return
-              </button>
-            </div>
+            {!isCashbackOnlyQuickAdd && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickMode("contribution")}
+                  className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                    quickMode === "contribution"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  💸 Contribution
+                </button>
+                <button
+                  type="button"
+                  onClick={() => !hasLiveCryptoQuote && setQuickMode("value_update")}
+                  disabled={hasLiveCryptoQuote}
+                  title={hasLiveCryptoQuote ? "Not available for live-priced crypto — value is derived from units × spot price" : undefined}
+                  className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                    hasLiveCryptoQuote
+                      ? "border-border text-muted-foreground/40 cursor-not-allowed"
+                      : quickMode === "value_update"
+                        ? Number(quickAmount) < 0
+                          ? "border-urgent bg-urgent/10 text-urgent"
+                          : "border-success bg-success/10 text-success"
+                      : "border-border text-muted-foreground hover:border-success/40"
+                  }`}
+                >
+                  📈 Profit / Return
+                </button>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              {quickMode === "contribution"
-                ? "New money you're putting in — increases both Invested and Current value."
-                : hasLiveCryptoQuote
-                  ? "Profit / Return not available — current value is derived from live price."
-                  : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
+              {isCashbackOnlyQuickAdd
+                ? "Register cashback units earned. EUR value is calculated from units × live spot. This updates Current and monthly P/L only — Invested does not change."
+                : quickMode === "contribution"
+                  ? "New money you're putting in — increases both Invested and Current value."
+                  : hasLiveCryptoQuote
+                    ? "Profit / Return not available — current value is derived from live price."
+                    : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
             </p>
             <div>
               <Label htmlFor={`quick-date-${investment.id}`}>Date</Label>
@@ -267,21 +314,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 onChange={(e) => setQuickDate(e.target.value)}
               />
             </div>
-            <div>
-              <Label htmlFor={`quick-amount-${investment.id}`}>
-                {quickMode === "contribution" ? "Amount to invest (€)" : "Amount gained / lost (€)"}
-              </Label>
-              <Input
-                id={`quick-amount-${investment.id}`}
-                type="number"
-                step="0.01"
-                value={quickAmount}
-                onChange={(e) => setQuickAmount(e.target.value)}
-              />
-            </div>
-            {investment.type === "crypto" && quickMode === "contribution" ? (
+            {isCashbackOnlyQuickAdd ? (
               <div>
-                <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({asset})</Label>
+                <Label htmlFor={`quick-units-${investment.id}`}>Cashback units ({cashbackQuickAsset})</Label>
                 <Input
                   id={`quick-units-${investment.id}`}
                   type="number"
@@ -289,6 +324,43 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                   value={quickUnits}
                   onChange={(e) => setQuickUnits(e.target.value)}
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {Number.isFinite(cashbackQuickSpotEur)
+                    ? `Calculated value: ${formatCurrency((Number.isFinite(parseDecimalInput(quickUnits)) ? parseDecimalInput(quickUnits) : 0) * Number(cashbackQuickSpotEur))} (${cashbackQuickAsset} × live spot)`
+                    : "Live spot unavailable — cannot calculate value now."}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor={`quick-amount-${investment.id}`}>
+                  {quickMode === "contribution" ? "Amount to invest (€)" : "Amount gained / lost (€)"}
+                </Label>
+                <Input
+                  id={`quick-amount-${investment.id}`}
+                  type="number"
+                  step="0.01"
+                  value={quickAmount}
+                  onChange={(e) => setQuickAmount(e.target.value)}
+                />
+              </div>
+            )}
+            {investment.type === "crypto" && quickMode === "contribution" && !isCashbackOnlyQuickAdd ? (
+              <div>
+                <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({previewAsset})</Label>
+                <Input
+                  id={`quick-units-${investment.id}`}
+                  type="number"
+                  step="0.00000001"
+                  value={quickUnits}
+                  onChange={(e) => setQuickUnits(e.target.value)}
+                />
+                {hasQuickUnitsPreview ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {`Live preview: ${formatCurrency(Number(quickUnitsPreviewValue))} (${quickUnitsValue.toFixed(8)} ${previewAsset} × ${formatCurrency(Number(spotEur))})`}
+                  </p>
+                ) : quickUnits.trim() !== "" ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Live preview unavailable — missing spot quote.</p>
+                ) : null}
               </div>
             ) : null}
             <div className="flex justify-end gap-2">

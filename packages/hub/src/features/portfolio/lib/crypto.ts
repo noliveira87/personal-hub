@@ -157,8 +157,14 @@ export function parseInvestmentMovements(notes?: string): InvestmentMovement[] {
         id: String(item.id),
         date: String(item.date),
         kind: item.kind,
-        amount: Number(item.amount) || 0,
-        units: item.units != null ? Number(item.units) : undefined,
+        amount: typeof item.amount === "string"
+          ? Number(item.amount.replace(/\s/g, "").replace(",", ".")) || 0
+          : Number(item.amount) || 0,
+        units: item.units != null
+          ? (typeof item.units === "string"
+              ? Number(item.units.replace(/\s/g, "").replace(",", "."))
+              : Number(item.units))
+          : undefined,
         note: item.note ? String(item.note) : undefined,
       }))
       .filter((item) => item.id && item.date && Number.isFinite(item.amount));
