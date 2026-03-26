@@ -332,13 +332,62 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     cashback: "text-success",
   };
 
+  // Calculate performance by category for selected month
+  type CategoryPerformance = {
+    category: string;
+    profit: number;
+    loss: number;
+    netPerformance: number;
+  };
+
+  const categoryPerformanceMap = new Map<string, CategoryPerformance>();
+
+  investments.forEach((inv) => {
+    const movements = parseInvestmentMovements(inv.notes);
+    movements
+      .filter(
+        (m) =>
+          m.date.startsWith(selectedMonth) &&
+          m.note !== "Initial position" &&
+          (m.kind === "adjustment" || m.kind === "cashback")
+      )
+      .forEach((m) => {
+        const existing = categoryPerformanceMap.get(inv.category) || {
+          category: inv.category,
+          profit: 0,
+          loss: 0,
+          netPerformance: 0,
+        };
+
+        if (m.amount > 0) {
+          existing.profit += m.amount;
+        } else {
+          existing.loss += Math.abs(m.amount);
+        }
+        existing.netPerformance += m.amount;
+        categoryPerformanceMap.set(inv.category, existing);
+      });
+  });
+
+  const categoryPerformanceList = Array.from(categoryPerformanceMap.values())
+    .sort((a, b) => b.netPerformance - a.netPerformance);
+
+  const topGainers = categoryPerformanceList
+    .filter((c) => c.netPerformance > 0)
+    .slice(0, 5);
+
+  const topLosers = categoryPerformanceList
+    .filter((c) => c.netPerformance < 0)
+    .sort((a, b) => a.netPerformance - b.netPerformance)
+    .slice(0, 5);
+
   return (
     <>
       {/* ── Annual insights card ── */}
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
           <CardTitle>Annual insights</CardTitle>
-          <CardDescription>Yearly invested capital, performance and return trends.</CardDescription>
+          <CardDescription>Year-to-date performance overview.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
           {/* Current year KPIs */}
@@ -362,81 +411,54 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           </div>
 
           {/* Best / worst year */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Best year</p>
-              <div className="mt-2 flex items-center gap-2 text-success">
-                <TrendingUp className="h-4 w-4" />
-                <span className="font-medium">{bestYear.year}</span>
+          {annualInsights.length > 1 && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Best year</p>
+                <div className="mt-2 flex items-center gap-2 text-success">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="font-medium">{bestYear.year}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatCurrency(bestYear.annualPerformance)} ({formatPercentage(bestYear.annualReturnPct)})
+                </p>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {formatCurrency(bestYear.annualPerformance)} ({formatPercentage(bestYear.annualReturnPct)})
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst year</p>
-              <div className="mt-2 flex items-center gap-2 text-urgent">
-                <TrendingDown className="h-4 w-4" />
-                <span className="font-medium">{worstYear.year}</span>
+              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst year</p>
+                <div className="mt-2 flex items-center gap-2 text-urgent">
+                  <TrendingDown className="h-4 w-4" />
+                  <span className="font-medium">{worstYear.year}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatCurrency(worstYear.annualPerformance)} ({formatPercentage(worstYear.annualReturnPct)})
+                </p>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {formatCurrency(worstYear.annualPerformance)} ({formatPercentage(worstYear.annualReturnPct)})
-              </p>
             </div>
-          </div>
+          )}
 
           {/* Yearly evolution */}
-          <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-            <p className="text-sm font-medium text-foreground">Yearly evolution</p>
-            {annualInsights.map((yearData) => {
-              const ratio = Math.max(3, (Math.abs(yearData.annualPerformance) / maxAbsAnnualPerformance) * 100);
-              const isPositive = yearData.annualPerformance >= 0;
-              return (
-                <div key={yearData.year} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{yearData.year}</span>
-                    <span className={isPositive ? "text-success" : "text-urgent"}>
-                      {formatCurrency(yearData.annualPerformance)} ({formatPercentage(yearData.annualReturnPct)})
-                    </span>
+          {annualInsights.length > 1 && (
+            <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+              <p className="text-sm font-medium text-foreground">Yearly evolution</p>
+              {annualInsights.map((yearData) => {
+                const ratio = Math.max(3, (Math.abs(yearData.annualPerformance) / maxAbsAnnualPerformance) * 100);
+                const isPositive = yearData.annualPerformance >= 0;
+                return (
+                  <div key={yearData.year} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{yearData.year}</span>
+                      <span className={isPositive ? "text-success" : "text-urgent"}>
+                        {formatCurrency(yearData.annualPerformance)} ({formatPercentage(yearData.annualReturnPct)})
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted">
+                      <div className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`} style={{ width: `${ratio}%` }} />
+                    </div>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-muted">
-                    <div className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`} style={{ width: `${ratio}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-            <p className="text-sm font-medium text-foreground">Monthly evolution</p>
-            {visibleMonthlyRows.map((snapshot) => {
-              const ratio = Math.max(3, (Math.abs(snapshot.monthlyPerformance) / maxAbsPerformance) * 100);
-              const isPositive = snapshot.monthlyPerformance >= 0;
-              return (
-                <div key={snapshot.month} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{formatMonthLabel(snapshot.month)}</span>
-                    <span className={isPositive ? "text-success" : "text-urgent"}>
-                      {formatCurrency(snapshot.monthlyPerformance)} ({formatPercentage(snapshot.monthlyReturnPct)})
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-muted">
-                    <div className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`} style={{ width: `${ratio}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-            {remainingMonthlyRows > 0 && (
-              <button type="button" onClick={() => setVisibleMonthsCount((c) => c + 9)} className="text-xs font-medium text-primary hover:underline">
-                {`Load ${Math.min(9, remainingMonthlyRows)} more month${Math.min(9, remainingMonthlyRows) === 1 ? "" : "s"}`}
-              </button>
-            )}
-            {visibleMonthsCount > 3 && (
-              <button type="button" onClick={() => setVisibleMonthsCount(3)} className="text-xs font-medium text-primary hover:underline">
-                Show only last 3 months
-              </button>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -444,7 +466,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
           <CardTitle>Monthly insights</CardTitle>
-          <CardDescription>Monthly invested capital, performance and return.</CardDescription>
+          <CardDescription>Month-by-month performance tracking.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
           {/* Month navigator */}
@@ -500,38 +522,32 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               <p className={`mt-2 text-xl font-semibold ${selected.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
                 {formatCurrency(selected.monthlyPerformance)}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {`Crypto P/L: ${formatCurrency(cryptoMonthlyPerformance)}`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {`Remaining: ${formatCurrency(nonInvestmentMonthlyPerformance)} from non-crypto movements.`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {`Rewards: ${formatCurrency(latestMonthEarnings)}`}
-              </p>
             </div>
           </div>
 
-          {/* Best / worst month + recent movements */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
-              <div className="mt-2 flex items-center gap-2 text-success">
-                <TrendingUp className="h-4 w-4" />
-                <span className="font-medium">{formatMonthLabel(bestMonth.month)}</span>
+          {/* Best / worst month */}
+          {reconstructedActiveSorted.length > 1 && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
+                <div className="mt-2 flex items-center gap-2 text-success">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="font-medium">{formatMonthLabel(bestMonth.month)}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(bestMonth.monthlyPerformance)}</p>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(bestMonth.monthlyPerformance)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
-              <div className="mt-2 flex items-center gap-2 text-urgent">
-                <TrendingDown className="h-4 w-4" />
-                <span className="font-medium">{formatMonthLabel(worstMonth.month)}</span>
+              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
+                <div className="mt-2 flex items-center gap-2 text-urgent">
+                  <TrendingDown className="h-4 w-4" />
+                  <span className="font-medium">{formatMonthLabel(worstMonth.month)}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(worstMonth.monthlyPerformance)}</p>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(worstMonth.monthlyPerformance)}</p>
             </div>
-          </div>
+          )}
 
+          {/* Recent movements for this month */}
           {recentMovements.length > 0 && (
             <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
               <p className="text-sm font-medium text-foreground mb-3">
@@ -542,18 +558,14 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                   <div key={m.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2 text-sm">
                     <div className="min-w-0">
                       <span className="font-medium text-foreground truncate">{m.investmentName}</span>
-                      <span className={`ml-2 text-xs font-semibold ${m.amount < 0 ? "text-urgent" : movementKindColor[m.kind] ?? "text-muted-foreground"}`}>
-                        {movementKindLabel[m.kind] ?? m.kind}
-                      </span>
                       {m.note && m.note !== "Profit / Return" && (
                         <span className="ml-1 text-xs text-muted-foreground">· {m.note}</span>
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`font-semibold ${m.amount < 0 ? "text-urgent" : movementKindColor[m.kind] ?? "text-foreground"}`}>
+                      <p className={`font-semibold text-sm ${m.amount < 0 ? "text-urgent" : "text-success"}`}>
                         {m.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(m.amount))}
                       </p>
-                      <p className="text-xs text-muted-foreground">{m.date}</p>
                     </div>
                   </div>
                 ))}
@@ -561,24 +573,96 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           )}
 
-          {/* Summary metrics grid */}
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Net invested flow</p>
-              <p className={`mt-2 text-xl font-semibold ${netInvestedFlow >= 0 ? "text-success" : "text-urgent"}`}>{formatCurrency(netInvestedFlow)}</p>
+          {/* Monthly evolution */}
+          {reconstructedActiveSorted.length > 1 && (
+            <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+              <p className="text-sm font-medium text-foreground">Monthly evolution</p>
+              {visibleMonthlyRows.map((snapshot) => {
+                const ratio = Math.max(3, (Math.abs(snapshot.monthlyPerformance) / maxAbsPerformance) * 100);
+                const isPositive = snapshot.monthlyPerformance >= 0;
+                return (
+                  <div key={snapshot.month} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{formatMonthLabel(snapshot.month)}</span>
+                      <span className={isPositive ? "text-success" : "text-urgent"}>
+                        {formatCurrency(snapshot.monthlyPerformance)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted">
+                      <div className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`} style={{ width: `${ratio}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {remainingMonthlyRows > 0 && (
+                <button type="button" onClick={() => setVisibleMonthsCount((c) => c + 9)} className="text-xs font-medium text-primary hover:underline">
+                  {`Load ${Math.min(9, remainingMonthlyRows)} more month${Math.min(9, remainingMonthlyRows) === 1 ? "" : "s"}`}
+                </button>
+              )}
+              {visibleMonthsCount > 3 && (
+                <button type="button" onClick={() => setVisibleMonthsCount(3)} className="text-xs font-medium text-primary hover:underline">
+                  Show only last 3 months
+                </button>
+              )}
             </div>
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Total performance</p>
-              <p className={`mt-2 text-xl font-semibold ${monthlyPerformanceTotal >= 0 ? "text-success" : "text-urgent"}`}>{formatCurrency(monthlyPerformanceTotal)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Rewards earned</p>
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(monthEarnings)}</p>
-            </div>
-          </div>
-
+          )}
         </CardContent>
       </Card>
+
+      {/* ── Performance by category ── */}
+      {(topGainers.length > 0 || topLosers.length > 0) && (
+        <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
+          <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+            <CardTitle>Performance by category</CardTitle>
+            <CardDescription>
+              {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} category performance.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Top gainers */}
+              {topGainers.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
+                  <div className="space-y-2">
+                    {topGainers.map((cat) => (
+                      <div key={cat.category} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-foreground capitalize">{cat.category}</span>
+                          <span className="text-sm font-semibold text-success">+{formatCurrency(cat.netPerformance)}</span>
+                        </div>
+                        <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                          <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (cat.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top losers */}
+              {topLosers.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
+                  <div className="space-y-2">
+                    {topLosers.map((cat) => (
+                      <div key={cat.category} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-foreground capitalize">{cat.category}</span>
+                          <span className="text-sm font-semibold text-urgent">{formatCurrency(cat.netPerformance)}</span>
+                        </div>
+                        <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                          <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(cat.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }
