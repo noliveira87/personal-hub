@@ -46,10 +46,10 @@ const Index = () => {
 			</Button>
 		</div>
 
-		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8">
+		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 pt-16 pb-6 sm:px-6 sm:py-8">
 			<div className="w-full">
 				{/* D12 Couple Illustration */}
-				<div className="mb-3 mt-8 flex justify-center sm:mb-4 sm:mt-10">
+				<div className="mb-2 flex justify-center sm:mb-3">
 					<div className="relative inline-flex items-center justify-center">
 						<div className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/12 blur-3xl" />
 						<img
@@ -60,7 +60,7 @@ const Index = () => {
 					</div>
 				</div>
 
-				<header className="mb-5 text-center sm:mb-6">
+				<header className="mb-4 text-center sm:mb-5">
 					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">D12 Projects</h1>
 				</header>
 
