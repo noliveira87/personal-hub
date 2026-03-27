@@ -1,20 +1,20 @@
 {
-  "name": "Personal Hub",
-  "short_name": "Hub",
-  "description": "Personal Hub launcher for contracts, portfolio, warranties, and home tools",
+  "name": "D12 Hub",
+  "short_name": "D12 Hub",
+  "description": "D12 Hub launcher for contracts, portfolio, warranties, and home tools",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#151821",
   "theme_color": "#151821",
   "icons": [
     {
-      "src": "/icone.png",
+      "src": "/d12-hub-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icone.png",
+      "src": "/d12-hub-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
