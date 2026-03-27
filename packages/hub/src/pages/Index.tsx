@@ -46,25 +46,25 @@ const Index = () => {
 			</Button>
 		</div>
 
-		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 pt-16 pb-6 sm:px-6 sm:py-8">
+		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 pt-14 pb-4 sm:px-6 sm:py-8">
 			<div className="w-full">
 				{/* D12 Couple Illustration */}
-				<div className="mb-2 flex justify-center sm:mb-3">
+				<div className="mb-1 flex justify-center sm:mb-3">
 					<div className="relative inline-flex items-center justify-center">
 						<div className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/12 blur-3xl" />
 						<img
 							src="/d12-new.png"
 							alt="D12 Couple"
-							className="h-auto w-full max-w-[17rem] object-contain object-center sm:max-w-[20rem]"
+							className="h-auto w-full max-w-[11rem] object-contain object-center sm:max-w-[20rem]"
 						/>
 					</div>
 				</div>
 
-				<header className="mb-4 text-center sm:mb-5">
-					<h1 className="text-3xl font-bold tracking-tight sm:text-4xl">D12 Projects</h1>
+				<header className="mb-3 text-center sm:mb-5">
+					<h1 className="text-2xl font-bold tracking-tight sm:text-4xl">D12 Projects</h1>
 				</header>
 
-				<div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+				<div className="mx-auto grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
 					{projects.map((project) => {
 						const Icon = project.icon;
 
@@ -73,7 +73,7 @@ const Index = () => {
 								<Button
 									asChild
 									variant="ghost"
-									className="group h-auto w-full justify-start rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/20 via-primary/10 to-card px-5 py-4 text-left text-foreground shadow-xl ring-1 ring-primary/20 transition-all hover:-translate-y-1 hover:border-primary/50 hover:from-primary/25 hover:via-primary/15 hover:shadow-2xl sm:px-6 sm:py-5"
+									className="group h-auto w-full justify-start rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/20 via-primary/10 to-card px-4 py-3 text-left text-foreground shadow-xl ring-1 ring-primary/20 transition-all hover:-translate-y-1 hover:border-primary/50 hover:from-primary/25 hover:via-primary/15 hover:shadow-2xl sm:px-6 sm:py-5"
 								>
 									<Link to={project.to} aria-label={`Open ${project.title}`}>
 										<div className="flex w-full items-center justify-between gap-4">
