@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary } from "@/features/portfolio/types/investment";
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 import {
@@ -57,6 +57,21 @@ const normalizeOrder = (order: string[], ids: string[]) => {
 
 const sameOrder = (a: string[], b: string[]) => a.length === b.length && a.every((item, index) => item === b[index]);
 
+const sameSnapshot = (a: MonthlySnapshot, b: MonthlySnapshot) => (
+  a.month === b.month
+  && a.totalInvested === b.totalInvested
+  && a.totalCurrentValue === b.totalCurrentValue
+  && a.totalProfitLoss === b.totalProfitLoss
+  && a.overallReturnPct === b.overallReturnPct
+  && a.monthlyInflow === b.monthlyInflow
+  && a.monthlyPerformance === b.monthlyPerformance
+  && a.monthlyReturnPct === b.monthlyReturnPct
+);
+
+const sameSnapshots = (a: MonthlySnapshot[], b: MonthlySnapshot[]) => (
+  a.length === b.length && a.every((item, index) => sameSnapshot(item, b[index]))
+);
+
 const sortByOrder = (items: Investment[], order: string[]) => {
   const indexMap = new Map(order.map((id, index) => [id, index]));
   return [...items].sort((a, b) => {
@@ -74,6 +89,12 @@ export function useInvestments() {
   const [longTermOrder, setLongTermOrder] = useState<string[]>(() => readOrder(LONG_TERM_ORDER_KEY));
 
   const [remoteHydrated, setRemoteHydrated] = useState(false);
+  const skipInitialSyncRef = useRef({
+    investments: true,
+    earnings: true,
+    order: true,
+    snapshots: true,
+  });
 
   const getMonthKey = (date = new Date()) => {
     const year = date.getFullYear();
@@ -197,18 +218,30 @@ export function useInvestments() {
 
   useEffect(() => {
     if (isSupabaseConfigured && remoteHydrated) {
+      if (skipInitialSyncRef.current.investments) {
+        skipInitialSyncRef.current.investments = false;
+        return;
+      }
       void upsertInvestmentsInDb(investments);
     }
   }, [investments, remoteHydrated]);
 
   useEffect(() => {
     if (isSupabaseConfigured && remoteHydrated) {
+      if (skipInitialSyncRef.current.earnings) {
+        skipInitialSyncRef.current.earnings = false;
+        return;
+      }
       void upsertPortfolioEarningsInDb(earnings);
     }
   }, [earnings, remoteHydrated]);
 
   useEffect(() => {
     if (isSupabaseConfigured && remoteHydrated) {
+      if (skipInitialSyncRef.current.order) {
+        skipInitialSyncRef.current.order = false;
+        return;
+      }
       void upsertPortfolioCardOrderInDb(shortTermOrder, longTermOrder);
     }
   }, [shortTermOrder, longTermOrder, remoteHydrated]);
@@ -229,11 +262,12 @@ export function useInvestments() {
 
     setMonthlySnapshots(prev => {
       const sorted = [...prev].sort((a, b) => a.month.localeCompare(b.month));
+      const next = [...sorted];
 
-      if (!sorted.length) {
+      if (!next.length) {
         // Reconstruct baseline by subtracting this month's inflows so it represents
         // the portfolio state at the START of the month (before contributions).
-        sorted.push({
+        next.push({
           month: baselineMonth,
           totalInvested: summary.totalInvested - thisMonthInflow,
           totalCurrentValue: summary.totalCurrentValue - thisMonthInflow,
@@ -246,9 +280,9 @@ export function useInvestments() {
         });
       }
 
-      if (sorted.length === 1 && sorted[0].month === currentMonth) {
-        sorted.unshift({
-          ...sorted[0],
+      if (next.length === 1 && next[0].month === currentMonth) {
+        next.unshift({
+          ...next[0],
           month: baselineMonth,
           monthlyInflow: 0,
           monthlyPerformance: 0,
@@ -256,8 +290,8 @@ export function useInvestments() {
         });
       }
 
-      const existingIndex = sorted.findIndex(s => s.month === currentMonth);
-      const previousSnapshot = existingIndex > 0 ? sorted[existingIndex - 1] : sorted[sorted.length - 1];
+      const existingIndex = next.findIndex(s => s.month === currentMonth);
+      const previousSnapshot = existingIndex > 0 ? next[existingIndex - 1] : next[next.length - 1];
 
       const monthlyInflow = previousSnapshot ? summary.totalInvested - previousSnapshot.totalInvested : summary.totalInvested;
       const monthlyPerformance = previousSnapshot
@@ -266,7 +300,7 @@ export function useInvestments() {
       const monthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + monthlyInflow : summary.totalInvested;
       const monthlyReturnPct = monthlyBase > 0 ? (monthlyPerformance / monthlyBase) * 100 : 0;
 
-      const nextSnapshot: MonthlySnapshot = {
+      const currentSnapshotBase: MonthlySnapshot = {
         month: currentMonth,
         totalInvested: summary.totalInvested,
         totalCurrentValue: summary.totalCurrentValue,
@@ -275,21 +309,30 @@ export function useInvestments() {
         monthlyInflow,
         monthlyPerformance,
         monthlyReturnPct,
-        updatedAt: new Date().toISOString(),
+        updatedAt: existingIndex >= 0 ? next[existingIndex].updatedAt : new Date().toISOString(),
       };
 
       if (existingIndex >= 0) {
-        sorted[existingIndex] = nextSnapshot;
+        if (!sameSnapshot(next[existingIndex], currentSnapshotBase)) {
+          next[existingIndex] = {
+            ...currentSnapshotBase,
+            updatedAt: new Date().toISOString(),
+          };
+        }
       } else {
-        sorted.push(nextSnapshot);
+        next.push(currentSnapshotBase);
       }
 
-      return sorted;
+      return sameSnapshots(sorted, next) ? prev : next;
     });
   }, [investments]);
 
   useEffect(() => {
     if (isSupabaseConfigured && remoteHydrated) {
+      if (skipInitialSyncRef.current.snapshots) {
+        skipInitialSyncRef.current.snapshots = false;
+        return;
+      }
       void upsertMonthlySnapshotsInDb(monthlySnapshots);
     }
   }, [monthlySnapshots, remoteHydrated]);
@@ -345,6 +388,7 @@ export function useInvestments() {
   const longTerm = sortByOrder(investments.filter(i => i.category === "long-term"), longTermOrder);
 
   return {
+    loading: !remoteHydrated,
     investments,
     monthlySnapshots,
     earnings,

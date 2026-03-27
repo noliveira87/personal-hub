@@ -11,6 +11,7 @@ import { Investment, InvestmentMovementKind, PortfolioEarning, calculateSummary 
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useCryptoQuotes } from "@/features/portfolio/hooks/use-btc-quote";
 import { parseCryptoNotes, parseInvestmentMovements, resolveInvestmentCurrentValue, serializeInvestmentNotes } from "@/features/portfolio/lib/crypto";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const InvestmentDialog = lazy(() =>
   import("@/features/portfolio/components/InvestmentDialog").then((module) => ({ default: module.InvestmentDialog })),
@@ -25,6 +26,7 @@ const Index = () => {
     investments,
     monthlySnapshots,
     earnings,
+    loading,
     shortTerm,
     longTerm,
     addInvestment,
@@ -233,43 +235,147 @@ const Index = () => {
             <h1 className="text-xl font-bold">D12 Portfolio</h1>
           </div>
 
-          <KpiCards summary={summary} />
+          {loading ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-9 w-9 rounded-xl" />
+                    </div>
+                    <Skeleton className="h-9 w-36" />
+                  </div>
+                ))}
+              </div>
 
-          <AllocationSection investments={resolvedInvestments} />
+              <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+                <div className="mb-5 border-b border-border/70 pb-5">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-52" />
+                      <Skeleton className="h-4 w-64" />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <Skeleton className="h-20 w-full rounded-2xl" />
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`alloc-left-${index}`} className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-28" />
+                        </div>
+                        <Skeleton className="h-2 w-full rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-4">
+                    <Skeleton className="h-20 w-full rounded-2xl" />
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`alloc-right-${index}`} className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-28" />
+                        </div>
+                        <Skeleton className="h-2 w-full rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 gap-6">
-              <InvestmentSection
-                title="Short-term Investments"
-                investments={resolvedShortTerm}
-                category="short-term"
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onQuickContribution={handleQuickContribution}
-                onMoveInvestment={moveInvestment}
-                cryptoSpotEur={cryptoSpotEur}
-                cryptoQuoteLoading={cryptoQuoteLoading}
-              />
-              <InvestmentSection
-                title="Long-term Investments"
-                investments={resolvedLongTerm}
-                category="long-term"
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onQuickContribution={handleQuickContribution}
-                onMoveInvestment={moveInvestment}
-                cryptoSpotEur={cryptoSpotEur}
-                cryptoQuoteLoading={cryptoQuoteLoading}
-              />
-            </div>
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 gap-6">
+                  {Array.from({ length: 2 }).map((_, index) => (
+                    <div key={index} className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+                      <div className="mb-5 border-b border-border/70 pb-5">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-10 w-10 rounded-xl" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-6 w-56" />
+                            <Skeleton className="h-4 w-24" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <Skeleton className="h-52 w-full rounded-2xl" />
+                        <Skeleton className="h-52 w-full rounded-2xl" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-            <EarningsSection
-              earnings={earnings}
-              onAdd={handleAddEarning}
-              onEdit={handleEditEarning}
-              onDelete={handleDeleteEarning}
-            />
-          </div>
+                <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+                  <div className="mb-5 border-b border-border/70 pb-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-10 w-10 rounded-xl" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-6 w-44" />
+                          <Skeleton className="h-4 w-72" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-10 w-32 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <div key={`earnings-${index}`} className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-28" />
+                        </div>
+                        <Skeleton className="h-2 w-full rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <KpiCards summary={summary} />
+
+              <AllocationSection investments={resolvedInvestments} />
+
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 gap-6">
+                  <InvestmentSection
+                    title="Short-term Investments"
+                    investments={resolvedShortTerm}
+                    category="short-term"
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onQuickContribution={handleQuickContribution}
+                    onMoveInvestment={moveInvestment}
+                    cryptoSpotEur={cryptoSpotEur}
+                    cryptoQuoteLoading={cryptoQuoteLoading}
+                  />
+                  <InvestmentSection
+                    title="Long-term Investments"
+                    investments={resolvedLongTerm}
+                    category="long-term"
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onQuickContribution={handleQuickContribution}
+                    onMoveInvestment={moveInvestment}
+                    cryptoSpotEur={cryptoSpotEur}
+                    cryptoQuoteLoading={cryptoQuoteLoading}
+                  />
+                </div>
+
+                <EarningsSection
+                  earnings={earnings}
+                  onAdd={handleAddEarning}
+                  onEdit={handleEditEarning}
+                  onDelete={handleDeleteEarning}
+                />
+              </div>
+            </>
+          )}
         </div>
       </main>
 
