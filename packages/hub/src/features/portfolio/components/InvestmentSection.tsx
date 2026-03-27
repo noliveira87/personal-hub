@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Clock3, Landmark } from "lucide-react";
 import { Investment, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
 import { InvestmentCard } from "./InvestmentCard";
 import { CryptoQuoteMap, parseInvestmentMovements, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
@@ -20,6 +21,7 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
   const [showAllMovements, setShowAllMovements] = useState(false);
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const SectionIcon = category === "long-term" ? Landmark : Clock3;
 
   const totalInvested = investments.reduce((sum, inv) => sum + inv.investedAmount, 0);
   const totalCurrentValue = investments.reduce(
@@ -66,8 +68,13 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
     <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex flex-col gap-3 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <h2 className="text-lg font-extrabold tracking-tight text-primary sm:text-xl">{title}</h2>
-          <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <SectionIcon className="h-4 w-4" />
+            </div>
+            <h2 className="text-lg font-extrabold tracking-tight text-primary sm:text-xl">{title}</h2>
+          </div>
+          <p className="pl-[3.25rem] text-sm text-muted-foreground">
             {investments.length} {investments.length === 1 ? "position" : "positions"}
           </p>
         </div>

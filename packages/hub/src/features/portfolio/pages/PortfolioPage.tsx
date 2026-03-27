@@ -263,11 +263,6 @@ const Index = () => {
               />
             </div>
 
-            <div className="space-y-1 px-1">
-              <h2 className="text-lg font-semibold text-foreground">Earnings</h2>
-              <p className="text-sm text-muted-foreground">Track cashback, rewards, and dividends.</p>
-            </div>
-
             <EarningsSection
               earnings={earnings}
               onAdd={handleAddEarning}
