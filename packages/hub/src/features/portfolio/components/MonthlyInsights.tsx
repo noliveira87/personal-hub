@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
@@ -17,6 +18,7 @@ interface MonthlyInsightsProps {
 export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0 }: MonthlyInsightsProps) {
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
+  const [selectedAnnualYear, setSelectedAnnualYear] = useState<string | null>(null);
 
   const isNonInvestmentWithdrawal = (movement: { id?: string; kind: string; note?: string }) => {
     if (movement.kind !== "withdrawal") return false;
@@ -78,6 +80,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const dataMonths = new Set<string>([
     currentMonth,
     ...Object.keys(movementStatsByMonth),
+    ...Object.keys(earningsByMonth),
   ]);
 
   const sorted = [...snapshots]
@@ -141,6 +144,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     new Set<string>([
       ...activeSorted.map((snapshot) => snapshot.month),
       ...Object.keys(movementStatsByMonth),
+      ...Object.keys(earningsByMonth),
       currentMonth,
     ]),
   ).sort();
@@ -306,42 +310,17 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const visibleMonthlyRows = monthlyEvolutionRows.slice(0, visibleMonthsCount);
   const remainingMonthlyRows = Math.max(0, monthlyEvolutionRows.length - visibleMonthlyRows.length);
 
-  // Collect profit/return movements for the selected month
-  const recentMovements = investments
-    .flatMap((inv) =>
-      parseInvestmentMovements(inv.notes).map((m) => ({ ...m, investmentName: inv.name }))
-    )
-    .filter((m) =>
-      m.note !== "Initial position" &&
-      (m.kind === "adjustment" || m.kind === "cashback") &&
-      m.date.startsWith(selectedMonth)
-    )
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
-
-  const movementKindLabel: Record<string, string> = {
-    contribution: "Contribution",
-    withdrawal: "Withdrawal",
-    adjustment: "Profit / Return",
-    cashback: "Cashback",
-  };
-  const movementKindColor: Record<string, string> = {
-    contribution: "text-primary",
-    withdrawal: "text-urgent",
-    adjustment: "text-success",
-    cashback: "text-success",
-  };
-
-  // Calculate performance by category for selected month
-  type CategoryPerformance = {
-    category: string;
+  // Calculate performance by type for selected month (investments + earnings)
+  type TypePerformance = {
+    type: string;
     profit: number;
     loss: number;
     netPerformance: number;
   };
 
-  const categoryPerformanceMap = new Map<string, CategoryPerformance>();
+  const typePerformanceMap = new Map<string, TypePerformance>();
 
+  // Add investment movements by type
   investments.forEach((inv) => {
     const movements = parseInvestmentMovements(inv.notes);
     movements
@@ -352,8 +331,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           (m.kind === "adjustment" || m.kind === "cashback")
       )
       .forEach((m) => {
-        const existing = categoryPerformanceMap.get(inv.category) || {
-          category: inv.category,
+        const existing = typePerformanceMap.get(inv.type) || {
+          type: inv.type,
           profit: 0,
           loss: 0,
           netPerformance: 0,
@@ -365,47 +344,257 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           existing.loss += Math.abs(m.amount);
         }
         existing.netPerformance += m.amount;
-        categoryPerformanceMap.set(inv.category, existing);
+        typePerformanceMap.set(inv.type, existing);
       });
   });
 
-  const categoryPerformanceList = Array.from(categoryPerformanceMap.values())
+  // Add earnings by type mapping
+  earnings
+    .filter((earning) => earning.date.startsWith(selectedMonth))
+    .forEach((earning) => {
+      const earningType = earning.kind === "survey"
+        ? "surveys"
+        : earning.kind === "cashback"
+          ? "cashback"
+          : earning.kind === "crypto_cashback"
+            ? "crypto_cashback"
+            : earning.kind === "social_media"
+              ? "social_media"
+              : "other";
+      const existing = typePerformanceMap.get(earningType) || {
+        type: earningType,
+        profit: 0,
+        loss: 0,
+        netPerformance: 0,
+      };
+
+      existing.profit += earning.amountEur;
+      existing.netPerformance += earning.amountEur;
+      typePerformanceMap.set(earningType, existing);
+    });
+
+  const typePerformanceList = Array.from(typePerformanceMap.values())
     .sort((a, b) => b.netPerformance - a.netPerformance);
 
-  const topGainers = categoryPerformanceList
+  const topGainers = typePerformanceList
     .filter((c) => c.netPerformance > 0)
     .slice(0, 5);
 
-  const topLosers = categoryPerformanceList
+  const topLosers = typePerformanceList
     .filter((c) => c.netPerformance < 0)
     .sort((a, b) => a.netPerformance - b.netPerformance)
     .slice(0, 5);
+
+  const annualYears = annualInsights.map((item) => item.year);
+  const annualFocusYear = selectedAnnualYear && annualYears.includes(selectedAnnualYear)
+    ? selectedAnnualYear
+    : latestYear.year;
+  const annualFocusYearIdx = annualYears.indexOf(annualFocusYear);
+  const focusedAnnualInsight = annualInsights[annualFocusYearIdx] ?? latestYear;
+  const annualTypePerformanceMap = new Map<string, TypePerformance>();
+
+  investments.forEach((inv) => {
+    const movements = parseInvestmentMovements(inv.notes);
+    movements
+      .filter(
+        (m) =>
+          m.date.startsWith(annualFocusYear) &&
+          m.note !== "Initial position" &&
+          (m.kind === "adjustment" || m.kind === "cashback"),
+      )
+      .forEach((m) => {
+        const existing = annualTypePerformanceMap.get(inv.type) || {
+          type: inv.type,
+          profit: 0,
+          loss: 0,
+          netPerformance: 0,
+        };
+
+        if (m.amount > 0) {
+          existing.profit += m.amount;
+        } else {
+          existing.loss += Math.abs(m.amount);
+        }
+
+        existing.netPerformance += m.amount;
+        annualTypePerformanceMap.set(inv.type, existing);
+      });
+  });
+
+  earnings
+    .filter((earning) => earning.date.startsWith(annualFocusYear))
+    .forEach((earning) => {
+      const earningType = earning.kind === "survey"
+        ? "surveys"
+        : earning.kind === "cashback"
+          ? "cashback"
+          : earning.kind === "crypto_cashback"
+            ? "crypto_cashback"
+            : earning.kind === "social_media"
+              ? "social_media"
+              : "other";
+
+      const existing = annualTypePerformanceMap.get(earningType) || {
+        type: earningType,
+        profit: 0,
+        loss: 0,
+        netPerformance: 0,
+      };
+
+      existing.profit += earning.amountEur;
+      existing.netPerformance += earning.amountEur;
+      annualTypePerformanceMap.set(earningType, existing);
+    });
+
+  const annualTypePerformanceList = Array.from(annualTypePerformanceMap.values()).sort((a, b) => b.netPerformance - a.netPerformance);
+  const annualTopGainers = annualTypePerformanceList.filter((item) => item.netPerformance > 0).slice(0, 3);
+  const annualTopLosers = annualTypePerformanceList
+    .filter((item) => item.netPerformance < 0)
+    .sort((a, b) => a.netPerformance - b.netPerformance)
+    .slice(0, 3);
+
+  const monthlyChartData = [...reconstructedActiveSorted]
+    .slice(-12)
+    .map((snapshot) => ({
+      month: snapshot.month,
+      monthLabel: new Date(`${snapshot.month}-01`).toLocaleDateString("en-US", { month: "short" }),
+      performance: snapshot.monthlyPerformance,
+      inflow: snapshot.monthlyInflow,
+      returnPct: snapshot.monthlyReturnPct,
+    }));
+
+  const annualChartData = annualInsights.map((yearData) => ({
+    year: yearData.year,
+    performance: yearData.annualPerformance,
+    returnPct: yearData.annualReturnPct,
+  }));
+
+  const categoryGrowthChartData = [...reconstructedActiveSorted]
+    .slice(-12)
+    .map((snapshot) => {
+      let longPerformance = 0;
+      let shortPerformance = 0;
+
+      investments.forEach((investment) => {
+        const monthPerformance = parseInvestmentMovements(investment.notes)
+          .filter(
+            (movement) =>
+              movement.date.startsWith(snapshot.month) &&
+              movement.note !== "Initial position" &&
+              (movement.kind === "adjustment" || movement.kind === "cashback"),
+          )
+          .reduce((sum, movement) => sum + movement.amount, 0);
+
+        if (investment.category === "long-term") {
+          longPerformance += monthPerformance;
+        } else {
+          shortPerformance += monthPerformance;
+        }
+      });
+
+      return {
+        month: snapshot.month,
+        monthLabel: new Date(`${snapshot.month}-01`).toLocaleDateString("en-US", { month: "short" }),
+        longPerformance,
+        shortPerformance,
+      };
+    });
+
+  const longTermSummary = investments
+    .filter((investment) => investment.category === "long-term")
+    .reduce(
+      (acc, investment) => ({
+        invested: acc.invested + investment.investedAmount,
+        current: acc.current + investment.currentValue,
+      }),
+      { invested: 0, current: 0 },
+    );
+  const shortTermSummary = investments
+    .filter((investment) => investment.category === "short-term")
+    .reduce(
+      (acc, investment) => ({
+        invested: acc.invested + investment.investedAmount,
+        current: acc.current + investment.currentValue,
+      }),
+      { invested: 0, current: 0 },
+    );
+
+  const longTermProfit = longTermSummary.current - longTermSummary.invested;
+  const shortTermProfit = shortTermSummary.current - shortTermSummary.invested;
+  const longTermReturn = longTermSummary.invested > 0 ? (longTermProfit / longTermSummary.invested) * 100 : 0;
+  const shortTermReturn = shortTermSummary.invested > 0 ? (shortTermProfit / shortTermSummary.invested) * 100 : 0;
+
+  const formatTypeName = (type: string): string => {
+    const names: Record<string, string> = {
+      cash: "Cash",
+      aforro: "Savings",
+      etf: "ETFs",
+      crypto: "Crypto",
+      p2p: "P2P",
+      ppr: "PPR",
+      surveys: "Surveys",
+      social_media: "Social media",
+      cashback: "Cashback",
+      crypto_cashback: "Crypto Cashback",
+      other: "Other",
+    };
+    return names[type] || type.charAt(0).toUpperCase() + type.slice(1);
+  };
 
   return (
     <>
       {/* ── Annual insights card ── */}
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-          <CardTitle>Annual insights</CardTitle>
-          <CardDescription>Year-to-date performance overview.</CardDescription>
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-2">
+              <CardTitle>Annual insights</CardTitle>
+              <CardDescription>Year-to-date performance overview.</CardDescription>
+            </div>
+            {annualYears.length > 1 ? (
+              <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/20 p-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={annualFocusYearIdx <= 0}
+                  onClick={() => setSelectedAnnualYear(annualYears[annualFocusYearIdx - 1])}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-14 text-center text-sm font-medium text-foreground">{annualFocusYear}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={annualFocusYearIdx >= annualYears.length - 1}
+                  onClick={() => setSelectedAnnualYear(annualYears[annualFocusYearIdx + 1])}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
           {/* Current year KPIs */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">{latestYear.year} return</p>
-              <p className={`mt-2 text-xl font-semibold ${latestYear.annualReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
-                {formatPercentage(latestYear.annualReturnPct)}
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{focusedAnnualInsight.year} return</p>
+              <p className={`mt-2 text-xl font-semibold ${focusedAnnualInsight.annualReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
+                {formatPercentage(focusedAnnualInsight.annualReturnPct)}
               </p>
             </div>
             <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">{latestYear.year} invested</p>
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(latestYear.annualInflow)}</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{focusedAnnualInsight.year} invested</p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(focusedAnnualInsight.annualInflow)}</p>
             </div>
             <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">{latestYear.year} performance</p>
-              <p className={`mt-2 text-xl font-semibold ${latestYear.annualPerformance >= 0 ? "text-success" : "text-urgent"}`}>
-                {formatCurrency(latestYear.annualPerformance)}
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{focusedAnnualInsight.year} performance</p>
+              <p className={`mt-2 text-xl font-semibold ${focusedAnnualInsight.annualPerformance >= 0 ? "text-success" : "text-urgent"}`}>
+                {formatCurrency(focusedAnnualInsight.annualPerformance)}
               </p>
             </div>
           </div>
@@ -436,6 +625,47 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           )}
 
+          {(annualTopGainers.length > 0 || annualTopLosers.length > 0) && (
+            <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{annualFocusYear} growth drivers</p>
+                  <p className="mt-1 text-xs text-muted-foreground">What contributed most to growth during {annualFocusYear}.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {annualTopGainers.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Top growth</p>
+                    {annualTopGainers.map((item) => (
+                      <div key={`annual-gain-${item.type}`} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                          <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {annualTopLosers.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Largest drags</p>
+                    {annualTopLosers.map((item) => (
+                      <div key={`annual-loss-${item.type}`} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                          <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           {/* Yearly evolution */}
           {annualInsights.length > 1 && (
             <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
@@ -459,8 +689,146 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               })}
             </div>
           )}
+
+          {/* Monthly evolution */}
+          {reconstructedActiveSorted.length > 1 && (
+            <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+              <p className="text-sm font-medium text-foreground">Monthly evolution</p>
+              {visibleMonthlyRows.map((snapshot) => {
+                const ratio = Math.max(3, (Math.abs(snapshot.monthlyPerformance) / maxAbsPerformance) * 100);
+                const isPositive = snapshot.monthlyPerformance >= 0;
+                return (
+                  <div key={snapshot.month} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{formatMonthLabel(snapshot.month)}</span>
+                      <span className={isPositive ? "text-success" : "text-urgent"}>
+                        {formatCurrency(snapshot.monthlyPerformance)}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted">
+                      <div className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`} style={{ width: `${ratio}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+              {remainingMonthlyRows > 0 && (
+                <button type="button" onClick={() => setVisibleMonthsCount((c) => c + 9)} className="text-xs font-medium text-primary hover:underline">
+                  {`Load ${Math.min(9, remainingMonthlyRows)} more month${Math.min(9, remainingMonthlyRows) === 1 ? "" : "s"}`}
+                </button>
+              )}
+              {visibleMonthsCount > 3 && (
+                <button type="button" onClick={() => setVisibleMonthsCount(3)} className="text-xs font-medium text-primary hover:underline">
+                  Show only last 3 months
+                </button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* ── Performance charts ── */}
+      {(monthlyChartData.length > 1 || annualChartData.length > 0) && (
+        <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
+          <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+            <CardTitle>Performance charts</CardTitle>
+            <CardDescription>Monthly trend and annual comparison based on recorded snapshots.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {monthlyChartData.length > 1 && (
+                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
+                  <p className="text-sm font-medium text-foreground">Monthly performance trend (last 12 months)</p>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={monthlyChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === "performance") return [formatCurrency(value), "Performance"];
+                            if (name === "inflow") return [formatCurrency(value), "Invested"];
+                            return [value, name];
+                          }}
+                          labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="performance"
+                          stroke="hsl(var(--success))"
+                          strokeWidth={2.5}
+                          dot={{ r: 2 }}
+                          activeDot={{ r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {annualChartData.length > 0 && (
+                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
+                  <p className="text-sm font-medium text-foreground">Annual performance comparison</p>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={annualChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                        <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string, item) => {
+                            if (name === "performance") {
+                              const returnPct = item.payload.returnPct;
+                              return [`${formatCurrency(value)} (${formatPercentage(returnPct)})`, "Performance"];
+                            }
+                            return [value, name];
+                          }}
+                        />
+                        <Bar dataKey="performance" radius={[6, 6, 0, 0]}>
+                          {annualChartData.map((entry) => (
+                            <Cell key={entry.year} fill={entry.performance >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {categoryGrowthChartData.length > 1 && (
+              <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-foreground">Long-term vs Short-term growth</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-success/10 px-2.5 py-1 font-medium text-success">Long: {formatCurrency(longTermProfit)} ({formatPercentage(longTermReturn)})</span>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">Short: {formatCurrency(shortTermProfit)} ({formatPercentage(shortTermReturn)})</span>
+                  </div>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={categoryGrowthChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                      <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value: number, name: string) => {
+                          if (name === "longPerformance") return [formatCurrency(value), "Long-term"];
+                          if (name === "shortPerformance") return [formatCurrency(value), "Short-term"];
+                          return [value, name];
+                        }}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                      />
+                      <Line type="monotone" dataKey="longPerformance" name="Long-term" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="shortPerformance" name="Short-term" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Monthly insights card ── */}
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
@@ -547,75 +915,17 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           )}
 
-          {/* Recent movements for this month */}
-          {recentMovements.length > 0 && (
-            <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-sm font-medium text-foreground mb-3">
-                {isCurrentMonthSelected ? "Profit / returns" : `Profit / returns · ${formatMonthLabel(selectedMonth)}`}
-              </p>
-              <div className="space-y-2">
-                {recentMovements.map((m) => (
-                  <div key={m.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2 text-sm">
-                    <div className="min-w-0">
-                      <span className="font-medium text-foreground truncate">{m.investmentName}</span>
-                      {m.note && m.note !== "Profit / Return" && (
-                        <span className="ml-1 text-xs text-muted-foreground">· {m.note}</span>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`font-semibold text-sm ${m.amount < 0 ? "text-urgent" : "text-success"}`}>
-                        {m.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(m.amount))}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Monthly evolution */}
-          {reconstructedActiveSorted.length > 1 && (
-            <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-sm font-medium text-foreground">Monthly evolution</p>
-              {visibleMonthlyRows.map((snapshot) => {
-                const ratio = Math.max(3, (Math.abs(snapshot.monthlyPerformance) / maxAbsPerformance) * 100);
-                const isPositive = snapshot.monthlyPerformance >= 0;
-                return (
-                  <div key={snapshot.month} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{formatMonthLabel(snapshot.month)}</span>
-                      <span className={isPositive ? "text-success" : "text-urgent"}>
-                        {formatCurrency(snapshot.monthlyPerformance)}
-                      </span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted">
-                      <div className={`h-2 rounded-full ${isPositive ? "bg-success" : "bg-urgent"}`} style={{ width: `${ratio}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-              {remainingMonthlyRows > 0 && (
-                <button type="button" onClick={() => setVisibleMonthsCount((c) => c + 9)} className="text-xs font-medium text-primary hover:underline">
-                  {`Load ${Math.min(9, remainingMonthlyRows)} more month${Math.min(9, remainingMonthlyRows) === 1 ? "" : "s"}`}
-                </button>
-              )}
-              {visibleMonthsCount > 3 && (
-                <button type="button" onClick={() => setVisibleMonthsCount(3)} className="text-xs font-medium text-primary hover:underline">
-                  Show only last 3 months
-                </button>
-              )}
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* ── Performance by category ── */}
+      {/* ── Performance by type ── */}
       {(topGainers.length > 0 || topLosers.length > 0) && (
         <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
           <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-            <CardTitle>Performance by category</CardTitle>
+            <CardTitle>Performance by type</CardTitle>
             <CardDescription>
-              {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} category performance.
+              {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
@@ -625,14 +935,14 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
                   <div className="space-y-2">
-                    {topGainers.map((cat) => (
-                      <div key={cat.category} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                    {topGainers.map((item) => (
+                      <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-foreground capitalize">{cat.category}</span>
-                          <span className="text-sm font-semibold text-success">+{formatCurrency(cat.netPerformance)}</span>
+                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                          <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
                         </div>
                         <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
-                          <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (cat.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
+                          <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (item.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
                         </div>
                       </div>
                     ))}
@@ -645,14 +955,14 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
                   <div className="space-y-2">
-                    {topLosers.map((cat) => (
-                      <div key={cat.category} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                    {topLosers.map((item) => (
+                      <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-foreground capitalize">{cat.category}</span>
-                          <span className="text-sm font-semibold text-urgent">{formatCurrency(cat.netPerformance)}</span>
+                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                          <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
                         </div>
                         <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
-                          <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(cat.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
+                          <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(item.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
                         </div>
                       </div>
                     ))}

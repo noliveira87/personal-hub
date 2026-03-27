@@ -46,6 +46,8 @@ type PortfolioCardOrderRow = {
   updated_at: string;
 };
 
+const SOCIAL_MEDIA_NOTE_PREFIX = "KIND:social_media";
+
 function normalizeCategory(value: string): InvestmentCategory {
   return value === "short-term" || value === "long-term" ? value : "long-term";
 }
@@ -58,10 +60,37 @@ function normalizeType(value: string): InvestmentType {
   return "cash";
 }
 
-function normalizeEarningKind(value: string): PortfolioEarningKind {
-  return value === "cashback" || value === "survey" || value === "crypto_cashback"
+function normalizeEarningKind(value: string, notes?: string | null): PortfolioEarningKind {
+  if ((notes ?? "").startsWith(SOCIAL_MEDIA_NOTE_PREFIX)) {
+    return "social_media";
+  }
+
+  return value === "cashback" || value === "survey" || value === "crypto_cashback" || value === "social_media"
     ? value
     : "cashback";
+}
+
+function encodeEarningKind(kind: PortfolioEarningKind, notes?: string | null) {
+  const cleanNotes = notes ?? null;
+
+  if (kind === "social_media") {
+    return {
+      dbKind: "survey",
+      dbNotes: cleanNotes ? `${SOCIAL_MEDIA_NOTE_PREFIX}\n${cleanNotes}` : SOCIAL_MEDIA_NOTE_PREFIX,
+    };
+  }
+
+  return {
+    dbKind: kind,
+    dbNotes: cleanNotes,
+  };
+}
+
+function decodeEarningNotes(notes?: string | null) {
+  if (!notes) return undefined;
+  if (!notes.startsWith(SOCIAL_MEDIA_NOTE_PREFIX)) return notes;
+  const stripped = notes.slice(SOCIAL_MEDIA_NOTE_PREFIX.length).replace(/^\n/, "").trim();
+  return stripped || undefined;
 }
 
 function mapInvestmentRow(row: InvestmentRow): Investment {
@@ -97,13 +126,13 @@ function mapPortfolioEarningRow(row: PortfolioEarningRow): PortfolioEarning {
     id: row.id,
     title: row.title,
     provider: row.provider ?? undefined,
-    kind: normalizeEarningKind(row.kind),
+    kind: normalizeEarningKind(row.kind, row.notes),
     date: row.date,
     amountEur: Number(row.amount_eur) || 0,
     cryptoAsset: row.crypto_asset === "BTC" || row.crypto_asset === "ETH" ? row.crypto_asset : undefined,
     cryptoUnits: row.crypto_units != null ? Number(row.crypto_units) : null,
     spotEurAtEarned: row.spot_eur_at_earned != null ? Number(row.spot_eur_at_earned) : null,
-    notes: row.notes ?? undefined,
+    notes: decodeEarningNotes(row.notes),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -236,20 +265,24 @@ export async function loadPortfolioEarningsFromDb(): Promise<PortfolioEarning[] 
 export async function upsertPortfolioEarningsInDb(earnings: PortfolioEarning[]): Promise<void> {
   if (!supabase) return;
 
-  const payload = earnings.map((item) => ({
-    id: item.id,
-    title: item.title,
-    provider: item.provider ?? null,
-    kind: item.kind,
-    date: item.date,
-    amount_eur: item.amountEur,
-    crypto_asset: item.cryptoAsset ?? null,
-    crypto_units: item.cryptoUnits ?? null,
-    spot_eur_at_earned: item.spotEurAtEarned ?? null,
-    notes: item.notes ?? null,
-    created_at: item.createdAt,
-    updated_at: item.updatedAt,
-  }));
+  const payload = earnings.map((item) => {
+    const { dbKind, dbNotes } = encodeEarningKind(item.kind, item.notes ?? null);
+
+    return {
+      id: item.id,
+      title: item.title,
+      provider: item.provider ?? null,
+      kind: dbKind,
+      date: item.date,
+      amount_eur: item.amountEur,
+      crypto_asset: item.cryptoAsset ?? null,
+      crypto_units: item.cryptoUnits ?? null,
+      spot_eur_at_earned: item.spotEurAtEarned ?? null,
+      notes: dbNotes,
+      created_at: item.createdAt,
+      updated_at: item.updatedAt,
+    };
+  });
 
   const { error } = await supabase
     .from("portfolio_earnings")

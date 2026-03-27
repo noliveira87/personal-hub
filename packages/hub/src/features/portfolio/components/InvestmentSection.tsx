@@ -1,6 +1,8 @@
-import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
+import { useState } from "react";
+import { Investment, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
 import { InvestmentCard } from "./InvestmentCard";
-import { CryptoQuoteMap, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { CryptoQuoteMap, parseInvestmentMovements, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { Button } from "@/components/ui/button";
 
 interface InvestmentSectionProps {
   title: string;
@@ -15,6 +17,10 @@ interface InvestmentSectionProps {
 }
 
 export function InvestmentSection({ title, category, investments, onEdit, onDelete, onQuickContribution, onMoveInvestment, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
+  const [showAllMovements, setShowAllMovements] = useState(false);
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   const totalInvested = investments.reduce((sum, inv) => sum + inv.investedAmount, 0);
   const totalCurrentValue = investments.reduce(
     (sum, inv) => sum + resolveInvestmentCurrentValue(inv, cryptoSpotEur),
@@ -29,6 +35,30 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
     percentageReturn,
   };
   const isPositive = summary.totalProfitLoss >= 0;
+
+  const recentMovements = investments
+    .flatMap((inv) =>
+      parseInvestmentMovements(inv.notes)
+        .filter((m) => m.date.startsWith(currentMonth) && m.note !== "Initial position" && (m.kind === "contribution" || m.kind === "adjustment" || m.kind === "cashback"))
+        .map((m) => ({ ...m, investmentName: inv.name })),
+    )
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 50);
+
+  const visibleMovements = showAllMovements ? recentMovements : recentMovements.slice(0, 5);
+  const hasMoreMovements = recentMovements.length > 5;
+
+  const movementLabel: Record<string, string> = {
+    contribution: "Contribution",
+    adjustment: "Profit/Loss",
+    cashback: "Profit/Loss",
+  };
+
+  const formatMovementDate = (date: string) => {
+    const parsed = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return date;
+    return parsed.toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
+  };
 
   if (investments.length === 0) return null;
 
@@ -68,6 +98,51 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
           />
         ))}
       </div>
+
+      {recentMovements.length > 0 ? (
+        <div className="mt-6 border-t border-border/70 pt-5">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-foreground">Profit / returns · {formatMonthLabel(currentMonth)}</h3>
+          </div>
+          <div className="space-y-2">
+            {visibleMovements.map((movement) => (
+              <div key={movement.id} className="flex items-center justify-between gap-3 rounded-xl bg-muted/30 px-3 py-2 text-sm">
+                <div className="min-w-0 flex items-center gap-2 overflow-hidden">
+                  <span className="font-medium text-foreground shrink-0">{movement.investmentName}</span>
+                  <div className="flex items-center gap-1.5 text-[11px] shrink-0">
+                    <span className={`rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ${movement.kind === "contribution" ? "bg-primary/10 text-primary" : movement.amount < 0 ? "bg-urgent/10 text-urgent" : "bg-success/10 text-success"}`}>
+                      {movementLabel[movement.kind] ?? movement.kind}
+                    </span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                      {formatMovementDate(movement.date)}
+                    </span>
+                  </div>
+                  {movement.note && movement.note !== "Profit / Return" ? (
+                    <span className="text-xs text-muted-foreground truncate">{movement.note}</span>
+                  ) : null}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`font-semibold text-sm ${movement.kind === "contribution" ? "text-primary" : movement.amount < 0 ? "text-urgent" : "text-success"}`}>
+                    {movement.amount < 0 ? "-" : "+"}{formatCurrency(Math.abs(movement.amount))}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {hasMoreMovements ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-auto px-0 text-xs font-medium text-primary hover:bg-transparent hover:underline"
+                onClick={() => setShowAllMovements((prev) => !prev)}
+              >
+                {showAllMovements ? "Show less" : "Show more"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

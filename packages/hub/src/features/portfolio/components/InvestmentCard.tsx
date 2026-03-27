@@ -35,8 +35,9 @@ const CRYPTO_SYMBOL: Record<string, string> = {
 };
 
 export function InvestmentCard({ investment, onEdit, onDelete, onQuickContribution, onMove, canMoveUp, canMoveDown, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
+  const defaultQuickMode: "contribution" | "value_update" = investment.category === "long-term" ? "value_update" : "contribution";
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [quickMode, setQuickMode] = useState<"contribution" | "value_update">("contribution");
+  const [quickMode, setQuickMode] = useState<"contribution" | "value_update">(defaultQuickMode);
   const [quickAmount, setQuickAmount] = useState("");
   const [quickDate, setQuickDate] = useState(new Date().toISOString().slice(0, 10));
   const [quickUnits, setQuickUnits] = useState("");
@@ -61,13 +62,45 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const cardIcon = investment.type === "crypto" ? (CRYPTO_SYMBOL[cryptoDisplayAsset ?? "BTC"] ?? TYPE_EMOJI.crypto) : (TYPE_EMOJI[investment.type] || "💰");
 
   const parseDecimalInput = (value: string) => {
-    const normalized = value.replace(/\s/g, "").replace(",", ".");
+    const raw = value
+      .replace(/\s/g, "")
+      .replace(/€/g, "")
+      .trim();
+
+    if (!raw) return NaN;
+
+    const hasComma = raw.includes(",");
+    const hasDot = raw.includes(".");
+
+    let normalized = raw;
+
+    if (hasComma && hasDot) {
+      const lastComma = raw.lastIndexOf(",");
+      const lastDot = raw.lastIndexOf(".");
+      const decimalSeparator = lastComma > lastDot ? "," : ".";
+      const thousandSeparator = decimalSeparator === "," ? "." : ",";
+
+      normalized = raw.split(thousandSeparator).join("");
+      if (decimalSeparator === ",") {
+        normalized = normalized.replace(",", ".");
+      }
+    } else if (hasComma) {
+      normalized = raw.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = raw.replace(/,/g, "");
+    }
+
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : NaN;
   };
 
   const quickAmountValue = parseDecimalInput(quickAmount);
   const quickUnitsValue = parseDecimalInput(quickUnits);
+  const isLongTermValueUpdate = !isCashbackOnlyQuickAdd && investment.category === "long-term" && quickMode === "value_update";
+  const quickCurrentTotalValue = parseDecimalInput(quickAmount);
+  const computedQuickProfitLoss = Number.isFinite(quickCurrentTotalValue)
+    ? quickCurrentTotalValue - displayCurrentValue
+    : NaN;
   const hasQuickUnitsPreview = investment.type === "crypto"
     && quickMode === "contribution"
     && !isCashbackOnlyQuickAdd
@@ -86,7 +119,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       ? (Number.isFinite(rawUnits) && Number.isFinite(cashbackQuickSpotEur)
           ? rawUnits * Number(cashbackQuickSpotEur)
           : NaN)
-      : rawAmount;
+      : isLongTermValueUpdate
+        ? computedQuickProfitLoss
+        : rawAmount;
     const unitsBought = isCashbackOnlyQuickAdd ? rawUnits : rawUnits;
 
     // Contributions must be positive. Profit/loss (value_update) can be negative.
@@ -123,7 +158,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
     setQuickAmount("");
     setQuickUnits("");
     setQuickDate(new Date().toISOString().slice(0, 10));
-    setQuickMode("contribution");
+    setQuickMode(defaultQuickMode);
     setQuickAddOpen(false);
   };
 
@@ -176,7 +211,10 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
           <div className="h-6 w-px bg-border/80" />
           <div className="flex items-center gap-1 pl-1.5">
             <button
-              onClick={() => setQuickAddOpen(true)}
+              onClick={() => {
+                setQuickMode(defaultQuickMode);
+                setQuickAddOpen(true);
+              }}
               className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:h-8 sm:w-8"
               title="Add contribution"
             >
@@ -316,7 +354,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                       ? "New money you're putting in — increases both Invested and Current value."
                       : hasLiveCryptoQuote
                         ? "Profit / Return not available — current value is derived from live price."
-                        : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
+                        : isLongTermValueUpdate
+                          ? "For long-term positions, enter the latest total current value. P/L is calculated automatically as (new total - current total)."
+                          : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
                 </p>
               </div>
             )}
@@ -351,7 +391,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
             ) : (
               <div>
                 <Label htmlFor={`quick-amount-${investment.id}`}>
-                  {quickMode === "contribution" ? "Amount to invest (€)" : "Amount gained / lost (€)"}
+                  {quickMode === "contribution"
+                    ? "Amount to invest (€)"
+                    : isLongTermValueUpdate
+                      ? "Current total value (€)"
+                      : "Amount gained / lost (€)"}
                 </Label>
                 <Input
                   id={`quick-amount-${investment.id}`}
@@ -360,6 +404,13 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                   value={quickAmount}
                   onChange={(e) => setQuickAmount(e.target.value)}
                 />
+                {isLongTermValueUpdate ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {Number.isFinite(computedQuickProfitLoss)
+                      ? `Current saved: ${formatCurrency(displayCurrentValue)} → P/L to record: ${formatCurrency(computedQuickProfitLoss)}`
+                      : `Current saved: ${formatCurrency(displayCurrentValue)}`}
+                  </p>
+                ) : null}
               </div>
             )}
             {investment.type === "crypto" && quickMode === "contribution" && !isCashbackOnlyQuickAdd ? (

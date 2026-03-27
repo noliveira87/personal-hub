@@ -15,6 +15,7 @@ interface EarningsSectionProps {
 const kindLabel: Record<string, string> = {
   cashback: "Cashback",
   survey: "Survey",
+  social_media: "Social media",
   crypto_cashback: "Crypto cashback",
 };
 
@@ -62,6 +63,12 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
   );
 
   const monthTotal = monthEarnings.reduce((sum, e) => sum + e.amountEur, 0);
+  const surveyTotal = earnings
+    .filter((earning) => earning.kind === "survey")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const cashbackTotal = earnings
+    .filter((earning) => earning.kind === "cashback")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
   const visible = monthEarnings.slice(0, visibleCount);
   const remaining = Math.max(0, monthEarnings.length - visibleCount);
 
@@ -79,7 +86,13 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
           </div>
           <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys and crypto cashback.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+            {formatCurrency(surveyTotal)} surveys total
+          </span>
+          <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+            {formatCurrency(cashbackTotal)} cashback total
+          </span>
           <span className="rounded-full bg-success/10 px-3 py-1.5 text-sm font-semibold text-success">
             {formatCurrency(monthTotal)} {isCurrentMonth ? "this month" : formatMonthLabel(selectedMonth)}
           </span>

@@ -1,7 +1,7 @@
 export type InvestmentCategory = "short-term" | "long-term";
 export type InvestmentType = "cash" | "aforro" | "etf" | "crypto" | "p2p" | "ppr";
 export type InvestmentMovementKind = "contribution" | "withdrawal" | "cashback" | "adjustment";
-export type PortfolioEarningKind = "cashback" | "survey" | "crypto_cashback";
+export type PortfolioEarningKind = "cashback" | "survey" | "crypto_cashback" | "social_media";
 
 export interface InvestmentMovement {
   id: string;

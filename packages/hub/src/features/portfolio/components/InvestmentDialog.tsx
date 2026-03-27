@@ -493,7 +493,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                         contribution: "Contribution",
                         withdrawal: "Withdrawal",
                         cashback: "Cashback",
-                        adjustment: "Adjustment",
+                        adjustment: "Profit / Loss",
                       };
                       const kindColor: Record<string, string> = {
                         contribution: "text-primary",
@@ -532,7 +532,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                                 <SelectContent>
                                   <SelectItem value="contribution">Contribution</SelectItem>
                                   <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                                  <SelectItem value="adjustment">Adjustment</SelectItem>
+                                  <SelectItem value="adjustment">Profit / Loss</SelectItem>
                                   <SelectItem value="cashback">Cashback</SelectItem>
                                 </SelectContent>
                               </Select>
