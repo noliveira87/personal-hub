@@ -89,17 +89,40 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
     .filter((earning) => earning.kind === "cashback")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
 
-  const currentYear = String(new Date().getFullYear());
-  const yearEarnings = earnings.filter((earning) => earning.date.startsWith(currentYear));
-  const yearSurveyTotal = yearEarnings
+  const allTimeSurveyTotal = earnings
     .filter((earning) => earning.kind === "survey")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const yearCashbackTotal = yearEarnings
+  const allTimeCashbackTotal = earnings
     .filter((earning) => earning.kind === "cashback")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const yearTotal = yearSurveyTotal + yearCashbackTotal;
-  const yearSurveyRatio = yearTotal > 0 ? (yearSurveyTotal / yearTotal) * 100 : 0;
-  const yearCashbackRatio = yearTotal > 0 ? (yearCashbackTotal / yearTotal) * 100 : 0;
+
+  const monthTrackedTotal = monthSurveyTotal + monthCashbackTotal;
+  const monthSurveyRatio = monthTrackedTotal > 0 ? (monthSurveyTotal / monthTrackedTotal) * 100 : 0;
+  const monthCashbackRatio = monthTrackedTotal > 0 ? (monthCashbackTotal / monthTrackedTotal) * 100 : 0;
+  const monthSplitRows = [
+    {
+      key: "surveys",
+      label: "Surveys",
+      value: monthSurveyTotal,
+      ratio: monthSurveyRatio,
+    },
+    {
+      key: "cashback",
+      label: "Cashback",
+      value: monthCashbackTotal,
+      ratio: monthCashbackRatio,
+    },
+  ].sort((a, b) => b.value - a.value);
+
+  const sortedBadges = useMemo(() => {
+    const badges = [
+      { type: "month", value: monthTotal },
+      { type: "survey", value: allTimeSurveyTotal },
+      { type: "cashback", value: allTimeCashbackTotal },
+    ];
+    return badges.sort((a, b) => b.value - a.value);
+  }, [monthTotal, allTimeSurveyTotal, allTimeCashbackTotal]);
+
   const visible = filteredMonthEarnings.slice(0, visibleCount);
   const remaining = Math.max(0, filteredMonthEarnings.length - visibleCount);
 
@@ -122,13 +145,37 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
           <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys and crypto cashback.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
-            <span className="font-bold">{formatCurrency(monthTotal)}</span>
-            <span className="text-success/80">·</span>
-            <span className="font-medium text-success/90">
-              {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
-            </span>
-          </span>
+          {sortedBadges.map((badge) => {
+            if (badge.type === "month") {
+              return (
+                <span key="month" className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
+                  <span className="font-bold">{formatCurrency(badge.value)}</span>
+                  <span className="text-success/80">·</span>
+                  <span className="font-medium text-success/90">
+                    {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
+                  </span>
+                </span>
+              );
+            }
+            if (badge.type === "survey") {
+              return (
+                <span key="survey" className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-sm font-medium text-purple-600">
+                  <span>Surveys</span>
+                  <span className="font-bold">{formatCurrency(badge.value)}</span>
+                  <span className="text-xs text-purple-600/70">· all-time</span>
+                </span>
+              );
+            }
+            if (badge.type === "cashback") {
+              return (
+                <span key="cashback" className="inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-600">
+                  <span>Cashback</span>
+                  <span className="font-bold">{formatCurrency(badge.value)}</span>
+                  <span className="text-xs text-orange-600/70">· all-time</span>
+                </span>
+              );
+            }
+          })}
           <Button onClick={onAdd} size="sm" className="gap-1.5">
             <Plus className="h-4 w-4" />
             <span>Add earning</span>
@@ -137,37 +184,18 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
       </div>
 
       <div className="mb-5">
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Surveys · {currentYear}</p>
-            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(yearSurveyTotal)}</p>
-          </div>
-          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Cashback · {currentYear}</p>
-            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(yearCashbackTotal)}</p>
-          </div>
-        </div>
-
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-foreground">Surveys</span>
-              <span className="text-muted-foreground">{formatCurrency(yearSurveyTotal)} · {yearSurveyRatio.toFixed(1)}%</span>
+          {monthSplitRows.map((row) => (
+            <div key={`bar-${row.key}`} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium text-foreground">{row.label}</span>
+                <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted">
+                <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, row.ratio)}%` }} />
+              </div>
             </div>
-            <div className="h-2 w-full rounded-full bg-muted">
-              <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, yearSurveyRatio)}%` }} />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium text-foreground">Cashback</span>
-              <span className="text-muted-foreground">{formatCurrency(yearCashbackTotal)} · {yearCashbackRatio.toFixed(1)}%</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-muted">
-              <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, yearCashbackRatio)}%` }} />
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
