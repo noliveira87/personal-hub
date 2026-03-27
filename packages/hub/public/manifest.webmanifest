@@ -1,0 +1,23 @@
+{
+  "name": "Personal Hub",
+  "short_name": "Hub",
+  "description": "Personal Hub launcher for contracts, portfolio, warranties, and home tools",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#151821",
+  "theme_color": "#151821",
+  "icons": [
+    {
+      "src": "/icone.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icone.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
