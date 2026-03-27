@@ -88,23 +88,18 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
   const monthCashbackTotal = monthEarnings
     .filter((earning) => earning.kind === "cashback")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const monthTrackedTotal = monthSurveyTotal + monthCashbackTotal;
-  const monthSurveyRatio = monthTrackedTotal > 0 ? (monthSurveyTotal / monthTrackedTotal) * 100 : 0;
-  const monthCashbackRatio = monthTrackedTotal > 0 ? (monthCashbackTotal / monthTrackedTotal) * 100 : 0;
-  const monthSplitRows = [
-    {
-      key: "survey",
-      label: "Surveys",
-      value: monthSurveyTotal,
-      ratio: monthSurveyRatio,
-    },
-    {
-      key: "cashback",
-      label: "Cashback",
-      value: monthCashbackTotal,
-      ratio: monthCashbackRatio,
-    },
-  ].sort((a, b) => b.value - a.value);
+
+  const currentYear = String(new Date().getFullYear());
+  const yearEarnings = earnings.filter((earning) => earning.date.startsWith(currentYear));
+  const yearSurveyTotal = yearEarnings
+    .filter((earning) => earning.kind === "survey")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const yearCashbackTotal = yearEarnings
+    .filter((earning) => earning.kind === "cashback")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const yearTotal = yearSurveyTotal + yearCashbackTotal;
+  const yearSurveyRatio = yearTotal > 0 ? (yearSurveyTotal / yearTotal) * 100 : 0;
+  const yearCashbackRatio = yearTotal > 0 ? (yearCashbackTotal / yearTotal) * 100 : 0;
   const visible = filteredMonthEarnings.slice(0, visibleCount);
   const remaining = Math.max(0, filteredMonthEarnings.length - visibleCount);
 
@@ -143,26 +138,36 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
 
       <div className="mb-5">
         <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {monthSplitRows.map((row) => (
-            <div key={`card-${row.key}`} className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">{row.label} · {formatMonthLabel(selectedMonth)}</p>
-              <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(row.value)}</p>
-            </div>
-          ))}
+          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Surveys · {currentYear}</p>
+            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(yearSurveyTotal)}</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Cashback · {currentYear}</p>
+            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(yearCashbackTotal)}</p>
+          </div>
         </div>
 
         <div className="space-y-3">
-          {monthSplitRows.map((row) => (
-            <div key={`bar-${row.key}`} className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-foreground">{row.label}</span>
-                <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, row.ratio)}%` }} />
-              </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-foreground">Surveys</span>
+              <span className="text-muted-foreground">{formatCurrency(yearSurveyTotal)} · {yearSurveyRatio.toFixed(1)}%</span>
             </div>
-          ))}
+            <div className="h-2 w-full rounded-full bg-muted">
+              <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, yearSurveyRatio)}%` }} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-foreground">Cashback</span>
+              <span className="text-muted-foreground">{formatCurrency(yearCashbackTotal)} · {yearCashbackRatio.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted">
+              <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, yearCashbackRatio)}%` }} />
+            </div>
+          </div>
         </div>
       </div>
 
