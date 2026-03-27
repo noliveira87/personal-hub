@@ -857,64 +857,59 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           )}
 
+          {/* Performance by type */}
+          {(topGainers.length > 0 || topLosers.length > 0) && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Performance by type</h3>
+              <p className="text-xs text-muted-foreground">
+                {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
+              </p>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Top gainers */}
+                {topGainers.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
+                    <div className="space-y-2">
+                      {topGainers.map((item) => (
+                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                            <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
+                          </div>
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                            <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (item.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top losers */}
+                {topLosers.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
+                    <div className="space-y-2">
+                      {topLosers.map((item) => (
+                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                            <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
+                          </div>
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                            <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(item.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         </CardContent>
       </Card>
-
-      {/* ── Performance by type ── */}
-      {(topGainers.length > 0 || topLosers.length > 0) && (
-        <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
-          <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-            <CardTitle>Performance by type</CardTitle>
-            <CardDescription>
-              {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Top gainers */}
-              {topGainers.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
-                  <div className="space-y-2">
-                    {topGainers.map((item) => (
-                      <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
-                          <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
-                        </div>
-                        <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
-                          <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (item.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Top losers */}
-              {topLosers.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
-                  <div className="space-y-2">
-                    {topLosers.map((item) => (
-                      <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
-                          <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
-                        </div>
-                        <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
-                          <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(item.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ── Performance charts ── */}
       {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1) && (
