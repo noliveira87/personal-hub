@@ -64,8 +64,8 @@ export function AllocationSection({ investments }: AllocationSectionProps) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Long-term</p>
-            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(longTerm)}</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-foreground/90">Long-term</p>
+            <p className="mt-2 text-2xl font-bold text-foreground">{formatCurrency(longTerm)}</p>
           </div>
 
           <div className="space-y-3">
@@ -85,8 +85,8 @@ export function AllocationSection({ investments }: AllocationSectionProps) {
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Short-term</p>
-            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(shortTerm)}</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-foreground/90">Short-term</p>
+            <p className="mt-2 text-2xl font-bold text-foreground">{formatCurrency(shortTerm)}</p>
           </div>
 
           <div className="space-y-3">

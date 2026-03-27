@@ -575,6 +575,145 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
   return (
     <>
+      {/* ── Monthly insights card ── */}
+      <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
+        <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+          <CardTitle>Monthly insights</CardTitle>
+          <CardDescription>Month-by-month performance tracking.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+          {/* Month navigator */}
+          <div className="flex items-center justify-between">
+            <Button
+              type="button" variant="ghost" size="icon"
+              disabled={selectedIdx <= 0}
+              onClick={() => setSelectedMonthKey(activeMonths[selectedIdx - 1])}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {isCurrentMonthSelected
+                  ? `This month · ${formatMonthLabel(selectedMonth)}`
+                  : formatMonthLabel(selectedMonth)}
+              </span>
+              {!isCurrentMonthSelected ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonthKey(currentMonth)}>
+                  Current month
+                </Button>
+              ) : null}
+            </div>
+            <Button
+              type="button" variant="ghost" size="icon"
+              disabled={selectedIdx >= activeMonths.length - 1}
+              onClick={() => setSelectedMonthKey(activeMonths[selectedIdx + 1])}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {isCurrentMonthSelected ? "This month return" : `${formatMonthLabel(selectedMonth)} return`}
+              </p>
+              <p className={`mt-2 text-xl font-semibold ${selected.monthlyReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
+                {formatPercentage(selected.monthlyReturnPct)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {isCurrentMonthSelected ? "This month invested" : `${formatMonthLabel(selectedMonth)} invested`}
+              </p>
+              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(selected.monthlyInflow)}</p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {isCurrentMonthSelected ? "This month performance" : `${formatMonthLabel(selectedMonth)} performance`}
+              </p>
+              <p className={`mt-2 text-xl font-semibold ${selected.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
+                {formatCurrency(selected.monthlyPerformance)}
+              </p>
+            </div>
+          </div>
+
+          {/* Best / worst month */}
+          {reconstructedActiveSorted.length > 1 && (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
+                <div className="mt-2 flex items-center gap-2 text-success">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="font-medium">{formatMonthLabel(bestMonth.month)}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(bestMonth.monthlyPerformance)}</p>
+              </div>
+              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
+                <div className="mt-2 flex items-center gap-2 text-urgent">
+                  <TrendingDown className="h-4 w-4" />
+                  <span className="font-medium">{formatMonthLabel(worstMonth.month)}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(worstMonth.monthlyPerformance)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Performance by type */}
+          {(topGainers.length > 0 || topLosers.length > 0) && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Performance by type</h3>
+              <p className="text-xs text-muted-foreground">
+                {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
+              </p>
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* Top gainers */}
+                {topGainers.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
+                    <div className="space-y-2">
+                      {topGainers.map((item) => (
+                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                            <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
+                          </div>
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                            <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (item.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top losers */}
+                {topLosers.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
+                    <div className="space-y-2">
+                      {topLosers.map((item) => (
+                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                            <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
+                          </div>
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
+                            <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(item.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </CardContent>
+      </Card>
+
       {/* ── Annual insights card ── */}
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
@@ -769,145 +908,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* ── Monthly insights card ── */}
-      <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
-        <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-          <CardTitle>Monthly insights</CardTitle>
-          <CardDescription>Month-by-month performance tracking.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
-          {/* Month navigator */}
-          <div className="flex items-center justify-between">
-            <Button
-              type="button" variant="ghost" size="icon"
-              disabled={selectedIdx <= 0}
-              onClick={() => setSelectedMonthKey(activeMonths[selectedIdx - 1])}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">
-                {isCurrentMonthSelected
-                  ? `This month · ${formatMonthLabel(selectedMonth)}`
-                  : formatMonthLabel(selectedMonth)}
-              </span>
-              {!isCurrentMonthSelected ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonthKey(currentMonth)}>
-                  Current month
-                </Button>
-              ) : null}
-            </div>
-            <Button
-              type="button" variant="ghost" size="icon"
-              disabled={selectedIdx >= activeMonths.length - 1}
-              onClick={() => setSelectedMonthKey(activeMonths[selectedIdx + 1])}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* KPI cards */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                {isCurrentMonthSelected ? "This month return" : `${formatMonthLabel(selectedMonth)} return`}
-              </p>
-              <p className={`mt-2 text-xl font-semibold ${selected.monthlyReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
-                {formatPercentage(selected.monthlyReturnPct)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                {isCurrentMonthSelected ? "This month invested" : `${formatMonthLabel(selectedMonth)} invested`}
-              </p>
-              <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(selected.monthlyInflow)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                {isCurrentMonthSelected ? "This month performance" : `${formatMonthLabel(selectedMonth)} performance`}
-              </p>
-              <p className={`mt-2 text-xl font-semibold ${selected.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
-                {formatCurrency(selected.monthlyPerformance)}
-              </p>
-            </div>
-          </div>
-
-          {/* Best / worst month */}
-          {reconstructedActiveSorted.length > 1 && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
-                <div className="mt-2 flex items-center gap-2 text-success">
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="font-medium">{formatMonthLabel(bestMonth.month)}</span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(bestMonth.monthlyPerformance)}</p>
-              </div>
-              <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
-                <div className="mt-2 flex items-center gap-2 text-urgent">
-                  <TrendingDown className="h-4 w-4" />
-                  <span className="font-medium">{formatMonthLabel(worstMonth.month)}</span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(worstMonth.monthlyPerformance)}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Performance by type */}
-          {(topGainers.length > 0 || topLosers.length > 0) && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-foreground">Performance by type</h3>
-              <p className="text-xs text-muted-foreground">
-                {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
-              </p>
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                {/* Top gainers */}
-                {topGainers.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
-                    <div className="space-y-2">
-                      {topGainers.map((item) => (
-                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
-                            <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
-                          </div>
-                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
-                            <div className="h-1.5 rounded-full bg-success" style={{ width: `${Math.min(100, (item.netPerformance / Math.max(...topGainers.map(g => g.netPerformance))) * 100)}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Top losers */}
-                {topLosers.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
-                    <div className="space-y-2">
-                      {topLosers.map((item) => (
-                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
-                            <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
-                          </div>
-                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
-                            <div className="h-1.5 rounded-full bg-urgent" style={{ width: `${Math.min(100, (Math.abs(item.netPerformance) / Math.max(...topLosers.map(l => Math.abs(l.netPerformance)))) * 100)}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
         </CardContent>
       </Card>
 

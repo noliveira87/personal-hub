@@ -66,7 +66,7 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
     <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex flex-col gap-3 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <h2 className="text-lg font-bold text-foreground sm:text-xl">{title}</h2>
+          <h2 className="text-lg font-extrabold tracking-tight text-primary sm:text-xl">{title}</h2>
           <p className="text-sm text-muted-foreground">
             {investments.length} {investments.length === 1 ? "position" : "positions"}
           </p>
@@ -101,8 +101,11 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
 
       {recentMovements.length > 0 ? (
         <div className="mt-6 border-t border-border/70 pt-5">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-foreground">Profit / returns · {formatMonthLabel(currentMonth)}</h3>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-bold tracking-tight text-primary sm:text-lg">Profit / returns</h3>
+            <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+              Current month: {formatMonthLabel(currentMonth)}
+            </span>
           </div>
           <div className="space-y-2">
             {visibleMovements.map((movement) => (

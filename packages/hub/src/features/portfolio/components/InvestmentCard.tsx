@@ -239,9 +239,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       </div>
 
       <div className="grid grid-cols-1 gap-3 rounded-2xl bg-muted/40 p-3 sm:grid-cols-2 sm:p-4">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Current</p>
-          <p className={`text-sm font-medium ${isCashbackOnly ? "text-success" : "text-foreground"}`}>
+        <div className="space-y-1 rounded-xl bg-primary/8 px-3 py-2 ring-1 ring-primary/15">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Current</p>
+          <p className={`text-xl font-bold ${isCashbackOnly ? "text-success" : "text-foreground"}`}>
             {formatCurrency(isCashbackOnly ? cashbackDisplayValue : displayCurrentValue)}
           </p>
           {!isCashbackOnly && hasLiveCryptoQuote && asset && (
@@ -253,9 +253,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
             <p className="text-[11px] text-muted-foreground">Fetching crypto quote…</p>
           )}
         </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Invested</p>
-          <p className="text-sm font-medium text-foreground">{formatCurrency(investment.investedAmount)}</p>
+        <div className="space-y-1 px-3 py-2">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Invested</p>
+          <p className="text-lg font-semibold text-foreground/90">{formatCurrency(investment.investedAmount)}</p>
         </div>
       </div>
 

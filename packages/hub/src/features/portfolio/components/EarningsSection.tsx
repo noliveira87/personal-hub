@@ -114,15 +114,6 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
     },
   ].sort((a, b) => b.value - a.value);
 
-  const sortedBadges = useMemo(() => {
-    const badges = [
-      { type: "month", value: monthTotal },
-      { type: "survey", value: allTimeSurveyTotal },
-      { type: "cashback", value: allTimeCashbackTotal },
-    ];
-    return badges.sort((a, b) => b.value - a.value);
-  }, [monthTotal, allTimeSurveyTotal, allTimeCashbackTotal]);
-
   const visible = filteredMonthEarnings.slice(0, visibleCount);
   const remaining = Math.max(0, filteredMonthEarnings.length - visibleCount);
 
@@ -145,37 +136,23 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
           <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys and crypto cashback.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          {sortedBadges.map((badge) => {
-            if (badge.type === "month") {
-              return (
-                <span key="month" className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
-                  <span className="font-bold">{formatCurrency(badge.value)}</span>
-                  <span className="text-success/80">·</span>
-                  <span className="font-medium text-success/90">
-                    {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
-                  </span>
-                </span>
-              );
-            }
-            if (badge.type === "survey") {
-              return (
-                <span key="survey" className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-sm font-medium text-purple-600">
-                  <span>Surveys</span>
-                  <span className="font-bold">{formatCurrency(badge.value)}</span>
-                  <span className="text-xs text-purple-600/70">· all-time</span>
-                </span>
-              );
-            }
-            if (badge.type === "cashback") {
-              return (
-                <span key="cashback" className="inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-600">
-                  <span>Cashback</span>
-                  <span className="font-bold">{formatCurrency(badge.value)}</span>
-                  <span className="text-xs text-orange-600/70">· all-time</span>
-                </span>
-              );
-            }
-          })}
+          <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
+            <span className="font-bold">{formatCurrency(monthTotal)}</span>
+            <span className="text-success/80">·</span>
+            <span className="font-medium text-success/90">
+              {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-orange-500/25 bg-orange-500/8 px-3.5 py-1.5 text-xs font-medium text-orange-600/85">
+            <span>Cashback</span>
+            <span className="font-bold">{formatCurrency(allTimeCashbackTotal)}</span>
+            <span className="text-[11px] text-orange-600/70">· all-time</span>
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-purple-500/25 bg-purple-500/8 px-3.5 py-1.5 text-xs font-medium text-purple-600/85">
+            <span>Surveys</span>
+            <span className="font-bold">{formatCurrency(allTimeSurveyTotal)}</span>
+            <span className="text-[11px] text-purple-600/70">· all-time</span>
+          </span>
           <Button onClick={onAdd} size="sm" className="gap-1.5">
             <Plus className="h-4 w-4" />
             <span>Add earning</span>
@@ -205,7 +182,7 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">
+          <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-sm font-semibold text-primary sm:px-4 sm:py-1.5">
             {isCurrentMonth ? `This month · ${formatMonthLabel(selectedMonth)}` : formatMonthLabel(selectedMonth)}
           </span>
           {!isCurrentMonth ? (
