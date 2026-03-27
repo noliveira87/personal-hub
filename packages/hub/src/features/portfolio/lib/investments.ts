@@ -65,7 +65,7 @@ function normalizeEarningKind(value: string, notes?: string | null): PortfolioEa
     return "social_media";
   }
 
-  return value === "cashback" || value === "survey" || value === "crypto_cashback" || value === "social_media"
+  return value === "cashback" || value === "survey" || value === "crypto_cashback" || value === "social_media" || value === "dividend"
     ? value
     : "cashback";
 }

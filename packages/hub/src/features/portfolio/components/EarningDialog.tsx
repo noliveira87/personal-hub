@@ -112,6 +112,7 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
                   <SelectContent>
                     <SelectItem value="cashback">Cashback</SelectItem>
                     <SelectItem value="survey">Survey</SelectItem>
+                    <SelectItem value="dividend">Dividend</SelectItem>
                     <SelectItem value="social_media">Social media</SelectItem>
                     <SelectItem value="crypto_cashback">Crypto cashback</SelectItem>
                   </SelectContent>

@@ -1,11 +1,11 @@
--- Portfolio earnings ledger (surveys, cashback, crypto cashback)
+-- Portfolio earnings ledger (surveys, cashback, dividends, crypto cashback)
 -- Run this in Supabase SQL Editor.
 
 create table if not exists public.portfolio_earnings (
   id text primary key,
   title text not null,
   provider text,
-  kind text not null check (kind in ('cashback', 'survey', 'crypto_cashback')),
+  kind text not null check (kind in ('cashback', 'survey', 'dividend', 'crypto_cashback')),
   date text not null,
   amount_eur numeric(12, 2) not null default 0,
   crypto_asset text check (crypto_asset in ('BTC', 'ETH')),
@@ -15,6 +15,13 @@ create table if not exists public.portfolio_earnings (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.portfolio_earnings
+  drop constraint if exists portfolio_earnings_kind_check;
+
+alter table public.portfolio_earnings
+  add constraint portfolio_earnings_kind_check
+  check (kind in ('cashback', 'survey', 'dividend', 'crypto_cashback'));
 
 create index if not exists portfolio_earnings_date_idx
   on public.portfolio_earnings (date desc);

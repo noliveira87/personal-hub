@@ -58,13 +58,15 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     return acc;
   }, {});
 
-  const earningsByKindMonth = earnings.reduce<Record<string, { surveys: number; cashback: number }>>((acc, earning) => {
+  const earningsByKindMonth = earnings.reduce<Record<string, { surveys: number; cashback: number; social_media: number; dividend: number }>>((acc, earning) => {
     const month = earning.date.slice(0, 7);
     if (!isValidMonthKey(month)) return acc;
 
-    acc[month] ??= { surveys: 0, cashback: 0 };
+    acc[month] ??= { surveys: 0, cashback: 0, social_media: 0, dividend: 0 };
     if (earning.kind === "survey") acc[month].surveys += earning.amountEur;
     if (earning.kind === "cashback") acc[month].cashback += earning.amountEur;
+    if (earning.kind === "social_media") acc[month].social_media += earning.amountEur;
+    if (earning.kind === "dividend") acc[month].dividend += earning.amountEur;
     return acc;
   }, {});
 
@@ -379,6 +381,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         ? "surveys"
         : earning.kind === "cashback"
           ? "cashback"
+          : earning.kind === "dividend"
+            ? "dividend"
           : earning.kind === "crypto_cashback"
             ? "crypto_cashback"
             : earning.kind === "social_media"
@@ -451,6 +455,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         ? "surveys"
         : earning.kind === "cashback"
           ? "cashback"
+          : earning.kind === "dividend"
+            ? "dividend"
           : earning.kind === "crypto_cashback"
             ? "crypto_cashback"
             : earning.kind === "social_media"
@@ -530,6 +536,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       monthLabel: formatShortMonthLabel(snapshot.month),
       surveys: earningsByKindMonth[snapshot.month]?.surveys ?? 0,
       cashback: earningsByKindMonth[snapshot.month]?.cashback ?? 0,
+      social_media: earningsByKindMonth[snapshot.month]?.social_media ?? 0,
+      dividend: earningsByKindMonth[snapshot.month]?.dividend ?? 0,
     }));
 
   const longTermSummary = investments
@@ -567,6 +575,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       surveys: "Surveys",
       social_media: "Social media",
       cashback: "Cashback",
+      dividend: "Dividend",
       crypto_cashback: "Crypto Cashback",
       other: "Other",
     };
@@ -662,16 +671,16 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
           {/* Performance by type */}
           {(topGainers.length > 0 || topLosers.length > 0) && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-foreground">Performance by type</h3>
-              <p className="text-xs text-muted-foreground">
+            <div className="space-y-5 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+              <h3 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">Performance by type</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
               </p>
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Top gainers */}
                 {topGainers.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-foreground">Top gainers</h4>
+                    <h4 className="text-base font-bold text-success">Top gainers</h4>
                     <div className="space-y-2">
                       {topGainers.map((item) => (
                         <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
@@ -691,7 +700,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 {/* Top losers */}
                 {topLosers.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-foreground">Top losers</h4>
+                    <h4 className="text-base font-bold text-urgent">Top losers</h4>
                     <div className="space-y-2">
                       {topLosers.map((item) => (
                         <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
@@ -982,7 +991,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
               {earningsEvolutionChartData.length > 1 && (
                 <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Earnings evolution (surveys vs cashback)</p>
+                  <p className="text-sm font-medium text-foreground">Earnings evolution (surveys vs cashback vs social media vs dividends)</p>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={earningsEvolutionChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
@@ -993,12 +1002,16 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                           formatter={(value: number, name: string) => {
                             if (name === "surveys") return [formatCurrency(value), "Surveys"];
                             if (name === "cashback") return [formatCurrency(value), "Cashback"];
+                            if (name === "social_media") return [formatCurrency(value), "Social media"];
+                            if (name === "dividend") return [formatCurrency(value), "Dividends"];
                             return [value, name];
                           }}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                         />
                         <Line type="monotone" dataKey="surveys" name="Surveys" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                         <Line type="monotone" dataKey="cashback" name="Cashback" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="social_media" name="Social media" stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="dividend" name="Dividends" stroke="hsl(var(--accent-foreground))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>

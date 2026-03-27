@@ -16,6 +16,7 @@ interface EarningsSectionProps {
 const kindLabel: Record<string, string> = {
   cashback: "Cashback",
   survey: "Survey",
+  dividend: "Dividend",
   social_media: "Social media",
   crypto_cashback: "Crypto cashback",
 };
@@ -64,11 +65,19 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
     [earnings, selectedMonth],
   );
 
+  const searchableEarnings = useMemo(() => {
+    if (searchTerm.trim()) {
+      return [...earnings].sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    return monthEarnings;
+  }, [earnings, monthEarnings, searchTerm]);
+
   const filteredMonthEarnings = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    if (!query) return monthEarnings;
+    if (!query) return searchableEarnings;
 
-    return monthEarnings.filter((earning) => {
+    return searchableEarnings.filter((earning) => {
       const kind = kindLabel[earning.kind] ?? earning.kind;
       const haystack = [earning.title, earning.provider, earning.notes, earning.date, kind]
         .filter(Boolean)
@@ -77,28 +86,44 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
 
       return haystack.includes(query);
     });
-  }, [monthEarnings, searchTerm]);
+  }, [searchableEarnings, searchTerm]);
 
   const monthTotal = monthEarnings.reduce((sum, e) => sum + e.amountEur, 0);
   const monthSurveyCount = monthEarnings.filter((earning) => earning.kind === "survey").length;
+  const monthSocialMediaCount = monthEarnings.filter((earning) => earning.kind === "social_media").length;
   const monthCashbackCount = monthEarnings.filter((earning) => earning.kind === "cashback").length;
+  const monthDividendCount = monthEarnings.filter((earning) => earning.kind === "dividend").length;
   const monthSurveyTotal = monthEarnings
     .filter((earning) => earning.kind === "survey")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const monthSocialMediaTotal = monthEarnings
+    .filter((earning) => earning.kind === "social_media")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
   const monthCashbackTotal = monthEarnings
     .filter((earning) => earning.kind === "cashback")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const monthDividendTotal = monthEarnings
+    .filter((earning) => earning.kind === "dividend")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
 
   const allTimeSurveyTotal = earnings
     .filter((earning) => earning.kind === "survey")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const allTimeSocialMediaTotal = earnings
+    .filter((earning) => earning.kind === "social_media")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
   const allTimeCashbackTotal = earnings
     .filter((earning) => earning.kind === "cashback")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const allTimeDividendTotal = earnings
+    .filter((earning) => earning.kind === "dividend")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
 
-  const monthTrackedTotal = monthSurveyTotal + monthCashbackTotal;
+  const monthTrackedTotal = monthSurveyTotal + monthSocialMediaTotal + monthCashbackTotal + monthDividendTotal;
   const monthSurveyRatio = monthTrackedTotal > 0 ? (monthSurveyTotal / monthTrackedTotal) * 100 : 0;
+  const monthSocialMediaRatio = monthTrackedTotal > 0 ? (monthSocialMediaTotal / monthTrackedTotal) * 100 : 0;
   const monthCashbackRatio = monthTrackedTotal > 0 ? (monthCashbackTotal / monthTrackedTotal) * 100 : 0;
+  const monthDividendRatio = monthTrackedTotal > 0 ? (monthDividendTotal / monthTrackedTotal) * 100 : 0;
   const monthSplitRows = [
     {
       key: "surveys",
@@ -112,6 +137,22 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
       value: monthCashbackTotal,
       ratio: monthCashbackRatio,
     },
+    ...(monthSocialMediaTotal > 0
+      ? [{
+        key: "social_media",
+        label: "Social media",
+        value: monthSocialMediaTotal,
+        ratio: monthSocialMediaRatio,
+      }]
+      : []),
+    ...(monthDividendTotal > 0
+      ? [{
+        key: "dividend",
+        label: "Dividend",
+        value: monthDividendTotal,
+        ratio: monthDividendRatio,
+      }]
+      : []),
   ].sort((a, b) => b.value - a.value);
 
   const visible = filteredMonthEarnings.slice(0, visibleCount);
@@ -133,30 +174,44 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
             </div>
             <h2 className="text-lg font-bold text-foreground sm:text-xl">Rewards & surveys</h2>
           </div>
-          <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys and crypto cashback.</p>
+          <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys, social media, dividends and crypto cashback.</p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
-            <span className="font-bold">{formatCurrency(monthTotal)}</span>
-            <span className="text-success/80">·</span>
-            <span className="font-medium text-success/90">
-              {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:flex-nowrap sm:justify-end sm:gap-2">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/8 px-3 py-1.5 text-xs font-medium text-orange-600/85">
+              <span>Cashback</span>
+              <span className="font-bold">{formatCurrency(allTimeCashbackTotal)}</span>
+              <span className="text-[11px] text-orange-600/70">· all-time</span>
             </span>
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-orange-500/25 bg-orange-500/8 px-3.5 py-1.5 text-xs font-medium text-orange-600/85">
-            <span>Cashback</span>
-            <span className="font-bold">{formatCurrency(allTimeCashbackTotal)}</span>
-            <span className="text-[11px] text-orange-600/70">· all-time</span>
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full border border-purple-500/25 bg-purple-500/8 px-3.5 py-1.5 text-xs font-medium text-purple-600/85">
-            <span>Surveys</span>
-            <span className="font-bold">{formatCurrency(allTimeSurveyTotal)}</span>
-            <span className="text-[11px] text-purple-600/70">· all-time</span>
-          </span>
-          <Button onClick={onAdd} size="sm" className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            <span>Add earning</span>
-          </Button>
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-purple-500/25 bg-purple-500/8 px-3 py-1.5 text-xs font-medium text-purple-600/85">
+              <span>Surveys</span>
+              <span className="font-bold">{formatCurrency(allTimeSurveyTotal)}</span>
+              <span className="text-[11px] text-purple-600/70">· all-time</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-pink-500/25 bg-pink-500/8 px-3 py-1.5 text-xs font-medium text-pink-600/85">
+              <span>Social media</span>
+              <span className="font-bold">{formatCurrency(allTimeSocialMediaTotal)}</span>
+              <span className="text-[11px] text-pink-600/70">· all-time</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-sky-500/25 bg-sky-500/8 px-3 py-1.5 text-xs font-medium text-sky-600/85">
+              <span>Dividends</span>
+              <span className="font-bold">{formatCurrency(allTimeDividendTotal)}</span>
+              <span className="text-[11px] text-sky-600/70">· all-time</span>
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end sm:gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
+              <span className="font-bold">{formatCurrency(monthTotal)}</span>
+              <span className="text-success/80">·</span>
+              <span className="font-medium text-success/90">
+                {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
+              </span>
+            </span>
+            <Button onClick={onAdd} size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              <span>Add earning</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -200,11 +255,13 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
         <Input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search earnings..."
+          placeholder="Search earnings across all months..."
           aria-label="Search earnings"
         />
         <p className="mt-2 text-xs text-muted-foreground">
-          {monthSurveyCount} surveys ({formatCurrency(monthSurveyTotal)}) · {monthCashbackCount} cashback ({formatCurrency(monthCashbackTotal)}) in {formatMonthLabel(selectedMonth)}
+          {searchTerm.trim()
+            ? `${filteredMonthEarnings.length} result${filteredMonthEarnings.length === 1 ? "" : "s"} across all months`
+            : `${monthSurveyCount} surveys (${formatCurrency(monthSurveyTotal)}) · ${monthCashbackCount} cashback (${formatCurrency(monthCashbackTotal)})${monthSocialMediaTotal > 0 ? ` · ${monthSocialMediaCount} social media (${formatCurrency(monthSocialMediaTotal)})` : ""}${monthDividendTotal > 0 ? ` · ${monthDividendCount} dividends (${formatCurrency(monthDividendTotal)})` : ""} in ${formatMonthLabel(selectedMonth)}`}
         </p>
       </div>
 
@@ -261,7 +318,7 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
       ) : (
         <div className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
           {searchTerm.trim()
-            ? `No results for "${searchTerm.trim()}" in ${formatMonthLabel(selectedMonth)}.`
+            ? `No results for "${searchTerm.trim()}" across all months.`
             : isCurrentMonth
               ? "No rewards logged this month yet."
               : `No rewards recorded for ${formatMonthLabel(selectedMonth)}.`}
