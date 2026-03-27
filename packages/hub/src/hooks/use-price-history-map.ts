@@ -8,6 +8,13 @@ export interface LatestPrice {
   currency: string;
 }
 
+interface PriceHistoryMapRow {
+  contract_id: string;
+  price: number;
+  currency: string;
+  date: string;
+}
+
 export function usePriceHistoryMap(contractIds: string[]) {
   const [priceMap, setPriceMap] = useState<Map<string, LatestPrice>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -52,7 +59,8 @@ export function usePriceHistoryMap(contractIds: string[]) {
         }
 
         // Sort by date DESC to ensure latest prices come first
-        const sortedData = (data || []).sort((a: any, b: any) => {
+        const rows = (data ?? []) as PriceHistoryMapRow[];
+        const sortedData = rows.sort((a, b) => {
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
 
@@ -60,7 +68,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
         const latestMap = new Map<string, LatestPrice>();
         const seenContracts = new Set<string>();
 
-        sortedData.forEach((entry: any) => {
+        sortedData.forEach((entry) => {
           if (!seenContracts.has(entry.contract_id)) {
             const latestEntry: LatestPrice = {
               price: entry.price,

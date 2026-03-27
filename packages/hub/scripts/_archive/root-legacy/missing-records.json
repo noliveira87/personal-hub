@@ -1,0 +1,422 @@
+{
+  "count": 52,
+  "records": [
+    {
+      "title": "Plenitude",
+      "supplier": "TB",
+      "kind": "social_media",
+      "date": "2026-01-20",
+      "amount_eur": 40,
+      "notes": ""
+    },
+    {
+      "title": "Radar Consumo",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2026-01-16",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "YouTube",
+      "supplier": "Revolut",
+      "kind": "social_media",
+      "date": "2025-12-23",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "Unibanco",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-12-18",
+      "amount_eur": 40,
+      "notes": ""
+    },
+    {
+      "title": "Radar Consumo",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-12-18",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "Revolut",
+      "kind": "social_media",
+      "date": "2025-11-30",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "Revolut",
+      "kind": "social_media",
+      "date": "2025-11-21",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "YouTube",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-11-17",
+      "amount_eur": 8,
+      "notes": ""
+    },
+    {
+      "title": "SHEIN",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-10-16",
+      "amount_eur": 3,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-10-10",
+      "amount_eur": 14,
+      "notes": ""
+    },
+    {
+      "title": "SHEIN",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-09-30",
+      "amount_eur": 11,
+      "notes": ""
+    },
+    {
+      "title": "Campanhas",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-09-25",
+      "amount_eur": 23,
+      "notes": ""
+    },
+    {
+      "title": "Radar Consumo",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-09-25",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "JOOM",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-09-04",
+      "amount_eur": 8,
+      "notes": ""
+    },
+    {
+      "title": "Galp - Amazon",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-08-26",
+      "amount_eur": 49.9,
+      "notes": ""
+    },
+    {
+      "title": "TripAdvisor",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-08-22",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-07-25",
+      "amount_eur": 11,
+      "notes": ""
+    },
+    {
+      "title": "TradeRepublic",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-07-25",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "TradeRepublic",
+      "supplier": "Vale",
+      "kind": "social_media",
+      "date": "2025-06-30",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "Computador Pintor",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-05-10",
+      "amount_eur": 50,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-04-17",
+      "amount_eur": 3,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-03-01",
+      "amount_eur": 13,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-01-06",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-01-05",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "LetyShops",
+      "supplier": "LetyShops",
+      "kind": "cashback",
+      "date": "2025-01-03",
+      "amount_eur": 0.13,
+      "notes": ""
+    },
+    {
+      "title": "IMDb",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2025-01-02",
+      "amount_eur": 22,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-12-03",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-12-01",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-11-30",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-11-28",
+      "amount_eur": 6,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-11-27",
+      "amount_eur": 18,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-11-13",
+      "amount_eur": 37,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-11-10",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-10-25",
+      "amount_eur": 11,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-10-24",
+      "amount_eur": 10,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-09-19",
+      "amount_eur": 14,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-09-18",
+      "amount_eur": 24,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-09-16",
+      "amount_eur": 44,
+      "notes": ""
+    },
+    {
+      "title": "Instagram",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-07-31",
+      "amount_eur": 6,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-06-24",
+      "amount_eur": 4,
+      "notes": ""
+    },
+    {
+      "title": "Booking",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-06-23",
+      "amount_eur": 11,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-06-19",
+      "amount_eur": 3,
+      "notes": ""
+    },
+    {
+      "title": "Spotify",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-05-30",
+      "amount_eur": 12,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-05-29",
+      "amount_eur": 6,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-05-29",
+      "amount_eur": 5,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-05-28",
+      "amount_eur": 3,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-05-20",
+      "amount_eur": 33,
+      "notes": ""
+    },
+    {
+      "title": "TikTok",
+      "supplier": "MBWay",
+      "kind": "social_media",
+      "date": "2024-05-12",
+      "amount_eur": 13,
+      "notes": ""
+    },
+    {
+      "title": "Plutus",
+      "supplier": "M - Plutus",
+      "kind": "cashback",
+      "date": "2024-03-07",
+      "amount_eur": 198.66,
+      "notes": ""
+    },
+    {
+      "title": "Plutus",
+      "supplier": "M - Plutus",
+      "kind": "cashback",
+      "date": "2024-02-10",
+      "amount_eur": 19.99,
+      "notes": ""
+    },
+    {
+      "title": "Plutus",
+      "supplier": "M - Plutus",
+      "kind": "cashback",
+      "date": "2024-01-10",
+      "amount_eur": 4.99,
+      "notes": ""
+    },
+    {
+      "title": "Curve",
+      "supplier": "M - Curve",
+      "kind": "cashback",
+      "date": "2024-01-09",
+      "amount_eur": 9.99,
+      "notes": ""
+    }
+  ],
+  "timestamp": "2026-03-27T10:55:24.249Z"
+}

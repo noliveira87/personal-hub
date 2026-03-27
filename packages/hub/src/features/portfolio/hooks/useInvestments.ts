@@ -173,24 +173,7 @@ export function useInvestments() {
         return investment;
       });
 
-      const hasAforro = normalizedInvestments.some((investment) => investment.name.trim().toLowerCase() === "aforro");
-      const hydratedInvestments = hasAforro
-        ? normalizedInvestments
-        : [
-            ...normalizedInvestments,
-            {
-              id: generateId(),
-              name: "Aforro",
-              category: "long-term",
-              type: "cash",
-              investedAmount: 0,
-              currentValue: 0,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
-          ];
-
-      setInvestments(hydratedInvestments);
+      setInvestments(normalizedInvestments);
       // Keep historical monthly snapshots from DB so month records are preserved
       // across month transitions. Current month is recalculated live below.
       setMonthlySnapshots((remoteSnapshots ?? []).sort((a, b) => a.month.localeCompare(b.month)));

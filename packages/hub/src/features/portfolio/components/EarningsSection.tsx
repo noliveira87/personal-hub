@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Gift, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PortfolioEarning, formatCurrency, formatMonthLabel } from "@/features/portfolio/types/investment";
 
 const PAGE_SIZE = 5;
@@ -30,6 +31,7 @@ const offsetMonth = (monthKey: string, delta: number) => {
 export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsSectionProps) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const availableMonths = useMemo(() => {
     const months = new Set(earnings.map((e) => e.date.slice(0, 7)));
@@ -62,15 +64,48 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
     [earnings, selectedMonth],
   );
 
+  const filteredMonthEarnings = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return monthEarnings;
+
+    return monthEarnings.filter((earning) => {
+      const kind = kindLabel[earning.kind] ?? earning.kind;
+      const haystack = [earning.title, earning.provider, earning.notes, earning.date, kind]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [monthEarnings, searchTerm]);
+
   const monthTotal = monthEarnings.reduce((sum, e) => sum + e.amountEur, 0);
-  const surveyTotal = earnings
+  const monthSurveyCount = monthEarnings.filter((earning) => earning.kind === "survey").length;
+  const monthCashbackCount = monthEarnings.filter((earning) => earning.kind === "cashback").length;
+  const monthSurveyTotal = monthEarnings
     .filter((earning) => earning.kind === "survey")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const cashbackTotal = earnings
+  const monthCashbackTotal = monthEarnings
     .filter((earning) => earning.kind === "cashback")
     .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const visible = monthEarnings.slice(0, visibleCount);
-  const remaining = Math.max(0, monthEarnings.length - visibleCount);
+
+  const currentYear = String(new Date().getFullYear());
+  const yearEarnings = earnings.filter((earning) => earning.date.startsWith(currentYear));
+  const yearSurveyTotal = yearEarnings
+    .filter((earning) => earning.kind === "survey")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const yearCashbackTotal = yearEarnings
+    .filter((earning) => earning.kind === "cashback")
+    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const yearTotal = yearSurveyTotal + yearCashbackTotal;
+  const yearSurveyRatio = yearTotal > 0 ? (yearSurveyTotal / yearTotal) * 100 : 0;
+  const yearCashbackRatio = yearTotal > 0 ? (yearCashbackTotal / yearTotal) * 100 : 0;
+  const visible = filteredMonthEarnings.slice(0, visibleCount);
+  const remaining = Math.max(0, filteredMonthEarnings.length - visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchTerm]);
 
   const isCurrentMonth = selectedMonth === currentMonthKey();
 
@@ -86,20 +121,53 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
           </div>
           <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys and crypto cashback.</p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-            {formatCurrency(surveyTotal)} surveys total
-          </span>
-          <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-            {formatCurrency(cashbackTotal)} cashback total
-          </span>
-          <span className="rounded-full bg-success/10 px-3 py-1.5 text-sm font-semibold text-success">
-            {formatCurrency(monthTotal)} {isCurrentMonth ? "this month" : formatMonthLabel(selectedMonth)}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
+            <span className="font-bold">{formatCurrency(monthTotal)}</span>
+            <span className="text-success/80">·</span>
+            <span className="font-medium text-success/90">
+              {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
+            </span>
           </span>
           <Button onClick={onAdd} size="sm" className="gap-1.5">
             <Plus className="h-4 w-4" />
             <span>Add earning</span>
           </Button>
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Surveys · {currentYear}</p>
+            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(yearSurveyTotal)}</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Cashback · {currentYear}</p>
+            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(yearCashbackTotal)}</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-foreground">Surveys</span>
+              <span className="text-muted-foreground">{formatCurrency(yearSurveyTotal)} · {yearSurveyRatio.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted">
+              <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, yearSurveyRatio)}%` }} />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-foreground">Cashback</span>
+              <span className="text-muted-foreground">{formatCurrency(yearCashbackTotal)} · {yearCashbackRatio.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted">
+              <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, yearCashbackRatio)}%` }} />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -121,6 +189,18 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
         <Button type="button" variant="ghost" size="icon" onClick={handleNext} disabled={!hasNext}>
           <ChevronRight className="h-4 w-4" />
         </Button>
+      </div>
+
+      <div className="mb-4">
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search earnings..."
+          aria-label="Search earnings"
+        />
+        <p className="mt-2 text-xs text-muted-foreground">
+          {monthSurveyCount} surveys ({formatCurrency(monthSurveyTotal)}) · {monthCashbackCount} cashback ({formatCurrency(monthCashbackTotal)}) in {formatMonthLabel(selectedMonth)}
+        </p>
       </div>
 
       {visible.length ? (
@@ -175,9 +255,11 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
-          {isCurrentMonth
-            ? "No rewards logged this month yet."
-            : `No rewards recorded for ${formatMonthLabel(selectedMonth)}.`}
+          {searchTerm.trim()
+            ? `No results for "${searchTerm.trim()}" in ${formatMonthLabel(selectedMonth)}.`
+            : isCurrentMonth
+              ? "No rewards logged this month yet."
+              : `No rewards recorded for ${formatMonthLabel(selectedMonth)}.`}
         </div>
       )}
     </section>

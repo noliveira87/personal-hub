@@ -112,7 +112,16 @@ export function formatPercentage(value: number): string {
 }
 
 export function formatMonthLabel(monthKey: string): string {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
+    return monthKey;
+  }
+
   const [year, month] = monthKey.split("-").map(Number);
   const date = new Date(year, (month || 1) - 1, 1);
+
+  if (Number.isNaN(date.getTime())) {
+    return monthKey;
+  }
+
   return new Intl.DateTimeFormat("pt-PT", { month: "short", year: "numeric" }).format(date);
 }

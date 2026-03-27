@@ -13,7 +13,7 @@ export function KpiCards({ summary }: KpiCardsProps) {
       label: "Current Value",
       value: formatCurrency(summary.totalCurrentValue),
       icon: PiggyBank,
-      accent: "primary" as const,
+      accent: "current" as const,
     },
     {
       label: "Total Invested",
@@ -49,6 +49,9 @@ export function KpiCards({ summary }: KpiCardsProps) {
             </span>
             <div
               className={`rounded-xl p-2.5 ${
+                card.accent === "current"
+                  ? "bg-primary/10 text-primary"
+                  :
                 card.accent === "profit"
                   ? "bg-success/10 text-success"
                   : card.accent === "loss"
@@ -61,6 +64,9 @@ export function KpiCards({ summary }: KpiCardsProps) {
           </div>
           <p
             className={`text-2xl font-bold tracking-tight sm:text-[1.75rem] ${
+              card.accent === "current"
+                ? "text-primary"
+                :
               card.accent === "profit"
                 ? "text-success"
                 : card.accent === "loss"

@@ -23,7 +23,7 @@ export default function ContractsList() {
   const { priceMap, loading: pricesLoading } = usePriceHistoryMap(contractIds);
 
   const filtered = useMemo(() => {
-    let result = contracts.filter(c => {
+    const result = contracts.filter(c => {
       const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.provider.toLowerCase().includes(search.toLowerCase());
       const matchCategory = categoryFilter === 'all' || c.category === categoryFilter;
       const matchStatus = statusFilter === 'all' || c.status === statusFilter;
@@ -107,7 +107,7 @@ export default function ContractsList() {
           <div className="flex flex-wrap gap-2 animate-fade-up">
             <select
               value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value as any)}
+              onChange={e => setCategoryFilter(e.target.value as ContractCategory | 'all')}
               className="px-3 py-2 rounded-lg border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">All Categories</option>
@@ -117,7 +117,7 @@ export default function ContractsList() {
             </select>
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as any)}
+              onChange={e => setStatusFilter(e.target.value as ContractStatus | 'all')}
               className="px-3 py-2 rounded-lg border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">All Statuses</option>
@@ -127,7 +127,7 @@ export default function ContractsList() {
             </select>
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
+              onChange={e => setSortBy(e.target.value as 'renewal' | 'price' | 'name')}
               className="px-3 py-2 rounded-lg border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="renewal">Sort by Renewal Date</option>

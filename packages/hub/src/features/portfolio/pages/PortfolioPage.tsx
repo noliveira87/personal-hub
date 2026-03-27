@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { KpiCards } from "@/features/portfolio/components/KpiCards";
 import { EarningsSection } from "@/features/portfolio/components/EarningsSection";
+import { AllocationSection } from "@/features/portfolio/components/AllocationSection";
 import { InvestmentSection } from "@/features/portfolio/components/InvestmentSection";
 import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
 import { Investment, InvestmentMovementKind, PortfolioEarning, calculateSummary } from "@/features/portfolio/types/investment";
@@ -233,6 +234,8 @@ const Index = () => {
           </div>
 
           <KpiCards summary={summary} />
+
+          <AllocationSection investments={resolvedInvestments} earnings={earnings} />
 
           <div className="space-y-8">
             <div className="space-y-1 px-1">

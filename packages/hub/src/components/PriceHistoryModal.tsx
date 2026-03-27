@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, X, Trash2, Edit } from 'lucide-react';
 import { usePriceHistory } from '@/hooks/use-price-history';
 import { formatCurrency } from '@/lib/contractUtils';
+import { PriceHistory } from '@/types/contract';
 
 interface PriceHistoryModalProps {
   contractId: string;
@@ -54,7 +55,7 @@ export function PriceHistoryModal({
     }
   };
 
-  const handleEditEntry = (entry: any) => {
+  const handleEditEntry = (entry: PriceHistory) => {
     setEditingId(entry.id);
     setFormData({
       price: entry.price,

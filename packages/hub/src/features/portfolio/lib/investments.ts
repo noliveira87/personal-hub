@@ -249,17 +249,31 @@ export async function upsertMonthlySnapshotsInDb(snapshots: MonthlySnapshot[]): 
 export async function loadPortfolioEarningsFromDb(): Promise<PortfolioEarning[] | null> {
   if (!supabase) return null;
 
-  const { data, error } = await supabase
-    .from("portfolio_earnings")
-    .select("*")
-    .order("date", { ascending: false });
+  const pageSize = 1000;
+  let from = 0;
+  const rows: PortfolioEarningRow[] = [];
 
-  if (error) {
-    console.error("Error loading portfolio earnings:", error);
-    return null;
+  while (true) {
+    const { data, error } = await supabase
+      .from("portfolio_earnings")
+      .select("*")
+      .order("date", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error("Error loading portfolio earnings:", error);
+      return null;
+    }
+
+    if (!data?.length) break;
+
+    rows.push(...(data as PortfolioEarningRow[]));
+
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
 
-  return (data ?? []).map((row) => mapPortfolioEarningRow(row as PortfolioEarningRow));
+  return rows.map((row) => mapPortfolioEarningRow(row));
 }
 
 export async function upsertPortfolioEarningsInDb(earnings: PortfolioEarning[]): Promise<void> {

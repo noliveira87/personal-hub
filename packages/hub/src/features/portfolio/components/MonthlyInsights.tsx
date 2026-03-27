@@ -20,6 +20,13 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAnnualYear, setSelectedAnnualYear] = useState<string | null>(null);
 
+  const isValidMonthKey = (monthKey: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey);
+  const formatShortMonthLabel = (monthKey: string) => {
+    if (!isValidMonthKey(monthKey)) return monthKey;
+    const [year, month] = monthKey.split("-").map(Number);
+    return new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "short" });
+  };
+
   const isNonInvestmentWithdrawal = (movement: { id?: string; kind: string; note?: string }) => {
     if (movement.kind !== "withdrawal") return false;
     if (movement.id === "goparity-2026-01-03-ajuste-amortizacao-capital") return true;
@@ -46,7 +53,18 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const liveSummary = calculateSummary(investments);
   const earningsByMonth = earnings.reduce<Record<string, number>>((acc, earning) => {
     const month = earning.date.slice(0, 7);
+    if (!isValidMonthKey(month)) return acc;
     acc[month] = (acc[month] ?? 0) + earning.amountEur;
+    return acc;
+  }, {});
+
+  const earningsByKindMonth = earnings.reduce<Record<string, { surveys: number; cashback: number }>>((acc, earning) => {
+    const month = earning.date.slice(0, 7);
+    if (!isValidMonthKey(month)) return acc;
+
+    acc[month] ??= { surveys: 0, cashback: 0 };
+    if (earning.kind === "survey") acc[month].surveys += earning.amountEur;
+    if (earning.kind === "cashback") acc[month].cashback += earning.amountEur;
     return acc;
   }, {});
 
@@ -57,6 +75,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       if (isNonInvestmentWithdrawal(movement)) return;
 
       const month = movement.date.slice(0, 7);
+      if (!isValidMonthKey(month)) return;
       acc[month] ??= { inflow: 0, performance: 0 };
 
       if (movement.kind === "contribution") {
@@ -83,7 +102,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     ...Object.keys(earningsByMonth),
   ]);
 
-  const sorted = [...snapshots]
+  const sorted = snapshots
+    .filter((snapshot) => isValidMonthKey(snapshot.month))
     .sort((a, b) => a.month.localeCompare(b.month))
     .map((snapshot, index, arr) => {
       const previousSnapshot = index > 0 ? arr[index - 1] : null;
@@ -147,7 +167,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       ...Object.keys(earningsByMonth),
       currentMonth,
     ]),
-  ).sort();
+  ).filter(isValidMonthKey).sort();
+
+  if (!reconstructedMonths.length) return null;
 
   const latestKnownMonth = reconstructedMonths[reconstructedMonths.length - 1];
   let endInvested = latestKnownMonth === currentMonth
@@ -197,6 +219,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       : activeMonths[activeMonths.length - 1];
   const selectedIdx = activeMonths.indexOf(effectiveMonth);
   const selected = reconstructedActiveSorted[selectedIdx];
+  if (!selected) return null;
 
   const selectedMonth = selected.month;
   const isCurrentMonthSelected = selectedMonth === currentMonth;
@@ -457,7 +480,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     .slice(-12)
     .map((snapshot) => ({
       month: snapshot.month,
-      monthLabel: new Date(`${snapshot.month}-01`).toLocaleDateString("en-US", { month: "short" }),
+      monthLabel: formatShortMonthLabel(snapshot.month),
       performance: snapshot.monthlyPerformance,
       inflow: snapshot.monthlyInflow,
       returnPct: snapshot.monthlyReturnPct,
@@ -494,11 +517,20 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
       return {
         month: snapshot.month,
-        monthLabel: new Date(`${snapshot.month}-01`).toLocaleDateString("en-US", { month: "short" }),
+        monthLabel: formatShortMonthLabel(snapshot.month),
         longPerformance,
         shortPerformance,
       };
     });
+
+  const earningsEvolutionChartData = [...reconstructedActiveSorted]
+    .slice(-12)
+    .map((snapshot) => ({
+      month: snapshot.month,
+      monthLabel: formatShortMonthLabel(snapshot.month),
+      surveys: earningsByKindMonth[snapshot.month]?.surveys ?? 0,
+      cashback: earningsByKindMonth[snapshot.month]?.cashback ?? 0,
+    }));
 
   const longTermSummary = investments
     .filter((investment) => investment.category === "long-term")
@@ -625,46 +657,60 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           )}
 
-          {(annualTopGainers.length > 0 || annualTopLosers.length > 0) && (
-            <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3">
+          {(annualTopGainers.length > 0 || annualTopLosers.length > 0) && (() => {
+            const maxGain = Math.max(...annualTopGainers.map((g) => g.netPerformance), 1);
+            const maxLoss = Math.max(...annualTopLosers.map((l) => Math.abs(l.netPerformance)), 1);
+            return (
+              <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
                 <div>
                   <p className="text-sm font-medium text-foreground">{annualFocusYear} growth drivers</p>
                   <p className="mt-1 text-xs text-muted-foreground">What contributed most to growth during {annualFocusYear}.</p>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {annualTopGainers.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Top growth</p>
-                    {annualTopGainers.map((item) => (
-                      <div key={`annual-gain-${item.type}`} className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
-                          <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  {annualTopGainers.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Top growth</p>
+                      {annualTopGainers.map((item) => {
+                        const barPct = Math.max(4, (item.netPerformance / maxGain) * 100);
+                        return (
+                          <div key={`annual-gain-${item.type}`} className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                              <span className="font-medium text-foreground">{formatTypeName(item.type)}</span>
+                              <span className="font-semibold tabular-nums text-success">+{formatCurrency(item.netPerformance)}</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div className="h-1.5 rounded-full bg-success transition-all" style={{ width: `${barPct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
 
-                {annualTopLosers.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Largest drags</p>
-                    {annualTopLosers.map((item) => (
-                      <div key={`annual-loss-${item.type}`} className="rounded-xl border border-border/50 bg-muted/20 p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
-                          <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                  {annualTopLosers.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Largest drags</p>
+                      {annualTopLosers.map((item) => {
+                        const barPct = Math.max(4, (Math.abs(item.netPerformance) / maxLoss) * 100);
+                        return (
+                          <div key={`annual-loss-${item.type}`} className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                              <span className="font-medium text-foreground">{formatTypeName(item.type)}</span>
+                              <span className="font-semibold tabular-nums text-urgent">{formatCurrency(item.netPerformance)}</span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                              <div className="h-1.5 rounded-full bg-urgent transition-all" style={{ width: `${barPct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Yearly evolution */}
           {annualInsights.length > 1 && (
@@ -727,7 +773,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       </Card>
 
       {/* ── Performance charts ── */}
-      {(monthlyChartData.length > 1 || annualChartData.length > 0) && (
+      {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1) && (
         <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
           <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
             <CardTitle>Performance charts</CardTitle>
@@ -790,6 +836,31 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                           ))}
                         </Bar>
                       </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {earningsEvolutionChartData.length > 1 && (
+                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
+                  <p className="text-sm font-medium text-foreground">Earnings evolution (surveys vs cashback)</p>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={earningsEvolutionChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === "surveys") return [formatCurrency(value), "Surveys"];
+                            if (name === "cashback") return [formatCurrency(value), "Cashback"];
+                            return [value, name];
+                          }}
+                          labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                        />
+                        <Line type="monotone" dataKey="surveys" name="Surveys" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="cashback" name="Cashback" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      </LineChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
