@@ -1,10 +1,9 @@
 import { useMemo } from "react";
 import { PieChart } from "lucide-react";
-import { Investment, PortfolioEarning, formatCurrency } from "@/features/portfolio/types/investment";
+import { Investment, formatCurrency } from "@/features/portfolio/types/investment";
 
 interface AllocationSectionProps {
   investments: Investment[];
-  earnings: PortfolioEarning[];
 }
 
 const typeLabel: Record<string, string> = {
@@ -16,75 +15,37 @@ const typeLabel: Record<string, string> = {
   ppr: "PPR",
 };
 
-export function AllocationSection({ investments, earnings }: AllocationSectionProps) {
-  const currentYear = String(new Date().getFullYear());
+export function AllocationSection({ investments }: AllocationSectionProps) {
+  const { longTerm, shortTerm, longTermByType, shortTermByType } = useMemo(() => {
+    const longTermInvestments = investments.filter((item) => item.category === "long-term");
+    const shortTermInvestments = investments.filter((item) => item.category === "short-term");
 
-  const { totalCurrentValue, byType, longTerm, shortTerm } = useMemo(() => {
-    const total = investments.reduce((sum, item) => sum + item.currentValue, 0);
-    const perType = investments.reduce<Record<string, number>>((acc, item) => {
-      acc[item.type] = (acc[item.type] ?? 0) + item.currentValue;
-      return acc;
-    }, {});
+    const long = longTermInvestments.reduce((sum, item) => sum + item.currentValue, 0);
+    const short = shortTermInvestments.reduce((sum, item) => sum + item.currentValue, 0);
 
-    const byTypeRows = Object.entries(perType)
-      .map(([type, value]) => ({
-        type,
-        label: typeLabel[type] ?? type,
-        value,
-        ratio: total > 0 ? (value / total) * 100 : 0,
-      }))
-      .sort((a, b) => b.value - a.value);
+    const buildRows = (list: Investment[], total: number) => {
+      const perType = list.reduce<Record<string, number>>((acc, item) => {
+        acc[item.type] = (acc[item.type] ?? 0) + item.currentValue;
+        return acc;
+      }, {});
 
-    const long = investments
-      .filter((item) => item.category === "long-term")
-      .reduce((sum, item) => sum + item.currentValue, 0);
-
-    const short = investments
-      .filter((item) => item.category === "short-term")
-      .reduce((sum, item) => sum + item.currentValue, 0);
+      return Object.entries(perType)
+        .map(([type, value]) => ({
+          type,
+          label: typeLabel[type] ?? type,
+          value,
+          ratio: total > 0 ? (value / total) * 100 : 0,
+        }))
+        .sort((a, b) => b.value - a.value);
+    };
 
     return {
-      totalCurrentValue: total,
-      byType: byTypeRows,
       longTerm: long,
       shortTerm: short,
+      longTermByType: buildRows(longTermInvestments, long),
+      shortTermByType: buildRows(shortTermInvestments, short),
     };
   }, [investments]);
-
-  const earningsState = useMemo(() => {
-    const yearly = earnings.filter((item) => item.date.startsWith(currentYear));
-    const surveys = yearly.filter((item) => item.kind === "survey");
-    const cashback = yearly.filter((item) => item.kind === "cashback");
-
-    const surveysTotal = surveys.reduce((sum, item) => sum + item.amountEur, 0);
-    const cashbackTotal = cashback.reduce((sum, item) => sum + item.amountEur, 0);
-    const total = surveysTotal + cashbackTotal;
-
-    return {
-      surveysTotal,
-      cashbackTotal,
-      surveysRatio: total > 0 ? (surveysTotal / total) * 100 : 0,
-      cashbackRatio: total > 0 ? (cashbackTotal / total) * 100 : 0,
-    };
-  }, [earnings, currentYear]);
-
-  const earningsRows = useMemo(
-    () => [
-      {
-        key: "survey",
-        label: "Surveys",
-        value: earningsState.surveysTotal,
-        ratio: earningsState.surveysRatio,
-      },
-      {
-        key: "cashback",
-        label: "Cashback",
-        value: earningsState.cashbackTotal,
-        ratio: earningsState.cashbackRatio,
-      },
-    ].sort((a, b) => b.value - a.value),
-    [earningsState.cashbackRatio, earningsState.cashbackTotal, earningsState.surveysRatio, earningsState.surveysTotal],
-  );
 
   return (
     <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
@@ -98,29 +59,18 @@ export function AllocationSection({ investments, earnings }: AllocationSectionPr
           </div>
           <p className="text-sm text-muted-foreground">How your portfolio is split right now.</p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-4 py-2">
-          <span className="text-base font-bold text-foreground">{formatCurrency(totalCurrentValue)}</span>
-          <span className="h-1 w-1 rounded-full bg-muted-foreground/60" aria-hidden="true" />
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total current value</span>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <div>
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Long-term</p>
-              <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(longTerm)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Short-term</p>
-              <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(shortTerm)}</p>
-            </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Long-term</p>
+            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(longTerm)}</p>
           </div>
 
           <div className="space-y-3">
-            {byType.map((row) => (
-              <div key={row.type} className="space-y-1.5">
+            {longTermByType.map((row) => (
+              <div key={`long-${row.type}`} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="font-medium text-foreground">{row.label}</span>
                   <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
@@ -133,19 +83,15 @@ export function AllocationSection({ investments, earnings }: AllocationSectionPr
           </div>
         </div>
 
-        <aside className="lg:border-l lg:border-border/70 lg:pl-5">
-          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {earningsRows.map((row) => (
-              <div key={`card-${row.key}`} className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{row.label} · {currentYear}</p>
-                <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(row.value)}</p>
-              </div>
-            ))}
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Short-term</p>
+            <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(shortTerm)}</p>
           </div>
 
           <div className="space-y-3">
-            {earningsRows.map((row) => (
-              <div key={`bar-${row.key}`} className="space-y-1.5">
+            {shortTermByType.map((row) => (
+              <div key={`short-${row.type}`} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="font-medium text-foreground">{row.label}</span>
                   <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
@@ -156,7 +102,7 @@ export function AllocationSection({ investments, earnings }: AllocationSectionPr
               </div>
             ))}
           </div>
-        </aside>
+        </div>
       </div>
     </section>
   );

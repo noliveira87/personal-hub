@@ -235,14 +235,9 @@ const Index = () => {
 
           <KpiCards summary={summary} />
 
-          <AllocationSection investments={resolvedInvestments} earnings={earnings} />
+          <AllocationSection investments={resolvedInvestments} />
 
           <div className="space-y-8">
-            <div className="space-y-1 px-1">
-              <h2 className="text-lg font-semibold text-foreground">Your positions</h2>
-              <p className="text-sm text-muted-foreground">Main portfolio view grouped by time horizon.</p>
-            </div>
-
             <div className="grid grid-cols-1 gap-6">
               <InvestmentSection
                 title="Short-term Investments"
