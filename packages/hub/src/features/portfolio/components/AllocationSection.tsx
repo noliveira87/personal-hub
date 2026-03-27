@@ -68,6 +68,24 @@ export function AllocationSection({ investments, earnings }: AllocationSectionPr
     };
   }, [earnings, currentYear]);
 
+  const earningsRows = useMemo(
+    () => [
+      {
+        key: "survey",
+        label: "Surveys",
+        value: earningsState.surveysTotal,
+        ratio: earningsState.surveysRatio,
+      },
+      {
+        key: "cashback",
+        label: "Cashback",
+        value: earningsState.cashbackTotal,
+        ratio: earningsState.cashbackRatio,
+      },
+    ].sort((a, b) => b.value - a.value),
+    [earningsState.cashbackRatio, earningsState.cashbackTotal, earningsState.surveysRatio, earningsState.surveysTotal],
+  );
+
   return (
     <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-5">
@@ -80,9 +98,11 @@ export function AllocationSection({ investments, earnings }: AllocationSectionPr
           </div>
           <p className="text-sm text-muted-foreground">How your portfolio is split right now.</p>
         </div>
-        <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-semibold text-foreground">
-          {formatCurrency(totalCurrentValue)} total current value
-        </span>
+        <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-4 py-2">
+          <span className="text-base font-bold text-foreground">{formatCurrency(totalCurrentValue)}</span>
+          <span className="h-1 w-1 rounded-full bg-muted-foreground/60" aria-hidden="true" />
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total current value</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
@@ -115,36 +135,26 @@ export function AllocationSection({ investments, earnings }: AllocationSectionPr
 
         <aside className="lg:border-l lg:border-border/70 lg:pl-5">
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Surveys · {currentYear}</p>
-              <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(earningsState.surveysTotal)}</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Cashback · {currentYear}</p>
-              <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(earningsState.cashbackTotal)}</p>
-            </div>
+            {earningsRows.map((row) => (
+              <div key={`card-${row.key}`} className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{row.label} · {currentYear}</p>
+                <p className="mt-1 text-base font-semibold text-foreground">{formatCurrency(row.value)}</p>
+              </div>
+            ))}
           </div>
 
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-foreground">Surveys</span>
-                <span className="text-muted-foreground">{formatCurrency(earningsState.surveysTotal)} · {earningsState.surveysRatio.toFixed(1)}%</span>
+            {earningsRows.map((row) => (
+              <div key={`bar-${row.key}`} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-foreground">{row.label}</span>
+                  <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, row.ratio)}%` }} />
+                </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, earningsState.surveysRatio)}%` }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-foreground">Cashback</span>
-                <span className="text-muted-foreground">{formatCurrency(earningsState.cashbackTotal)} · {earningsState.cashbackRatio.toFixed(1)}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, earningsState.cashbackRatio)}%` }} />
-              </div>
-            </div>
+            ))}
           </div>
         </aside>
       </div>

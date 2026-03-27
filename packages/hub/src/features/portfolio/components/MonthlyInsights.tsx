@@ -772,135 +772,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         </CardContent>
       </Card>
 
-      {/* ── Performance charts ── */}
-      {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1) && (
-        <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
-          <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-            <CardTitle>Performance charts</CardTitle>
-            <CardDescription>Monthly trend and annual comparison based on recorded snapshots.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {monthlyChartData.length > 1 && (
-                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Monthly performance trend (last 12 months)</p>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={monthlyChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          formatter={(value: number, name: string) => {
-                            if (name === "performance") return [formatCurrency(value), "Performance"];
-                            if (name === "inflow") return [formatCurrency(value), "Invested"];
-                            return [value, name];
-                          }}
-                          labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="performance"
-                          stroke="hsl(var(--success))"
-                          strokeWidth={2.5}
-                          dot={{ r: 2 }}
-                          activeDot={{ r: 4 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-
-              {annualChartData.length > 0 && (
-                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Annual performance comparison</p>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={annualChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                        <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          formatter={(value: number, name: string, item) => {
-                            if (name === "performance") {
-                              const returnPct = item.payload.returnPct;
-                              return [`${formatCurrency(value)} (${formatPercentage(returnPct)})`, "Performance"];
-                            }
-                            return [value, name];
-                          }}
-                        />
-                        <Bar dataKey="performance" radius={[6, 6, 0, 0]}>
-                          {annualChartData.map((entry) => (
-                            <Cell key={entry.year} fill={entry.performance >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-
-              {earningsEvolutionChartData.length > 1 && (
-                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Earnings evolution (surveys vs cashback)</p>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={earningsEvolutionChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          formatter={(value: number, name: string) => {
-                            if (name === "surveys") return [formatCurrency(value), "Surveys"];
-                            if (name === "cashback") return [formatCurrency(value), "Cashback"];
-                            return [value, name];
-                          }}
-                          labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
-                        />
-                        <Line type="monotone" dataKey="surveys" name="Surveys" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                        <Line type="monotone" dataKey="cashback" name="Cashback" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {categoryGrowthChartData.length > 1 && (
-              <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-foreground">Long-term vs Short-term growth</p>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-success/10 px-2.5 py-1 font-medium text-success">Long: {formatCurrency(longTermProfit)} ({formatPercentage(longTermReturn)})</span>
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">Short: {formatCurrency(shortTermProfit)} ({formatPercentage(shortTermReturn)})</span>
-                  </div>
-                </div>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={categoryGrowthChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                      <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        formatter={(value: number, name: string) => {
-                          if (name === "longPerformance") return [formatCurrency(value), "Long-term"];
-                          if (name === "shortPerformance") return [formatCurrency(value), "Short-term"];
-                          return [value, name];
-                        }}
-                        labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
-                      />
-                      <Line type="monotone" dataKey="longPerformance" name="Long-term" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="shortPerformance" name="Short-term" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* ── Monthly insights card ── */}
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
@@ -1041,6 +912,135 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Performance charts ── */}
+      {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1) && (
+        <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
+          <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+            <CardTitle>Performance charts</CardTitle>
+            <CardDescription>Monthly trend and annual comparison based on recorded snapshots.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {monthlyChartData.length > 1 && (
+                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
+                  <p className="text-sm font-medium text-foreground">Monthly performance trend (last 12 months)</p>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={monthlyChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === "performance") return [formatCurrency(value), "Performance"];
+                            if (name === "inflow") return [formatCurrency(value), "Invested"];
+                            return [value, name];
+                          }}
+                          labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="performance"
+                          stroke="hsl(var(--success))"
+                          strokeWidth={2.5}
+                          dot={{ r: 2 }}
+                          activeDot={{ r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {annualChartData.length > 0 && (
+                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
+                  <p className="text-sm font-medium text-foreground">Annual performance comparison</p>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={annualChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                        <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string, item) => {
+                            if (name === "performance") {
+                              const returnPct = item.payload.returnPct;
+                              return [`${formatCurrency(value)} (${formatPercentage(returnPct)})`, "Performance"];
+                            }
+                            return [value, name];
+                          }}
+                        />
+                        <Bar dataKey="performance" radius={[6, 6, 0, 0]}>
+                          {annualChartData.map((entry) => (
+                            <Cell key={entry.year} fill={entry.performance >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {earningsEvolutionChartData.length > 1 && (
+                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
+                  <p className="text-sm font-medium text-foreground">Earnings evolution (surveys vs cashback)</p>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={earningsEvolutionChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <Tooltip
+                          formatter={(value: number, name: string) => {
+                            if (name === "surveys") return [formatCurrency(value), "Surveys"];
+                            if (name === "cashback") return [formatCurrency(value), "Cashback"];
+                            return [value, name];
+                          }}
+                          labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                        />
+                        <Line type="monotone" dataKey="surveys" name="Surveys" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="cashback" name="Cashback" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {categoryGrowthChartData.length > 1 && (
+              <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-foreground">Long-term vs Short-term growth</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-success/10 px-2.5 py-1 font-medium text-success">Long: {formatCurrency(longTermProfit)} ({formatPercentage(longTermReturn)})</span>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">Short: {formatCurrency(shortTermProfit)} ({formatPercentage(shortTermReturn)})</span>
+                  </div>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={categoryGrowthChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                      <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value: number, name: string) => {
+                          if (name === "longPerformance") return [formatCurrency(value), "Long-term"];
+                          if (name === "shortPerformance") return [formatCurrency(value), "Short-term"];
+                          return [value, name];
+                        }}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                      />
+                      <Line type="monotone" dataKey="longPerformance" name="Long-term" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="shortPerformance" name="Short-term" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
