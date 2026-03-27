@@ -9,6 +9,12 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 ### Added
 - Versioning structure with `CHANGELOG.md` and release workflow guidance.
 
+## [v1.0.4-stable] - 2026-03-27
+
+### Changed
+- Contracts dashboard now separates active subscriptions into monthly and yearly sections for quicker scanning.
+- Hub public branding assets were refreshed to use the latest D12 icon set.
+
 ## [v1.0.3-stable] - 2026-03-27
 
 ### Added

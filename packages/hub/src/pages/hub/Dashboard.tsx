@@ -43,6 +43,8 @@ export default function Dashboard() {
   }
 
   const active = contracts.filter(c => c.status === 'active');
+  const activeYearly = active.filter(c => c.billingFrequency === 'yearly' || c.billingFrequency === 'one-time');
+  const activeMonthly = active.filter(c => c.billingFrequency === 'monthly' || c.billingFrequency === 'quarterly');
   const expiringSoon = active
     .map(c => ({ ...c, daysLeft: getDaysUntilExpiry(c) }))
     .filter(c => c.daysLeft >= 0 && c.daysLeft <= 60)
@@ -159,7 +161,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Recent */}
+      {/* All Active — split by billing frequency */}
       <section className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '360ms' }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">All Active</h2>
@@ -167,11 +169,30 @@ export default function Dashboard() {
             View all <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {active.slice(0, 6).map((contract, i) => (
-            <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
-          ))}
-        </div>
+
+        {/* Monthly */}
+        {activeMonthly.length > 0 && (
+          <div className="mb-5">
+            <p className="text-base font-bold text-foreground mb-3 pl-3 border-l-4 border-primary">Monthly</p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeMonthly.slice(0, 6).map((contract, i) => (
+                <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Yearly */}
+        {activeYearly.length > 0 && (
+          <div>
+            <p className="text-base font-bold text-foreground mb-3 pl-3 border-l-4 border-primary">Yearly</p>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeYearly.slice(0, 6).map((contract, i) => (
+                <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );
