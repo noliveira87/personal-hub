@@ -9,6 +9,17 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 ### Added
 - Versioning structure with `CHANGELOG.md` and release workflow guidance.
 
+## [v1.0.6-stable] - 2026-03-28
+
+### Added
+- New Trips module integrated into Personal Hub with home launcher card and dedicated route.
+- Supabase-backed Trips data layer with CRUD support and full schema/policies in `packages/hub/supabase/trips.sql`.
+- Initial CrossFit Games 2023 trip imported into database, including photos and structured travel details.
+
+### Changed
+- Trips landing experience now mirrors the original Travel Story homepage flow (dashboard, detail and form views) inside Hub.
+- Hub global typography now includes display/body font utilities used by the new Trips UI.
+
 ## [v1.0.5-stable] - 2026-03-28
 
 ### Performance

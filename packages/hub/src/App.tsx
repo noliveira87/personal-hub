@@ -17,6 +17,7 @@ const AlertsPage = lazy(() => import("@/pages/contracts/AlertsPage"));
 const InsightsPage = lazy(() => import("@/pages/contracts/InsightsPage"));
 const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
+const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
 const WarrantiesPage = lazy(() => import("@/pages/warranties/WarrantiesPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const WorkInProgress = lazy(() => import("@/pages/WorkInProgress"));
@@ -50,6 +51,9 @@ const App = () => (
                 {/* Portfolio */}
                 <Route path="/portfolio" element={<PortfolioPage />} />
                 <Route path="/portfolio/insights" element={<PortfolioMonthlyInsightsPage />} />
+
+                {/* Trips */}
+                <Route path="/trips" element={<TripsPage />} />
 
                 {/* Warranties */}
                 <Route path="/warranties" element={<WarrantiesPage />} />

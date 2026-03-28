@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChartLine, FileCheck2, House, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
+import { ChartLine, FileCheck2, House, Map, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
 import { useDarkMode } from "@shared-ui/use-dark-mode";
 
 const projects = [
@@ -15,6 +15,12 @@ const projects = [
 		subtitle: "Investments",
 		to: "/portfolio",
 		icon: ChartLine,
+	},
+	{
+		title: "Journey Book",
+		subtitle: "Trips",
+		to: "/trips",
+		icon: Map,
 	},
 	{
 		title: "Contracts Manager",
