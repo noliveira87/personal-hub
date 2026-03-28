@@ -14,6 +14,84 @@ interface TripFormProps {
   onCancel: () => void;
 }
 
+const MAX_IMAGE_DIMENSION = 1280;
+const MIN_IMAGE_DIMENSION = 700;
+const IMAGE_QUALITY_STEPS = [0.78, 0.62, 0.5, 0.42];
+const MAX_DATA_URL_LENGTH = 320_000;
+
+const readAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result ?? ""));
+  reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem."));
+  reader.readAsDataURL(file);
+});
+
+const loadImageElement = (src: string): Promise<HTMLImageElement> => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error("Nao foi possivel processar a imagem."));
+  image.src = src;
+});
+
+const compressDataUrl = (image: HTMLImageElement, maxDimension: number, quality: number) => {
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  if (!width || !height) return "";
+
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+
+  const context = canvas.getContext("2d");
+  if (!context) return "";
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+  return canvas.toDataURL("image/jpeg", quality);
+};
+
+const optimizeDataUrl = async (sourceDataUrl: string): Promise<string> => {
+  if (!sourceDataUrl.startsWith("data:image/")) return sourceDataUrl;
+  if (sourceDataUrl.length <= MAX_DATA_URL_LENGTH) return sourceDataUrl;
+
+  const image = await loadImageElement(sourceDataUrl);
+  let dimension = MAX_IMAGE_DIMENSION;
+  let best = sourceDataUrl;
+
+  while (dimension >= MIN_IMAGE_DIMENSION) {
+    for (const quality of IMAGE_QUALITY_STEPS) {
+      const compressed = compressDataUrl(image, dimension, quality);
+      if (!compressed) continue;
+
+      if (compressed.length < best.length) {
+        best = compressed;
+      }
+
+      if (compressed.length <= MAX_DATA_URL_LENGTH) {
+        return compressed;
+      }
+    }
+
+    dimension = Math.floor(dimension * 0.82);
+  }
+
+  return best;
+};
+
+const resizeImageFile = async (file: File): Promise<string> => {
+  const originalDataUrl = await readAsDataUrl(file);
+
+  // Skip processing for small files to keep quality high.
+  if (file.size <= 450_000) {
+    return optimizeDataUrl(originalDataUrl);
+  }
+
+  return optimizeDataUrl(originalDataUrl);
+};
+
 const emptyFlight = (): FlightLeg => ({ from: "", to: "", departure: "", arrival: "", carrier: "", flightNumber: "" });
 const emptyHotel = (): TripHotel => ({ name: "", address: "", checkIn: "", checkOut: "", cost: 0, phone: "", confirmationNumber: "" });
 const emptyFood = (): TripFood => ({ name: "", description: "" });
@@ -85,19 +163,19 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     setExpenses(trip?.expenses || []);
   }, [trip]);
 
-  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        if (loadEvent.target?.result) {
-          setPhotos((prev) => [...prev, loadEvent.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const resizedPhotos = await Promise.all(Array.from(files).map((file) => resizeImageFile(file)));
+      setPhotos((prev) => [...prev, ...resizedPhotos.filter(Boolean)]);
+    } catch (error) {
+      console.error("Error processing uploaded photos:", error);
+      alert("Nao foi possivel processar uma das fotos. Tenta novamente.");
+    } finally {
+      event.target.value = "";
+    }
   };
 
   const updateArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number, field: keyof T, value: unknown) => {
@@ -108,10 +186,11 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     setter((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!title || !destination || !startDate || !endDate) return;
 
+    const normalizedPhotos = await Promise.all(photos.map((photo) => optimizeDataUrl(photo)));
     const totalCost = expenses.reduce((sum, item) => sum + (item.amount || 0), 0);
 
     onSave({
@@ -120,7 +199,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       startDate,
       endDate,
       cost: totalCost || 0,
-      photos,
+      photos: normalizedPhotos,
       hotels,
       foods: foods.filter((food) => food.name),
       notes,

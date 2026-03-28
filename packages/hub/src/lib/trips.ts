@@ -28,6 +28,8 @@ type TripRow = {
   updated_at: string;
 };
 
+type TripUpdateInput = Partial<Omit<Trip, "id" | "createdAt" | "updatedAt">>;
+
 const parseStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
@@ -168,6 +170,30 @@ const mapTripToRow = (trip: Trip) => ({
   updated_at: trip.updatedAt,
 });
 
+const mapTripUpdateToRow = (changes: TripUpdateInput, updatedAt: string) => {
+  const row: Record<string, unknown> = {
+    updated_at: updatedAt,
+  };
+
+  if (changes.title !== undefined) row.title = changes.title;
+  if (changes.destination !== undefined) row.destination = changes.destination;
+  if (changes.startDate !== undefined) row.start_date = changes.startDate;
+  if (changes.endDate !== undefined) row.end_date = changes.endDate;
+  if (changes.cost !== undefined) row.cost = changes.cost;
+  if (changes.photos !== undefined) row.photos = changes.photos;
+  if (changes.hotels !== undefined) row.hotels = changes.hotels;
+  if (changes.foods !== undefined) row.foods = changes.foods;
+  if (changes.notes !== undefined) row.notes = changes.notes;
+  if (changes.tags !== undefined) row.tags = changes.tags;
+  if (Object.prototype.hasOwnProperty.call(changes, "travel")) {
+    row.travel = changes.travel ?? null;
+  }
+  if (changes.tickets !== undefined) row.tickets = changes.tickets;
+  if (changes.expenses !== undefined) row.expenses = changes.expenses;
+
+  return row;
+};
+
 export async function loadTrips(): Promise<Trip[]> {
   const { data, error } = await supabase
     .from("trips")
@@ -205,25 +231,21 @@ export async function createTrip(tripData: Omit<Trip, "id" | "createdAt" | "upda
   return mapRowToTrip(data as TripRow);
 }
 
-export async function updateTrip(trip: Trip): Promise<Trip> {
-  const payload: Trip = {
-    ...trip,
-    updatedAt: new Date().toISOString(),
-  };
+export async function updateTrip(id: string, changes: TripUpdateInput): Promise<{ updatedAt: string }> {
+  const updatedAt = new Date().toISOString();
+  const payload = mapTripUpdateToRow(changes, updatedAt);
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("trips")
-    .update(mapTripToRow(payload))
-    .eq("id", trip.id)
-    .select("*")
-    .single();
+    .update(payload)
+    .eq("id", id);
 
   if (error) {
     console.error("Error updating trip:", error);
     throw new Error(`Failed to update trip: ${error.message}`);
   }
 
-  return mapRowToTrip(data as TripRow);
+  return { updatedAt };
 }
 
 export async function deleteTrip(id: string): Promise<void> {

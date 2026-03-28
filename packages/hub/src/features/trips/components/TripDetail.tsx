@@ -40,6 +40,7 @@ const InfoCard = ({ children, className = "" }: { children: React.ReactNode; cla
 export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const totalFromExpenses = trip.expenses?.reduce((sum, item) => sum + item.amount, 0);
+  const formatEuro = (value: number) => `${value.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€`;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
@@ -62,14 +63,16 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
       <div className="container mx-auto px-4 sm:px-6 pb-6">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-3">{trip.title}</h1>
-          <div className="flex flex-wrap items-center gap-4 text-muted-foreground font-body">
-            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" />{trip.destination}</span>
-            <span className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2.5 font-body">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/35 px-3 py-1.5 text-muted-foreground">
+              <MapPin className="h-4 w-4" />{trip.destination}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/35 px-3 py-1.5 text-muted-foreground">
               <Calendar className="h-4 w-4" />
               {format(new Date(trip.startDate), "MMM d")} - {format(new Date(trip.endDate), "MMM d, yyyy")}
             </span>
-            <span className="flex items-center gap-1.5 font-semibold text-foreground">
-              EUR {(totalFromExpenses || trip.cost).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-foreground text-background px-3 py-1.5 font-semibold shadow-sm">
+              {formatEuro(totalFromExpenses || trip.cost)}
             </span>
           </div>
           {trip.tags.length > 0 && (
@@ -164,7 +167,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                   {ticket.venue && <p className="text-sm text-muted-foreground font-body mt-1">{ticket.venue}</p>}
                   {ticket.address && <p className="text-xs text-muted-foreground font-body">{ticket.address}</p>}
                   {ticket.seats && <p className="text-sm text-accent font-body mt-2">{ticket.seats}</p>}
-                  {ticket.cost && <p className="text-sm font-semibold text-foreground mt-2">EUR {ticket.cost.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</p>}
+                  {ticket.cost && <p className="text-sm font-semibold text-foreground mt-2">{formatEuro(ticket.cost)}</p>}
                 </InfoCard>
               ))}
             </Section>
@@ -187,9 +190,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                         {hotel.phone && <p className="text-xs text-muted-foreground font-body mt-1">Tel. {hotel.phone}</p>}
                         {hotel.confirmationNumber && <p className="text-xs text-muted-foreground font-body">Conf. #{hotel.confirmationNumber}</p>}
                       </div>
-                      {hotel.cost && (
-                        <p className="text-sm font-semibold text-foreground whitespace-nowrap">EUR {hotel.cost.toLocaleString("pt-PT")}</p>
-                      )}
+                      {hotel.cost && <p className="text-sm font-semibold text-foreground whitespace-nowrap">{formatEuro(hotel.cost)}</p>}
                     </div>
                   </InfoCard>
                 ))}
@@ -217,12 +218,12 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                   {trip.expenses.map((expense, index) => (
                     <div key={`${expense.label}-${index}`} className="flex items-center justify-between text-sm font-body">
                       <span className="text-muted-foreground">{expense.label}</span>
-                      <span className="text-foreground font-medium">EUR {expense.amount.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                      <span className="text-foreground font-medium">{formatEuro(expense.amount)}</span>
                     </div>
                   ))}
                   <div className="border-t border-border pt-3 flex items-center justify-between font-body">
                     <span className="font-semibold text-foreground">Total</span>
-                    <span className="font-bold text-lg text-foreground">EUR {(totalFromExpenses || trip.cost).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold text-lg text-foreground">{formatEuro(totalFromExpenses || trip.cost)}</span>
                   </div>
                 </div>
               </InfoCard>

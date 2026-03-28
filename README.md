@@ -86,29 +86,37 @@ See [SUPABASE_SETUP.md](packages/hub/SUPABASE_SETUP.md) for detailed schema.
 
 ## 📦 Deployment
 
-Production deploy is done over SSH on the NAS server:
+Production is deployed on the NAS with PM2 serving the SPA from `packages/hub/dist` on port `8081`.
+
+### Option A: Deploy directly on the server
 
 ```bash
 ssh tracker@192.168.1.172
-cd ~/projects
+cd ~/projects/personal-hub
 ./deploy.sh
 ```
 
-Or in a single command from the local machine:
+### Option B: Trigger deploy remotely in one command
 
 ```bash
-ssh tracker@192.168.1.172 'cd ~/projects && ./deploy.sh'
+ssh tracker@192.168.1.172 'cd ~/projects/personal-hub && ./deploy.sh'
 ```
 
-The remote script runs:
-1. Git pull from origin/main
-2. npm run build
-3. PM2 restart
+### What `./deploy.sh` does
+
+1. `git pull`
+2. `npm run build`
+3. Recreates PM2 process `hub` with SPA fallback:
+
+```bash
+pm2 delete hub || true
+pm2 serve packages/hub/dist 8081 --name hub --spa
+pm2 save
+```
 
 Notes:
-- the repository lives at `~/projects/personal-hub` on the server
-- the deploy script lives at `~/projects/deploy.sh`
-- if SSH asks for a password, complete the login interactively and then run `./deploy.sh`
+- repo path on server: `~/projects/personal-hub`
+- if SSH prompts for password, login interactively and run `./deploy.sh`
 
 ## 🏷️ Versioning
 
@@ -170,18 +178,6 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 **Note**: This `.env.local` is automatically discovered by all Vite applications in the monorepo. Do not create separate `.env` files in individual packages.
-
-## 🚢 Deployment
-
-Currently deployed on a personal NAS server via PM2.
-
-```bash
-# Build for production
-npm run build
-
-# Output: packages/warranties/dist/
-# Served via PM2: pm2 serve ~/projects/personal-hub/packages/warranties/dist 8081 --name hub --spa
-```
 
 **Domain**: `hub.cafofo12.ddns.net` (via Nginx Proxy Manager)
 

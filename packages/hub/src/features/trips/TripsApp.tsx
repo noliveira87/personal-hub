@@ -12,6 +12,52 @@ import { Trip } from "@/features/trips/types/trip";
 import { useEffect } from "react";
 
 type View = "dashboard" | "detail" | "add" | "edit";
+type EditableTripFields = Omit<Trip, "id" | "createdAt" | "updatedAt">;
+const EDITABLE_TRIP_KEYS: Array<keyof EditableTripFields> = [
+  "title",
+  "destination",
+  "startDate",
+  "endDate",
+  "cost",
+  "photos",
+  "hotels",
+  "foods",
+  "notes",
+  "tags",
+  "travel",
+  "tickets",
+  "expenses",
+];
+
+const hasSameValue = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+
+const buildTripChanges = (current: Trip, next: EditableTripFields): Partial<EditableTripFields> => {
+  const changes: Partial<Record<keyof EditableTripFields, unknown>> = {};
+  const currentEditable: Record<keyof EditableTripFields, unknown> = {
+    title: current.title,
+    destination: current.destination,
+    startDate: current.startDate,
+    endDate: current.endDate,
+    cost: current.cost,
+    photos: current.photos,
+    hotels: current.hotels,
+    foods: current.foods,
+    notes: current.notes,
+    tags: current.tags,
+    travel: current.travel,
+    tickets: current.tickets,
+    expenses: current.expenses,
+  };
+  const nextEditable = next as unknown as Record<keyof EditableTripFields, unknown>;
+
+  EDITABLE_TRIP_KEYS.forEach((key) => {
+    if (!hasSameValue(currentEditable[key], nextEditable[key])) {
+      changes[key] = nextEditable[key];
+    }
+  });
+
+  return changes as Partial<EditableTripFields>;
+};
 
 export function TripsApp() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -86,10 +132,18 @@ export function TripsApp() {
     if (!selectedTrip) return;
 
     try {
-      const updated = await updateTrip({
+      const changes = buildTripChanges(selectedTrip, data);
+      if (Object.keys(changes).length === 0) {
+        setView("detail");
+        return;
+      }
+
+      const { updatedAt } = await updateTrip(selectedTrip.id, changes);
+      const updated: Trip = {
         ...selectedTrip,
-        ...data,
-      });
+        ...changes,
+        updatedAt,
+      };
 
       setTrips((prev) => prev.map((trip) => (trip.id === updated.id ? updated : trip)));
       setSelectedTrip(updated);
@@ -152,49 +206,53 @@ export function TripsApp() {
     <>
       <Header />
       <main className="min-h-screen">
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-secondary/30" />
-          <div className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 relative">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
-              className="max-w-2xl"
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <Heart className="h-5 w-5 text-accent fill-accent" />
-                <span className="text-sm font-body font-medium text-accent uppercase tracking-widest">O nosso diario</span>
-              </div>
-              <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-foreground mb-4 leading-[1.05]">
-                As Nossas<br />
-                <span className="italic font-normal">Aventuras</span>
-              </h1>
-              <p className="text-muted-foreground font-body text-lg sm:text-xl max-w-lg leading-relaxed">
-                Cada viagem conta uma historia. Aqui guardamos as nossas memorias, juntos.
-              </p>
-            </motion.div>
+        <section className="relative overflow-hidden border-b border-border/40">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,hsl(var(--accent)/0.18),transparent_40%),radial-gradient(circle_at_85%_20%,hsl(var(--primary)/0.14),transparent_42%),linear-gradient(110deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.32)_45%,hsl(var(--background))_100%)]" />
 
-            {totalTrips > 0 && (
+          <div className="container mx-auto px-4 sm:px-6 py-14 sm:py-20 relative">
+            <div className="grid gap-10">
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 26 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.5 }}
-                className="flex flex-wrap gap-8 mt-10"
+                transition={{ duration: 0.65 }}
+                className="w-full"
               >
-                <div>
-                  <p className="font-display text-3xl sm:text-4xl font-bold text-foreground">{totalTrips}</p>
-                  <p className="text-sm text-muted-foreground font-body">viagens</p>
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-3 py-1.5">
+                  <Heart className="h-4 w-4 text-accent fill-accent" />
+                  <span className="text-[11px] font-body font-semibold text-accent uppercase tracking-[0.24em]">O nosso diario</span>
                 </div>
-                <div>
-                  <p className="font-display text-3xl sm:text-4xl font-bold text-foreground">{totalCountries}</p>
-                  <p className="text-sm text-muted-foreground font-body">destinos</p>
-                </div>
-                <div>
-                  <p className="font-display text-3xl sm:text-4xl font-bold text-foreground">EUR {totalSpent.toLocaleString("pt-PT", { minimumFractionDigits: 0 })}</p>
-                  <p className="text-sm text-muted-foreground font-body">investidos em memorias</p>
-                </div>
+
+                <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold tracking-tight text-foreground leading-[0.98]">
+                  As Nossas <span className="italic font-normal text-foreground/95">Aventuras</span>
+                </h1>
+
+                <p className="mt-6 text-muted-foreground font-body text-lg sm:text-xl leading-relaxed">
+                  Cada viagem conta uma historia. Aqui guardamos as nossas memorias, juntos.
+                </p>
               </motion.div>
-            )}
+
+              {totalTrips > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 26 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.6 }}
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                >
+                  <div className="rounded-2xl border border-border/60 bg-background/65 px-5 py-4 backdrop-blur-sm shadow-sm">
+                    <p className="font-display text-3xl font-semibold text-foreground">{totalTrips}</p>
+                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-muted-foreground">viagens</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-background/65 px-5 py-4 backdrop-blur-sm shadow-sm">
+                    <p className="font-display text-3xl font-semibold text-foreground">{totalCountries}</p>
+                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-muted-foreground">destinos</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-background/65 px-5 py-4 backdrop-blur-sm shadow-sm">
+                    <p className="font-display text-3xl font-semibold text-foreground">{totalSpent.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€</p>
+                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.12em] text-muted-foreground">investidos em memorias</p>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </div>
         </section>
 
