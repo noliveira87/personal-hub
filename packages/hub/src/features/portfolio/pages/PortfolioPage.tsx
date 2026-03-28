@@ -24,9 +24,9 @@ const EarningDialog = lazy(() =>
 const Index = () => {
   const {
     investments,
-    monthlySnapshots,
     earnings,
     loading,
+    earningsLoading,
     shortTerm,
     longTerm,
     addInvestment,
@@ -36,12 +36,16 @@ const Index = () => {
     updateEarning,
     deleteEarning,
     moveInvestment,
-  } = useInvestments();
+  } = useInvestments({ blockOnSnapshots: false, blockOnEarnings: false });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [earningDialogOpen, setEarningDialogOpen] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
   const [editingEarning, setEditingEarning] = useState<PortfolioEarning | null>(null);
-  const { pricesEur: cryptoSpotEur, loading: cryptoQuoteLoading } = useCryptoQuotes();
+  const hasCryptoInvestments = useMemo(
+    () => investments.some((investment) => investment.type === "crypto"),
+    [investments],
+  );
+  const { pricesEur: cryptoSpotEur, loading: cryptoQuoteLoading } = useCryptoQuotes(hasCryptoInvestments);
 
   const resolvedInvestments = useMemo(() => {
     return investments.map((investment) => ({
@@ -369,6 +373,7 @@ const Index = () => {
 
                 <EarningsSection
                   earnings={earnings}
+                  loading={earningsLoading}
                   onAdd={handleAddEarning}
                   onEdit={handleEditEarning}
                   onDelete={handleDeleteEarning}

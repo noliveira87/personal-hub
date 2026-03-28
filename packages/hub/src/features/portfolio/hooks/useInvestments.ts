@@ -15,6 +15,11 @@ import {
 } from "@/features/portfolio/lib/investments";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
+type UseInvestmentsOptions = {
+  blockOnSnapshots?: boolean;
+  blockOnEarnings?: boolean;
+};
+
 const generateId = () => {
   const webCrypto = globalThis.crypto;
 
@@ -81,14 +86,17 @@ const sortByOrder = (items: Investment[], order: string[]) => {
   });
 };
 
-export function useInvestments() {
+export function useInvestments(options: UseInvestmentsOptions = {}) {
+  const { blockOnSnapshots = true, blockOnEarnings = true } = options;
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [monthlySnapshots, setMonthlySnapshots] = useState<MonthlySnapshot[]>([]);
   const [earnings, setEarnings] = useState<PortfolioEarning[]>([]);
   const [shortTermOrder, setShortTermOrder] = useState<string[]>(() => readOrder(SHORT_TERM_ORDER_KEY));
   const [longTermOrder, setLongTermOrder] = useState<string[]>(() => readOrder(LONG_TERM_ORDER_KEY));
 
-  const [remoteHydrated, setRemoteHydrated] = useState(false);
+  const [coreHydrated, setCoreHydrated] = useState(false);
+  const [snapshotsHydrated, setSnapshotsHydrated] = useState(false);
+  const [earningsHydrated, setEarningsHydrated] = useState(false);
   const skipInitialSyncRef = useRef({
     investments: true,
     earnings: true,
@@ -173,14 +181,14 @@ export function useInvestments() {
 
     const hydrateFromSupabase = async () => {
       if (!isSupabaseConfigured) {
-        setRemoteHydrated(true);
+        setCoreHydrated(true);
+        setSnapshotsHydrated(true);
+        setEarningsHydrated(true);
         return;
       }
 
-      const [remoteInvestments, remoteSnapshots, remoteEarnings, remoteCardOrder] = await Promise.all([
+      const [remoteInvestments, remoteCardOrder] = await Promise.all([
         loadInvestmentsFromDb(),
-        loadMonthlySnapshotsFromDb(),
-        loadPortfolioEarningsFromDb(),
         loadPortfolioCardOrderFromDb(),
       ]);
 
@@ -195,18 +203,30 @@ export function useInvestments() {
       });
 
       setInvestments(normalizedInvestments);
-      // Keep historical monthly snapshots from DB so month records are preserved
-      // across month transitions. Current month is recalculated live below.
-      setMonthlySnapshots((remoteSnapshots ?? []).sort((a, b) => a.month.localeCompare(b.month)));
-      setEarnings((remoteEarnings ?? []).sort((a, b) => b.date.localeCompare(a.date)));
       if (remoteCardOrder) {
         setShortTermOrder(remoteCardOrder.shortTermOrder);
         setLongTermOrder(remoteCardOrder.longTermOrder);
       }
 
       if (!isCancelled) {
-        setRemoteHydrated(true);
+        setCoreHydrated(true);
       }
+
+      void loadMonthlySnapshotsFromDb().then((remoteSnapshots) => {
+        if (isCancelled) return;
+
+        // Keep historical monthly snapshots from DB so month records are preserved
+        // across month transitions. Current month is recalculated live below.
+        setMonthlySnapshots((remoteSnapshots ?? []).sort((a, b) => a.month.localeCompare(b.month)));
+        setSnapshotsHydrated(true);
+      });
+
+      void loadPortfolioEarningsFromDb().then((remoteEarnings) => {
+        if (isCancelled) return;
+
+        setEarnings((remoteEarnings ?? []).sort((a, b) => b.date.localeCompare(a.date)));
+        setEarningsHydrated(true);
+      });
     };
 
     void hydrateFromSupabase();
@@ -217,36 +237,40 @@ export function useInvestments() {
   }, []);
 
   useEffect(() => {
-    if (isSupabaseConfigured && remoteHydrated) {
+    if (isSupabaseConfigured && coreHydrated) {
       if (skipInitialSyncRef.current.investments) {
         skipInitialSyncRef.current.investments = false;
         return;
       }
       void upsertInvestmentsInDb(investments);
     }
-  }, [investments, remoteHydrated]);
+  }, [investments, coreHydrated]);
 
   useEffect(() => {
-    if (isSupabaseConfigured && remoteHydrated) {
+    if (isSupabaseConfigured && earningsHydrated) {
       if (skipInitialSyncRef.current.earnings) {
         skipInitialSyncRef.current.earnings = false;
         return;
       }
       void upsertPortfolioEarningsInDb(earnings);
     }
-  }, [earnings, remoteHydrated]);
+  }, [earnings, earningsHydrated]);
 
   useEffect(() => {
-    if (isSupabaseConfigured && remoteHydrated) {
+    if (isSupabaseConfigured && coreHydrated) {
       if (skipInitialSyncRef.current.order) {
         skipInitialSyncRef.current.order = false;
         return;
       }
       void upsertPortfolioCardOrderInDb(shortTermOrder, longTermOrder);
     }
-  }, [shortTermOrder, longTermOrder, remoteHydrated]);
+  }, [shortTermOrder, longTermOrder, coreHydrated]);
 
   useEffect(() => {
+    if (isSupabaseConfigured && !snapshotsHydrated) {
+      return;
+    }
+
     const summary = calculateSummary(investments);
     const currentMonth = getMonthKey();
     const baselineMonth = getPreviousMonthKey(currentMonth);
@@ -325,17 +349,17 @@ export function useInvestments() {
 
       return sameSnapshots(sorted, next) ? prev : next;
     });
-  }, [investments]);
+  }, [investments, snapshotsHydrated]);
 
   useEffect(() => {
-    if (isSupabaseConfigured && remoteHydrated) {
+    if (isSupabaseConfigured && snapshotsHydrated) {
       if (skipInitialSyncRef.current.snapshots) {
         skipInitialSyncRef.current.snapshots = false;
         return;
       }
       void upsertMonthlySnapshotsInDb(monthlySnapshots);
     }
-  }, [monthlySnapshots, remoteHydrated]);
+  }, [monthlySnapshots, snapshotsHydrated]);
 
   useEffect(() => {
     const shortIds = investments.filter((investment) => investment.category === "short-term").map((investment) => investment.id);
@@ -387,8 +411,12 @@ export function useInvestments() {
   const shortTerm = sortByOrder(investments.filter(i => i.category === "short-term"), shortTermOrder);
   const longTerm = sortByOrder(investments.filter(i => i.category === "long-term"), longTermOrder);
 
+  const loading = !coreHydrated || (blockOnSnapshots && !snapshotsHydrated) || (blockOnEarnings && !earningsHydrated);
+
   return {
-    loading: !remoteHydrated,
+    loading,
+    earningsLoading: !earningsHydrated,
+    snapshotsLoading: !snapshotsHydrated,
     investments,
     monthlySnapshots,
     earnings,

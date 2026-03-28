@@ -2,14 +2,54 @@ import { useEffect, useState } from "react";
 import { CryptoQuoteMap, fetchCryptoEurQuotes } from "@/features/portfolio/lib/crypto";
 
 const REFRESH_INTERVAL_MS = 60_000;
+const QUOTE_CACHE_KEY = "portfolio.crypto-quotes.v1";
+const QUOTE_CACHE_TTL_MS = 60_000;
 
-export function useCryptoQuotes() {
-  const [pricesEur, setPricesEur] = useState<CryptoQuoteMap>({});
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+type CachedCryptoQuote = {
+  pricesEur: CryptoQuoteMap;
+  lastUpdatedAt: string | null;
+  cachedAt: number;
+};
+
+const readCachedQuote = (): CachedCryptoQuote | null => {
+  try {
+    const raw = sessionStorage.getItem(QUOTE_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as CachedCryptoQuote;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (Date.now() - parsed.cachedAt > QUOTE_CACHE_TTL_MS) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedQuote = (quote: { pricesEur: CryptoQuoteMap; lastUpdatedAt: string | null }) => {
+  try {
+    sessionStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify({ ...quote, cachedAt: Date.now() }));
+  } catch {
+    // no-op
+  }
+};
+
+export function useCryptoQuotes(enabled = true) {
+  const cachedQuote = enabled ? readCachedQuote() : null;
+  const [pricesEur, setPricesEur] = useState<CryptoQuoteMap>(cachedQuote?.pricesEur ?? {});
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(cachedQuote?.lastUpdatedAt ?? null);
+  const [loading, setLoading] = useState(enabled && !cachedQuote);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setPricesEur({});
+      setLastUpdatedAt(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let mounted = true;
     const controller = new AbortController();
 
@@ -21,6 +61,7 @@ export function useCryptoQuotes() {
 
         setPricesEur(quote.pricesEur);
         setLastUpdatedAt(quote.lastUpdatedAt);
+        writeCachedQuote(quote);
       } catch (err) {
         if (!mounted) return;
         if (err instanceof Error && err.name === "AbortError") return;
@@ -42,7 +83,7 @@ export function useCryptoQuotes() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, []);
+  }, [enabled]);
 
   return { pricesEur, lastUpdatedAt, loading, error };
 }

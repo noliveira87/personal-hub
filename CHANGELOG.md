@@ -9,6 +9,16 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 ### Added
 - Versioning structure with `CHANGELOG.md` and release workflow guidance.
 
+## [v1.0.5-stable] - 2026-03-28
+
+### Performance
+- Portfolio startup now hydrates critical investment data first and loads snapshots/earnings in the background to render the page faster.
+- Earnings section calculations were reduced to single-pass aggregations to improve responsiveness with larger datasets.
+- Crypto quote fetching is now conditional (only when crypto investments exist) with short session caching to reduce repeated startup latency.
+
+### Changed
+- Portfolio earnings panel now shows a local loading state while earnings hydration completes, without blocking the rest of the page.
+
 ## [v1.0.4-stable] - 2026-03-27
 
 ### Changed
@@ -54,5 +64,5 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 1. Merge validated work into `main`
 2. Deploy and confirm production is stable
 3. Update `CHANGELOG.md`
-4. Create a tag like `v1.0.3-stable`
+4. Create a tag like `v1.0.5-stable`
 5. Publish a GitHub Release using the matching changelog notes

@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Gift, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PortfolioEarning, formatCurrency, formatMonthLabel } from "@/features/portfolio/types/investment";
 
 const PAGE_SIZE = 5;
 
 interface EarningsSectionProps {
   earnings: PortfolioEarning[];
+  loading?: boolean;
   onAdd: () => void;
   onEdit: (earning: PortfolioEarning) => void;
   onDelete: (id: string) => void;
@@ -29,16 +31,52 @@ const offsetMonth = (monthKey: string, delta: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
-export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsSectionProps) {
+export function EarningsSection({ earnings, loading = false, onAdd, onEdit, onDelete }: EarningsSectionProps) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
-  const availableMonths = useMemo(() => {
-    const months = new Set(earnings.map((e) => e.date.slice(0, 7)));
-    months.add(currentMonthKey());
-    return Array.from(months).sort();
-  }, [earnings]);
+  const sortedEarnings = useMemo(
+    () => [...earnings].sort((a, b) => b.date.localeCompare(a.date)),
+    [earnings],
+  );
+
+  const earningsData = useMemo(() => {
+    const monthMap = new Map<string, PortfolioEarning[]>();
+    const months = new Set<string>([currentMonthKey()]);
+    const allTime = {
+      survey: 0,
+      social_media: 0,
+      cashback: 0,
+      dividend: 0,
+    };
+
+    for (const earning of sortedEarnings) {
+      const monthKey = earning.date.slice(0, 7);
+      months.add(monthKey);
+
+      const existing = monthMap.get(monthKey);
+      if (existing) {
+        existing.push(earning);
+      } else {
+        monthMap.set(monthKey, [earning]);
+      }
+
+      if (earning.kind === "survey") allTime.survey += earning.amountEur;
+      if (earning.kind === "social_media") allTime.social_media += earning.amountEur;
+      if (earning.kind === "cashback") allTime.cashback += earning.amountEur;
+      if (earning.kind === "dividend") allTime.dividend += earning.amountEur;
+    }
+
+    return {
+      availableMonths: Array.from(months).sort(),
+      monthMap,
+      allTime,
+    };
+  }, [sortedEarnings]);
+
+  const availableMonths = earningsData.availableMonths;
 
   const prevMonth = offsetMonth(selectedMonth, -1);
   const nextMonth = offsetMonth(selectedMonth, 1);
@@ -59,65 +97,86 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
   };
 
   const monthEarnings = useMemo(
-    () => [...earnings]
-      .filter((e) => e.date.startsWith(selectedMonth))
-      .sort((a, b) => b.date.localeCompare(a.date)),
-    [earnings, selectedMonth],
+    () => earningsData.monthMap.get(selectedMonth) ?? [],
+    [earningsData, selectedMonth],
   );
 
-  const searchableEarnings = useMemo(() => {
-    if (searchTerm.trim()) {
-      return [...earnings].sort((a, b) => b.date.localeCompare(a.date));
+  const monthStats = useMemo(() => {
+    const stats = {
+      total: 0,
+      surveyCount: 0,
+      socialMediaCount: 0,
+      cashbackCount: 0,
+      dividendCount: 0,
+      surveyTotal: 0,
+      socialMediaTotal: 0,
+      cashbackTotal: 0,
+      dividendTotal: 0,
+    };
+
+    for (const earning of monthEarnings) {
+      stats.total += earning.amountEur;
+
+      if (earning.kind === "survey") {
+        stats.surveyCount += 1;
+        stats.surveyTotal += earning.amountEur;
+      }
+
+      if (earning.kind === "social_media") {
+        stats.socialMediaCount += 1;
+        stats.socialMediaTotal += earning.amountEur;
+      }
+
+      if (earning.kind === "cashback") {
+        stats.cashbackCount += 1;
+        stats.cashbackTotal += earning.amountEur;
+      }
+
+      if (earning.kind === "dividend") {
+        stats.dividendCount += 1;
+        stats.dividendTotal += earning.amountEur;
+      }
     }
 
-    return monthEarnings;
-  }, [earnings, monthEarnings, searchTerm]);
+    return stats;
+  }, [monthEarnings]);
 
-  const filteredMonthEarnings = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return searchableEarnings;
+  const searchableEarnings = useMemo(() => {
+    const query = deferredSearchTerm.trim();
 
-    return searchableEarnings.filter((earning) => {
+    if (!query) {
+      return monthEarnings;
+    }
+
+    const normalizedQuery = query.toLowerCase();
+
+    return sortedEarnings.filter((earning) => {
       const kind = kindLabel[earning.kind] ?? earning.kind;
       const haystack = [earning.title, earning.provider, earning.notes, earning.date, kind]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      return haystack.includes(query);
+      return haystack.includes(normalizedQuery);
     });
-  }, [searchableEarnings, searchTerm]);
+  }, [deferredSearchTerm, monthEarnings, sortedEarnings]);
 
-  const monthTotal = monthEarnings.reduce((sum, e) => sum + e.amountEur, 0);
-  const monthSurveyCount = monthEarnings.filter((earning) => earning.kind === "survey").length;
-  const monthSocialMediaCount = monthEarnings.filter((earning) => earning.kind === "social_media").length;
-  const monthCashbackCount = monthEarnings.filter((earning) => earning.kind === "cashback").length;
-  const monthDividendCount = monthEarnings.filter((earning) => earning.kind === "dividend").length;
-  const monthSurveyTotal = monthEarnings
-    .filter((earning) => earning.kind === "survey")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const monthSocialMediaTotal = monthEarnings
-    .filter((earning) => earning.kind === "social_media")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const monthCashbackTotal = monthEarnings
-    .filter((earning) => earning.kind === "cashback")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const monthDividendTotal = monthEarnings
-    .filter((earning) => earning.kind === "dividend")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const filteredMonthEarnings = searchableEarnings;
 
-  const allTimeSurveyTotal = earnings
-    .filter((earning) => earning.kind === "survey")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const allTimeSocialMediaTotal = earnings
-    .filter((earning) => earning.kind === "social_media")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const allTimeCashbackTotal = earnings
-    .filter((earning) => earning.kind === "cashback")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
-  const allTimeDividendTotal = earnings
-    .filter((earning) => earning.kind === "dividend")
-    .reduce((sum, earning) => sum + earning.amountEur, 0);
+  const monthTotal = monthStats.total;
+  const monthSurveyCount = monthStats.surveyCount;
+  const monthSocialMediaCount = monthStats.socialMediaCount;
+  const monthCashbackCount = monthStats.cashbackCount;
+  const monthDividendCount = monthStats.dividendCount;
+  const monthSurveyTotal = monthStats.surveyTotal;
+  const monthSocialMediaTotal = monthStats.socialMediaTotal;
+  const monthCashbackTotal = monthStats.cashbackTotal;
+  const monthDividendTotal = monthStats.dividendTotal;
+
+  const allTimeSurveyTotal = earningsData.allTime.survey;
+  const allTimeSocialMediaTotal = earningsData.allTime.social_media;
+  const allTimeCashbackTotal = earningsData.allTime.cashback;
+  const allTimeDividendTotal = earningsData.allTime.dividend;
 
   const monthTrackedTotal = monthSurveyTotal + monthSocialMediaTotal + monthCashbackTotal + monthDividendTotal;
   const monthSurveyRatio = monthTrackedTotal > 0 ? (monthSurveyTotal / monthTrackedTotal) * 100 : 0;
@@ -215,21 +274,35 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
         </div>
       </div>
 
-      <div className="mb-5">
-        <div className="space-y-3">
-          {monthSplitRows.map((row) => (
-            <div key={`bar-${row.key}`} className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-foreground">{row.label}</span>
-                <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
+      {loading ? (
+        <div className="mb-5 space-y-4">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`earnings-loading-${index}`} className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-28" />
               </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, row.ratio)}%` }} />
-              </div>
+              <Skeleton className="h-2 w-full rounded-full" />
             </div>
           ))}
         </div>
-      </div>
+      ) : (
+        <div className="mb-5">
+          <div className="space-y-3">
+            {monthSplitRows.map((row) => (
+              <div key={`bar-${row.key}`} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-foreground">{row.label}</span>
+                  <span className="text-muted-foreground">{formatCurrency(row.value)} · {row.ratio.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(3, row.ratio)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Month navigator */}
       <div className="mb-4 flex items-center justify-between">
@@ -257,15 +330,36 @@ export function EarningsSection({ earnings, onAdd, onEdit, onDelete }: EarningsS
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search earnings across all months..."
           aria-label="Search earnings"
+          disabled={loading}
         />
         <p className="mt-2 text-xs text-muted-foreground">
-          {searchTerm.trim()
+          {loading
+            ? "Loading earnings history..."
+            : searchTerm.trim()
             ? `${filteredMonthEarnings.length} result${filteredMonthEarnings.length === 1 ? "" : "s"} across all months`
             : `${monthSurveyCount} surveys (${formatCurrency(monthSurveyTotal)}) · ${monthCashbackCount} cashback (${formatCurrency(monthCashbackTotal)})${monthSocialMediaTotal > 0 ? ` · ${monthSocialMediaCount} social media (${formatCurrency(monthSocialMediaTotal)})` : ""}${monthDividendTotal > 0 ? ` · ${monthDividendCount} dividends (${formatCurrency(monthDividendTotal)})` : ""} in ${formatMonthLabel(selectedMonth)}`}
         </p>
       </div>
 
-      {visible.length ? (
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`earning-row-skeleton-${index}`} className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : visible.length ? (
         <div className="space-y-3">
           {visible.map((earning) => (
             <div key={earning.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
