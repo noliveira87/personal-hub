@@ -5,6 +5,14 @@ echo "🚀 Starting deployment..."
 echo "📦 Pulling latest changes..."
 git pull
 
+echo "📚 Installing dependencies..."
+npm ci || npm install
+
+echo "🩹 Ensuring native optional deps (Rollup/SWC)..."
+if ! node -e "require.resolve('@rollup/rollup-linux-x64-gnu'); require.resolve('@swc/core-linux-x64-gnu')" >/dev/null 2>&1; then
+	npm i @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu --no-save
+fi
+
 echo "🔨 Building application..."
 npm run build
 
