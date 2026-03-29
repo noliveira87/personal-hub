@@ -2,14 +2,16 @@ import { Trip } from "@/features/trips/types/trip";
 import { motion } from "framer-motion";
 import { MapPin, Calendar, Plane, Hotel as HotelIcon } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
+import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 
 interface TripCardProps {
   trip: Trip;
   onClick: () => void;
   index: number;
+  prioritizeImage?: boolean;
 }
 
-export function TripCard({ trip, onClick, index }: TripCardProps) {
+export function TripCard({ trip, onClick, index, prioritizeImage = false }: TripCardProps) {
   const photos = trip.photos.slice(0, 4);
   const days = differenceInDays(new Date(trip.endDate), new Date(trip.startDate));
 
@@ -28,7 +30,15 @@ export function TripCard({ trip, onClick, index }: TripCardProps) {
           <div className="grid grid-cols-2 grid-rows-2 h-full gap-[2px]">
             {photos.map((photo, i) => (
               <div key={i} className="overflow-hidden">
-                <img src={photo} alt={`${trip.title} ${i + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" loading="lazy" />
+                <img
+                  src={optimizeTripPhotoUrl(photo, { width: 600, quality: 68 })}
+                  alt={`${trip.title} ${i + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                  loading={prioritizeImage && i === 0 ? "eager" : "lazy"}
+                  fetchPriority={prioritizeImage && i === 0 ? "high" : "low"}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  decoding="async"
+                />
               </div>
             ))}
           </div>
@@ -36,12 +46,28 @@ export function TripCard({ trip, onClick, index }: TripCardProps) {
           <div className="grid grid-cols-2 h-full gap-[2px]">
             {photos.slice(0, 2).map((photo, i) => (
               <div key={i} className="overflow-hidden">
-                <img src={photo} alt={`${trip.title} ${i + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" loading="lazy" />
+                <img
+                  src={optimizeTripPhotoUrl(photo, { width: 600, quality: 68 })}
+                  alt={`${trip.title} ${i + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                  loading={prioritizeImage && i === 0 ? "eager" : "lazy"}
+                  fetchPriority={prioritizeImage && i === 0 ? "high" : "low"}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  decoding="async"
+                />
               </div>
             ))}
           </div>
         ) : photos[0] ? (
-          <img src={photos[0]} alt={trip.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" loading="lazy" />
+          <img
+            src={optimizeTripPhotoUrl(photos[0], { width: 900, quality: 68 })}
+            alt={trip.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+            loading={prioritizeImage ? "eager" : "lazy"}
+            fetchPriority={prioritizeImage ? "high" : "low"}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            decoding="async"
+          />
         ) : (
           <div className="w-full h-full bg-secondary flex items-center justify-center">
             <MapPin className="h-10 w-10 text-muted-foreground/30" />

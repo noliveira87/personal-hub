@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trip } from "@/features/trips/types/trip";
+import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 
 interface TripDetailProps {
   trip: Trip;
@@ -97,7 +98,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                 className={`overflow-hidden rounded-xl cursor-pointer ${index === 0 ? "col-span-2 row-span-2" : ""}`}
                 onClick={() => setSelectedPhoto(index)}
               >
-                <img src={photo} alt={`${trip.title} photo ${index + 1}`} className="w-full h-full object-cover aspect-square hover:scale-105 transition-transform duration-500" />
+                <img src={optimizeTripPhotoUrl(photo, { width: index === 0 ? 1200 : 700, quality: 70 })} alt={`${trip.title} photo ${index + 1}`} className="w-full h-full object-cover aspect-square hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
               </motion.div>
             ))}
           </div>
@@ -109,9 +110,10 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           <motion.img
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            src={trip.photos[selectedPhoto]}
+            src={optimizeTripPhotoUrl(trip.photos[selectedPhoto], { width: 1800, quality: 78 })}
             alt=""
             className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            decoding="async"
           />
         </div>
       )}

@@ -1,6 +1,7 @@
 import { Calendar, Hotel, MapPin, Plane, Receipt, StickyNote, Ticket, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trip, formatTripDateRange } from "@/features/trips/types/trip";
+import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 
 interface TripDetailDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
               <h3 className="text-sm font-semibold text-foreground">Photos</h3>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {trip.photos.map((photo, index) => (
-                  <img key={`${photo}-${index}`} src={photo} alt={`${trip.title}-${index + 1}`} className="h-28 w-full rounded-xl object-cover" loading="lazy" />
+                  <img key={`${photo}-${index}`} src={optimizeTripPhotoUrl(photo, { width: 420, quality: 68 })} alt={`${trip.title}-${index + 1}`} className="h-28 w-full rounded-xl object-cover" loading="lazy" decoding="async" />
                 ))}
               </div>
             </section>

@@ -7,6 +7,7 @@ import { Header } from "@/features/trips/components/Header";
 import { TripCard } from "@/features/trips/components/TripCard";
 import { TripDetail } from "@/features/trips/components/TripDetail";
 import { TripForm } from "@/features/trips/components/TripForm";
+import { TripsWorldMap } from "@/features/trips/components/TripsWorldMap";
 import { createTrip, deleteTrip, loadTrips, updateTrip } from "@/lib/trips";
 import { Trip } from "@/features/trips/types/trip";
 import { useEffect } from "react";
@@ -93,9 +94,11 @@ export function TripsApp() {
     ));
   }, [trips, search]);
 
-  const totalTrips = trips.length;
-  const totalCountries = new Set(trips.map((trip) => trip.destination)).size;
-  const totalSpent = trips.reduce((sum, trip) => sum + trip.cost, 0);
+  const { totalTrips, totalCountries, totalSpent } = useMemo(() => ({
+    totalTrips: trips.length,
+    totalCountries: new Set(trips.map((trip) => trip.destination)).size,
+    totalSpent: trips.reduce((sum, trip) => sum + trip.cost, 0),
+  }), [trips]);
 
   const handleDelete = async (id: string) => {
     const confirmed = window.confirm("Apagar esta viagem?");
@@ -281,6 +284,23 @@ export function TripsApp() {
             </Button>
           </motion.div>
 
+          {filteredTrips.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.22, duration: 0.55 }}
+              className="mb-8"
+            >
+              <TripsWorldMap
+                trips={filteredTrips}
+                onSelectTrip={(trip) => {
+                  setSelectedTrip(trip);
+                  setView("detail");
+                }}
+              />
+            </motion.div>
+          )}
+
           <AnimatePresence mode="popLayout">
             {filteredTrips.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
@@ -289,6 +309,7 @@ export function TripsApp() {
                     key={trip.id}
                     trip={trip}
                     index={index}
+                    prioritizeImage={index < 2}
                     onClick={() => {
                       setSelectedTrip(trip);
                       setView("detail");

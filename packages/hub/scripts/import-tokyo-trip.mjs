@@ -14,7 +14,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 const desktopDir = '/Users/olivenun/Desktop';
 const BUCKET = 'trip-photos';
 
@@ -24,7 +23,7 @@ if (bucketCheckError) {
   process.exit(1);
 }
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'malta-trip-'));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tokyo-trip-'));
 
 const buildCompressedPhoto = (absolutePath, index) => {
   const outputPath = path.join(tmpDir, `photo-${index + 1}.jpg`);
@@ -37,6 +36,7 @@ const buildCompressedPhoto = (absolutePath, index) => {
       absolutePath,
       '--out', outputPath,
     ], { stdio: 'ignore' });
+
     return outputPath;
   } catch {
     return absolutePath;
@@ -53,14 +53,14 @@ const uploadPhoto = async (absolutePath, storagePath) => {
 };
 
 const photoFiles = [
-  'IMG_1272.JPG',
-  'IMG_1381.JPG',
-  'IMG_1516.JPG',
-  'IMG_1553.JPG',
-  'IMG_1573.JPG',
+  '93420898-4BD4-4202-8BB3-D1FDE8BBA37F_1_105_c.jpeg',
+  '70570A6D-A147-4A53-963D-E0BBADF7675A_1_105_c.jpeg',
+  '93264375-865B-4B48-A11E-D4A65DCA8443_1_105_c.jpeg',
+  'C7ABB23C-2FAC-4D91-A702-3E968BAA9D5A_1_105_c.jpeg',
+  'DDAC7491-751A-425D-B88C-65C526CDC633_1_105_c.jpeg',
 ];
 
-const tripId = '22222222-2222-2222-2222-222222222222';
+const tripId = '33333333-3333-3333-3333-333333333333';
 
 console.log('Compressing and uploading photos to Supabase Storage...');
 const photos = await Promise.all(photoFiles.map(async (fileName, index) => {
@@ -76,62 +76,86 @@ const photos = await Promise.all(photoFiles.map(async (fileName, index) => {
 
 const tripRow = {
   id: tripId,
-  title: 'Malta 2024',
-  destination: 'Malta',
-  start_date: '2024-04-21',
-  end_date: '2024-04-26',
-  cost: 587.22,
+  title: 'Toquio 2026',
+  destination: 'Toquio, Japao',
+  start_date: '2026-04-02',
+  end_date: '2026-04-15',
+  cost: 4812.79,
   photos,
   tickets: [],
   travel: {
     outbound: [
       {
         from: 'Porto (OPO)',
-        to: 'Malta (MLT)',
-        departure: '16h50',
-        arrival: '20h55',
-        carrier: 'Ryanair',
-        flightNumber: 'FR1510',
+        to: 'Frankfurt (FRA)',
+        departure: '06h00',
+        arrival: '09h45',
+        carrier: 'Lufthansa',
+        flightNumber: 'LH1181',
+      },
+      {
+        from: 'Frankfurt (FRA)',
+        to: 'Toquio Haneda (HND)',
+        departure: '12h10',
+        arrival: '08h10 (+1)',
+        carrier: 'Lufthansa',
+        flightNumber: 'LH4948',
       },
     ],
     returnTrip: [
       {
-        from: 'Malta (MLT)',
+        from: 'Toquio Haneda (HND)',
+        to: 'Frankfurt (FRA)',
+        departure: '21h40',
+        arrival: '05h20 (+1)',
+        carrier: 'Lufthansa',
+        flightNumber: 'LH4921',
+      },
+      {
+        from: 'Frankfurt (FRA)',
         to: 'Porto (OPO)',
-        departure: '07h00',
-        arrival: '09h20',
-        carrier: 'Ryanair',
-        flightNumber: 'FR1509',
+        departure: '09h25',
+        arrival: '11h15',
+        carrier: 'Lufthansa',
+        flightNumber: 'LH1176',
       },
     ],
-    cost: 316.72,
+    cost: 2923.67,
   },
   hotels: [
     {
-      name: 'Buccaneers Boutique Guest House',
-      checkIn: '2024-04-21',
-      checkOut: '2024-04-26',
-      cost: 250.05,
-      confirmationNumber: '3752315509',
+      name: 'B&B Hotel Porto',
+      checkIn: '2026-04-02',
+      checkOut: '2026-04-03',
+      cost: 55.93,
+      confirmationNumber: '12394852839831907011',
+    },
+    {
+      name: 'Sotetsu Fresa Inn Tokyo Roppongi',
+      checkIn: '2026-04-04',
+      checkOut: '2026-04-14',
+      cost: 1781.19,
+      confirmationNumber: '4999168895',
     },
   ],
   expenses: [
-    { label: 'Voos Ryanair (ida e volta)', amount: 316.72 },
-    { label: 'Hotel - Buccaneers Boutique Guest House', amount: 250.05 },
-    { label: 'Parking Looking4Parking', amount: 20.45 },
+    { label: 'Voos Lufthansa (ida e volta)', amount: 2923.67 },
+    { label: 'Hotel B&B Porto (1 noite)', amount: 55.93 },
+    { label: 'Hotel Sotetsu Fresa Inn Tokyo Roppongi (10 noites)', amount: 1781.19 },
+    { label: 'Parking SAFE PARKING LOW COST', amount: 52.00 },
   ],
   foods: [],
-  notes: 'Viagem a Malta de 21 a 26 de abril. Parking reservado na Looking4Parking (ref: L4P-1-5453747). Safe Parking: Av. Mario Brito 5494, 4455-494 Perafita, Portugal. Coordenadas GPS: 41.2326974977184, -8.672278317295465.',
-  tags: ['malta', 'city-break', 'couple'],
+  notes: 'Viagem ao Japao em abril de 2026. Ref cliente voos: 40-583122888 (PIN: 8848). B&B Hotel Porto PIN: 991651. Hotel Toquio PIN: 3806. Parking ref: L4P-1-6805972.',
+  tags: ['toquio', 'japao', 'city-break', 'couple'],
 };
 
-console.log('Upserting Malta trip into public.trips...');
+console.log('Upserting Tokyo trip into public.trips...');
 const { error } = await supabase
   .from('trips')
   .upsert([tripRow], { onConflict: 'id' });
 
 if (error) {
-  console.error('Failed to import Malta trip:', error);
+  console.error('Failed to import Tokyo trip:', error);
   process.exit(1);
 }
 

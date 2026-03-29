@@ -18,6 +18,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const BUCKET = 'trip-photos';
 const MIME_BY_EXT = {
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
@@ -25,11 +26,21 @@ const MIME_BY_EXT = {
   '.webp': 'image/webp',
 };
 
-const toDataUrl = (absolutePath) => {
+const { error: bucketCheckError } = await supabase.storage.from(BUCKET).list('', { limit: 1 });
+if (bucketCheckError) {
+  console.error(`Cannot access bucket "${BUCKET}". Create a PUBLIC bucket named "trip-photos" in the Supabase dashboard.`);
+  process.exit(1);
+}
+
+const uploadPhoto = async (absolutePath, storagePath) => {
   const ext = path.extname(absolutePath).toLowerCase();
-  const mimeType = MIME_BY_EXT[ext] || 'application/octet-stream';
-  const base64 = fs.readFileSync(absolutePath).toString('base64');
-  return `data:${mimeType};base64,${base64}`;
+  const mimeType = MIME_BY_EXT[ext] || 'image/jpeg';
+  const buffer = fs.readFileSync(absolutePath);
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(storagePath, buffer, { contentType: mimeType, upsert: true });
+  if (error) throw new Error(`Upload failed for ${storagePath}: ${error.message}`);
+  return supabase.storage.from(BUCKET).getPublicUrl(storagePath).data.publicUrl;
 };
 
 const photoFiles = [
@@ -39,15 +50,18 @@ const photoFiles = [
   'trip-madison-1.jpeg',
 ];
 
-const photos = photoFiles.map((fileName) => {
+const tripId = '11111111-1111-1111-1111-111111111111';
+
+console.log('Uploading photos to Supabase Storage...');
+const photos = await Promise.all(photoFiles.map(async (fileName, index) => {
   const absolutePath = path.join(assetsDir, fileName);
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Photo file not found: ${absolutePath}`);
   }
-  return toDataUrl(absolutePath);
-});
-
-const tripId = '11111111-1111-1111-1111-111111111111';
+  const url = await uploadPhoto(absolutePath, `${tripId}/photo-${index + 1}.jpg`);
+  console.log(`  ✓ photo-${index + 1}: ${url}`);
+  return url;
+}));
 
 const tripRow = {
   id: tripId,

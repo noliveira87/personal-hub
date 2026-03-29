@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Plus, Upload, X, Plane, Hotel, UtensilsCrossed, Ticket, Receipt } from "lucide-react";
 import { FlightLeg, Trip, TripExpense, TripFood, TripHotel, TripTicket } from "@/features/trips/types/trip";
 import { Header } from "@/features/trips/components/Header";
+import { supabase } from "@/lib/supabase";
 
 interface TripFormProps {
   trip?: Trip;
@@ -15,9 +16,8 @@ interface TripFormProps {
 }
 
 const MAX_IMAGE_DIMENSION = 1280;
-const MIN_IMAGE_DIMENSION = 700;
-const IMAGE_QUALITY_STEPS = [0.78, 0.62, 0.5, 0.42];
-const MAX_DATA_URL_LENGTH = 320_000;
+const IMAGE_QUALITY = 0.78;
+const STORAGE_BUCKET = "trip-photos";
 
 const readAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -33,63 +33,22 @@ const loadImageElement = (src: string): Promise<HTMLImageElement> => new Promise
   image.src = src;
 });
 
-const compressDataUrl = (image: HTMLImageElement, maxDimension: number, quality: number) => {
-  const width = image.naturalWidth;
-  const height = image.naturalHeight;
-  if (!width || !height) return "";
-
-  const scale = Math.min(1, maxDimension / Math.max(width, height));
-  const targetWidth = Math.max(1, Math.round(width * scale));
-  const targetHeight = Math.max(1, Math.round(height * scale));
-
+const compressFileToBlob = async (file: File): Promise<Blob> => {
+  const dataUrl = await readAsDataUrl(file);
+  const image = await loadImageElement(dataUrl);
+  const { naturalWidth: w, naturalHeight: h } = image;
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(w, h));
   const canvas = document.createElement("canvas");
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
-
-  const context = canvas.getContext("2d");
-  if (!context) return "";
-
-  context.drawImage(image, 0, 0, targetWidth, targetHeight);
-  return canvas.toDataURL("image/jpeg", quality);
-};
-
-const optimizeDataUrl = async (sourceDataUrl: string): Promise<string> => {
-  if (!sourceDataUrl.startsWith("data:image/")) return sourceDataUrl;
-  if (sourceDataUrl.length <= MAX_DATA_URL_LENGTH) return sourceDataUrl;
-
-  const image = await loadImageElement(sourceDataUrl);
-  let dimension = MAX_IMAGE_DIMENSION;
-  let best = sourceDataUrl;
-
-  while (dimension >= MIN_IMAGE_DIMENSION) {
-    for (const quality of IMAGE_QUALITY_STEPS) {
-      const compressed = compressDataUrl(image, dimension, quality);
-      if (!compressed) continue;
-
-      if (compressed.length < best.length) {
-        best = compressed;
-      }
-
-      if (compressed.length <= MAX_DATA_URL_LENGTH) {
-        return compressed;
-      }
-    }
-
-    dimension = Math.floor(dimension * 0.82);
-  }
-
-  return best;
-};
-
-const resizeImageFile = async (file: File): Promise<string> => {
-  const originalDataUrl = await readAsDataUrl(file);
-
-  // Skip processing for small files to keep quality high.
-  if (file.size <= 450_000) {
-    return optimizeDataUrl(originalDataUrl);
-  }
-
-  return optimizeDataUrl(originalDataUrl);
+  canvas.width = Math.max(1, Math.round(w * scale));
+  canvas.height = Math.max(1, Math.round(h * scale));
+  canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Canvas toBlob failed"))),
+      "image/jpeg",
+      IMAGE_QUALITY,
+    );
+  });
 };
 
 const emptyFlight = (): FlightLeg => ({ from: "", to: "", departure: "", arrival: "", carrier: "", flightNumber: "" });
@@ -134,6 +93,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
   const [notes, setNotes] = useState(trip?.notes || "");
   const [tags, setTags] = useState(trip?.tags.join(", ") || "");
   const [photos, setPhotos] = useState<string[]>(trip?.photos || []);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [outbound, setOutbound] = useState<FlightLeg[]>(trip?.travel?.outbound || []);
   const [returnFlights, setReturnFlights] = useState<FlightLeg[]>(trip?.travel?.returnTrip || []);
@@ -167,13 +127,25 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     const files = event.target.files;
     if (!files) return;
 
+    setIsUploading(true);
     try {
-      const resizedPhotos = await Promise.all(Array.from(files).map((file) => resizeImageFile(file)));
-      setPhotos((prev) => [...prev, ...resizedPhotos.filter(Boolean)]);
+      const urls = await Promise.all(
+        Array.from(files).map(async (file) => {
+          const blob = await compressFileToBlob(file);
+          const fileName = `${crypto.randomUUID()}.jpg`;
+          const { error } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(fileName, blob, { contentType: "image/jpeg" });
+          if (error) throw new Error(`Upload falhou: ${error.message}`);
+          return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+        }),
+      );
+      setPhotos((prev) => [...prev, ...urls]);
     } catch (error) {
-      console.error("Error processing uploaded photos:", error);
-      alert("Nao foi possivel processar uma das fotos. Tenta novamente.");
+      console.error("Error uploading photos:", error);
+      alert("Nao foi possivel fazer upload das fotos. Tenta novamente.");
     } finally {
+      setIsUploading(false);
       event.target.value = "";
     }
   };
@@ -186,11 +158,10 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     setter((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!title || !destination || !startDate || !endDate) return;
 
-    const normalizedPhotos = await Promise.all(photos.map((photo) => optimizeDataUrl(photo)));
     const totalCost = expenses.reduce((sum, item) => sum + (item.amount || 0), 0);
 
     onSave({
@@ -199,7 +170,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       startDate,
       endDate,
       cost: totalCost || 0,
-      photos: normalizedPhotos,
+      photos,
       hotels,
       foods: foods.filter((food) => food.name),
       notes,
@@ -264,10 +235,10 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
 
             <section className="space-y-3">
               <h3 className="font-display text-lg font-semibold border-b border-border pb-2">Fotos</h3>
-              <label className="flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-accent/50 hover:bg-secondary/50 transition-colors">
+              <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-accent/50 hover:bg-secondary/50 transition-colors ${isUploading ? "opacity-50 pointer-events-none" : ""}`}>
                 <Upload className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground font-body">Clica para carregar fotos</span>
-                <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                <span className="text-sm text-muted-foreground font-body">{isUploading ? "A carregar fotos..." : "Clica para carregar fotos"}</span>
+                <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={isUploading} />
               </label>
               {photos.length > 0 && (
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
@@ -407,7 +378,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
               <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl font-body flex-1 sm:flex-none sm:px-8">
                 Cancelar
               </Button>
-              <Button type="submit" className="rounded-xl bg-foreground text-background hover:bg-foreground/90 font-body flex-1 sm:flex-none sm:px-8 h-11">
+              <Button type="submit" disabled={isUploading} className="rounded-xl bg-foreground text-background hover:bg-foreground/90 font-body flex-1 sm:flex-none sm:px-8 h-11">
                 {trip ? "Guardar Alteracoes" : "Criar Viagem"}
               </Button>
             </div>

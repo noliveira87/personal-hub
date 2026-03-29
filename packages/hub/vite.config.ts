@@ -15,9 +15,10 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
-	  "@shared-ui": path.resolve(__dirname, "../libs/ui/src"),
+      "@shared-ui": path.resolve(__dirname, "../libs/ui/src"),
     },
   },
   build: {
