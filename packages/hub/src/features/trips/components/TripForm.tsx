@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Upload, X, Plane, Hotel, UtensilsCrossed, Ticket, Receipt } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Star, Upload, X, Plane, Hotel, UtensilsCrossed, Ticket, Receipt } from "lucide-react";
 import { FlightLeg, Trip, TripExpense, TripFood, TripHotel, TripTicket } from "@/features/trips/types/trip";
 import { Header } from "@/features/trips/components/Header";
 import { supabase } from "@/lib/supabase";
@@ -504,6 +504,28 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     setter((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const movePhoto = (index: number, direction: -1 | 1) => {
+    setPhotos((prev) => {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+
+      const next = [...prev];
+      const [photo] = next.splice(index, 1);
+      next.splice(targetIndex, 0, photo);
+      return next;
+    });
+  };
+
+  const setCoverPhoto = (index: number) => {
+    setPhotos((prev) => {
+      if (index <= 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [photo] = next.splice(index, 1);
+      next.unshift(photo);
+      return next;
+    });
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!title || !destination || !startDate || !endDate) return;
@@ -621,15 +643,59 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                 <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={isUploading} />
               </label>
               {photos.length > 0 && (
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                <div className="space-y-3">
+                  <p className="text-xs font-body text-muted-foreground">
+                    A primeira foto fica como capa. Usa as setas para reorganizar ou a estrela para trazer uma foto para primeiro lugar.
+                  </p>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                   {photos.map((photo, index) => (
-                    <div key={`${photo}-${index}`} className="relative aspect-square rounded-lg overflow-hidden group/photo">
-                      <img src={photo} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setPhotos((prev) => prev.filter((_, idx) => idx !== index))} className="absolute top-1 right-1 p-0.5 bg-foreground/70 rounded-full opacity-0 group-hover/photo:opacity-100 transition-opacity">
+                    <div key={`${photo}-${index}`} className="relative aspect-square overflow-hidden rounded-lg group/photo border border-border/50 bg-secondary/20">
+                      <img src={photo} alt="" className="h-full w-full object-cover" />
+                      {index === 0 && (
+                        <span className="absolute left-1 top-1 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-body font-semibold uppercase tracking-[0.12em] text-foreground shadow-sm">
+                          Capa
+                        </span>
+                      )}
+                      <div className="absolute inset-x-1 bottom-1 flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover/photo:opacity-100 group-focus-within/photo:opacity-100">
+                        <button
+                          type="button"
+                          aria-label="Mover foto para a esquerda"
+                          onClick={() => movePhoto(index, -1)}
+                          disabled={index === 0}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/88 text-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Definir como foto de capa"
+                          onClick={() => setCoverPhoto(index)}
+                          disabled={index === 0}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/88 text-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Mover foto para a direita"
+                          onClick={() => movePhoto(index, 1)}
+                          disabled={index === photos.length - 1}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/88 text-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPhotos((prev) => prev.filter((_, idx) => idx !== index))}
+                        className="absolute right-1 top-1 rounded-full bg-foreground/70 p-0.5 opacity-0 transition-opacity group-hover/photo:opacity-100"
+                        aria-label="Remover foto"
+                      >
                         <X className="h-3 w-3 text-background" />
                       </button>
                     </div>
                   ))}
+                </div>
                 </div>
               )}
             </section>
