@@ -27,7 +27,9 @@ const Section = ({
 }) => (
   <motion.section initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay }}>
     <div className="flex items-center gap-2 mb-4">
-      <Icon className="h-5 w-5 text-accent" />
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+        <Icon className="h-4 w-4" />
+      </span>
       <h2 className="font-display text-2xl font-semibold">{title}</h2>
     </div>
     {children}
@@ -35,40 +37,50 @@ const Section = ({
 );
 
 const InfoCard = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-secondary/50 rounded-2xl p-5 border border-border/50 ${className}`}>{children}</div>
+  <div className={`rounded-2xl border border-border/70 bg-secondary/65 p-5 shadow-sm ${className}`}>{children}</div>
 );
+
+const firstSentence = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(.+?[.!?])(?:\s|$)/);
+  return match ? match[1].trim() : trimmed;
+};
 
 export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const totalFromExpenses = trip.expenses?.reduce((sum, item) => sum + item.amount, 0);
-  const formatEuro = (value: number) => `${value.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€`;
+  const formatEuro = (value: number) => `${value.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
-      <div className="container mx-auto px-4 sm:px-6 py-4">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={onBack} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-            <ArrowLeft className="h-4 w-4" />Voltar
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onEdit} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-              <Pencil className="h-4 w-4" />Editar
+      <div className="sticky top-16 z-30 border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+        <div className="container mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={onBack} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
+              <ArrowLeft className="h-4 w-4" />Voltar
             </Button>
-            <Button variant="ghost" onClick={() => onDelete(trip.id)} className="gap-2 font-body text-destructive hover:text-destructive rounded-full">
-              <Trash2 className="h-4 w-4" />Apagar
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={onEdit} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
+                <Pencil className="h-4 w-4" />Editar
+              </Button>
+              <Button variant="ghost" onClick={() => onDelete(trip.id)} className="gap-2 font-body text-destructive hover:text-destructive rounded-full">
+                <Trash2 className="h-4 w-4" />Apagar
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 sm:px-6 pb-6">
+      <div className="container mx-auto px-4 sm:px-6 pt-4 pb-6">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-3">{trip.title}</h1>
           <div className="flex flex-wrap items-center gap-2.5 font-body">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/35 px-3 py-1.5 text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3 py-1.5 text-foreground/75">
               <MapPin className="h-4 w-4" />{trip.destination}
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/35 px-3 py-1.5 text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3 py-1.5 text-foreground/75">
               <Calendar className="h-4 w-4" />
               {format(new Date(trip.startDate), "MMM d")} - {format(new Date(trip.endDate), "MMM d, yyyy")}
             </span>
@@ -79,7 +91,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           {trip.tags.length > 0 && (
             <div className="flex gap-2 mt-3">
               {trip.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="rounded-full font-body font-normal">{tag}</Badge>
+                <Badge key={tag} variant="secondary" className="rounded-full bg-secondary/70 font-body font-normal text-foreground/80">{tag}</Badge>
               ))}
             </div>
           )}
@@ -122,7 +134,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
         <div className="max-w-3xl mx-auto space-y-12">
           {trip.notes && (
             <Section icon={StickyNote} title="A Nossa Historia" delay={0.25}>
-              <p className="text-muted-foreground font-body leading-relaxed text-base sm:text-lg">{trip.notes}</p>
+              <p className="font-body text-base leading-relaxed text-foreground/80 sm:text-lg">{trip.notes}</p>
             </Section>
           )}
 
@@ -130,29 +142,29 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
             <Section icon={Plane} title="Viagem" delay={0.3}>
               <div className="space-y-4">
                 <InfoCard>
-                  <p className="text-xs font-body font-semibold uppercase tracking-wider text-muted-foreground mb-3">Ida - {format(new Date(trip.startDate), "d MMM yyyy")}</p>
+                  <p className="mb-3 text-xs font-body font-semibold uppercase tracking-wider text-foreground/75">Ida - {format(new Date(trip.startDate), "d MMM yyyy")}</p>
                   <div className="space-y-2">
                     {trip.travel.outbound.map((leg, index) => (
                       <div key={`out-${index}`} className="flex items-center gap-3 text-sm font-body">
-                        <span className="text-accent font-semibold min-w-[60px]">{leg.departure}</span>
+                        <span className="min-w-[60px] font-semibold text-foreground/80">{leg.departure}</span>
                         <span className="text-foreground">{leg.from}</span>
-                        <span className="text-muted-foreground">-&gt;</span>
+                        <span className="text-foreground/70">-&gt;</span>
                         <span className="text-foreground">{leg.to}</span>
-                        <span className="text-muted-foreground text-xs ml-auto hidden sm:block">{leg.carrier}</span>
+                        <span className="ml-auto hidden text-xs text-foreground/80 sm:block">{leg.carrier}</span>
                       </div>
                     ))}
                   </div>
                 </InfoCard>
                 <InfoCard>
-                  <p className="text-xs font-body font-semibold uppercase tracking-wider text-muted-foreground mb-3">Volta - {format(new Date(trip.endDate), "d MMM yyyy")}</p>
+                  <p className="mb-3 text-xs font-body font-semibold uppercase tracking-wider text-foreground/75">Volta - {format(new Date(trip.endDate), "d MMM yyyy")}</p>
                   <div className="space-y-2">
                     {trip.travel.returnTrip.map((leg, index) => (
                       <div key={`ret-${index}`} className="flex items-center gap-3 text-sm font-body">
-                        <span className="text-accent font-semibold min-w-[60px]">{leg.departure}</span>
+                        <span className="min-w-[60px] font-semibold text-foreground/80">{leg.departure}</span>
                         <span className="text-foreground">{leg.from}</span>
-                        <span className="text-muted-foreground">-&gt;</span>
+                        <span className="text-foreground/70">-&gt;</span>
                         <span className="text-foreground">{leg.to}</span>
-                        <span className="text-muted-foreground text-xs ml-auto hidden sm:block">{leg.carrier}</span>
+                        <span className="ml-auto hidden text-xs text-foreground/80 sm:block">{leg.carrier}</span>
                       </div>
                     ))}
                   </div>
@@ -166,8 +178,8 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
               {trip.tickets.map((ticket, index) => (
                 <InfoCard key={`${ticket.name}-${index}`}>
                   <p className="font-body font-medium text-foreground">{ticket.name}</p>
-                  {ticket.venue && <p className="text-sm text-muted-foreground font-body mt-1">{ticket.venue}</p>}
-                  {ticket.address && <p className="text-xs text-muted-foreground font-body">{ticket.address}</p>}
+                  {ticket.venue && <p className="mt-1 text-sm font-body text-foreground/75">{ticket.venue}</p>}
+                  {ticket.address && <p className="text-xs font-body text-foreground/65">{ticket.address}</p>}
                   {ticket.seats && <p className="text-sm text-accent font-body mt-2">{ticket.seats}</p>}
                   {ticket.cost && <p className="text-sm font-semibold text-foreground mt-2">{formatEuro(ticket.cost)}</p>}
                 </InfoCard>
@@ -183,14 +195,24 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div>
                         <p className="font-body font-medium text-foreground">{hotel.name}</p>
-                        {hotel.address && <p className="text-sm text-muted-foreground font-body mt-0.5">{hotel.address}</p>}
+                        {hotel.address && <p className="mt-0.5 text-sm font-body text-foreground/75">{hotel.address}</p>}
+                        {hotel.link && (
+                          <a
+                            href={hotel.link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+                          >
+                            Abrir link do hotel
+                          </a>
+                        )}
                         {hotel.checkIn && hotel.checkOut && (
-                          <p className="text-sm text-muted-foreground font-body mt-1">
+                          <p className="mt-1 text-sm font-body text-foreground/70">
                             {format(new Date(hotel.checkIn), "d MMM")} - {format(new Date(hotel.checkOut), "d MMM yyyy")}
                           </p>
                         )}
-                        {hotel.phone && <p className="text-xs text-muted-foreground font-body mt-1">Tel. {hotel.phone}</p>}
-                        {hotel.confirmationNumber && <p className="text-xs text-muted-foreground font-body">Conf. #{hotel.confirmationNumber}</p>}
+                        {hotel.phone && <p className="mt-1 text-xs font-body text-foreground/65">Tel. {hotel.phone}</p>}
+                        {hotel.confirmationNumber && <p className="text-xs font-body text-foreground/65">Conf. #{hotel.confirmationNumber}</p>}
                       </div>
                       {hotel.cost && <p className="text-sm font-semibold text-foreground whitespace-nowrap">{formatEuro(hotel.cost)}</p>}
                     </div>
@@ -205,8 +227,17 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
               <div className="grid gap-3">
                 {trip.foods.map((food, index) => (
                   <InfoCard key={`${food.name}-${index}`}>
-                    <p className="font-body font-medium text-foreground">{food.name}</p>
-                    {food.description && <p className="text-sm text-muted-foreground font-body mt-1">{food.description}</p>}
+                    <div className="flex items-start gap-3">
+                      {food.image ? (
+                        <img src={food.image} alt={food.name} className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0" loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="h-14 w-14 rounded-lg border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
+                      )}
+                      <div>
+                        <p className="font-body font-medium text-foreground">{food.name}</p>
+                        {food.description && <p className="mt-1 text-sm font-body text-foreground/75">{firstSentence(food.description)}</p>}
+                      </div>
+                    </div>
                   </InfoCard>
                 ))}
               </div>
@@ -219,7 +250,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                 <div className="space-y-3">
                   {trip.expenses.map((expense, index) => (
                     <div key={`${expense.label}-${index}`} className="flex items-center justify-between text-sm font-body">
-                      <span className="text-muted-foreground">{expense.label}</span>
+                      <span className="text-foreground/75">{expense.label}</span>
                       <span className="text-foreground font-medium">{formatEuro(expense.amount)}</span>
                     </div>
                   ))}

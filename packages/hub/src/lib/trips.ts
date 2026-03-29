@@ -40,6 +40,30 @@ const parseNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toSortableDate = (value?: string) => {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+};
+
+const sortHotelsByDate = (items: TripHotel[]) => [...items].sort((left, right) => {
+  const leftCheckIn = toSortableDate(left.checkIn);
+  const rightCheckIn = toSortableDate(right.checkIn);
+
+  if (leftCheckIn !== rightCheckIn) {
+    return leftCheckIn - rightCheckIn;
+  }
+
+  const leftCheckOut = toSortableDate(left.checkOut);
+  const rightCheckOut = toSortableDate(right.checkOut);
+
+  if (leftCheckOut !== rightCheckOut) {
+    return leftCheckOut - rightCheckOut;
+  }
+
+  return left.name.localeCompare(right.name, "pt-PT");
+});
+
 const parseFlightLegs = (value: unknown): FlightLeg[] => {
   if (!Array.isArray(value)) return [];
 
@@ -59,7 +83,7 @@ const parseFlightLegs = (value: unknown): FlightLeg[] => {
 const parseHotels = (value: unknown): TripHotel[] => {
   if (!Array.isArray(value)) return [];
 
-  return value
+  return sortHotelsByDate(value
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
     .map((item) => ({
       name: String(item.name ?? "").trim(),
@@ -71,7 +95,7 @@ const parseHotels = (value: unknown): TripHotel[] => {
       confirmationNumber: item.confirmationNumber ? String(item.confirmationNumber).trim() : undefined,
       phone: item.phone ? String(item.phone).trim() : undefined,
     }))
-    .filter((item) => item.name);
+    .filter((item) => item.name));
 };
 
 const parseFoods = (value: unknown): TripFood[] => {

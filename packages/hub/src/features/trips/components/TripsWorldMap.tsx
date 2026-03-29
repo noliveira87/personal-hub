@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { geoEqualEarth, geoPath } from "d3-geo";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { geoContains, geoEqualEarth, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import worldTopology from "world-atlas/countries-110m.json";
-import { MapPin, Globe2 } from "lucide-react";
+import usStatesTopology from "us-atlas/states-10m.json";
+import { MapPin, ZoomIn, ZoomOut } from "lucide-react";
 import { Trip } from "@/features/trips/types/trip";
+import { getTripLocationSummaries } from "@/features/trips/utils/locations";
 
 type TripsWorldMapProps = {
   trips: Trip[];
@@ -11,7 +13,10 @@ type TripsWorldMapProps = {
 };
 
 type TripPoint = {
+  id: string;
   trip: Trip;
+  label: string;
+  query: string;
   lat: number;
   lng: number;
   source: "cache" | "fallback" | "geocode";
@@ -23,6 +28,7 @@ type CachedGeo = {
 };
 
 const GEO_CACHE_KEY = "trip-destination-geocode-cache-v1";
+const USA_COUNTRY_ID = "840";
 
 const DESTINATION_FALLBACKS: Array<{ regex: RegExp; lat: number; lng: number }> = [
   { regex: /madison|wisconsin/i, lat: 43.0731, lng: -89.4012 },
@@ -36,6 +42,8 @@ const DESTINATION_FALLBACKS: Array<{ regex: RegExp; lat: number; lng: number }> 
   { regex: /rome|roma/i, lat: 41.9028, lng: 12.4964 },
   { regex: /berlin/i, lat: 52.52, lng: 13.405 },
   { regex: /amsterdam/i, lat: 52.3676, lng: 4.9041 },
+  { regex: /miami|florida/i, lat: 25.7617, lng: -80.1918 },
+  { regex: /philadelphia|philly|pennsylvania|bartram/i, lat: 39.9526, lng: -75.1652 },
   { regex: /new york/i, lat: 40.7128, lng: -74.006 },
   { regex: /chicago/i, lat: 41.8781, lng: -87.6298 },
   { regex: /tokyo/i, lat: 35.6762, lng: 139.6503 },
@@ -71,6 +79,26 @@ const findFallback = (destination: string): CachedGeo | null => {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let labelMeasureContext: CanvasRenderingContext2D | null | undefined;
+
+const measureHoverLabelWidth = (label: string): number => {
+  if (typeof document === "undefined") {
+    return Math.max(80, label.length * 7);
+  }
+
+  if (labelMeasureContext === undefined) {
+    const canvas = document.createElement("canvas");
+    labelMeasureContext = canvas.getContext("2d");
+  }
+
+  if (!labelMeasureContext) {
+    return Math.max(80, label.length * 7);
+  }
+
+  labelMeasureContext.font = "12px system-ui, sans-serif";
+  return Math.ceil(labelMeasureContext.measureText(label).width + 18);
+};
+
 const geocodeDestination = async (destination: string): Promise<CachedGeo | null> => {
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(destination)}`;
 
@@ -98,9 +126,22 @@ const geocodeDestination = async (destination: string): Promise<CachedGeo | null
 };
 
 export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
-  const [pointsByTrip, setPointsByTrip] = useState<Record<string, TripPoint>>({});
+  const [pointsById, setPointsById] = useState<Record<string, TripPoint>>({});
   const [loading, setLoading] = useState(false);
-  const [hoveredTripId, setHoveredTripId] = useState<string | null>(null);
+  const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
 
   const worldGeo = useMemo(() => {
     const topology = worldTopology as unknown as {
@@ -111,23 +152,34 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     return feature(topology as never, topology.objects.countries as never);
   }, []);
 
+  const usStatesGeo = useMemo(() => {
+    const topology = usStatesTopology as unknown as {
+      objects?: { states?: unknown };
+    };
+    if (!topology.objects?.states) return null;
+
+    return feature(topology as never, topology.objects.states as never);
+  }, []);
+
   const pathGenerator = useMemo(() => {
     if (!worldGeo) return null;
     const projection = geoEqualEarth().fitExtent([[10, 12], [990, 488]], worldGeo as never);
     return geoPath(projection);
   }, [worldGeo]);
 
-  const destinations = useMemo(() => {
-    const unique = new Set(trips.map((trip) => trip.destination.trim()).filter(Boolean));
+  const tripLocations = useMemo(() => getTripLocationSummaries(trips), [trips]);
+
+  const locationQueries = useMemo(() => {
+    const unique = new Set(tripLocations.map((location) => location.query.trim()).filter(Boolean));
     return Array.from(unique);
-  }, [trips]);
+  }, [tripLocations]);
 
   useEffect(() => {
     let cancelled = false;
 
     const resolveDestinations = async () => {
       if (!trips.length) {
-        setPointsByTrip({});
+        setPointsById({});
         return;
       }
 
@@ -135,7 +187,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
       const destinationCoords: Record<string, { lat: number; lng: number; source: TripPoint["source"] }> = {};
       const unresolved: string[] = [];
 
-      destinations.forEach((destination) => {
+      locationQueries.forEach((destination) => {
         if (cache[destination]) {
           destinationCoords[destination] = { ...cache[destination], source: "cache" };
           return;
@@ -151,17 +203,20 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
       });
 
       const firstPass: Record<string, TripPoint> = {};
-      trips.forEach((trip) => {
-        const resolved = destinationCoords[trip.destination];
+      tripLocations.forEach((location) => {
+        const resolved = destinationCoords[location.query];
         if (!resolved) return;
-        firstPass[trip.id] = {
-          trip,
+        firstPass[location.id] = {
+          id: location.id,
+          trip: location.trip,
+          label: location.label,
+          query: location.query,
           lat: resolved.lat,
           lng: resolved.lng,
           source: resolved.source,
         };
       });
-      setPointsByTrip(firstPass);
+      setPointsById(firstPass);
 
       if (!unresolved.length) return;
 
@@ -182,17 +237,20 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
       if (cancelled) return;
 
       const finalPass: Record<string, TripPoint> = {};
-      trips.forEach((trip) => {
-        const resolved = destinationCoords[trip.destination];
+      tripLocations.forEach((location) => {
+        const resolved = destinationCoords[location.query];
         if (!resolved) return;
-        finalPass[trip.id] = {
-          trip,
+        finalPass[location.id] = {
+          id: location.id,
+          trip: location.trip,
+          label: location.label,
+          query: location.query,
           lat: resolved.lat,
           lng: resolved.lng,
           source: resolved.source,
         };
       });
-      setPointsByTrip(finalPass);
+      setPointsById(finalPass);
       setLoading(false);
     };
 
@@ -201,10 +259,10 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     return () => {
       cancelled = true;
     };
-  }, [destinations, trips]);
+  }, [locationQueries, tripLocations, trips]);
 
-  const points = useMemo(() => Object.values(pointsByTrip), [pointsByTrip]);
-  const unresolvedCount = trips.length - points.length;
+  const points = useMemo(() => Object.values(pointsById), [pointsById]);
+  const unresolvedCount = tripLocations.length - points.length;
   const mapFeatures = useMemo(() => {
     if (!worldGeo || !("features" in worldGeo) || !Array.isArray(worldGeo.features)) {
       return [] as Array<{ d: string; id: string }>;
@@ -219,6 +277,57 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
       }))
       .filter((item) => item.d);
   }, [pathGenerator, worldGeo]);
+
+  const usStateFeatures = useMemo(() => {
+    if (!usStatesGeo || !("features" in usStatesGeo) || !Array.isArray(usStatesGeo.features)) {
+      return [] as Array<{ d: string; id: string }>;
+    }
+
+    if (!pathGenerator) return [] as Array<{ d: string; id: string }>;
+
+    return usStatesGeo.features
+      .map((geo, index) => ({
+        d: pathGenerator(geo as never) ?? "",
+        id: String((geo as { id?: string | number }).id ?? index),
+      }))
+      .filter((item) => item.d);
+  }, [pathGenerator, usStatesGeo]);
+
+  const visitedCountryIds = useMemo(() => {
+    if (!worldGeo || !("features" in worldGeo) || !Array.isArray(worldGeo.features)) {
+      return new Set<string>();
+    }
+
+    const ids = new Set<string>();
+
+    worldGeo.features.forEach((geo, index) => {
+      const id = String((geo as { id?: string | number }).id ?? index);
+      const visited = points.some((point) => geoContains(geo as never, [point.lng, point.lat]));
+      if (visited) {
+        ids.add(id);
+      }
+    });
+
+    return ids;
+  }, [points, worldGeo]);
+
+  const visitedUsStateIds = useMemo(() => {
+    if (!usStatesGeo || !("features" in usStatesGeo) || !Array.isArray(usStatesGeo.features)) {
+      return new Set<string>();
+    }
+
+    const ids = new Set<string>();
+
+    usStatesGeo.features.forEach((geo, index) => {
+      const id = String((geo as { id?: string | number }).id ?? index);
+      const visited = points.some((point) => geoContains(geo as never, [point.lng, point.lat]));
+      if (visited) {
+        ids.add(id);
+      }
+    });
+
+    return ids;
+  }, [points, usStatesGeo]);
 
   const projectedPoints = useMemo(() => {
     if (!pathGenerator?.projection()) return [] as Array<{ point: TripPoint; x: number; y: number }>;
@@ -238,10 +347,150 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
   }, [pathGenerator, points]);
 
   const hoveredPoint = useMemo(
-    () => projectedPoints.find(({ point }) => point.trip.id === hoveredTripId) ?? null,
-    [hoveredTripId, projectedPoints],
+    () => projectedPoints.find(({ point }) => point.id === hoveredPointId) ?? null,
+    [hoveredPointId, projectedPoints],
   );
-  const hoveredLabelWidth = hoveredPoint ? Math.max(88, hoveredPoint.point.trip.destination.length * 7 + 18) : 0;
+  const hoveredLabelWidth = hoveredPoint ? measureHoverLabelWidth(hoveredPoint.point.label) : 0;
+
+  const getPanBounds = (currentZoom: number) => ({
+    x: Math.max(0, ((1000 * currentZoom) - 1000) / 2),
+    y: Math.max(0, ((500 * currentZoom) - 500) / 2),
+  });
+
+  const clampPan = (nextPan: { x: number; y: number }, nextZoom: number) => {
+    const bounds = getPanBounds(nextZoom);
+    return {
+      x: Math.max(-bounds.x, Math.min(bounds.x, nextPan.x)),
+      y: Math.max(-bounds.y, Math.min(bounds.y, nextPan.y)),
+    };
+  };
+
+  const zoomTransform = `translate(${pan.x} ${pan.y}) translate(${500 - 500 * zoom} ${250 - 250 * zoom}) scale(${zoom})`;
+  // Pins shrink slightly as zoom increases, so dense areas stay readable.
+  const pinScale = Number((0.9 / Math.pow(zoom, 1.2)).toFixed(4));
+
+  const applyZoomDelta = (delta: number) => {
+    setZoom((current) => {
+      const nextZoom = Math.min(3, Math.max(1, Number((current + delta).toFixed(2))));
+      setPan((currentPan) => clampPan(currentPan, nextZoom));
+      return nextZoom;
+    });
+  };
+
+  const handleWheelZoom = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    if (event.ctrlKey || event.metaKey) {
+      applyZoomDelta(event.deltaY < 0 ? 0.18 : -0.18);
+      return;
+    }
+
+    if (zoom <= 1) return;
+
+    setPan((current) => clampPan({
+      x: current.x - event.deltaX,
+      y: current.y - event.deltaY,
+    }, zoom));
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const endDrag = () => {
+    dragStateRef.current = null;
+    setIsDragging(false);
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (zoom <= 1 || event.button !== 0) return;
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: pan.x,
+      originY: pan.y,
+      moved: false,
+    };
+    suppressClickRef.current = false;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+    const moved = Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3;
+
+    if (moved) {
+      dragState.moved = true;
+      suppressClickRef.current = true;
+    }
+
+    setPan(clampPan({
+      x: dragState.originX + deltaX,
+      y: dragState.originY + deltaY,
+    }, zoom));
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    endDrag();
+
+    if (dragState.moved) {
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+  };
+
+  const handlePointerCancel = (event: React.PointerEvent<SVGSVGElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    suppressClickRef.current = false;
+    endDrag();
+  };
+
+  useEffect(() => {
+    if (zoom === 1 && (pan.x !== 0 || pan.y !== 0)) {
+      setPan({ x: 0, y: 0 });
+    }
+  }, [pan.x, pan.y, zoom]);
+
+  const mapInteractionHint = zoom > 1
+    ? "Pinch para zoom. Clica e arrasta para deslocar o mapa."
+    : "Pinch para fazer zoom no mapa.";
+
+  const isDarkTheme = typeof document !== "undefined"
+    && document.documentElement.classList.contains("dark");
+  const visitedCountryFill = isDarkTheme
+    ? "rgba(239, 68, 68, 0.28)"
+    : "rgba(239, 68, 68, 0.16)";
+  const visitedCountryStroke = isDarkTheme
+    ? "rgba(248, 113, 113, 0.96)"
+    : "rgba(220, 38, 38, 0.88)";
+
+  const handleWheelCapture = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey || zoom > 1) {
+      handleWheelZoom(event);
+    }
+  };
 
   return (
     <div className="rounded-3xl border border-border/60 bg-gradient-to-b from-secondary/40 to-background p-4 sm:p-5 lg:p-6 shadow-sm">
@@ -250,111 +499,154 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
           <p className="text-xs font-body uppercase tracking-[0.14em] text-muted-foreground">Mapa de Viagens</p>
           <h3 className="font-display text-xl sm:text-2xl text-foreground">Pegadas pelo mundo</h3>
         </div>
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-body text-muted-foreground bg-background/70">
-          <MapPin className="h-3.5 w-3.5" />
-          <span>{points.length} pins</span>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 p-1 text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => applyZoomDelta(-0.2)}
+              disabled={zoom <= 1}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Diminuir zoom do mapa"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={resetView}
+              disabled={zoom === 1 && pan.x === 0 && pan.y === 0}
+              className="rounded-full px-2 py-1 text-[11px] font-body hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => applyZoomDelta(0.2)}
+              disabled={zoom >= 3}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Aumentar zoom do mapa"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-body text-muted-foreground bg-background/70">
+            <MapPin className="h-3.5 w-3.5" />
+            <span>{points.length} pins</span>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border/50 bg-background/70 p-2 sm:p-3">
-        <svg viewBox="0 0 1000 500" className="w-full h-auto" role="img" aria-label="Mapa do mundo com pins de viagens">
+      <div onWheel={handleWheelCapture} className="rounded-2xl border border-border/50 bg-background/70 p-2 sm:p-3 overflow-hidden">
+        <svg
+          ref={svgRef}
+          viewBox="0 0 1000 500"
+          className="h-auto w-full touch-none select-none"
+          style={{ cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default" }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          role="img"
+          aria-label="Mapa do mundo com pins de viagens"
+        >
           <rect x="0" y="0" width="1000" height="500" fill="hsl(var(--background))" />
-          {mapFeatures.map((country) => (
-            <path
-              key={country.id}
-              d={country.d}
-              fill="hsl(var(--secondary))"
-              stroke="hsl(var(--border))"
-              strokeWidth="0.5"
-            />
-          ))}
+          <g transform={zoomTransform} style={{ transition: "transform 180ms ease" }}>
+            {mapFeatures.map((country) => (
+              <path
+                key={country.id}
+                d={country.d}
+                fill={visitedCountryIds.has(country.id) && country.id !== USA_COUNTRY_ID ? visitedCountryFill : "hsl(var(--secondary))"}
+                stroke={visitedCountryIds.has(country.id) && country.id !== USA_COUNTRY_ID ? visitedCountryStroke : "hsl(var(--border))"}
+                strokeWidth={visitedCountryIds.has(country.id) && country.id !== USA_COUNTRY_ID ? "1" : "0.5"}
+              />
+            ))}
 
-          {projectedPoints.map(({ point, x, y }) => (
-            <g
-              key={point.trip.id}
-              transform={`translate(${x}, ${y})`}
-              onClick={() => onSelectTrip?.(point.trip)}
-              onMouseEnter={() => setHoveredTripId(point.trip.id)}
-              onMouseLeave={() => setHoveredTripId((prev) => (prev === point.trip.id ? null : prev))}
-              style={{
-                cursor: onSelectTrip ? "pointer" : "default",
-                transition: "transform 160ms ease",
-              }}
-            >
-              <title>{point.trip.destination}</title>
-              <circle
-                r={hoveredTripId === point.trip.id ? "17" : "13"}
-                fill="hsl(var(--accent) / 0.22)"
-                style={{ transition: "r 160ms ease" }}
-              />
-              <circle
-                r={hoveredTripId === point.trip.id ? "9.8" : "8.2"}
-                fill="#ef4444"
-                stroke="hsl(var(--background))"
-                strokeWidth={hoveredTripId === point.trip.id ? "3.4" : "2.8"}
-                style={{ transition: "r 160ms ease, stroke-width 160ms ease" }}
-              />
-              <circle
-                r={hoveredTripId === point.trip.id ? "3.6" : "3.1"}
-                fill="hsl(var(--background))"
-                style={{ transition: "r 160ms ease" }}
-              />
-            </g>
-          ))}
+            {usStateFeatures.map((state) => {
+              if (!visitedUsStateIds.has(state.id)) return null;
 
-          {hoveredPoint && (
-            <g
-              transform={`translate(${hoveredPoint.x + 12}, ${hoveredPoint.y - 30})`}
-              style={{ pointerEvents: "none" }}
-            >
-              <rect
-                x="0"
-                y="0"
-                rx="8"
-                ry="8"
-                width={hoveredLabelWidth}
-                height="24"
-                fill="hsl(var(--foreground))"
-                opacity="0.95"
-              />
-              <text
-                x="9"
-                y="16"
-                fill="hsl(var(--background))"
-                fontSize="12"
-                fontFamily="system-ui, sans-serif"
+              return (
+                <path
+                  key={`us-state-${state.id}`}
+                  d={state.d}
+                  fill={visitedCountryFill}
+                  stroke={visitedCountryStroke}
+                  strokeWidth="0.9"
+                />
+              );
+            })}
+
+            {projectedPoints.map(({ point, x, y }) => (
+              <g
+                key={point.id}
+                transform={`translate(${x}, ${y}) scale(${pinScale})`}
+                onClick={() => {
+                  if (suppressClickRef.current) return;
+                  onSelectTrip?.(point.trip);
+                }}
+                onMouseEnter={() => setHoveredPointId(point.id)}
+                onMouseLeave={() => setHoveredPointId((prev) => (prev === point.id ? null : prev))}
+                style={{
+                  cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : (onSelectTrip ? "pointer" : "default"),
+                  transition: "transform 160ms ease",
+                }}
               >
-                {hoveredPoint.point.trip.destination}
-              </text>
-            </g>
-          )}
+                <title>{point.label}</title>
+                <circle
+                  r={hoveredPointId === point.id ? "15" : "12"}
+                  fill="hsl(var(--accent) / 0.22)"
+                  style={{ transition: "r 160ms ease" }}
+                />
+                <circle
+                  r={hoveredPointId === point.id ? "9.6" : "8"}
+                  fill="#ef4444"
+                  stroke="hsl(var(--background))"
+                  strokeWidth={hoveredPointId === point.id ? "3.2" : "2.8"}
+                  style={{ transition: "r 160ms ease, stroke-width 160ms ease" }}
+                />
+                <circle
+                  r={hoveredPointId === point.id ? "3.4" : "2.9"}
+                  fill="hsl(var(--background))"
+                  style={{ transition: "r 160ms ease" }}
+                />
+              </g>
+            ))}
+
+            {hoveredPoint && (
+              <g
+                transform={`translate(${hoveredPoint.x + 12}, ${hoveredPoint.y - 30}) scale(${pinScale})`}
+                style={{ pointerEvents: "none" }}
+              >
+                <rect
+                  x="0"
+                  y="0"
+                  rx="8"
+                  ry="8"
+                  width={hoveredLabelWidth}
+                  height="24"
+                  fill="hsl(var(--foreground))"
+                  opacity="0.95"
+                />
+                <text
+                  x="9"
+                  y="16"
+                  fill="hsl(var(--background))"
+                  fontSize="12"
+                  fontFamily="system-ui, sans-serif"
+                >
+                  {hoveredPoint.point.label}
+                </text>
+              </g>
+            )}
+          </g>
         </svg>
       </div>
 
-      <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-1 text-[11px] font-body text-muted-foreground">
-        <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" aria-hidden="true" />
-        <span>Pin vermelho = destino visitado</span>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {points.slice(0, 12).map((point) => (
-          <button
-            key={`chip-${point.trip.id}`}
-            type="button"
-            onClick={() => onSelectTrip?.(point.trip)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-body text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Globe2 className="h-3.5 w-3.5" />
-            <span>{point.trip.destination}</span>
-          </button>
-        ))}
-      </div>
+      <p className="mt-2 text-[11px] font-body text-muted-foreground">{mapInteractionHint}</p>
 
       {(loading || unresolvedCount > 0) && (
         <p className="mt-3 text-xs font-body text-muted-foreground">
           {loading
             ? "A localizar destinos no mapa..."
-            : `${unresolvedCount} ${unresolvedCount === 1 ? "viagem ainda sem pin" : "viagens ainda sem pin"}`}
+            : `${unresolvedCount} ${unresolvedCount === 1 ? "destino ainda sem pin" : "destinos ainda sem pin"}`}
         </p>
       )}
     </div>

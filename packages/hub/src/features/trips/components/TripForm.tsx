@@ -52,10 +52,317 @@ const compressFileToBlob = async (file: File): Promise<Blob> => {
 };
 
 const emptyFlight = (): FlightLeg => ({ from: "", to: "", departure: "", arrival: "", carrier: "", flightNumber: "" });
-const emptyHotel = (): TripHotel => ({ name: "", address: "", checkIn: "", checkOut: "", cost: 0, phone: "", confirmationNumber: "" });
+const emptyHotel = (): TripHotel => ({ name: "", link: "", address: "", checkIn: "", checkOut: "", cost: 0, phone: "", confirmationNumber: "" });
 const emptyFood = (): TripFood => ({ name: "", description: "" });
 const emptyTicket = (): TripTicket => ({ name: "", venue: "", address: "", seats: "", cost: 0 });
 const emptyExpense = (): TripExpense => ({ label: "", amount: 0 });
+
+const normalizeHotelKey = (value: string) => value.trim().toLowerCase();
+
+const KNOWN_HOTEL_ADDRESS_FALLBACKS: Record<string, string> = {
+  [normalizeHotelKey("Guest House Guerra Junqueiro")]: "Lisboa, Portugal",
+  [normalizeHotelKey("La Quinta by Wyndham Madison American Center")]: "5217 East Terrace Drive, Madison, WI 53718, United States",
+};
+
+const toSortableDate = (value?: string) => {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+};
+
+const sortHotelsByDate = (items: TripHotel[]) => [...items].sort((left, right) => {
+  const leftCheckIn = toSortableDate(left.checkIn);
+  const rightCheckIn = toSortableDate(right.checkIn);
+
+  if (leftCheckIn !== rightCheckIn) {
+    return leftCheckIn - rightCheckIn;
+  }
+
+  const leftCheckOut = toSortableDate(left.checkOut);
+  const rightCheckOut = toSortableDate(right.checkOut);
+
+  if (leftCheckOut !== rightCheckOut) {
+    return leftCheckOut - rightCheckOut;
+  }
+
+  return left.name.localeCompare(right.name, "pt-PT");
+});
+
+const isHotelDraft = (hotel: TripHotel) => !hotel.checkIn?.trim() && !hotel.checkOut?.trim();
+
+const sortHotelsForForm = (items: TripHotel[]) => {
+  const drafts = items.filter(isHotelDraft);
+  const scheduled = items.filter((hotel) => !isHotelDraft(hotel));
+  return [...drafts, ...sortHotelsByDate(scheduled)];
+};
+
+type PhotonFeature = {
+  properties?: {
+    name?: string;
+    street?: string;
+    housenumber?: string;
+    postcode?: string;
+    city?: string;
+    locality?: string;
+    suburb?: string;
+    district?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+  };
+};
+
+const normalizeExpenseLabel = (value: string) => value.trim().toLowerCase();
+
+const buildHotelExpenseLabel = (hotelName: string) => `Hotel - ${hotelName.trim()}`;
+
+const isHotelLinkedExpense = (expense: TripExpense, hotels: TripHotel[]) => {
+  const normalizedLabel = normalizeExpenseLabel(expense.label);
+  if (!normalizedLabel) return false;
+
+  return hotels.some((hotel) => {
+    const normalizedHotelName = hotel.name.trim().toLowerCase();
+    if (!normalizedHotelName) return false;
+
+    return normalizedLabel === normalizedHotelName
+      || normalizedLabel === normalizeExpenseLabel(buildHotelExpenseLabel(hotel.name))
+      || normalizedLabel.includes(normalizedHotelName);
+  });
+};
+
+const buildMergedExpenses = (expenses: TripExpense[], hotels: TripHotel[]) => {
+  const manualExpenses = expenses
+    .filter((expense) => expense.label.trim())
+    .filter((expense) => !isHotelLinkedExpense(expense, hotels));
+
+  const hotelExpenses = hotels
+    .filter((hotel) => hotel.name.trim() && Number(hotel.cost) > 0)
+    .map((hotel) => ({
+      label: buildHotelExpenseLabel(hotel.name),
+      amount: Number(hotel.cost) || 0,
+    }));
+
+  return [...manualExpenses, ...hotelExpenses];
+};
+
+const buildHotelLookupQuery = (hotel: TripHotel, tripDestination: string) => {
+  const parts = [hotel.name, hotel.address, tripDestination]
+    .map((value) => value?.trim())
+    .filter(Boolean);
+
+  return parts.join(", ");
+};
+
+const buildHotelMapLink = (hotel: TripHotel, tripDestination: string) => {
+  const query = buildHotelLookupQuery(hotel, tripDestination);
+  return query
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+    : hotel.link || "";
+};
+
+const firstSentence = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(.+?[.!?])(?:\s|$)/);
+  return match ? match[1].trim() : trimmed;
+};
+
+const normalizeFoodTitle = (value: string) => value
+  .replace(/\s+/g, " ")
+  .trim();
+
+const CURATED_FOOD_DESCRIPTIONS: Record<string, string> = {
+  cheesesteak: "A hot sandwich with thinly sliced beef and melted cheese, iconic street food.",
+  "new york pizza": "Thin, foldable slices with tomato sauce and cheese, classic NYC style.",
+  pizza: "Thin-crust pizza baked hot, a classic comfort-food favorite.",
+  ramen: "Rich broth with noodles and warm toppings, deeply comforting.",
+  sushi: "Seasoned rice with fresh fish and delicate flavor combinations.",
+  tacos: "Soft or crisp tortillas with bold fillings and fresh toppings.",
+  burger: "A juicy burger with toasted bun and well-balanced toppings.",
+};
+
+const SUMMARY_BLOCKLIST = [
+  "fast-food chain",
+  "restaurant chain",
+  "company",
+  "brand",
+  "founded in",
+  "headquartered",
+  "is a dutch",
+  "is an american company",
+];
+
+const SUMMARY_ALLOWLIST = [
+  "dish",
+  "food",
+  "sandwich",
+  "pizza",
+  "cuisine",
+  "noodle",
+  "soup",
+  "dessert",
+  "street food",
+];
+
+const getCuratedFoodDescription = (foodName: string): string | null => {
+  const normalized = normalizeFoodTitle(foodName).toLowerCase();
+  if (!normalized) return null;
+
+  const exact = CURATED_FOOD_DESCRIPTIONS[normalized];
+  if (exact) return exact;
+
+  const partial = Object.entries(CURATED_FOOD_DESCRIPTIONS)
+    .find(([key]) => normalized.includes(key));
+  return partial ? partial[1] : null;
+};
+
+const isFoodSummaryRelevant = (summary: string, foodName: string) => {
+  const normalizedSummary = summary.toLowerCase();
+  const normalizedFood = normalizeFoodTitle(foodName).toLowerCase();
+
+  const hasBlockedTerm = SUMMARY_BLOCKLIST.some((term) => normalizedSummary.includes(term));
+  const hasAllowedTerm = SUMMARY_ALLOWLIST.some((term) => normalizedSummary.includes(term));
+  const hasFoodKeyword = normalizedFood
+    .split(" ")
+    .filter((token) => token.length >= 4)
+    .some((token) => normalizedSummary.includes(token));
+
+  if (hasBlockedTerm && !hasAllowedTerm) return false;
+  return hasAllowedTerm || hasFoodKeyword;
+};
+
+const fetchFoodDescription = async (foodName: string): Promise<string | null> => {
+  const normalizedName = normalizeFoodTitle(foodName);
+  if (!normalizedName) return null;
+
+  const curated = getCuratedFoodDescription(normalizedName);
+  if (curated) return curated;
+
+  const candidates = [
+    `${normalizedName} dish`,
+    `${normalizedName} food`,
+    normalizedName,
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(candidate)}`);
+      if (!response.ok) continue;
+
+      const payload = await response.json() as { extract?: string; type?: string };
+      if (payload.type === "disambiguation") continue;
+      const extract = payload.extract?.trim();
+      if (!extract) continue;
+
+      const sentence = firstSentence(extract);
+      if (!sentence || !isFoodSummaryRelevant(sentence, normalizedName)) continue;
+      return sentence;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return null;
+};
+
+const enrichFood = async (food: TripFood, destination: string): Promise<TripFood> => {
+  const name = food.name?.trim();
+  if (!name) return food;
+  if (food.description?.trim()) return food;
+
+  const fetchedDescription = await fetchFoodDescription(name);
+  const fallbackDescription = `A local favorite enjoyed in ${destination}.`;
+
+  return {
+    ...food,
+    description: fetchedDescription || fallbackDescription,
+  };
+};
+
+const enrichFoods = async (foods: TripFood[], destination: string) => Promise.all(
+  foods.map((food) => enrichFood(food, destination)),
+);
+
+const hasUsableGoogleMapsQuery = (link?: string) => {
+  const normalized = link?.trim();
+  if (!normalized) return false;
+
+  try {
+    const parsed = new URL(normalized);
+    const q = parsed.searchParams.get("query")?.trim();
+    return Boolean(q);
+  } catch {
+    return normalized.includes("query=") ? !/query=\s*$/.test(normalized) : true;
+  }
+};
+
+const formatPhotonAddress = (feature: PhotonFeature): string => {
+  const properties = feature.properties ?? {};
+  const streetLine = [properties.street, properties.housenumber].filter(Boolean).join(" ").trim();
+  const cityLike = properties.city ?? properties.locality ?? properties.suburb ?? properties.district ?? properties.county;
+  const locality = [properties.postcode, cityLike].filter(Boolean).join(" ").trim();
+  const region = [properties.state, properties.country].filter(Boolean).join(", ").trim();
+  const fallbackName = properties.name?.trim() || "";
+
+  return [streetLine, locality, region, fallbackName].filter(Boolean).join(", ").trim();
+};
+
+const enrichHotel = async (hotel: TripHotel, tripDestination: string): Promise<TripHotel> => {
+  const normalizedName = hotel.name.trim();
+  if (!normalizedName) return hotel;
+
+  const normalizedHotelKey = normalizeHotelKey(normalizedName);
+  const knownAddressFallback = KNOWN_HOTEL_ADDRESS_FALLBACKS[normalizedHotelKey];
+  const fallbackLink = hasUsableGoogleMapsQuery(hotel.link)
+    ? (hotel.link?.trim() || "")
+    : buildHotelMapLink(hotel, tripDestination);
+  const needsAddress = !hotel.address?.trim();
+  const needsLink = !hotel.link?.trim();
+
+  if (!needsAddress && !needsLink) {
+    return hotel;
+  }
+
+  let resolvedAddress = "";
+
+  const queries = [
+    normalizedName,
+    `${normalizedName}, ${tripDestination}`,
+    buildHotelLookupQuery(hotel, tripDestination),
+  ]
+    .map((value) => value?.trim())
+    .filter((value, index, all) => Boolean(value) && all.indexOf(value) === index) as string[];
+
+  for (const query of queries) {
+    try {
+      const response = await fetch(`https://photon.komoot.io/api/?limit=1&q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const payload = await response.json() as { features?: PhotonFeature[] };
+        const firstMatch = payload.features?.[0];
+        if (firstMatch && !resolvedAddress) {
+          resolvedAddress = formatPhotonAddress(firstMatch);
+          if (resolvedAddress) break;
+        }
+      }
+    } catch {
+      // Continue
+    }
+
+    // Small delay between requests
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  return {
+    ...hotel,
+    address: hotel.address?.trim() || resolvedAddress || knownAddressFallback || hotel.address,
+    link: fallbackLink || hotel.link,
+  };
+};
+
+const enrichHotels = async (hotels: TripHotel[], tripDestination: string) => Promise.all(
+  hotels.map((hotel) => enrichHotel(hotel, tripDestination)),
+);
 
 const SectionHeader = ({
   icon: Icon,
@@ -94,15 +401,19 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
   const [tags, setTags] = useState(trip?.tags.join(", ") || "");
   const [photos, setPhotos] = useState<string[]>(trip?.photos || []);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingFoodThumb, setIsUploadingFoodThumb] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   const [outbound, setOutbound] = useState<FlightLeg[]>(trip?.travel?.outbound || []);
   const [returnFlights, setReturnFlights] = useState<FlightLeg[]>(trip?.travel?.returnTrip || []);
   const [travelCost, setTravelCost] = useState(trip?.travel?.cost?.toString() || "");
 
-  const [hotels, setHotels] = useState<TripHotel[]>(trip?.hotels || []);
+  const [hotels, setHotels] = useState<TripHotel[]>(sortHotelsForForm(trip?.hotels || []));
   const [foods, setFoods] = useState<TripFood[]>(trip?.foods || []);
   const [tickets, setTickets] = useState<TripTicket[]>(trip?.tickets || []);
-  const [expenses, setExpenses] = useState<TripExpense[]>(trip?.expenses || []);
+  const [expenses, setExpenses] = useState<TripExpense[]>(
+    (trip?.expenses || []).filter((expense) => !isHotelLinkedExpense(expense, trip?.hotels || [])),
+  );
 
   useEffect(() => {
     setTitle(trip?.title || "");
@@ -117,11 +428,13 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     setReturnFlights(trip?.travel?.returnTrip || []);
     setTravelCost(trip?.travel?.cost?.toString() || "");
 
-    setHotels(trip?.hotels || []);
+    setHotels(sortHotelsForForm(trip?.hotels || []));
     setFoods(trip?.foods || []);
     setTickets(trip?.tickets || []);
-    setExpenses(trip?.expenses || []);
+    setExpenses((trip?.expenses || []).filter((expense) => !isHotelLinkedExpense(expense, trip?.hotels || [])));
   }, [trip]);
+
+  const mergedExpenses = buildMergedExpenses(expenses, hotels);
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -150,29 +463,72 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
     }
   };
 
+  const handleFoodThumbnailUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingFoodThumb(true);
+    try {
+      const blob = await compressFileToBlob(file);
+      const fileName = `foods/${crypto.randomUUID()}.jpg`;
+      const { error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(fileName, blob, { contentType: "image/jpeg", upsert: true });
+      if (error) throw new Error(`Upload falhou: ${error.message}`);
+      const imageUrl = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName).data.publicUrl;
+
+      setFoods((prev) => prev.map((food, i) => (i === index ? { ...food, image: imageUrl } : food)));
+    } catch (error) {
+      console.error("Error uploading food thumbnail:", error);
+      alert("Nao foi possivel carregar a miniatura da comida.");
+    } finally {
+      setIsUploadingFoodThumb(false);
+      event.target.value = "";
+    }
+  };
+
   const updateArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number, field: keyof T, value: unknown) => {
     setter((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  const updateHotel = (index: number, field: keyof TripHotel, value: unknown) => {
+    setHotels((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  const removeHotel = (index: number) => {
+    setHotels((prev) => prev.filter((_, i) => i !== index));
   };
 
   const removeFromArray = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, index: number) => {
     setter((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!title || !destination || !startDate || !endDate) return;
 
-    const totalCost = expenses.reduce((sum, item) => sum + (item.amount || 0), 0);
+    setIsEnriching(true);
+    try {
+      const normalizedHotels = hotels.filter((hotel) => hotel.name.trim());
+      const enrichedHotels = sortHotelsByDate(await enrichHotels(normalizedHotels, destination));
+      setHotels(enrichedHotels);
 
-    onSave({
+      const normalizedFoods = foods.filter((food) => food.name.trim());
+      const enrichedFoods = await enrichFoods(normalizedFoods, destination);
+      setFoods(enrichedFoods);
+
+      const nextMergedExpenses = buildMergedExpenses(expenses, enrichedHotels);
+      const totalCost = nextMergedExpenses.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+      onSave({
       title,
       destination,
       startDate,
       endDate,
       cost: totalCost || 0,
       photos,
-      hotels,
-      foods: foods.filter((food) => food.name),
+      hotels: enrichedHotels,
+      foods: enrichedFoods,
       notes,
       tags: tags ? tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
       travel: outbound.length > 0 || returnFlights.length > 0
@@ -183,24 +539,47 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
         }
         : undefined,
       tickets: tickets.filter((ticket) => ticket.name),
-      expenses: expenses.filter((expense) => expense.label),
-    });
+      expenses: nextMergedExpenses,
+      });
+    } finally {
+      setIsEnriching(false);
+    }
   };
 
   return (
     <>
       <Header />
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen">
+        <div className="sticky top-16 z-30 border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+          <div className="container mx-auto px-4 sm:px-6 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <Button variant="ghost" onClick={onCancel} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
+                <ArrowLeft className="h-4 w-4" />Voltar
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl font-body h-10">
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  form="trip-form"
+                  disabled={isUploading || isUploadingFoodThumb || isEnriching}
+                  className="rounded-xl bg-foreground text-background hover:bg-foreground/90 font-body h-10"
+                >
+                  {isEnriching ? "A enriquecer dados..." : (trip ? "Guardar Alteracoes" : "Criar Viagem")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="container mx-auto px-4 sm:px-6 py-4">
-          <Button variant="ghost" onClick={onCancel} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full mb-4">
-            <ArrowLeft className="h-4 w-4" />Voltar
-          </Button>
 
           <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-8">
             {trip ? "Editar Viagem" : "Nova Aventura"}
           </h1>
 
-          <form onSubmit={handleSubmit} className="max-w-3xl space-y-10 pb-20">
+          <form id="trip-form" onSubmit={handleSubmit} className="max-w-3xl space-y-10 pb-20">
             <section className="space-y-4">
               <h3 className="font-display text-lg font-semibold border-b border-border pb-2">Informacao Geral</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -261,7 +640,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
               </div>
 
               <div className="space-y-3">
-                <SectionHeader icon={Plane} title="Ida" onAdd={() => setOutbound((prev) => [...prev, emptyFlight()])} addLabel="Voo" />
+                <SectionHeader icon={Plane} title="Ida" onAdd={() => setOutbound((prev) => [emptyFlight(), ...prev])} addLabel="Voo" />
                 {outbound.map((leg, index) => (
                   <div key={`out-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                     <RemoveBtn onClick={() => removeFromArray(setOutbound, index)} />
@@ -280,7 +659,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
               </div>
 
               <div className="space-y-3">
-                <SectionHeader icon={Plane} title="Volta" onAdd={() => setReturnFlights((prev) => [...prev, emptyFlight()])} addLabel="Voo" />
+                <SectionHeader icon={Plane} title="Volta" onAdd={() => setReturnFlights((prev) => [emptyFlight(), ...prev])} addLabel="Voo" />
                 {returnFlights.map((leg, index) => (
                   <div key={`ret-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                     <RemoveBtn onClick={() => removeFromArray(setReturnFlights, index)} />
@@ -305,7 +684,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={Ticket} title="Bilhetes / Eventos" onAdd={() => setTickets((prev) => [...prev, emptyTicket()])} addLabel="Bilhete" />
+              <SectionHeader icon={Ticket} title="Bilhetes / Eventos" onAdd={() => setTickets((prev) => [emptyTicket(), ...prev])} addLabel="Bilhete" />
               {tickets.map((ticket, index) => (
                 <div key={`ticket-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                   <RemoveBtn onClick={() => removeFromArray(setTickets, index)} />
@@ -323,41 +702,69 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={Hotel} title="Hoteis / Alojamento" onAdd={() => setHotels((prev) => [...prev, emptyHotel()])} addLabel="Hotel" />
+              <SectionHeader icon={Hotel} title="Hoteis / Alojamento" onAdd={() => setHotels((prev) => sortHotelsForForm([emptyHotel(), ...prev]))} addLabel="Hotel" />
               {hotels.map((hotel, index) => (
                 <div key={`hotel-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
-                  <RemoveBtn onClick={() => removeFromArray(setHotels, index)} />
-                  <Input placeholder="Nome do hotel" value={hotel.name} onChange={(event) => updateArray(setHotels, index, "name", event.target.value)} className="rounded-lg text-sm" />
-                  <Input placeholder="Morada" value={hotel.address || ""} onChange={(event) => updateArray(setHotels, index, "address", event.target.value)} className="rounded-lg text-sm" />
+                  <RemoveBtn onClick={() => removeHotel(index)} />
+                  <Input placeholder="Nome do hotel" value={hotel.name} onChange={(event) => updateHotel(index, "name", event.target.value)} className="rounded-lg text-sm" />
+                  <Input placeholder="Morada" value={hotel.address || ""} onChange={(event) => updateHotel(index, "address", event.target.value)} className="rounded-lg text-sm" />
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <Input type="date" value={hotel.checkIn || ""} onChange={(event) => updateArray(setHotels, index, "checkIn", event.target.value)} className="rounded-lg text-sm" />
-                    <Input type="date" value={hotel.checkOut || ""} onChange={(event) => updateArray(setHotels, index, "checkOut", event.target.value)} className="rounded-lg text-sm" />
-                    <Input type="number" step="0.01" placeholder="Custo (EUR)" value={hotel.cost || ""} onChange={(event) => updateArray(setHotels, index, "cost", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
-                    <Input placeholder="Telefone" value={hotel.phone || ""} onChange={(event) => updateArray(setHotels, index, "phone", event.target.value)} className="rounded-lg text-sm" />
+                    <Input type="date" value={hotel.checkIn || ""} onChange={(event) => updateHotel(index, "checkIn", event.target.value)} className="rounded-lg text-sm" />
+                    <Input type="date" value={hotel.checkOut || ""} onChange={(event) => updateHotel(index, "checkOut", event.target.value)} className="rounded-lg text-sm" />
+                    <Input type="number" step="0.01" placeholder="Custo (EUR)" value={hotel.cost || ""} onChange={(event) => updateHotel(index, "cost", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
+                    <Input placeholder="Telefone" value={hotel.phone || ""} onChange={(event) => updateHotel(index, "phone", event.target.value)} className="rounded-lg text-sm" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <Input placeholder="No Confirmacao" value={hotel.confirmationNumber || ""} onChange={(event) => updateArray(setHotels, index, "confirmationNumber", event.target.value)} className="rounded-lg text-sm" />
-                    <Input placeholder="Website (link)" value={hotel.link || ""} onChange={(event) => updateArray(setHotels, index, "link", event.target.value)} className="rounded-lg text-sm" />
+                    <Input placeholder="No Confirmacao" value={hotel.confirmationNumber || ""} onChange={(event) => updateHotel(index, "confirmationNumber", event.target.value)} className="rounded-lg text-sm" />
+                    <Input placeholder="Website (link)" value={hotel.link || ""} onChange={(event) => updateHotel(index, "link", event.target.value)} className="rounded-lg text-sm" />
                   </div>
+                  <p className="text-xs font-body text-muted-foreground">
+                    O custo do hotel entra automaticamente na lista de despesas ao guardar.
+                  </p>
                 </div>
               ))}
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={UtensilsCrossed} title="Comidas" onAdd={() => setFoods((prev) => [...prev, emptyFood()])} addLabel="Comida" />
+              <SectionHeader icon={UtensilsCrossed} title="Comidas" onAdd={() => setFoods((prev) => [emptyFood(), ...prev])} addLabel="Comida" />
               {foods.map((food, index) => (
                 <div key={`food-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                   <RemoveBtn onClick={() => removeFromArray(setFoods, index)} />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input placeholder="Nome do prato" value={food.name} onChange={(event) => updateArray(setFoods, index, "name", event.target.value)} className="rounded-lg text-sm" />
-                    <Input placeholder="Descricao" value={food.description || ""} onChange={(event) => updateArray(setFoods, index, "description", event.target.value)} className="rounded-lg text-sm" />
+                  <div className="grid grid-cols-1 sm:grid-cols-[92px_1fr] gap-3 items-start">
+                    <div className="space-y-2">
+                      <div className="h-20 w-20 rounded-lg border border-border/60 overflow-hidden bg-secondary/60 flex items-center justify-center">
+                        {food.image ? (
+                          <img src={food.image} alt={food.name || "Comida"} className="h-full w-full object-cover" />
+                        ) : (
+                          <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-border/60 px-2 py-1 text-[11px] font-body text-foreground/75 hover:bg-secondary/50">
+                        Miniatura
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => void handleFoodThumbnailUpload(index, event)}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <Input placeholder="Nome do prato" value={food.name} onChange={(event) => updateArray(setFoods, index, "name", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder="Descricao" value={food.description || ""} onChange={(event) => updateArray(setFoods, index, "description", event.target.value)} className="rounded-lg text-sm" />
+                    </div>
                   </div>
+                  <p className="text-xs font-body text-muted-foreground">Se a descricao estiver vazia, tentamos enriquecer automaticamente ao guardar.</p>
                 </div>
               ))}
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={Receipt} title="Despesas" onAdd={() => setExpenses((prev) => [...prev, emptyExpense()])} addLabel="Despesa" />
+              <SectionHeader icon={Receipt} title="Despesas" onAdd={() => setExpenses((prev) => [emptyExpense(), ...prev])} addLabel="Despesa" />
+              <p className="text-xs font-body text-muted-foreground">
+                Usa esta secao para despesas extra. Os custos dos hoteis sao adicionados automaticamente a partir do alojamento.
+              </p>
               {expenses.map((expense, index) => (
                 <div key={`expense-${index}`} className="relative bg-secondary/30 rounded-xl p-3 border border-border/40">
                   <RemoveBtn onClick={() => removeFromArray(setExpenses, index)} />
@@ -367,21 +774,13 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                   </div>
                 </div>
               ))}
-              {expenses.length > 0 && (
+              {mergedExpenses.length > 0 && (
                 <p className="text-sm font-body text-right text-muted-foreground">
-                  Total: <span className="font-semibold text-foreground">EUR {expenses.reduce((sum, item) => sum + (item.amount || 0), 0).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                  Total: <span className="font-semibold text-foreground">EUR {mergedExpenses.reduce((sum, item) => sum + (item.amount || 0), 0).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
                 </p>
               )}
             </section>
 
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl font-body flex-1 sm:flex-none sm:px-8">
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isUploading} className="rounded-xl bg-foreground text-background hover:bg-foreground/90 font-body flex-1 sm:flex-none sm:px-8 h-11">
-                {trip ? "Guardar Alteracoes" : "Criar Viagem"}
-              </Button>
-            </div>
           </form>
         </div>
       </motion.div>

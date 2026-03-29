@@ -9,6 +9,14 @@ interface TripDetailDialogProps {
   trip: Trip | null;
 }
 
+const firstSentence = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(.+?[.!?])(?:\s|$)/);
+  return match ? match[1].trim() : trimmed;
+};
+
 export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogProps) {
   if (!trip) return null;
 
@@ -52,7 +60,9 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
           {trip.notes ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                <StickyNote className="h-4 w-4" />
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+                  <StickyNote className="h-3.5 w-3.5" />
+                </span>
                 Notes
               </h3>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{trip.notes}</p>
@@ -62,7 +72,9 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
           {trip.travel ? (
             <section className="space-y-3">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                <Plane className="h-4 w-4" />
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+                  <Plane className="h-3.5 w-3.5" />
+                </span>
                 Travel
               </h3>
               <div className="grid gap-3 md:grid-cols-2">
@@ -93,7 +105,9 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
           {trip.hotels.length ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                <Hotel className="h-4 w-4" />
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+                  <Hotel className="h-3.5 w-3.5" />
+                </span>
                 Hotels
               </h3>
               <div className="space-y-2">
@@ -101,6 +115,16 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                   <div key={`${hotel.name}-${index}`} className="rounded-xl border border-border/70 p-3 text-sm">
                     <p className="font-medium text-foreground">{hotel.name}</p>
                     {hotel.address ? <p className="text-muted-foreground">{hotel.address}</p> : null}
+                    {hotel.link ? (
+                      <a
+                        href={hotel.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+                      >
+                        Abrir link do hotel
+                      </a>
+                    ) : null}
                     <p className="text-muted-foreground">
                       {hotel.checkIn || "-"} {" -> "} {hotel.checkOut || "-"}
                       {hotel.cost != null ? ` · EUR ${hotel.cost.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : ""}
@@ -114,14 +138,25 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
           {trip.foods.length ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                <Utensils className="h-4 w-4" />
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+                  <Utensils className="h-3.5 w-3.5" />
+                </span>
                 Food highlights
               </h3>
               <div className="space-y-2">
                 {trip.foods.map((food, index) => (
                   <div key={`${food.name}-${index}`} className="rounded-xl border border-border/70 p-3 text-sm">
-                    <p className="font-medium text-foreground">{food.name}</p>
-                    {food.description ? <p className="text-muted-foreground">{food.description}</p> : null}
+                    <div className="flex items-start gap-3">
+                      {food.image ? (
+                        <img src={food.image} alt={food.name} className="h-12 w-12 rounded-md border border-border/60 object-cover shrink-0" loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="h-12 w-12 rounded-md border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
+                      )}
+                      <div>
+                        <p className="font-medium text-foreground">{food.name}</p>
+                        {food.description ? <p className="text-muted-foreground">{firstSentence(food.description)}</p> : null}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -131,7 +166,9 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
           {trip.tickets?.length ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                <Ticket className="h-4 w-4" />
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+                  <Ticket className="h-3.5 w-3.5" />
+                </span>
                 Tickets
               </h3>
               <div className="space-y-2">
@@ -151,7 +188,9 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
           {trip.expenses?.length ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-                <Receipt className="h-4 w-4" />
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
+                  <Receipt className="h-3.5 w-3.5" />
+                </span>
                 Expenses
               </h3>
               <div className="rounded-xl border border-border/70 p-3 space-y-2 text-sm">
