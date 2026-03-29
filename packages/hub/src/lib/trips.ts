@@ -107,6 +107,7 @@ const parseFoods = (value: unknown): TripFood[] => {
       name: String(item.name ?? "").trim(),
       description: item.description ? String(item.description).trim() : undefined,
       image: item.image ? String(item.image).trim() : undefined,
+      reviewUrl: item.reviewUrl ? String(item.reviewUrl).trim() : undefined,
     }))
     .filter((item) => item.name);
 };

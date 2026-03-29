@@ -53,7 +53,7 @@ const compressFileToBlob = async (file: File): Promise<Blob> => {
 
 const emptyFlight = (): FlightLeg => ({ from: "", to: "", departure: "", arrival: "", carrier: "", flightNumber: "" });
 const emptyHotel = (): TripHotel => ({ name: "", link: "", address: "", checkIn: "", checkOut: "", cost: 0, phone: "", confirmationNumber: "" });
-const emptyFood = (): TripFood => ({ name: "", description: "" });
+const emptyFood = (): TripFood => ({ name: "", description: "", reviewUrl: "" });
 const emptyTicket = (): TripTicket => ({ name: "", venue: "", address: "", seats: "", cost: 0 });
 const emptyExpense = (): TripExpense => ({ label: "", amount: 0 });
 
@@ -403,6 +403,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingFoodThumb, setIsUploadingFoodThumb] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
+  const [selectedFoodPreview, setSelectedFoodPreview] = useState<{ src: string; alt: string } | null>(null);
 
   const [outbound, setOutbound] = useState<FlightLeg[]>(trip?.travel?.outbound || []);
   const [returnFlights, setReturnFlights] = useState<FlightLeg[]>(trip?.travel?.returnTrip || []);
@@ -734,7 +735,12 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                     <div className="space-y-2">
                       <div className="h-20 w-20 rounded-lg border border-border/60 overflow-hidden bg-secondary/60 flex items-center justify-center">
                         {food.image ? (
-                          <img src={food.image} alt={food.name || "Comida"} className="h-full w-full object-cover" />
+                          <img
+                            src={food.image}
+                            alt={food.name || "Comida"}
+                            className="h-full w-full cursor-zoom-in object-cover"
+                            onClick={() => setSelectedFoodPreview({ src: food.image as string, alt: food.name || "Comida" })}
+                          />
                         ) : (
                           <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
                         )}
@@ -753,6 +759,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                     <div className="grid grid-cols-1 gap-3">
                       <Input placeholder="Nome do prato" value={food.name} onChange={(event) => updateArray(setFoods, index, "name", event.target.value)} className="rounded-lg text-sm" />
                       <Input placeholder="Descricao" value={food.description || ""} onChange={(event) => updateArray(setFoods, index, "description", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder="URL da critica do restaurante" value={food.reviewUrl || ""} onChange={(event) => updateArray(setFoods, index, "reviewUrl", event.target.value)} className="rounded-lg text-sm" />
                     </div>
                   </div>
                   <p className="text-xs font-body text-muted-foreground">Se a descricao estiver vazia, tentamos enriquecer automaticamente ao guardar.</p>
@@ -780,6 +787,31 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                 </p>
               )}
             </section>
+
+            {selectedFoodPreview && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/90 p-4"
+                onClick={() => setSelectedFoodPreview(null)}
+              >
+                <button
+                  type="button"
+                  aria-label="Fechar preview"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedFoodPreview(null);
+                  }}
+                  className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <img
+                  src={selectedFoodPreview.src}
+                  alt={selectedFoodPreview.alt}
+                  className="max-h-[85vh] max-w-full rounded-lg object-contain"
+                  decoding="async"
+                />
+              </div>
+            )}
 
           </form>
         </div>

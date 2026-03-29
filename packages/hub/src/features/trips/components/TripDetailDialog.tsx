@@ -1,4 +1,5 @@
-import { Calendar, Hotel, MapPin, Plane, Receipt, StickyNote, Ticket, Utensils } from "lucide-react";
+import { useState } from "react";
+import { Calendar, Hotel, MapPin, Plane, Receipt, StickyNote, Ticket, Utensils, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Trip, formatTripDateRange } from "@/features/trips/types/trip";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
@@ -17,7 +18,16 @@ const firstSentence = (value?: string) => {
   return match ? match[1].trim() : trimmed;
 };
 
+const formatExternalUrl = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
 export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogProps) {
+  const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
+
   if (!trip) return null;
 
   const totalExpenses = (trip.expenses ?? []).reduce((sum, item) => sum + item.amount, 0);
@@ -148,13 +158,30 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                   <div key={`${food.name}-${index}`} className="rounded-xl border border-border/70 p-3 text-sm">
                     <div className="flex items-start gap-3">
                       {food.image ? (
-                        <img src={food.image} alt={food.name} className="h-12 w-12 rounded-md border border-border/60 object-cover shrink-0" loading="lazy" decoding="async" />
+                        <img
+                          src={food.image}
+                          alt={food.name}
+                          className="h-12 w-12 rounded-md border border-border/60 object-cover shrink-0 cursor-zoom-in"
+                          loading="lazy"
+                          decoding="async"
+                          onClick={() => setSelectedFoodImage({ src: food.image, alt: food.name || "Food photo" })}
+                        />
                       ) : (
                         <div className="h-12 w-12 rounded-md border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
                       )}
                       <div>
                         <p className="font-medium text-foreground">{food.name}</p>
                         {food.description ? <p className="text-muted-foreground">{firstSentence(food.description)}</p> : null}
+                        {food.reviewUrl ? (
+                          <a
+                            href={formatExternalUrl(food.reviewUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+                          >
+                            Ver critica do restaurante
+                          </a>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -206,6 +233,31 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 </div>
               </div>
             </section>
+          ) : null}
+
+          {selectedFoodImage ? (
+            <div
+              className="fixed inset-0 z-[100] bg-foreground/90 flex items-center justify-center p-4"
+              onClick={() => setSelectedFoodImage(null)}
+            >
+              <button
+                type="button"
+                aria-label="Fechar preview"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedFoodImage(null);
+                }}
+                className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <img
+                src={selectedFoodImage.src}
+                alt={selectedFoodImage.alt}
+                className="max-w-full max-h-[85vh] object-contain rounded-lg"
+                decoding="async"
+              />
+            </div>
           ) : null}
         </div>
       </DialogContent>

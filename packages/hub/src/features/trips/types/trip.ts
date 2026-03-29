@@ -2,6 +2,7 @@ export interface TripFood {
   name: string;
   description?: string;
   image?: string;
+  reviewUrl?: string;
 }
 
 export interface TripHotel {

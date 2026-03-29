@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil, X } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +48,16 @@ const firstSentence = (value?: string) => {
   return match ? match[1].trim() : trimmed;
 };
 
+const formatExternalUrl = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
 export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
+  const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
   const totalFromExpenses = trip.expenses?.reduce((sum, item) => sum + item.amount, 0);
   const formatEuro = (value: number) => `${value.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
 
@@ -124,6 +132,33 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
             animate={{ scale: 1, opacity: 1 }}
             src={optimizeTripPhotoUrl(trip.photos[selectedPhoto], { width: 1800, quality: 78 })}
             alt=""
+            className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            decoding="async"
+          />
+        </div>
+      )}
+
+      {selectedFoodImage && (
+        <div
+          className="fixed inset-0 z-50 bg-foreground/90 flex items-center justify-center p-4"
+          onClick={() => setSelectedFoodImage(null)}
+        >
+          <button
+            type="button"
+            aria-label="Fechar preview"
+            onClick={(event) => {
+              event.stopPropagation();
+              setSelectedFoodImage(null);
+            }}
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <motion.img
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            src={selectedFoodImage.src}
+            alt={selectedFoodImage.alt}
             className="max-w-full max-h-[85vh] object-contain rounded-lg"
             decoding="async"
           />
@@ -229,13 +264,30 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                   <InfoCard key={`${food.name}-${index}`}>
                     <div className="flex items-start gap-3">
                       {food.image ? (
-                        <img src={food.image} alt={food.name} className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0" loading="lazy" decoding="async" />
+                        <img
+                          src={food.image}
+                          alt={food.name}
+                          className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0 cursor-zoom-in"
+                          loading="lazy"
+                          decoding="async"
+                          onClick={() => setSelectedFoodImage({ src: food.image as string, alt: food.name || "Food photo" })}
+                        />
                       ) : (
                         <div className="h-14 w-14 rounded-lg border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
                       )}
                       <div>
                         <p className="font-body font-medium text-foreground">{food.name}</p>
                         {food.description && <p className="mt-1 text-sm font-body text-foreground/75">{firstSentence(food.description)}</p>}
+                        {food.reviewUrl && (
+                          <a
+                            href={formatExternalUrl(food.reviewUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
+                          >
+                            Ver critica do restaurante
+                          </a>
+                        )}
                       </div>
                     </div>
                   </InfoCard>
