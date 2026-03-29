@@ -9,6 +9,29 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 ### Added
 - Versioning structure with `CHANGELOG.md` and release workflow guidance.
 
+### Changed
+- Deployment script now skips dependency installation when `package-lock.json` is unchanged and keeps native dependency fallback checks for Linux builds.
+
+## [v1.1.0-stable] - 2026-03-29
+
+### Added
+- New Tokyo 2026 trip import script with full travel/hotel/expenses payload and photo upload to Supabase Storage.
+- One-shot migration script to move existing trip photos from base64 in DB to Supabase Storage public URLs.
+- Trips world map component and storage image URL optimization helper.
+
+### Changed
+- Trips photo handling migrated from base64 blobs in the `trips` table to Supabase Storage URLs.
+- Trips form now uploads photos directly to Storage.
+- Trips import scripts now upload images to Storage instead of embedding data URLs.
+
+### Performance
+- Trips image rendering now requests transformed Storage URLs (smaller thumbnails and tuned quality).
+- Added lazy/deferred image decoding and fetch priority tuning for above-the-fold Trip cards.
+- Trips dashboard stats now use memoized calculations to reduce repeated render work.
+
+### Fixed
+- React invalid hook call caused by duplicated React resolution in shared UI package / Vite setup.
+
 ## [v1.0.6-stable] - 2026-03-28
 
 ### Added
