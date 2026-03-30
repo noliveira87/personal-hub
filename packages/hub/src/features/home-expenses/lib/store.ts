@@ -1,6 +1,90 @@
-import { Transaction, MonthData } from './types';
+import { supabase } from '@/lib/supabase';
+import { Transaction } from './types';
 
-const STORAGE_KEY = 'finflow-transactions';
+const TABLE = 'home_expenses_transactions';
+const LEGACY_KEY = 'finflow-transactions';
+
+type TransactionRow = {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  category: string | null;
+  amount: number;
+  date: string;
+  recurring: boolean;
+};
+
+function rowToTransaction(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    category: row.category as Transaction['category'] ?? undefined,
+    amount: Number(row.amount),
+    date: row.date,
+    recurring: row.recurring,
+  };
+}
+
+function transactionToRow(tx: Transaction): TransactionRow {
+  return {
+    id: tx.id,
+    name: tx.name,
+    type: tx.type,
+    category: tx.category ?? null,
+    amount: tx.amount,
+    date: tx.date,
+    recurring: tx.recurring,
+  };
+}
+
+export async function fetchTransactions(): Promise<Transaction[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data as TransactionRow[]).map(rowToTransaction);
+}
+
+export async function insertTransaction(tx: Transaction): Promise<void> {
+  const { error } = await supabase.from(TABLE).insert(transactionToRow(tx));
+  if (error) throw error;
+}
+
+export async function updateTransactionInDb(id: string, updates: Partial<Transaction>): Promise<void> {
+  const row: Partial<TransactionRow> = {};
+  if (updates.name !== undefined) row.name = updates.name;
+  if (updates.type !== undefined) row.type = updates.type;
+  if ('category' in updates) row.category = updates.category ?? null;
+  if (updates.amount !== undefined) row.amount = updates.amount;
+  if (updates.date !== undefined) row.date = updates.date;
+  if (updates.recurring !== undefined) row.recurring = updates.recurring;
+  const { error } = await supabase.from(TABLE).update(row).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteTransactionFromDb(id: string): Promise<void> {
+  const { error } = await supabase.from(TABLE).delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** One-time migration: reads legacy localStorage data and returns it (without deleting). */
+export function readLegacyTransactions(): Transaction[] {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return [];
+    const parsed: Transaction[] = JSON.parse(raw);
+    // Only migrate manual (non-contract) transactions
+    return parsed.filter((t) => !t.isContractExpense);
+  } catch {
+    return [];
+  }
+}
+
+export function clearLegacyTransactions(): void {
+  localStorage.removeItem(LEGACY_KEY);
+}
 
 /**
  * Parse a YYYY-MM-DD date string as LOCAL time (not UTC).
@@ -10,63 +94,6 @@ const STORAGE_KEY = 'finflow-transactions';
 export function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
-}
-
-export function loadTransactions(): Transaction[] {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveTransactions(transactions: Transaction[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
-}
-
-export function addTransaction(tx: Omit<Transaction, 'id'>): Transaction {
-  const transactions = loadTransactions();
-  const newTx: Transaction = { ...tx, id: crypto.randomUUID() };
-  transactions.push(newTx);
-  saveTransactions(transactions);
-  return newTx;
-}
-
-export function updateTransaction(id: string, updates: Partial<Transaction>) {
-  const transactions = loadTransactions();
-  const idx = transactions.findIndex((t) => t.id === id);
-  if (idx !== -1) {
-    transactions[idx] = { ...transactions[idx], ...updates };
-    saveTransactions(transactions);
-  }
-  return transactions;
-}
-
-export function deleteTransaction(id: string) {
-  const transactions = loadTransactions().filter((t) => t.id !== id);
-  saveTransactions(transactions);
-  return transactions;
-}
-
-export function getMonthTransactions(year: number, month: number): Transaction[] {
-  return loadTransactions().filter((t) => {
-    const d = new Date(t.date);
-    return d.getFullYear() === year && d.getMonth() === month;
-  });
-}
-
-export function getMonthData(year: number, month: number): MonthData {
-  const txs = getMonthTransactions(year, month);
-  const income = txs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const expenses = txs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const balance = income - expenses;
-  const savingsRate = income > 0 ? (balance / income) * 100 : 0;
-  return { month, year, income, expenses, balance, savingsRate };
-}
-
-export function getYearData(year: number): MonthData[] {
-  return Array.from({ length: 12 }, (_, i) => getMonthData(year, i));
 }
 
 export function formatCurrency(value: number): string {

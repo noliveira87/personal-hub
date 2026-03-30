@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function TransactionForm({ editTx, onClose, open: controlledOpen }: Props) {
-  const { transactions, setTransactions } = useData();
+  const { addTx, updateTx } = useData();
   const { t } = useI18n();
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = controlledOpen ?? internalOpen;
@@ -48,20 +48,9 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen 
     if (!name.trim() || isNaN(parsed) || parsed <= 0) return;
 
     if (editTx) {
-      setTransactions(
-        transactions.map((t) => (t.id === editTx.id ? { ...t, type, name: name.trim(), amount: parsed, category: type === 'expense' ? category : undefined, date, recurring } : t))
-      );
+      updateTx(editTx.id, { type, name: name.trim(), amount: parsed, category: type === 'expense' ? category : undefined, date, recurring });
     } else {
-      const newTx: Transaction = {
-        id: crypto.randomUUID(),
-        type,
-        name: name.trim(),
-        amount: parsed,
-        category: type === 'expense' ? category : undefined,
-        date,
-        recurring,
-      };
-      setTransactions([...transactions, newTx]);
+      addTx({ type, name: name.trim(), amount: parsed, category: type === 'expense' ? category : undefined, date, recurring });
     }
     reset();
     setOpen(false);

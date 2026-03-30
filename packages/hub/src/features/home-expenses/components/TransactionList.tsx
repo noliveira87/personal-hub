@@ -9,7 +9,7 @@ import { isContractTransaction } from '@/features/home-expenses/lib/contractMapp
 import { useI18n } from '@/i18n/I18nProvider';
 
 export default function TransactionList() {
-  const { allTransactions, transactions, setTransactions, selectedYear, selectedMonth } = useData();
+  const { allTransactions, deleteTx, selectedYear, selectedMonth } = useData();
   const { t, locale } = useI18n();
   const [editTx, setEditTx] = useState<Transaction | null>(null);
 
@@ -23,7 +23,7 @@ export default function TransactionList() {
   }, [allTransactions, selectedYear, selectedMonth]);
 
   const handleDelete = (id: string) => {
-    setTransactions(transactions.filter((t) => t.id !== id));
+    deleteTx(id);
   };
 
   const getCategoryLabel = (cat?: string) => {
