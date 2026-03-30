@@ -55,21 +55,35 @@ export default function ExpensePieChart() {
       .sort((a, b) => b.value - a.value);
   }, [allTransactions, selectedYear, selectedMonth, t]);
 
+  const chartHeight = useMemo(() => {
+    if (data.length <= 2) return 180;
+    if (data.length <= 4) return 220;
+    if (data.length <= 6) return 250;
+    return 280;
+  }, [data.length]);
+
+  const chartKey = useMemo(() => {
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    return `${selectedYear}-${selectedMonth}-${data.length}-${Math.round(total)}`;
+  }, [data, selectedMonth, selectedYear]);
+
+  const outerRadius = data.length <= 2 ? '74%' : data.length <= 4 ? '78%' : '82%';
+
   if (data.length === 0) {
     return (
-      <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
+      <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
         <p className="text-sm text-muted-foreground">{t('homeExpenses.charts.noExpensesThisMonth')}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
+    <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
-      <div className="h-[18rem] sm:h-[19rem]">
+      <div key={chartKey} className="w-full" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} cx="50%" cy="50%" innerRadius="50%" outerRadius="82%" paddingAngle={2} dataKey="value">
+            <Pie data={data} cx="50%" cy="50%" innerRadius="50%" outerRadius={outerRadius} paddingAngle={2} dataKey="value">
               {data.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
@@ -78,7 +92,7 @@ export default function ExpensePieChart() {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-1 gap-2.5 mt-4 pb-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2.5 mt-4 sm:grid-cols-2">
         {data.map((d, i) => (
           <div key={d.name} className="rounded-xl border border-border bg-background/80 px-3 py-2 text-xs shadow-sm">
             <p className="flex items-center gap-2 text-foreground/90">

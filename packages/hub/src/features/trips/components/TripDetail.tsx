@@ -7,6 +7,7 @@ import { Trip } from "@/features/trips/types/trip";
 import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
+import { getTripTotal } from "@/features/trips/utils/totals";
 
 interface TripDetailProps {
   trip: Trip;
@@ -60,7 +61,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
   const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
-  const totalFromExpenses = trip.expenses?.reduce((sum, item) => sum + item.amount, 0);
+  const tripTotal = getTripTotal(trip);
   const formatEuro = (value: number) => formatCurrency(value, "EUR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const localizedTitle = getLocalizedTripTitle(trip, language);
   const localizedDestination = getLocalizedTripDestination(trip.destination, language);
@@ -97,7 +98,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
               {formatDate(trip.startDate, { month: "short", day: "numeric" })} - {formatDate(trip.endDate, { month: "short", day: "numeric", year: "numeric" })}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-foreground text-background px-3 py-1.5 font-semibold shadow-sm">
-              {formatEuro(totalFromExpenses || trip.cost)}
+              {formatEuro(tripTotal)}
             </span>
           </div>
           {trip.tags.length > 0 && (
@@ -312,7 +313,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                   ))}
                   <div className="border-t border-border pt-3 flex items-center justify-between font-body">
                     <span className="font-semibold text-foreground">{t("common.total")}</span>
-                    <span className="font-bold text-lg text-foreground">{formatEuro(totalFromExpenses || trip.cost)}</span>
+                    <span className="font-bold text-lg text-foreground">{formatEuro(tripTotal)}</span>
                   </div>
                 </div>
               </InfoCard>

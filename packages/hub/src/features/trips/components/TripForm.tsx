@@ -9,6 +9,7 @@ import { FlightLeg, Trip, TripExpense, TripFood, TripHotel, TripTicket } from "@
 import { Header } from "@/features/trips/components/Header";
 import { useI18n } from "@/i18n/I18nProvider";
 import { supabase } from "@/lib/supabase";
+import { getTicketsTotal } from "@/features/trips/utils/totals";
 
 interface TripFormProps {
   trip?: Trip;
@@ -58,13 +59,6 @@ const emptyFood = (): TripFood => ({ name: "", description: "", reviewUrl: "" })
 const emptyTicket = (): TripTicket => ({ name: "", venue: "", address: "", seats: "", cost: 0 });
 const emptyExpense = (): TripExpense => ({ label: "", amount: 0 });
 
-const normalizeHotelKey = (value: string) => value.trim().toLowerCase();
-
-const KNOWN_HOTEL_ADDRESS_FALLBACKS: Record<string, string> = {
-  [normalizeHotelKey("Guest House Guerra Junqueiro")]: "Lisboa, Portugal",
-  [normalizeHotelKey("La Quinta by Wyndham Madison American Center")]: "5217 East Terrace Drive, Madison, WI 53718, United States",
-};
-
 const toSortableDate = (value?: string) => {
   if (!value) return Number.POSITIVE_INFINITY;
   const parsed = new Date(value).getTime();
@@ -95,22 +89,6 @@ const sortHotelsForForm = (items: TripHotel[]) => {
   const drafts = items.filter(isHotelDraft);
   const scheduled = items.filter((hotel) => !isHotelDraft(hotel));
   return [...drafts, ...sortHotelsByDate(scheduled)];
-};
-
-type PhotonFeature = {
-  properties?: {
-    name?: string;
-    street?: string;
-    housenumber?: string;
-    postcode?: string;
-    city?: string;
-    locality?: string;
-    suburb?: string;
-    district?: string;
-    county?: string;
-    state?: string;
-    country?: string;
-  };
 };
 
 const normalizeExpenseLabel = (value: string) => value.trim().toLowerCase();
@@ -297,65 +275,23 @@ const hasUsableGoogleMapsQuery = (link?: string) => {
   }
 };
 
-const formatPhotonAddress = (feature: PhotonFeature): string => {
-  const properties = feature.properties ?? {};
-  const streetLine = [properties.street, properties.housenumber].filter(Boolean).join(" ").trim();
-  const cityLike = properties.city ?? properties.locality ?? properties.suburb ?? properties.district ?? properties.county;
-  const locality = [properties.postcode, cityLike].filter(Boolean).join(" ").trim();
-  const region = [properties.state, properties.country].filter(Boolean).join(", ").trim();
-  const fallbackName = properties.name?.trim() || "";
-
-  return [streetLine, locality, region, fallbackName].filter(Boolean).join(", ").trim();
-};
-
 const enrichHotel = async (hotel: TripHotel, tripDestination: string): Promise<TripHotel> => {
   const normalizedName = hotel.name.trim();
   if (!normalizedName) return hotel;
 
-  const normalizedHotelKey = normalizeHotelKey(normalizedName);
-  const knownAddressFallback = KNOWN_HOTEL_ADDRESS_FALLBACKS[normalizedHotelKey];
   const fallbackLink = hasUsableGoogleMapsQuery(hotel.link)
     ? (hotel.link?.trim() || "")
     : buildHotelMapLink(hotel, tripDestination);
-  const needsAddress = !hotel.address?.trim();
   const needsLink = !hotel.link?.trim();
 
-  if (!needsAddress && !needsLink) {
+  if (!needsLink) {
     return hotel;
-  }
-
-  let resolvedAddress = "";
-
-  const queries = [
-    normalizedName,
-    `${normalizedName}, ${tripDestination}`,
-    buildHotelLookupQuery(hotel, tripDestination),
-  ]
-    .map((value) => value?.trim())
-    .filter((value, index, all) => Boolean(value) && all.indexOf(value) === index) as string[];
-
-  for (const query of queries) {
-    try {
-      const response = await fetch(`https://photon.komoot.io/api/?limit=1&q=${encodeURIComponent(query)}`);
-      if (response.ok) {
-        const payload = await response.json() as { features?: PhotonFeature[] };
-        const firstMatch = payload.features?.[0];
-        if (firstMatch && !resolvedAddress) {
-          resolvedAddress = formatPhotonAddress(firstMatch);
-          if (resolvedAddress) break;
-        }
-      }
-    } catch {
-      // Continue
-    }
-
-    // Small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   return {
     ...hotel,
-    address: hotel.address?.trim() || resolvedAddress || knownAddressFallback || hotel.address,
+    // Keep address exactly as entered by the user; do not auto-enrich when empty.
+    address: hotel.address,
     link: fallbackLink || hotel.link,
   };
 };
@@ -377,10 +313,16 @@ const SectionHeader = ({
 }) => (
   <div className="flex items-center justify-between mb-3">
     <div className="flex items-center gap-2">
-      <Icon className="h-4 w-4 text-accent" />
-      <h3 className="font-display text-lg font-semibold">{title}</h3>
+      <Icon className="h-4 w-4 text-foreground" />
+      <h3 className="font-display text-lg font-semibold text-foreground">{title}</h3>
     </div>
-    <Button type="button" variant="ghost" size="sm" onClick={onAdd} className="gap-1 text-accent hover:text-accent font-body text-xs rounded-full">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={onAdd}
+      className="gap-1 rounded-full border-border/70 bg-secondary/60 text-foreground hover:bg-secondary font-body text-xs"
+    >
       <Plus className="h-3 w-3" />{addLabel}
     </Button>
   </div>
@@ -541,8 +483,13 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       const enrichedFoods = await enrichFoods(normalizedFoods, destination, t("trips.fallbackFoodDescription", { destination }));
       setFoods(enrichedFoods);
 
+      const parsedTravelCost = parseFloat(travelCost) || 0;
+      const normalizedTickets = tickets.filter((ticket) => ticket.name);
+
       const nextMergedExpenses = buildMergedExpenses(expenses, enrichedHotels);
-      const totalCost = nextMergedExpenses.reduce((sum, item) => sum + (item.amount || 0), 0);
+      const totalCost = nextMergedExpenses.reduce((sum, item) => sum + (item.amount || 0), 0)
+        + parsedTravelCost
+        + getTicketsTotal(normalizedTickets);
 
       onSave({
       title,
@@ -559,10 +506,10 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
         ? {
           outbound: outbound.filter((item) => item.from && item.to),
           returnTrip: returnFlights.filter((item) => item.from && item.to),
-          cost: parseFloat(travelCost) || undefined,
+          cost: parsedTravelCost || undefined,
         }
         : undefined,
-      tickets: tickets.filter((ticket) => ticket.name),
+      tickets: normalizedTickets,
       expenses: nextMergedExpenses,
       });
     } finally {

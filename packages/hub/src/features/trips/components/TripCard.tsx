@@ -5,6 +5,7 @@ import { MapPin, Calendar, Plane, Hotel as HotelIcon } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
+import { getTripTotal } from "@/features/trips/utils/totals";
 
 interface TripCardProps {
   trip: Trip;
@@ -18,6 +19,7 @@ export function TripCard({ trip, onClick, index, prioritizeImage = false }: Trip
   const photos = trip.photos.slice(0, 4);
   const days = differenceInDays(new Date(trip.endDate), new Date(trip.startDate));
   const isUpcoming = new Date(trip.startDate).getTime() > Date.now();
+  const total = getTripTotal(trip);
   const localizedTitle = getLocalizedTripTitle(trip, language);
   const localizedDestination = getLocalizedTripDestination(trip.destination, language);
 
@@ -143,8 +145,8 @@ export function TripCard({ trip, onClick, index, prioritizeImage = false }: Trip
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {trip.travel && <Plane className="h-3.5 w-3.5" />}
           {trip.hotels.length > 0 && <HotelIcon className="h-3.5 w-3.5" />}
-          {trip.cost > 0 ? (
-            <span className="font-semibold text-foreground">{formatCurrency(trip.cost, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+          {total > 0 ? (
+            <span className="font-semibold text-foreground">{formatCurrency(total, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
           ) : null}
         </div>
       </div>

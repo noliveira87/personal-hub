@@ -18,6 +18,7 @@ import {
   getTripsOutsidePortugalCount,
 } from "@/features/trips/utils/locations";
 import { useI18n } from "@/i18n/I18nProvider";
+import { getTripTotal } from "@/features/trips/utils/totals";
 
 type View = "dashboard" | "detail" | "add" | "edit";
 type EditableTripFields = Omit<Trip, "id" | "createdAt" | "updatedAt">;
@@ -113,7 +114,7 @@ export function TripsApp() {
   const { totalTrips, totalDestinations, totalSpent } = useMemo(() => ({
     totalTrips: getTripsOutsidePortugalCount(trips),
     totalDestinations: getTripDestinationCount(trips),
-    totalSpent: trips.reduce((sum, trip) => sum + trip.cost, 0),
+    totalSpent: trips.reduce((sum, trip) => sum + getTripTotal(trip), 0),
   }), [trips]);
 
   const handleDelete = async (id: string) => {
