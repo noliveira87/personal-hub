@@ -6,7 +6,7 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 
 ## [Unreleased]
 
-## [v1.2.0-stable] - 2026-03-30
+## [v1.3.0-stable] - 2026-03-30
 
 ### Added
 - Versioning structure with `CHANGELOG.md` and release workflow guidance.
