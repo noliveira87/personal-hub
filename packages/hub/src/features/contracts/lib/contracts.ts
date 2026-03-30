@@ -8,6 +8,7 @@ type ContractRow = {
   provider: string;
   type: string;
   housing_usage: string | null;
+  mortgage_details: unknown;
   start_date: string;
   end_date: string | null;
   no_end_date: boolean;
@@ -33,6 +34,9 @@ function mapRowToContract(row: ContractRow): Contract {
     provider: row.provider,
     type: row.type as Contract['type'],
     housingUsage: row.housing_usage as Contract['housingUsage'],
+    mortgageDetails: row.mortgage_details && typeof row.mortgage_details === 'object'
+      ? row.mortgage_details as Contract['mortgageDetails']
+      : null,
     startDate: row.start_date,
     endDate: row.end_date,
     noEndDate: row.no_end_date,
@@ -61,6 +65,7 @@ function mapContractToRow(contract: Contract) {
     provider: contract.provider,
     type: contract.type,
     housing_usage: contract.housingUsage,
+    mortgage_details: contract.mortgageDetails,
     start_date: contract.startDate,
     end_date: normalizedEndDate,
     no_end_date: contract.noEndDate,

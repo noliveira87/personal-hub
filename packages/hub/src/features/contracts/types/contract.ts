@@ -19,6 +19,20 @@ export type RenewalType = 'manual' | 'auto-renew' | 'no-renewal';
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
 export type ContractStatus = 'active' | 'pending-cancellation' | 'expired' | 'archived';
 
+export interface MortgageDetails {
+  principalAmount: number | null;
+  totalTermYears: number | null;
+  totalTermMonths: number | null;
+  fixedRateYears: number | null;
+  fixedRateMonths: number | null;
+  variableRateYears: number | null;
+  variableRateMonths: number | null;
+  tanFixed: number | null;
+  tanVariable: number | null;
+  spread: number | null;
+  taeg: number | null;
+}
+
 export interface AlertSetting {
   daysBefore: number;
   enabled: boolean;
@@ -32,6 +46,7 @@ export interface Contract {
   provider: string;
   type: ContractType;
   housingUsage: HousingUsage | null;
+  mortgageDetails: MortgageDetails | null;
   startDate: string;
   endDate: string | null;
   noEndDate: boolean;

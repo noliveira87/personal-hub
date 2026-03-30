@@ -17,14 +17,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card/50 backdrop-blur-xl fixed h-full z-30">
-        <div className="p-6 border-b border-border">
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
-            <span className="text-primary">Fin</span>Flow
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">{t('homeExpenses.layout.managerSubtitle')}</p>
-        </div>
-        <nav className="flex-1 p-4 space-y-1">
+      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card/50 backdrop-blur-xl fixed h-full z-30 pt-16">
+        <nav className="flex-1 p-4 space-y-1 border-t border-border">
           {links.map((l) => (
             <NavLink
               key={l.to}

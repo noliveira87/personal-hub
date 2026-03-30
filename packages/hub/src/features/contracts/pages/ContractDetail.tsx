@@ -61,6 +61,8 @@ export default function ContractDetail() {
     { label: 'Status', value: null },
   ];
 
+  const formatPercent = (value: number | null | undefined) => value == null ? '—' : `${String(value).replace('.', ',')}%`;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 pt-16">
       <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/contracts" backLabel="Back" />
@@ -141,6 +143,46 @@ export default function ContractDetail() {
           ))}
         </div>
       </div>
+
+      {contract.type === 'mortgage' && contract.mortgageDetails && (
+        <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '170ms' }}>
+          <h2 className="text-sm font-semibold text-foreground mb-4">Crédito Habitação</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Valor total</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{contract.mortgageDetails.principalAmount != null ? formatCurrency(contract.mortgageDetails.principalAmount, contract.currency) : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Prazo</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{contract.mortgageDetails.totalTermYears ?? '—'} anos · {contract.mortgageDetails.totalTermMonths ?? '—'} meses</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Taxa fixa</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{contract.mortgageDetails.fixedRateYears ?? '—'} anos · {contract.mortgageDetails.fixedRateMonths ?? '—'} meses</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Taxa variável</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{contract.mortgageDetails.variableRateYears ?? '—'} anos · {contract.mortgageDetails.variableRateMonths ?? '—'} meses</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">TAN fixa</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{formatPercent(contract.mortgageDetails.tanFixed)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">TAN variável</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{formatPercent(contract.mortgageDetails.tanVariable)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Spread</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{formatPercent(contract.mortgageDetails.spread)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">TAEG</p>
+              <p className="text-sm font-medium text-foreground mt-0.5">{formatPercent(contract.mortgageDetails.taeg)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notes */}
       {contract.notes && (

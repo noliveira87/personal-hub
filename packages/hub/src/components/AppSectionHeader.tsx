@@ -35,9 +35,9 @@ export default function AppSectionHeader({
     <header
       className={`fixed right-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg ${
         isContractsLayoutPath
-          ? 'top-14 left-0 lg:top-0 lg:left-60'
+          ? 'top-14 left-0 lg:top-0 lg:left-0'
           : isHomeExpensesLayoutPath
-            ? 'top-14 left-0 lg:top-0 lg:left-64'
+            ? 'top-14 left-0 lg:top-0 lg:left-0'
             : 'top-0 left-0'
       }`}
     >

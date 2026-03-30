@@ -10,9 +10,24 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 
 const defaultAlert = (): AlertSetting => ({ daysBefore: 30, enabled: true, telegramEnabled: false });
 
+const defaultMortgageDetails = () => ({
+  principalAmount: null,
+  totalTermYears: null,
+  totalTermMonths: null,
+  fixedRateYears: null,
+  fixedRateMonths: null,
+  variableRateYears: null,
+  variableRateMonths: null,
+  tanFixed: null,
+  tanVariable: null,
+  spread: null,
+  taeg: null,
+});
+
 const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   name: '', category: 'other', provider: '', type: 'other',
   housingUsage: null,
+  mortgageDetails: null,
   startDate: new Date().toISOString().split('T')[0],
   endDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
   noEndDate: false,
@@ -21,6 +36,28 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: null,
   priceHistoryEnabled: true,
 });
+
+const TYPE_CATEGORY_OPTIONS: Record<ContractType, ContractCategory[]> = {
+  mortgage: ['mortgage'],
+  insurance: ['home-insurance', 'apartment-insurance'],
+  utility: ['gas', 'electricity', 'water'],
+  telecom: ['internet', 'mobile'],
+  subscription: ['tv-streaming', 'software'],
+  maintenance: ['maintenance', 'security-alarm'],
+  other: ['other'],
+};
+
+function getAllowedCategories(type: ContractType): ContractCategory[] {
+  return TYPE_CATEGORY_OPTIONS[type];
+}
+
+function getDefaultCategory(type: ContractType): ContractCategory {
+  return getAllowedCategories(type)[0];
+}
+
+function isCategoryAllowed(type: ContractType, category: ContractCategory): boolean {
+  return getAllowedCategories(type).includes(category);
+}
 
 export default function ContractForm() {
   const { id } = useParams();
@@ -31,6 +68,7 @@ export default function ContractForm() {
 
   const [form, setForm] = useState(emptyContract());
   const defaultEndDate = useState(() => new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0])[0];
+  const categoryOptions = getAllowedCategories(form.type);
 
   useEffect(() => {
     if (isEdit) {
@@ -41,6 +79,15 @@ export default function ContractForm() {
       }
     }
   }, [id, isEdit, getContract]);
+
+  useEffect(() => {
+    if (!isCategoryAllowed(form.type, form.category)) {
+      setForm(prev => ({
+        ...prev,
+        category: getDefaultCategory(prev.type),
+      }));
+    }
+  }, [form.type, form.category]);
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -64,8 +111,9 @@ export default function ContractForm() {
       // Always set price to 0 - prices are managed only through price history
       const submitData = {
         ...form,
-        category: form.type === 'mortgage' ? 'mortgage' : form.category,
+        category: isCategoryAllowed(form.type, form.category) ? form.category : getDefaultCategory(form.type),
         housingUsage: form.type === 'mortgage' ? form.housingUsage : null,
+        mortgageDetails: form.type === 'mortgage' ? (form.mortgageDetails ?? defaultMortgageDetails()) : null,
         endDate: normalizedEndDate,
         price: 0,
       };
@@ -88,6 +136,15 @@ export default function ContractForm() {
   const removeAlert = (i: number) => set('alerts', form.alerts.filter((_, idx) => idx !== i));
   const updateAlert = (i: number, patch: Partial<AlertSetting>) =>
     set('alerts', form.alerts.map((a, idx) => idx === i ? { ...a, ...patch } : a));
+
+  const updateMortgage = <K extends keyof NonNullable<typeof form.mortgageDetails>>(key: K, value: NonNullable<typeof form.mortgageDetails>[K]) =>
+    setForm(prev => ({
+      ...prev,
+      mortgageDetails: {
+        ...(prev.mortgageDetails ?? defaultMortgageDetails()),
+        [key]: value,
+      },
+    }));
 
   const inputClass = 'w-full px-3 py-2.5 rounded-lg border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow';
   const labelClass = 'text-sm font-medium text-foreground mb-1.5 block';
@@ -114,12 +171,6 @@ export default function ContractForm() {
               <input className={inputClass} value={form.provider} onChange={e => set('provider', e.target.value)} required placeholder="e.g. Allianz" disabled={submitting} />
             </div>
             <div>
-              <label className={labelClass}>Category</label>
-              <select className={inputClass} value={form.category} onChange={e => set('category', e.target.value as ContractCategory)} disabled={submitting}>
-                {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </div>
-            <div>
               <label className={labelClass}>Type</label>
               <select
                 className={inputClass}
@@ -129,8 +180,11 @@ export default function ContractForm() {
                   setForm(prev => ({
                     ...prev,
                     type: nextType,
-                    category: nextType === 'mortgage' ? 'mortgage' : prev.category,
+                    category: isCategoryAllowed(nextType, prev.category)
+                      ? prev.category
+                      : getDefaultCategory(nextType),
                     housingUsage: nextType === 'mortgage' ? (prev.housingUsage ?? 'primary-residence') : null,
+                    mortgageDetails: nextType === 'mortgage' ? (prev.mortgageDetails ?? defaultMortgageDetails()) : null,
                   }));
                 }}
                 disabled={submitting}
@@ -138,8 +192,18 @@ export default function ContractForm() {
                 {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
+            {form.type !== 'mortgage' && (
+              <div>
+                <label className={labelClass}>Category</label>
+                <select className={inputClass} value={form.category} onChange={e => set('category', e.target.value as ContractCategory)} disabled={submitting}>
+                  {categoryOptions.map(category => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}
+                </select>
+                <p className="mt-2 text-xs text-muted-foreground">As categorias dependem do tipo escolhido.</p>
+              </div>
+            )}
             {form.type === 'mortgage' && (
               <div className="sm:col-span-2">
+                <p className="mb-2 text-xs text-muted-foreground">A categoria passa automaticamente para Mortgage.</p>
                 <label className={labelClass}>Tipo de habitação</label>
                 <select
                   className={inputClass}
@@ -153,6 +217,59 @@ export default function ContractForm() {
             )}
           </div>
         </div>
+
+        {form.type === 'mortgage' && (
+          <div className="bg-card rounded-xl p-6 border space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Dados do Crédito Habitação</h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Valor total</label>
+                <input type="number" step="0.01" className={inputClass} value={form.mortgageDetails?.principalAmount ?? ''} onChange={e => updateMortgage('principalAmount', e.target.value ? parseFloat(e.target.value) : null)} disabled={submitting} />
+              </div>
+              <div />
+              <div>
+                <label className={labelClass}>Prazo total (anos)</label>
+                <input type="number" className={inputClass} value={form.mortgageDetails?.totalTermYears ?? ''} onChange={e => updateMortgage('totalTermYears', e.target.value ? parseInt(e.target.value, 10) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>Prazo total (meses)</label>
+                <input type="number" className={inputClass} value={form.mortgageDetails?.totalTermMonths ?? ''} onChange={e => updateMortgage('totalTermMonths', e.target.value ? parseInt(e.target.value, 10) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>Taxa fixa (anos)</label>
+                <input type="number" className={inputClass} value={form.mortgageDetails?.fixedRateYears ?? ''} onChange={e => updateMortgage('fixedRateYears', e.target.value ? parseInt(e.target.value, 10) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>Taxa fixa (meses)</label>
+                <input type="number" className={inputClass} value={form.mortgageDetails?.fixedRateMonths ?? ''} onChange={e => updateMortgage('fixedRateMonths', e.target.value ? parseInt(e.target.value, 10) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>Taxa variável (anos)</label>
+                <input type="number" className={inputClass} value={form.mortgageDetails?.variableRateYears ?? ''} onChange={e => updateMortgage('variableRateYears', e.target.value ? parseInt(e.target.value, 10) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>Taxa variável (meses)</label>
+                <input type="number" className={inputClass} value={form.mortgageDetails?.variableRateMonths ?? ''} onChange={e => updateMortgage('variableRateMonths', e.target.value ? parseInt(e.target.value, 10) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>TAN fixa (%)</label>
+                <input type="number" step="0.001" className={inputClass} value={form.mortgageDetails?.tanFixed ?? ''} onChange={e => updateMortgage('tanFixed', e.target.value ? parseFloat(e.target.value) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>TAN variável (%)</label>
+                <input type="number" step="0.001" className={inputClass} value={form.mortgageDetails?.tanVariable ?? ''} onChange={e => updateMortgage('tanVariable', e.target.value ? parseFloat(e.target.value) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>Spread (%)</label>
+                <input type="number" step="0.001" className={inputClass} value={form.mortgageDetails?.spread ?? ''} onChange={e => updateMortgage('spread', e.target.value ? parseFloat(e.target.value) : null)} disabled={submitting} />
+              </div>
+              <div>
+                <label className={labelClass}>TAEG (%)</label>
+                <input type="number" step="0.001" className={inputClass} value={form.mortgageDetails?.taeg ?? ''} onChange={e => updateMortgage('taeg', e.target.value ? parseFloat(e.target.value) : null)} disabled={submitting} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Dates & billing */}
         <div className="bg-card rounded-xl p-6 border space-y-4">

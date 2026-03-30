@@ -66,11 +66,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col border-r bg-card/50 backdrop-blur-sm z-30">
-        <div className="px-6 h-16 flex items-center border-b">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">{t('layout.contractsTitle')}</h1>
-        </div>
-        <nav className="flex-1 p-3 space-y-1">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col border-r bg-card/50 backdrop-blur-sm z-30 pt-16">
+        <nav className="flex-1 p-3 space-y-1 border-t">
           {navItems.map(item => (
             <NavLink
               key={item.to}
