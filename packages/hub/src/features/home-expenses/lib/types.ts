@@ -37,7 +37,7 @@ export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string; icon: 
   { value: 'water', label: 'Water', icon: '💧' },
   { value: 'internet', label: 'Internet', icon: '🌐' },
   { value: 'car', label: 'Car', icon: '🚗' },
-  { value: 'gym', label: 'Gym', icon: '🏋️' },
+  { value: 'gym', label: 'Gym', icon: '💪' },
   { value: 'socialSecurity', label: 'Social Security', icon: '🧾' },
   { value: 'other', label: 'Other', icon: '🏆' },
 ];
