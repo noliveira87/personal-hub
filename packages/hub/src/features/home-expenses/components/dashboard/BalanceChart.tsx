@@ -58,7 +58,7 @@ export default function BalanceChart() {
   return (
     <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex h-full flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.monthlyBalance')} — {selectedYear}</h3>
-      <div className="h-[18rem] sm:h-[19rem] lg:h-[22rem]">
+      <div className="flex-1 min-h-[18rem]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} barGap={6} barCategoryGap="16%" margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
