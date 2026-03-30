@@ -16,7 +16,7 @@ const normalizeDestinationKey = (value: string) => value
   .replace(/\s+/g, " ")
   .trim();
 
-const PORTUGAL_DESTINATION_REGEX = /\b(portugal|lisboa|lisbon|porto|coimbra|faro|braga|aveiro|maia|sintra|cascais|setubal|evora)\b/;
+const PORTUGAL_DESTINATION_REGEX = /\b(portugal|lisboa|lisbon|porto|coimbra|faro|braga|aveiro|maia|sintra|cascais|setubal|evora|matosinhos|portalegre)\b/;
 
 const ADDRESS_LABEL_EXCLUSIONS = new Set([
   "usa",
