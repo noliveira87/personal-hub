@@ -1,4 +1,4 @@
-import { ContractCategory, CATEGORY_LABELS, CATEGORY_ICONS } from '@/types/contract';
+import { ContractCategory, CATEGORY_LABELS, CATEGORY_ICONS } from '@/features/contracts/types/contract';
 
 export function CategoryBadge({ category }: { category: ContractCategory }) {
   return (

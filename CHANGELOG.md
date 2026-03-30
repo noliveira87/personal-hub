@@ -6,6 +6,21 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 
 ## [Unreleased]
 
+## [v1.4.0-stable] - 2026-03-30
+
+### Added
+- Feature-first Contracts module under `packages/hub/src/features/contracts` with domain-scoped pages, components, context, lib and types.
+
+### Changed
+- Contracts routes were consolidated under `/contracts/*` (`/contracts/calendar`, `/contracts/alerts`, `/contracts/insights`) and sidebar navigation was aligned.
+- Contracts data loading provider scope was reduced to contracts and dashboard routes instead of the full app shell.
+- Contracts pages were aligned to the shared app header behavior and redundant page-level controls were removed.
+- Desktop contracts sidebar was simplified by removing redundant "Projects" back links.
+
+### Refactor
+- Legacy contracts files were removed from `pages/contracts`, `components`, `context`, `lib` and `types` after migrating all imports to the new feature paths.
+- Cross-module imports were updated to use contracts feature paths in dashboard and hooks consuming contracts types/data.
+
 ## [v1.3.0-stable] - 2026-03-30
 
 ### Added

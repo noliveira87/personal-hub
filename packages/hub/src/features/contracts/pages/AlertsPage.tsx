@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { useContracts } from '@/context/ContractContext';
-import { getDaysUntilExpiry, getUrgencyLevel } from '@/lib/contractUtils';
-import { CATEGORY_ICONS } from '@/types/contract';
+import { useContracts } from '@/features/contracts/context/ContractContext';
+import { getDaysUntilExpiry, getUrgencyLevel } from '@/features/contracts/lib/contractUtils';
+import { CATEGORY_ICONS } from '@/features/contracts/types/contract';
 import { format, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';

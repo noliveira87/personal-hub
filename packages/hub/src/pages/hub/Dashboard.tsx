@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
-import { useContracts } from '@/context/ContractContext';
+import { useContracts } from '@/features/contracts/context/ContractContext';
 import { StatsCard } from '@/components/StatsCard';
-import { ContractCard } from '@/components/ContractCard';
-import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost, formatCurrency } from '@/lib/contractUtils';
+import { ContractCard } from '@/features/contracts/components/ContractCard';
+import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost, formatCurrency } from '@/features/contracts/lib/contractUtils';
 import { Link } from 'react-router-dom';
 import { Plus, ArrowRight, LayoutDashboard, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import AppSectionHeader from '@/components/AppSectionHeader';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { parseISO } from 'date-fns';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
 export default function Dashboard() {
   const { contracts, loading, error } = useContracts();
@@ -101,6 +101,11 @@ export default function Dashboard() {
           </Link>
         )}
       />
+
+      <div className="animate-fade-up" style={{ animationDelay: '60ms' }}>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1">Overview of active contracts and renewals</p>
+      </div>
 
       {/* Stats row */}
       <div className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { PriceHistory } from '@/types/contract';
+import { PriceHistory } from '@/features/contracts/types/contract';
 import { supabase } from '@/lib/supabase';
 
 export interface LatestPrice {

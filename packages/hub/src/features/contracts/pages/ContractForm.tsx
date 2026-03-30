@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useContracts } from '@/context/ContractContext';
+import { useContracts } from '@/features/contracts/context/ContractContext';
 import {
   Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus,
   CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting,
-} from '@/types/contract';
-import { ArrowLeft, Plus, X, Loader, FileText } from 'lucide-react';
+} from '@/features/contracts/types/contract';
+import { Plus, X, Loader, FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 
 const defaultAlert = (): AlertSetting => ({ daysBefore: 30, enabled: true, telegramEnabled: false });
@@ -91,11 +91,7 @@ export default function ContractForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pt-16">
-      <AppSectionHeader title="D12 Contracts" icon={FileText} />
-
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors animate-fade-up">
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
+      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/contracts" backLabel="Back" />
 
       <h1 className="text-2xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '60ms' }}>
         {isEdit ? 'Edit Contract' : 'Add Contract'}

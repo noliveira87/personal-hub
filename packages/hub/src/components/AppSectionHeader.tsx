@@ -28,9 +28,14 @@ export default function AppSectionHeader({
   const { isDark, toggleDark } = useDarkMode();
   const { t } = useI18n();
   const resolvedBackLabel = backLabel ?? t('common.backToProjects');
+  const isContractsLayoutPath = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+    <header
+      className={`fixed right-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg ${
+        isContractsLayoutPath ? 'top-14 left-0 lg:top-0 lg:left-60' : 'top-0 left-0'
+      }`}
+    >
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">
         <Button
           variant="outline"

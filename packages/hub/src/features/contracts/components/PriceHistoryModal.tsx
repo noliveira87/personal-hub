@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Plus, X, Trash2, Edit } from 'lucide-react';
 import { usePriceHistory } from '@/hooks/use-price-history';
-import { formatCurrency } from '@/lib/contractUtils';
-import { PriceHistory } from '@/types/contract';
+import { formatCurrency } from '@/features/contracts/lib/contractUtils';
+import { PriceHistory } from '@/features/contracts/types/contract';
 
 interface PriceHistoryModalProps {
   contractId: string;

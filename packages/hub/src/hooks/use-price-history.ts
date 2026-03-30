@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { PriceHistory } from '@/types/contract';
-import * as contractsDB from '@/lib/contracts';
+import { PriceHistory } from '@/features/contracts/types/contract';
+import * as contractsDB from '@/features/contracts/lib/contracts';
 
 export function usePriceHistory(contractId: string) {
   const [history, setHistory] = useState<PriceHistory[]>([]);

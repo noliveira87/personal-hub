@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { ContractStatus, STATUS_LABELS } from '@/types/contract';
+import { ContractStatus, STATUS_LABELS } from '@/features/contracts/types/contract';
 
 const statusStyles: Record<ContractStatus, string> = {
   active: 'bg-success/10 text-success',

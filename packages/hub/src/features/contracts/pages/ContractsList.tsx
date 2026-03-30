@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useContracts } from '@/context/ContractContext';
-import { ContractCard } from '@/components/ContractCard';
-import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/types/contract';
-import { getDaysUntilExpiry } from '@/lib/contractUtils';
+import { useContracts } from '@/features/contracts/context/ContractContext';
+import { ContractCard } from '@/features/contracts/components/ContractCard';
+import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/features/contracts/types/contract';
+import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { Plus, Search, SlidersHorizontal, Loader, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,8 +64,8 @@ export default function ContractsList() {
 
   return (
     <div className="space-y-6 pt-16">
-      <AppSectionHeader 
-        title="D12 Contracts" 
+      <AppSectionHeader
+        title="D12 Contracts"
         icon={FileText}
         actions={
           <Button size="sm" className="gap-1.5" onClick={() => navigate('/contracts/new')}>

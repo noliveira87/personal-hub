@@ -1,4 +1,4 @@
-import { Contract } from '@/types/contract';
+import { Contract } from '@/features/contracts/types/contract';
 import { differenceInDays, parseISO } from 'date-fns';
 
 export function getDaysUntilExpiry(contract: Contract): number {

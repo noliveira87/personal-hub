@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Contract } from '@/types/contract';
-import * as contractsDB from '@/lib/contracts';
+import { Contract } from '@/features/contracts/types/contract';
+import * as contractsDB from '@/features/contracts/lib/contracts';
 
 interface ContractContextType {
   contracts: Contract[];

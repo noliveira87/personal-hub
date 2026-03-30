@@ -1,6 +1,6 @@
-import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/types/contract';
+import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/features/contracts/types/contract';
 import { StatusBadge } from './StatusBadge';
-import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel, formatExpiryCountdown } from '@/lib/contractUtils';
+import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays } from 'lucide-react';

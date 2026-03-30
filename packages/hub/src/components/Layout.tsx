@@ -1,16 +1,16 @@
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarDays, Bell, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bell, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
   { to: '/dashboard', labelKey: 'layout.nav.dashboard', icon: LayoutDashboard },
-  { to: '/calendar', labelKey: 'layout.nav.calendar', icon: CalendarDays },
-  { to: '/alerts', labelKey: 'layout.nav.alerts', icon: Bell },
-  { to: '/insights', labelKey: 'layout.nav.insights', icon: TrendingUp },
+  { to: '/contracts/calendar', labelKey: 'layout.nav.calendar', icon: CalendarDays },
+  { to: '/contracts/alerts', labelKey: 'layout.nav.alerts', icon: Bell },
+  { to: '/contracts/insights', labelKey: 'layout.nav.insights', icon: TrendingUp },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -19,7 +19,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
-  const isContractsPage = /^\/(dashboard|contracts|calendar|alerts|insights)/.test(location.pathname);
+  const isContractsPage = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
   const showSidebar = isContractsPage;
   const showDesktopHeaderToggle = !isLandingPage;
 
@@ -67,12 +67,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col border-r bg-card/50 backdrop-blur-sm z-30">
-        <div className="px-6 h-16 flex items-center justify-between border-b">
+        <div className="px-6 h-16 flex items-center border-b">
           <h1 className="text-lg font-semibold text-foreground tracking-tight">{t('layout.contractsTitle')}</h1>
-          <Link to="/" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3 h-3" />
-            <span>{t('common.projects')}</span>
-          </Link>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map(item => (
@@ -91,12 +87,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t">
-          <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            {t('common.backToProjects')}
-          </Link>
-        </div>
       </aside>
 
       {showDesktopHeaderToggle && (

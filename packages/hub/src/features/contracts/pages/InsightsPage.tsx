@@ -1,12 +1,12 @@
 import { Suspense, lazy, useMemo } from 'react';
-import { useContracts } from '@/context/ContractContext';
-import { getAnnualEquivalent, getMonthlyEquivalent, formatCurrency } from '@/lib/contractUtils';
-import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/types/contract';
-import AppSectionHeader from '@/components/AppSectionHeader';
-import { FileText } from 'lucide-react';
+import { useContracts } from '@/features/contracts/context/ContractContext';
+import { getAnnualEquivalent, getMonthlyEquivalent, formatCurrency } from '@/features/contracts/lib/contractUtils';
+import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
+import { FileText } from 'lucide-react';
+import AppSectionHeader from '@/components/AppSectionHeader';
 
-const InsightsCategoryChart = lazy(() => import('@/pages/contracts/InsightsCategoryChart'));
+const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
 
 export default function InsightsPage() {
   const { contracts } = useContracts();

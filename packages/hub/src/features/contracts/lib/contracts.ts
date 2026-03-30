@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Contract, PriceHistory } from '@/types/contract';
+import { Contract, PriceHistory } from '@/features/contracts/types/contract';
 
 type ContractRow = {
   id: string;
