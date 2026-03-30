@@ -26,6 +26,22 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 - Japan trip pins and labels falling back to overly specific district names such as Minato instead of the main destination.
 - Missing bidirectional translations for locations such as Germany/Alemanha and Berlin/Berlim in trip titles and pin labels.
 
+## [v1.2.0-stable] - 2026-03-30
+
+### Added
+- California and New York trip import scripts with structured travel, hotel and expense payloads.
+- Trips location extraction utilities to derive city-level map pins from hotel/address data.
+
+### Changed
+- Deployment script now skips dependency installation when `package-lock.json` is unchanged and keeps native dependency fallback checks for Linux builds.
+- Trips map experience now includes country highlighting, US state-level highlighting and Portugal mini-map rendering.
+- Trips create/edit flow was expanded to support richer trip data, food review URLs, photo handling and improved trip editing UX.
+- Trips data loading and persistence were updated to support the expanded structured trip payload.
+
+### Fixed
+- Remote deploy handling for optional native dependencies.
+- Trips map/pin behavior and trip edit interactions in the dashboard and detail flows.
+
 ## [v1.1.0-stable] - 2026-03-29
 
 ### Added
