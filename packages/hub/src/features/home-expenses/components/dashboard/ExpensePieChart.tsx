@@ -57,14 +57,14 @@ export default function ExpensePieChart() {
 
   if (data.length === 0) {
     return (
-      <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
+      <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
         <p className="text-sm text-muted-foreground">{t('homeExpenses.charts.noExpensesThisMonth')}</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
+    <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
       <div className="h-[18rem] sm:h-[19rem]">
         <ResponsiveContainer width="100%" height="100%">
