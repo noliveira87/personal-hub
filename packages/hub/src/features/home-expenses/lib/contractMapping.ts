@@ -54,6 +54,15 @@ export function getMonthlyContractTransactions(
       // Only include active contracts
       if (contract.status !== 'active') return false;
 
+      // If there is explicit price history for this month, always include regardless of
+      // start/end date — the user intentionally recorded a bill for this month.
+      const hasPriceHistory = allPriceHistory.some(h => {
+        if (h.contractId !== contract.id) return false;
+        const ym = extractYearMonth(h.date);
+        return ym !== null && ym.year === year && ym.month === month;
+      });
+      if (hasPriceHistory) return true;
+
       const startDate = new Date(contract.startDate);
       const endDate = contract.endDate ? new Date(contract.endDate) : null;
 
