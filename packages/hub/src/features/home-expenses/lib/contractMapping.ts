@@ -17,6 +17,7 @@ export function mapContractCategoryToExpenseCategory(
   contractCategory: ContractCategory
 ): ExpenseCategory | null {
   const mapping: Record<ContractCategory, ExpenseCategory | null> = {
+    'mortgage': 'mortgage',
     'home-insurance': 'mortgage', // Insurance goes with housing/mortgage
     'apartment-insurance': 'mortgage', // Apartment insurance -> housing
     'gas': 'electricity', // Gas is a utility like electricity

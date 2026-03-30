@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import {
   Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus,
-  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting,
+  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting, HOUSING_USAGE_LABELS,
 } from '@/features/contracts/types/contract';
 import { Plus, X, Loader, FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -12,6 +12,7 @@ const defaultAlert = (): AlertSetting => ({ daysBefore: 30, enabled: true, teleg
 
 const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   name: '', category: 'other', provider: '', type: 'other',
+  housingUsage: null,
   startDate: new Date().toISOString().split('T')[0],
   endDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
   noEndDate: false,
@@ -63,6 +64,8 @@ export default function ContractForm() {
       // Always set price to 0 - prices are managed only through price history
       const submitData = {
         ...form,
+        category: form.type === 'mortgage' ? 'mortgage' : form.category,
+        housingUsage: form.type === 'mortgage' ? form.housingUsage : null,
         endDate: normalizedEndDate,
         price: 0,
       };
@@ -118,10 +121,36 @@ export default function ContractForm() {
             </div>
             <div>
               <label className={labelClass}>Type</label>
-              <select className={inputClass} value={form.type} onChange={e => set('type', e.target.value as ContractType)} disabled={submitting}>
+              <select
+                className={inputClass}
+                value={form.type}
+                onChange={e => {
+                  const nextType = e.target.value as ContractType;
+                  setForm(prev => ({
+                    ...prev,
+                    type: nextType,
+                    category: nextType === 'mortgage' ? 'mortgage' : prev.category,
+                    housingUsage: nextType === 'mortgage' ? (prev.housingUsage ?? 'primary-residence') : null,
+                  }));
+                }}
+                disabled={submitting}
+              >
                 {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
+            {form.type === 'mortgage' && (
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Tipo de habitação</label>
+                <select
+                  className={inputClass}
+                  value={form.housingUsage ?? 'primary-residence'}
+                  onChange={e => set('housingUsage', e.target.value as Contract['housingUsage'])}
+                  disabled={submitting}
+                >
+                  {Object.entries(HOUSING_USAGE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

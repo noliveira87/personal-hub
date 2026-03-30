@@ -5,7 +5,7 @@ import { CategoryBadge } from '@/features/contracts/components/CategoryBadge';
 import { PriceHistoryModal } from '@/features/contracts/components/PriceHistoryModal';
 import { getDaysUntilExpiry, formatCurrency, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
-import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS } from '@/features/contracts/types/contract';
+import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS, HOUSING_USAGE_LABELS } from '@/features/contracts/types/contract';
 import { format, parseISO } from 'date-fns';
 import { Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,6 +50,9 @@ export default function ContractDetail() {
   const infoRows = [
     { label: 'Provider', value: contract.provider },
     { label: 'Type', value: TYPE_LABELS[contract.type] },
+    ...(contract.type === 'mortgage' && contract.housingUsage
+      ? [{ label: 'Housing Use', value: HOUSING_USAGE_LABELS[contract.housingUsage] }]
+      : []),
     { label: 'Billing', value: BILLING_LABELS[contract.billingFrequency] },
     { label: 'Renewal', value: RENEWAL_LABELS[contract.renewalType] },
     { label: 'Start Date', value: format(parseISO(contract.startDate), 'MMM d, yyyy') },

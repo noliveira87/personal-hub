@@ -1,4 +1,5 @@
 export type ContractCategory =
+  | 'mortgage'
   | 'home-insurance'
   | 'apartment-insurance'
   | 'gas'
@@ -12,7 +13,8 @@ export type ContractCategory =
   | 'security-alarm'
   | 'other';
 
-export type ContractType = 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'other';
+export type ContractType = 'mortgage' | 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'other';
+export type HousingUsage = 'primary-residence' | 'secondary-home';
 export type RenewalType = 'manual' | 'auto-renew' | 'no-renewal';
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
 export type ContractStatus = 'active' | 'pending-cancellation' | 'expired' | 'archived';
@@ -29,6 +31,7 @@ export interface Contract {
   category: ContractCategory;
   provider: string;
   type: ContractType;
+  housingUsage: HousingUsage | null;
   startDate: string;
   endDate: string | null;
   noEndDate: boolean;
@@ -57,6 +60,7 @@ export interface PriceHistory {
 }
 
 export const CATEGORY_LABELS: Record<ContractCategory, string> = {
+  'mortgage': 'Mortgage',
   'home-insurance': 'Home Insurance',
   'apartment-insurance': 'Apartment Insurance',
   'gas': 'Gas',
@@ -72,6 +76,7 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
 };
 
 export const CATEGORY_ICONS: Record<ContractCategory, string> = {
+  'mortgage': '🏦',
   'home-insurance': '🏠',
   'apartment-insurance': '🏢',
   'gas': '🔥',
@@ -87,12 +92,18 @@ export const CATEGORY_ICONS: Record<ContractCategory, string> = {
 };
 
 export const TYPE_LABELS: Record<ContractType, string> = {
+  mortgage: 'Mortgage',
   insurance: 'Insurance',
   utility: 'Utility',
   telecom: 'Telecom',
   subscription: 'Subscription',
   maintenance: 'Maintenance',
   other: 'Other',
+};
+
+export const HOUSING_USAGE_LABELS: Record<HousingUsage, string> = {
+  'primary-residence': 'Habitação Própria Permanente',
+  'secondary-home': 'Habitação secundária',
 };
 
 export const STATUS_LABELS: Record<ContractStatus, string> = {
