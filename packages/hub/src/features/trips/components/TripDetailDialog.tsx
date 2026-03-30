@@ -5,6 +5,7 @@ import { Trip } from "@/features/trips/types/trip";
 import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
+import { getTripTotal, withFlightsInExpenses } from "@/features/trips/utils/totals";
 
 interface TripDetailDialogProps {
   open: boolean;
@@ -33,7 +34,8 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
 
   if (!trip) return null;
 
-  const totalExpenses = (trip.expenses ?? []).reduce((sum, item) => sum + item.amount, 0);
+  const displayExpenses = withFlightsInExpenses(trip);
+  const totalExpenses = getTripTotal(trip);
   const localizedTitle = getLocalizedTripTitle(trip, language);
   const localizedDestination = getLocalizedTripDestination(trip.destination, language);
 
@@ -217,7 +219,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
             </section>
           ) : null}
 
-          {trip.expenses?.length ? (
+          {displayExpenses.length ? (
             <section className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
@@ -226,7 +228,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 {t("common.expenses")}
               </h3>
               <div className="rounded-xl border border-border/70 p-3 space-y-2 text-sm">
-                {trip.expenses.map((expense, index) => (
+                {displayExpenses.map((expense, index) => (
                   <div key={`${expense.label}-${index}`} className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">{expense.label}</span>
                     <span className="text-foreground">{formatCurrency(expense.amount, "EUR", { minimumFractionDigits: 2 })}</span>

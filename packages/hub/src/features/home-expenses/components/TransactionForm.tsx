@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { Transaction, EXPENSE_CATEGORIES, TransactionType, ExpenseCategory } from '@/features/home-expenses/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -7,17 +7,22 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Plus } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useContracts } from '@/features/contracts/context/ContractContext';
+import { mapContractCategoryToExpenseCategory } from '@/features/home-expenses/lib/contractMapping';
 
 interface Props {
   editTx?: Transaction;
   onClose?: () => void;
   open?: boolean;
+  initialDate?: string;
 }
 
-export default function TransactionForm({ editTx, onClose, open: controlledOpen }: Props) {
+export default function TransactionForm({ editTx, onClose, open: controlledOpen, initialDate }: Props) {
   const { addTx, updateTx } = useData();
+  const { contracts } = useContracts();
   const { t } = useI18n();
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = controlledOpen ?? internalOpen;
@@ -30,31 +35,86 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen 
   const [name, setName] = useState(editTx?.name ?? '');
   const [amount, setAmount] = useState(editTx?.amount?.toString() ?? '');
   const [category, setCategory] = useState<ExpenseCategory>(editTx?.category ?? 'other');
-  const [date, setDate] = useState(editTx?.date ?? new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState(editTx?.notes ?? '');
+  const [date, setDate] = useState(editTx?.date ?? initialDate ?? new Date().toISOString().slice(0, 10));
   const [recurring, setRecurring] = useState(editTx?.recurring ?? false);
+  const [contractId, setContractId] = useState(editTx?.contractId ?? 'none');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editTx) return;
+    setType(editTx.type ?? 'expense');
+    setName(editTx.name ?? '');
+    setAmount(editTx.amount?.toString() ?? '');
+    setCategory(editTx.category ?? 'other');
+    setNotes(editTx.notes ?? '');
+    setDate(editTx.date ?? initialDate ?? new Date().toISOString().slice(0, 10));
+    setRecurring(editTx.recurring ?? false);
+    setContractId(editTx.contractId ?? 'none');
+  }, [editTx, initialDate]);
+
+  const selectedContract = contractId !== 'none'
+    ? contracts.find(contract => contract.id === contractId)
+    : undefined;
 
   const reset = () => {
     setType('expense');
     setName('');
     setAmount('');
     setCategory('other');
-    setDate(new Date().toISOString().slice(0, 10));
+    setNotes('');
+    setDate(initialDate ?? new Date().toISOString().slice(0, 10));
     setRecurring(false);
+    setContractId('none');
+    setSubmitError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(amount);
     if (!name.trim() || isNaN(parsed) || parsed <= 0) return;
+    setSubmitError(null);
 
-    if (editTx) {
-      updateTx(editTx.id, { type, name: name.trim(), amount: parsed, category: type === 'expense' ? category : undefined, date, recurring });
-    } else {
-      addTx({ type, name: name.trim(), amount: parsed, category: type === 'expense' ? category : undefined, date, recurring });
+    const nextCategory = type === 'expense'
+      ? (selectedContract ? (mapContractCategoryToExpenseCategory(selectedContract.category) ?? 'other') : category)
+      : undefined;
+    const nextNotes = type === 'expense' && nextCategory === 'other' ? (notes.trim() || undefined) : undefined;
+    const nextContractId = type === 'expense' && selectedContract ? selectedContract.id : undefined;
+
+    try {
+      if (editTx) {
+        await updateTx(editTx.id, {
+          type,
+          name: name.trim(),
+          amount: parsed,
+          category: nextCategory,
+          notes: nextNotes,
+          date,
+          recurring,
+          contractId: nextContractId,
+          isContractExpense: Boolean(nextContractId),
+        });
+      } else {
+        await addTx({
+          type,
+          name: name.trim(),
+          amount: parsed,
+          category: nextCategory,
+          notes: nextNotes,
+          date,
+          recurring,
+          contractId: nextContractId,
+          isContractExpense: Boolean(nextContractId),
+        });
+      }
+      reset();
+      setOpen(false);
+    } catch {
+      setSubmitError('Could not save transaction. Please try again.');
     }
-    reset();
-    setOpen(false);
   };
+
+  const showLinkedContract = type === 'expense' && category !== 'other';
 
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
@@ -91,21 +151,93 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen 
           </div>
 
           {type === 'expense' && (
-            <div>
-              <Label>{t('homeExpenses.form.category')}</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPENSE_CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.icon} {t(`homeExpenses.categories.${c.value}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <>
+              <div>
+                <Label>{t('homeExpenses.form.category')}</Label>
+                <Select
+                  value={category}
+                  onValueChange={(v) => {
+                    const next = v as ExpenseCategory;
+                    setCategory(next);
+                    if (next === 'other') {
+                      setContractId('none');
+                    }
+                  }}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_CATEGORIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.icon} {t(`homeExpenses.categories.${c.value}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {showLinkedContract && (
+                <div>
+                  <Label>Linked contract</Label>
+                  <Select
+                    value={contractId}
+                    onValueChange={(value) => {
+                      setContractId(value);
+                      if (value === 'none') {
+                        return;
+                      }
+
+                      const contract = contracts.find(item => item.id === value);
+                      if (!contract) {
+                        return;
+                      }
+
+                      const mappedCategory = mapContractCategoryToExpenseCategory(contract.category);
+                      if (mappedCategory) {
+                        setCategory(mappedCategory);
+                      }
+
+                      if (!name.trim()) {
+                        setName(`${contract.name} (${contract.provider})`);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No linked contract</SelectItem>
+                      {contracts
+                        .filter(contract => contract.status === 'active')
+                        .map(contract => (
+                          <SelectItem key={contract.id} value={contract.id}>
+                            {contract.name} ({contract.provider})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedContract && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      This expense will feed the contract price history automatically.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {category === 'other' && (
+                <div>
+                  <Label htmlFor="notes">{t('homeExpenses.form.notes')}</Label>
+                  <Textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder={t('homeExpenses.form.notesPlaceholder')}
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            </>
           )}
 
           <div>
@@ -121,6 +253,9 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen 
           <Button type="submit" className="w-full">
             {editTx ? t('homeExpenses.form.saveChanges') : t('homeExpenses.form.addTransaction')}
           </Button>
+          {submitError && (
+            <p className="text-sm text-destructive">{submitError}</p>
+          )}
         </form>
       </DialogContent>
     </Dialog>

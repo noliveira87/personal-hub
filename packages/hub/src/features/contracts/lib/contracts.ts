@@ -85,22 +85,21 @@ function mapContractToRow(contract: Contract) {
 
 type PriceHistoryRow = {
   id: string;
-  contract_id: string;
-  price: number;
-  currency: string;
+  contract_id: string | null;
+  amount: number;
   date: string;
-  notes: string | null;
+  name: string;
   created_at: string;
 };
 
 function mapRowToPriceHistory(row: PriceHistoryRow): PriceHistory {
   return {
     id: row.id,
-    contractId: row.contract_id,
-    price: row.price,
-    currency: row.currency,
+    contractId: row.contract_id ?? '',
+    price: Number(row.amount),
+    currency: 'EUR',
     date: row.date,
-    notes: row.notes,
+    notes: row.name,
     createdAt: row.created_at,
   };
 }
@@ -182,10 +181,12 @@ export async function deleteContract(id: string): Promise<void> {
 
 export async function loadPriceHistoryForContract(contractId: string): Promise<PriceHistory[]> {
   const { data, error } = await supabase
-    .from('contract_price_history')
-    .select('*')
+    .from('home_expenses_transactions')
+    .select('id, contract_id, amount, date, name, created_at')
+    .eq('type', 'expense')
     .eq('contract_id', contractId)
-    .order('date', { ascending: false });
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error loading price history:', error);
@@ -197,9 +198,12 @@ export async function loadPriceHistoryForContract(contractId: string): Promise<P
 
 export async function loadAllPriceHistory(): Promise<PriceHistory[]> {
   const { data, error } = await supabase
-    .from('contract_price_history')
-    .select('*')
-    .order('date', { ascending: true });
+    .from('home_expenses_transactions')
+    .select('id, contract_id, amount, date, name, created_at')
+    .eq('type', 'expense')
+    .not('contract_id', 'is', null)
+    .order('date', { ascending: true })
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.error('Error loading all price history:', error);
@@ -216,43 +220,17 @@ export async function addPriceHistoryEntry(
   date: string,
   notes?: string
 ): Promise<PriceHistory> {
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from('contract_price_history')
-    .insert([
-      {
-        id,
-        contract_id: contractId,
-        price,
-        currency,
-        date,
-        notes: notes || null,
-        created_at: now,
-      },
-    ])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding price history entry:', error);
-    throw new Error(`Failed to add price history: ${error.message}`);
-  }
-
-  return mapRowToPriceHistory(data);
+  void contractId;
+  void price;
+  void currency;
+  void date;
+  void notes;
+  throw new Error('Contract price history is now managed from Home Expenses.');
 }
 
 export async function deletePriceHistoryEntry(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('contract_price_history')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting price history entry:', error);
-    throw new Error(`Failed to delete price history: ${error.message}`);
-  }
+  void id;
+  throw new Error('Contract price history is now managed from Home Expenses.');
 }
 
 export async function updatePriceHistoryEntry(
@@ -262,82 +240,22 @@ export async function updatePriceHistoryEntry(
   date: string,
   notes?: string
 ): Promise<PriceHistory> {
-  const { data, error } = await supabase
-    .from('contract_price_history')
-    .update({
-      price,
-      currency,
-      date,
-      notes: notes || null,
-    })
-    .eq('id', id)
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error updating price history entry:', error);
-    throw new Error(`Failed to update price history: ${error.message}`);
-  }
-
-  if (data) {
-    return mapRowToPriceHistory(data);
-  }
-
-  const { data: existing, error: existingError } = await supabase
-    .from('contract_price_history')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (existingError) {
-    console.error('Error loading existing price history entry for fallback:', existingError);
-    throw new Error(`Failed to update price history: ${existingError.message}`);
-  }
-
-  if (!existing) {
-    throw new Error('Failed to update price history: entry not found or not accessible');
-  }
-
-  const { error: deleteError } = await supabase
-    .from('contract_price_history')
-    .delete()
-    .eq('id', id);
-
-  if (deleteError) {
-    console.error('Error deleting price history entry during fallback update:', deleteError);
-    throw new Error(`Failed to update price history: ${deleteError.message}`);
-  }
-
-  const { data: inserted, error: insertError } = await supabase
-    .from('contract_price_history')
-    .insert([
-      {
-        id,
-        contract_id: existing.contract_id,
-        price,
-        currency,
-        date,
-        notes: notes || null,
-        created_at: existing.created_at,
-      },
-    ])
-    .select()
-    .single();
-
-  if (insertError) {
-    console.error('Error inserting price history entry during fallback update:', insertError);
-    throw new Error(`Failed to update price history: ${insertError.message}`);
-  }
-
-  return mapRowToPriceHistory(inserted);
+  void id;
+  void price;
+  void currency;
+  void date;
+  void notes;
+  throw new Error('Contract price history is now managed from Home Expenses.');
 }
 
 export async function getLatestPriceForContract(contractId: string): Promise<PriceHistory | null> {
   const { data, error } = await supabase
-    .from('contract_price_history')
-    .select('*')
+    .from('home_expenses_transactions')
+    .select('id, contract_id, amount, date, name, created_at')
+    .eq('type', 'expense')
     .eq('contract_id', contractId)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1)
     .single();
 

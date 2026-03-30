@@ -15,11 +15,12 @@ export interface Transaction {
   name: string;
   type: TransactionType;
   category?: ExpenseCategory;
+  notes?: string;
   amount: number;
   date: string; // YYYY-MM-DD
   recurring: boolean;
-  contractId?: string; // Link to contract manager if derived from a contract
-  isContractExpense?: boolean; // Flag to indicate this comes from contract manager
+  contractId?: string; // Link to contract manager when this expense is a contract payment
+  isContractExpense?: boolean; // Flag to indicate this expense is linked to a contract
 }
 
 export interface MonthData {

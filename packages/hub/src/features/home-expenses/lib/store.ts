@@ -9,9 +9,12 @@ type TransactionRow = {
   name: string;
   type: 'income' | 'expense';
   category: string | null;
+  notes: string | null;
   amount: number;
   date: string;
   recurring: boolean;
+  contract_id: string | null;
+  created_at?: string;
 };
 
 function rowToTransaction(row: TransactionRow): Transaction {
@@ -20,9 +23,12 @@ function rowToTransaction(row: TransactionRow): Transaction {
     name: row.name,
     type: row.type,
     category: row.category as Transaction['category'] ?? undefined,
+    notes: row.notes ?? undefined,
     amount: Number(row.amount),
     date: row.date,
     recurring: row.recurring,
+    contractId: row.contract_id ?? undefined,
+    isContractExpense: Boolean(row.contract_id),
   };
 }
 
@@ -32,9 +38,11 @@ function transactionToRow(tx: Transaction): TransactionRow {
     name: tx.name,
     type: tx.type,
     category: tx.category ?? null,
+    notes: tx.notes ?? null,
     amount: tx.amount,
     date: tx.date,
     recurring: tx.recurring,
+    contract_id: tx.contractId ?? null,
   };
 }
 
@@ -57,9 +65,11 @@ export async function updateTransactionInDb(id: string, updates: Partial<Transac
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.type !== undefined) row.type = updates.type;
   if ('category' in updates) row.category = updates.category ?? null;
+  if ('notes' in updates) row.notes = updates.notes ?? null;
   if (updates.amount !== undefined) row.amount = updates.amount;
   if (updates.date !== undefined) row.date = updates.date;
   if (updates.recurring !== undefined) row.recurring = updates.recurring;
+  if ('contractId' in updates) row.contract_id = updates.contractId ?? null;
   const { error } = await supabase.from(TABLE).update(row).eq('id', id);
   if (error) throw error;
 }

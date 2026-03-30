@@ -4,6 +4,7 @@ import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/sto
 import { MONTHS, EXPENSE_CATEGORIES, Transaction } from '@/features/home-expenses/lib/types';
 import { Input } from '@/components/ui/input';
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
+import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { CalendarDays } from 'lucide-react';
 import { isContractTransaction } from '@/features/home-expenses/lib/contractMapping';
@@ -25,9 +26,10 @@ const MONTH_KEYS = [
 ] as const;
 
 export default function Monthly() {
-  const { allTransactions, transactions, setTransactions, selectedYear } = useData();
+  const { allTransactions, updateTx, selectedYear, selectedMonth } = useData();
   const { t } = useI18n();
   const currentYear = new Date().getFullYear();
+  const initialDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
 
   const monthlyData = useMemo(() => {
     const visibleMonths = (() => {
@@ -70,9 +72,7 @@ export default function Monthly() {
     if (!editingCell) return;
     const parsed = parseFloat(editValue);
     if (!isNaN(parsed) && parsed >= 0) {
-      setTransactions(
-        transactions.map((t) => (t.id === editingCell.txId ? { ...t, amount: parsed } : t))
-      );
+      void updateTx(editingCell.txId, { amount: parsed });
     }
     setEditingCell(null);
   };
@@ -83,7 +83,12 @@ export default function Monthly() {
         title={t('homeExpenses.appTitle')}
         icon={CalendarDays}
         backTo="/"
-        actions={<MonthYearSelector />}
+        actions={(
+          <div className="flex items-center gap-2">
+            <MonthYearSelector />
+            <TransactionForm initialDate={initialDate} />
+          </div>
+        )}
       />
 
       <div>
@@ -157,7 +162,7 @@ export default function Monthly() {
                           {tx.type === 'expense' && EXPENSE_CATEGORIES.find((c) => c.value === tx.category)?.icon}
                         </td>
                         <td className="py-2 text-right">
-                          {editingCell?.txId === tx.id && !isContractTx ? (
+                          {editingCell?.txId === tx.id ? (
                             <Input
                               type="number"
                               step="0.01"
@@ -170,8 +175,8 @@ export default function Monthly() {
                             />
                           ) : (
                             <span
-                              className={`tabular-nums ${isContractTx ? 'cursor-default' : 'cursor-pointer hover:underline'} ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}
-                              onClick={() => !isContractTx && startEdit(tx.id, 'amount', tx.amount)}
+                              className={`tabular-nums cursor-pointer hover:underline ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}
+                              onClick={() => startEdit(tx.id, 'amount', tx.amount)}
                             >
                               {formatCurrency(tx.amount)}
                               {isContractTx && <span className="text-xs text-muted-foreground ml-1">{t('homeExpenses.list.contractTag')}</span>}

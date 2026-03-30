@@ -32,12 +32,12 @@ export default function ContractsList() {
 
     result.sort((a, b) => {
       if (sortBy === 'renewal') return getDaysUntilExpiry(a) - getDaysUntilExpiry(b);
-      if (sortBy === 'price') return b.price - a.price;
+      if (sortBy === 'price') return (priceMap.get(b.id)?.price ?? b.price) - (priceMap.get(a.id)?.price ?? a.price);
       return a.name.localeCompare(b.name);
     });
 
     return result;
-  }, [contracts, search, categoryFilter, statusFilter, sortBy]);
+  }, [contracts, search, categoryFilter, statusFilter, sortBy, priceMap]);
 
   if (loading) {
     return (

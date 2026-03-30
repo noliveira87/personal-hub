@@ -7,7 +7,7 @@ import { Trip } from "@/features/trips/types/trip";
 import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
-import { getTripTotal } from "@/features/trips/utils/totals";
+import { getTripTotal, withFlightsInExpenses } from "@/features/trips/utils/totals";
 
 interface TripDetailProps {
   trip: Trip;
@@ -62,6 +62,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
   const tripTotal = getTripTotal(trip);
+  const displayExpenses = withFlightsInExpenses(trip);
   const formatEuro = (value: number) => formatCurrency(value, "EUR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const localizedTitle = getLocalizedTripTitle(trip, language);
   const localizedDestination = getLocalizedTripDestination(trip.destination, language);
@@ -301,11 +302,11 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
             </Section>
           )}
 
-          {trip.expenses && trip.expenses.length > 0 && (
+          {displayExpenses.length > 0 && (
             <Section icon={Receipt} title={t("common.expenses")} delay={0.5}>
               <InfoCard>
                 <div className="space-y-3">
-                  {trip.expenses.map((expense, index) => (
+                  {displayExpenses.map((expense, index) => (
                     <div key={`${expense.label}-${index}`} className="flex items-center justify-between text-sm font-body">
                       <span className="text-foreground/75">{expense.label}</span>
                       <span className="text-foreground font-medium">{formatEuro(expense.amount)}</span>

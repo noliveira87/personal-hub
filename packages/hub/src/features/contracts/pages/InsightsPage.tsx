@@ -1,19 +1,22 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent, formatCurrency } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
 
 export default function InsightsPage() {
-  const { contracts } = useContracts();
+  const { contracts, allPriceHistory } = useContracts();
 
   const active = contracts.filter(c => c.status === 'active');
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
   const { priceMap } = usePriceHistoryMap(contractIds);
+  const [selectedScope, setSelectedScope] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const activeWithResolvedPrices = useMemo(() => {
     return active.map((contract) => {
@@ -52,6 +55,76 @@ export default function InsightsPage() {
       .slice(0, 5);
   }, [activeWithResolvedPrices]);
 
+  const availableHistoryYears = useMemo(() => {
+    const years = new Set<number>();
+    allPriceHistory.forEach((entry) => years.add(new Date(entry.date).getFullYear()));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allPriceHistory]);
+
+  const effectiveYear = availableHistoryYears.includes(selectedYear)
+    ? selectedYear
+    : (availableHistoryYears[0] ?? selectedYear);
+
+  const chartContractOptions = useMemo(() => {
+    return active
+      .map((contract) => ({ id: contract.id, label: `${contract.name} (${contract.provider})` }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-PT'));
+  }, [active]);
+
+  const electricityContractIds = useMemo(() => {
+    return contracts
+      .filter((contract) => contract.category === 'electricity')
+      .map((contract) => contract.id);
+  }, [contracts]);
+
+  const monthlyEvolutionData = useMemo(() => {
+    const byMonth = new Map<number, number>();
+
+    const scopedContractIds = selectedScope === 'all'
+      ? null
+      : selectedScope === 'category:electricity'
+        ? new Set(electricityContractIds)
+        : new Set([selectedScope]);
+
+    for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+      const monthEntries = allPriceHistory.filter((entry) => {
+        const date = new Date(entry.date);
+        if (date.getFullYear() !== effectiveYear || date.getMonth() !== monthIndex) {
+          return false;
+        }
+
+        if (!scopedContractIds) {
+          return true;
+        }
+
+        return scopedContractIds.has(entry.contractId);
+      });
+
+      if (monthEntries.length === 0) {
+        continue;
+      }
+
+      const latestByContract = new Map<string, { date: string; price: number }>();
+      monthEntries.forEach((entry) => {
+        const current = latestByContract.get(entry.contractId);
+        if (!current || entry.date > current.date) {
+          latestByContract.set(entry.contractId, { date: entry.date, price: entry.price });
+        }
+      });
+
+      const monthTotal = Array.from(latestByContract.values()).reduce((sum, value) => sum + value.price, 0);
+      byMonth.set(monthIndex, monthTotal);
+    }
+
+    return Array.from({ length: 12 }, (_, monthIndex) => ({
+      month: new Date(effectiveYear, monthIndex, 1).toLocaleDateString('pt-PT', { month: 'short' }),
+      value: byMonth.get(monthIndex) ?? null,
+    }));
+  }, [allPriceHistory, effectiveYear, selectedScope, electricityContractIds]);
+
+  const selectedContract = contracts.find((contract) => contract.id === selectedScope);
+  const chartCurrency = selectedContract?.currency ?? 'EUR';
+
   return (
     <div className="space-y-8 pt-16">
       <AppSectionHeader title="D12 Contracts" icon={FileText} />
@@ -81,6 +154,69 @@ export default function InsightsPage() {
         <Suspense fallback={<div className="h-64 rounded-lg bg-muted/30 animate-pulse" />}>
           <InsightsCategoryChart data={byCategory} />
         </Suspense>
+      </div>
+
+      <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '200ms' }}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <h2 className="text-sm font-semibold text-foreground">Price Evolution</h2>
+          <div className="flex gap-2">
+            <select
+              value={selectedScope}
+              onChange={(e) => setSelectedScope(e.target.value)}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="all">All contracts</option>
+              <option value="category:electricity">Luz (todos os contratos)</option>
+              {chartContractOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+            <select
+              value={effectiveYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+            >
+              {availableHistoryYears.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {monthlyEvolutionData.some((point) => point.value != null) ? (
+          <div className="h-64 rounded-lg border bg-background p-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={monthlyEvolutionData} margin={{ top: 10, right: 10, left: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis
+                  tick={{ fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => formatCurrency(Number(value), chartCurrency)}
+                  width={84}
+                />
+                <Tooltip
+                  formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
+                  labelFormatter={(label) => `${label} ${effectiveYear}`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2.5}
+                  dot={{ r: 3 }}
+                  activeDot={{ r: 5 }}
+                  connectNulls={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="text-center py-4 text-sm text-muted-foreground rounded-lg border bg-muted/20">
+            No data for {effectiveYear}
+          </div>
+        )}
       </div>
 
       {/* Category breakdown list */}

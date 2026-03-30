@@ -357,7 +357,7 @@ export default function ContractForm() {
           {/* Info about price */}
           <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <p className="text-sm text-blue-700 dark:text-blue-400">
-              <strong>💡 Tip:</strong> After creating the contract, add the current price via the price history section. The latest price will display as the contract's current price.
+              <strong>💡 Tip:</strong> After creating the contract, add the monthly expense in Home Expenses and link it to this contract. The contract price history now reads from those linked expenses.
             </p>
           </div>
         </div>

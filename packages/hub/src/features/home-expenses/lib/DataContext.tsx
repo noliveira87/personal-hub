@@ -9,8 +9,6 @@ import {
   clearLegacyTransactions,
   parseLocalDate,
 } from './store';
-import { getMonthlyContractTransactions } from './contractMapping';
-import { useContracts } from '@/features/contracts/context/ContractContext';
 
 interface DataContextType {
   transactions: Transaction[];       // manual transactions only (from Supabase)
@@ -34,7 +32,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const { contracts, allPriceHistory } = useContracts();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,29 +74,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // All transactions for the selected year: manual entries + one auto-generated entry
-  // per active monthly contract per month. Components filter by month themselves.
+  // All transactions are now persisted in home-expenses, including contract-linked expenses.
   const allTransactions = useMemo(() => {
-    const yearManual = transactions.filter(t => {
+    return transactions.filter(t => {
       const d = parseLocalDate(t.date);
       return d.getFullYear() === selectedYear;
     });
-
-    const yearContractTxs: Transaction[] = [];
-    for (let m = 0; m < 12; m++) {
-      for (const ct of getMonthlyContractTransactions(contracts, allPriceHistory, selectedYear, m)) {
-        yearContractTxs.push(ct);
-      }
-    }
-
-    // Dedup by id only (contract ids are deterministic: contract-{id}-{year}-{month})
-    const seen = new Set<string>();
-    return [...yearManual, ...yearContractTxs].filter(t => {
-      if (seen.has(t.id)) return false;
-      seen.add(t.id);
-      return true;
-    });
-  }, [transactions, contracts, allPriceHistory, selectedYear]);
+  }, [transactions, selectedYear]);
 
   return (
     <DataContext.Provider value={{ transactions, loading, addTx, updateTx, deleteTx, refresh, selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, allTransactions }}>

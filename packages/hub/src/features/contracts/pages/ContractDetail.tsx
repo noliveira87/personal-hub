@@ -96,7 +96,7 @@ export default function ContractDetail() {
           <div>
             <p className="text-sm text-muted-foreground">Price</p>
             <p className="text-2xl font-bold tabular-nums">
-              {latestPrice ? formatCurrency(latestPrice.price, latestPrice.currency) : 'No price'}
+              {latestPrice ? formatCurrency(latestPrice.price, latestPrice.currency || contract.currency) : 'No price'}
               {latestPrice && (
                 <span className="text-xs font-normal text-muted-foreground ml-2">
                   • {format(parseISO(latestPrice.date), 'MMM d')}

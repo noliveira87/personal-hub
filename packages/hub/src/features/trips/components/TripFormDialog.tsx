@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FlightLeg, Trip, TripExpense, TripFood, TripHotel, TripTicket } from "@/features/trips/types/trip";
+import { isFlightExpenseLabel } from "@/features/trips/utils/totals";
 
 interface TripFormDialogProps {
   open: boolean;
@@ -57,7 +58,7 @@ export function TripFormDialog({ open, onOpenChange, trip, onSave }: TripFormDia
       setHotels(trip.hotels ?? []);
       setFoods(trip.foods ?? []);
       setTickets(trip.tickets ?? []);
-      setExpenses(trip.expenses ?? []);
+      setExpenses((trip.expenses ?? []).filter((item) => !isFlightExpenseLabel(item.label)));
       return;
     }
 
@@ -106,7 +107,7 @@ export function TripFormDialog({ open, onOpenChange, trip, onSave }: TripFormDia
 
     const normalizedExpenses = expenses
       .map((item) => ({ label: item.label.trim(), amount: Number(item.amount) || 0 }))
-      .filter((item) => item.label);
+      .filter((item) => item.label && !isFlightExpenseLabel(item.label));
 
     const totalCost = normalizedExpenses.length
       ? normalizedExpenses.reduce((sum, item) => sum + item.amount, 0)

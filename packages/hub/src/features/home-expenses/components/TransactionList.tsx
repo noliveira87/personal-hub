@@ -35,7 +35,7 @@ export default function TransactionList() {
 
   return (
     <div className="space-y-2">
-      {editTx && !isContractTx(editTx) && <TransactionForm editTx={editTx} onClose={() => setEditTx(null)} open />}
+      {editTx && <TransactionForm editTx={editTx} onClose={() => setEditTx(null)} open />}
       {filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">{t('homeExpenses.list.noTransactionsThisMonth')}</div>
       )}
@@ -47,7 +47,7 @@ export default function TransactionList() {
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm text-foreground truncate">{tx.name}</span>
                 {isContractTx(tx) && (
-                  <span title={t('homeExpenses.list.fromContractManager')} className="text-muted-foreground">
+                  <span title="Linked contract" className="text-muted-foreground">
                     <Link2 className="w-3 h-3" />
                   </span>
                 )}
@@ -58,22 +58,23 @@ export default function TransactionList() {
                 {tx.type === 'expense' && ' · '}
                 {new Date(tx.date).toLocaleDateString(locale)}
               </span>
+              {tx.type === 'expense' && tx.category === 'other' && tx.notes && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{tx.notes}</p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">
             <span className={`tabular-nums font-semibold text-sm ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
               {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
             </span>
-            {!isContractTx(tx) && (
-              <>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </>
-            )}
+            <>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
+                <Pencil className="w-3.5 h-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </>
           </div>
         </div>
       ))}

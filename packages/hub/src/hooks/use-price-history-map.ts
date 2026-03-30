@@ -5,13 +5,12 @@ import { supabase } from '@/lib/supabase';
 export interface LatestPrice {
   price: number;
   date: string;
-  currency: string;
+  currency?: string;
 }
 
 interface PriceHistoryMapRow {
-  contract_id: string;
-  price: number;
-  currency: string;
+  contract_id: string | null;
+  amount: number;
   date: string;
 }
 
@@ -43,8 +42,9 @@ export function usePriceHistoryMap(contractIds: string[]) {
       setError(null);
       try {
         const { data, error: err } = await supabase
-          .from('contract_price_history')
-          .select('id, contract_id, price, currency, date')
+          .from('home_expenses_transactions')
+          .select('id, contract_id, amount, date, created_at')
+          .eq('type', 'expense')
           .in('contract_id', contractIds);
 
         if (err) {
@@ -69,15 +69,16 @@ export function usePriceHistoryMap(contractIds: string[]) {
         const seenContracts = new Set<string>();
 
         sortedData.forEach((entry) => {
-          if (!seenContracts.has(entry.contract_id)) {
-            const latestEntry: LatestPrice = {
-              price: entry.price,
-              date: entry.date,
-              currency: entry.currency,
-            };
-            latestMap.set(entry.contract_id, latestEntry);
-            seenContracts.add(entry.contract_id);
+          if (!entry.contract_id || seenContracts.has(entry.contract_id)) {
+            return;
           }
+
+          const latestEntry: LatestPrice = {
+            price: Number(entry.amount),
+            date: entry.date,
+          };
+          latestMap.set(entry.contract_id, latestEntry);
+          seenContracts.add(entry.contract_id);
         });
 
         setPriceMap(latestMap);

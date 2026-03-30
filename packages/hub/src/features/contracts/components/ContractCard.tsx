@@ -19,7 +19,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   
   // Use latest price from history, fallback to contract price
   const displayPrice = latestPrice?.price ?? contract.price;
-  const displayCurrency = latestPrice?.currency ?? contract.currency;
+  const displayCurrency = latestPrice?.currency || contract.currency;
   const priceDate = latestPrice?.date;
 
   return (
