@@ -35,18 +35,18 @@ export default function Index() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
         <div className="space-y-4 lg:col-span-8">
-          <div className="min-h-[30rem] lg:h-[30rem]">
+          <div className="min-h-[30rem]">
             <BalanceChart />
           </div>
-          <div className="min-h-[14rem] lg:h-[14rem]">
+          <div>
             <AnnualSummarySection />
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 lg:col-span-4">
-          <div className="min-h-[30rem] lg:h-[30rem]">
+          <div>
             <ExpensePieChart />
           </div>
-          <div className="min-h-[14rem] lg:h-[14rem]">
+          <div>
             <HighlightsPanel />
           </div>
         </div>

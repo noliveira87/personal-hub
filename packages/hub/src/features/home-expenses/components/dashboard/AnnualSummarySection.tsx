@@ -24,7 +24,7 @@ export default function AnnualSummarySection() {
   }, [allTransactions, selectedYear]);
 
   return (
-    <section className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col justify-center">
+    <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col justify-center">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-foreground">{t('homeExpenses.annual.title')} — {selectedYear}</h3>
         <p className="text-xs text-muted-foreground mt-1">{t('homeExpenses.annual.subtitle')}</p>
