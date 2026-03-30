@@ -11,7 +11,13 @@ import { TripsWorldMap } from "@/features/trips/components/TripsWorldMap";
 import { createTrip, deleteTrip, loadTrips, updateTrip } from "@/lib/trips";
 import { Trip } from "@/features/trips/types/trip";
 import { useEffect } from "react";
-import { getTripLocationSummaries } from "@/features/trips/utils/locations";
+import {
+  getLocalizedTripDestination,
+  getLocalizedTripTitle,
+  getTripDestinationCount,
+  getTripsOutsidePortugalCount,
+} from "@/features/trips/utils/locations";
+import { useI18n } from "@/i18n/I18nProvider";
 
 type View = "dashboard" | "detail" | "add" | "edit";
 type EditableTripFields = Omit<Trip, "id" | "createdAt" | "updatedAt">;
@@ -62,6 +68,7 @@ const buildTripChanges = (current: Trip, next: EditableTripFields): Partial<Edit
 };
 
 export function TripsApp() {
+  const { t, formatCurrency, language } = useI18n();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -95,20 +102,22 @@ export function TripsApp() {
     if (!search) return trips;
     const query = search.toLowerCase();
     return trips.filter((trip) => (
-      trip.title.toLowerCase().includes(query)
+      getLocalizedTripTitle(trip, language).toLowerCase().includes(query)
+      || getLocalizedTripDestination(trip.destination, language).toLowerCase().includes(query)
+      || trip.title.toLowerCase().includes(query)
       || trip.destination.toLowerCase().includes(query)
       || trip.tags.some((tag) => tag.toLowerCase().includes(query))
     ));
-  }, [trips, search]);
+  }, [trips, search, language]);
 
-  const { totalTrips, totalCountries, totalSpent } = useMemo(() => ({
-    totalTrips: trips.length,
-    totalCountries: new Set(getTripLocationSummaries(trips).map((location) => location.label)).size,
+  const { totalTrips, totalDestinations, totalSpent } = useMemo(() => ({
+    totalTrips: getTripsOutsidePortugalCount(trips),
+    totalDestinations: getTripDestinationCount(trips),
     totalSpent: trips.reduce((sum, trip) => sum + trip.cost, 0),
   }), [trips]);
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm("Apagar esta viagem?");
+    const confirmed = window.confirm(t("trips.confirmDelete"));
     if (!confirmed) return;
 
     try {
@@ -118,7 +127,7 @@ export function TripsApp() {
       setSelectedTrip(null);
     } catch (error) {
       console.error("Error deleting trip:", error);
-      alert("Nao foi possivel apagar a viagem.");
+      alert(t("trips.deleteError"));
     }
   };
 
@@ -134,7 +143,7 @@ export function TripsApp() {
       setView("dashboard");
     } catch (error) {
       console.error("Error creating trip:", error);
-      alert("Nao foi possivel criar a viagem.");
+      alert(t("trips.createError"));
     }
   };
 
@@ -160,7 +169,7 @@ export function TripsApp() {
       setView("detail");
     } catch (error) {
       console.error("Error updating trip:", error);
-      alert("Nao foi possivel guardar as alteracoes.");
+      alert(t("trips.saveError"));
     }
   };
 
@@ -168,7 +177,7 @@ export function TripsApp() {
     return (
       <>
         <Header />
-        <main className="min-h-screen flex items-center justify-center text-muted-foreground">A carregar viagens...</main>
+        <main className="min-h-screen flex items-center justify-center text-muted-foreground">{t("trips.loadingTrips")}</main>
       </>
     );
   }
@@ -228,11 +237,11 @@ export function TripsApp() {
                 className="w-full"
               >
                 <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-foreground leading-[0.98]">
-                  As Nossas <span className="italic font-normal text-foreground/95">Aventuras</span>
+                  {t("trips.pageTitle")}
                 </h1>
 
                 <p className="mt-4 text-muted-foreground font-body text-base sm:text-lg leading-relaxed">
-                  Cada viagem conta uma historia. Aqui guardamos as nossas memorias, juntos.
+                  {t("trips.pageSubtitle")}
                 </p>
               </motion.div>
 
@@ -246,17 +255,17 @@ export function TripsApp() {
                   <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
                     <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
                     <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalTrips}</p>
-                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">viagens</p>
+                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.trips")}</p>
                   </div>
                   <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
                     <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
-                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalCountries}</p>
-                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">destinos</p>
+                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalDestinations}</p>
+                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.destinations")}</p>
                   </div>
                   <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
                     <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
-                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalSpent.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€</p>
-                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.12em] text-foreground/65">investidos em memorias</p>
+                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(totalSpent, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.12em] text-foreground/65">{t("trips.stats.invested")}</p>
                   </div>
                 </motion.div>
               )}
@@ -293,7 +302,7 @@ export function TripsApp() {
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Pesquisar viagens..."
+                placeholder={t("trips.searchPlaceholder")}
                 className="pl-11 h-11 rounded-full bg-secondary/50 border-border/50 font-body"
               />
             </div>
@@ -302,7 +311,7 @@ export function TripsApp() {
               className="gap-2 rounded-full px-6 h-11 bg-foreground text-background hover:bg-foreground/90 font-body shadow-lg hover:shadow-xl transition-shadow"
             >
               <Plus className="h-4 w-4" />
-              Nova Viagem
+              {t("trips.newTrip")}
             </Button>
           </motion.div>
 
@@ -326,14 +335,14 @@ export function TripsApp() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-24">
                 <Compass className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                 <p className="font-display text-2xl text-muted-foreground mb-2">
-                  {search ? "Nenhuma viagem encontrada" : "Ainda sem viagens"}
+                  {search ? t("trips.noTripsFound") : t("trips.noTripsYet")}
                 </p>
                 <p className="text-sm text-muted-foreground font-body mb-6">
-                  {search ? "Tenta outra pesquisa." : "Comeca por adicionar a vossa primeira aventura juntos."}
+                  {search ? t("trips.tryAnotherSearch") : t("trips.addFirstAdventure")}
                 </p>
                 {!search && (
                   <Button onClick={() => setView("add")} className="rounded-full px-6 bg-foreground text-background hover:bg-foreground/90 font-body gap-2">
-                    <Plus className="h-4 w-4" />Nova Viagem
+                    <Plus className="h-4 w-4" />{t("trips.newTrip")}
                   </Button>
                 )}
               </motion.div>

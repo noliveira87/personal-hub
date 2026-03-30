@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Star, Upload, X, Plane, Hotel, UtensilsCrossed, Ticket, Receipt } from "lucide-react";
 import { FlightLeg, Trip, TripExpense, TripFood, TripHotel, TripTicket } from "@/features/trips/types/trip";
 import { Header } from "@/features/trips/components/Header";
+import { useI18n } from "@/i18n/I18nProvider";
 import { supabase } from "@/lib/supabase";
 
 interface TripFormProps {
@@ -266,13 +267,12 @@ const fetchFoodDescription = async (foodName: string): Promise<string | null> =>
   return null;
 };
 
-const enrichFood = async (food: TripFood, destination: string): Promise<TripFood> => {
+const enrichFood = async (food: TripFood, destination: string, fallbackDescription: string): Promise<TripFood> => {
   const name = food.name?.trim();
   if (!name) return food;
   if (food.description?.trim()) return food;
 
   const fetchedDescription = await fetchFoodDescription(name);
-  const fallbackDescription = `A local favorite enjoyed in ${destination}.`;
 
   return {
     ...food,
@@ -280,8 +280,8 @@ const enrichFood = async (food: TripFood, destination: string): Promise<TripFood
   };
 };
 
-const enrichFoods = async (foods: TripFood[], destination: string) => Promise.all(
-  foods.map((food) => enrichFood(food, destination)),
+const enrichFoods = async (foods: TripFood[], destination: string, fallbackDescription: string) => Promise.all(
+  foods.map((food) => enrichFood(food, destination, fallbackDescription)),
 );
 
 const hasUsableGoogleMapsQuery = (link?: string) => {
@@ -393,6 +393,7 @@ const RemoveBtn = ({ onClick }: { onClick: () => void }) => (
 );
 
 export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
+  const { t, formatCurrency } = useI18n();
   const [title, setTitle] = useState(trip?.title || "");
   const [destination, setDestination] = useState(trip?.destination || "");
   const [startDate, setStartDate] = useState(trip?.startDate || "");
@@ -457,7 +458,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       setPhotos((prev) => [...prev, ...urls]);
     } catch (error) {
       console.error("Error uploading photos:", error);
-      alert("Nao foi possivel fazer upload das fotos. Tenta novamente.");
+      alert(t("trips.photoUploadError"));
     } finally {
       setIsUploading(false);
       event.target.value = "";
@@ -481,7 +482,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       setFoods((prev) => prev.map((food, i) => (i === index ? { ...food, image: imageUrl } : food)));
     } catch (error) {
       console.error("Error uploading food thumbnail:", error);
-      alert("Nao foi possivel carregar a miniatura da comida.");
+      alert(t("trips.foodThumbnailUploadError"));
     } finally {
       setIsUploadingFoodThumb(false);
       event.target.value = "";
@@ -537,7 +538,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       setHotels(enrichedHotels);
 
       const normalizedFoods = foods.filter((food) => food.name.trim());
-      const enrichedFoods = await enrichFoods(normalizedFoods, destination);
+      const enrichedFoods = await enrichFoods(normalizedFoods, destination, t("trips.fallbackFoodDescription", { destination }));
       setFoods(enrichedFoods);
 
       const nextMergedExpenses = buildMergedExpenses(expenses, enrichedHotels);
@@ -577,11 +578,11 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
           <div className="container mx-auto px-4 sm:px-6 py-3">
             <div className="flex items-center justify-between gap-2">
               <Button variant="ghost" onClick={onCancel} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-                <ArrowLeft className="h-4 w-4" />Voltar
+                <ArrowLeft className="h-4 w-4" />{t("trips.back")}
               </Button>
               <div className="flex items-center gap-2">
                 <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl font-body h-10">
-                  Cancelar
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -589,7 +590,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                   disabled={isUploading || isUploadingFoodThumb || isEnriching}
                   className="rounded-xl bg-foreground text-background hover:bg-foreground/90 font-body h-10"
                 >
-                  {isEnriching ? "A enriquecer dados..." : (trip ? "Guardar Alteracoes" : "Criar Viagem")}
+                  {isEnriching ? t("trips.enrichData") : (trip ? t("trips.saveChanges") : t("trips.createTrip"))}
                 </Button>
               </div>
             </div>
@@ -599,53 +600,53 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
         <div className="container mx-auto px-4 sm:px-6 py-4">
 
           <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-8">
-            {trip ? "Editar Viagem" : "Nova Aventura"}
+            {trip ? t("trips.editTrip") : t("trips.newAdventure")}
           </h1>
 
           <form id="trip-form" onSubmit={handleSubmit} className="max-w-3xl space-y-10 pb-20">
             <section className="space-y-4">
-              <h3 className="font-display text-lg font-semibold border-b border-border pb-2">Informacao Geral</h3>
+              <h3 className="font-display text-lg font-semibold border-b border-border pb-2">{t("trips.generalInfo")}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="font-body text-sm font-medium">Titulo</Label>
-                  <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="CrossFit Games 2024" required className="rounded-xl" />
+                  <Label className="font-body text-sm font-medium">{t("trips.title")}</Label>
+                  <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("trips.titlePlaceholder")} required className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-body text-sm font-medium">Destino</Label>
-                  <Input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder="Madison, Wisconsin" required className="rounded-xl" />
+                  <Label className="font-body text-sm font-medium">{t("trips.destination")}</Label>
+                  <Input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={t("trips.destinationPlaceholder")} required className="rounded-xl" />
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label className="font-body text-sm font-medium">Data Inicio</Label>
+                  <Label className="font-body text-sm font-medium">{t("trips.startDate")}</Label>
                   <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-body text-sm font-medium">Data Fim</Label>
+                  <Label className="font-body text-sm font-medium">{t("trips.endDate")}</Label>
                   <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} required className="rounded-xl" />
                 </div>
                 <div className="space-y-2 col-span-2 sm:col-span-1">
-                  <Label className="font-body text-sm font-medium">Tags</Label>
-                  <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="aventura, fitness" className="rounded-xl" />
+                  <Label className="font-body text-sm font-medium">{t("trips.tags")}</Label>
+                  <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder={t("trips.tagsPlaceholder")} className="rounded-xl" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="font-body text-sm font-medium">Notas / Historia</Label>
-                <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Escreve sobre as vossas memorias favoritas..." rows={3} className="rounded-xl resize-none" />
+                <Label className="font-body text-sm font-medium">{t("trips.notesLabel")}</Label>
+                <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={t("trips.notesPlaceholder")} rows={3} className="rounded-xl resize-none" />
               </div>
             </section>
 
             <section className="space-y-3">
-              <h3 className="font-display text-lg font-semibold border-b border-border pb-2">Fotos</h3>
+              <h3 className="font-display text-lg font-semibold border-b border-border pb-2">{t("trips.photosTitle")}</h3>
               <label className={`flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-accent/50 hover:bg-secondary/50 transition-colors ${isUploading ? "opacity-50 pointer-events-none" : ""}`}>
                 <Upload className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground font-body">{isUploading ? "A carregar fotos..." : "Clica para carregar fotos"}</span>
+                <span className="text-sm text-muted-foreground font-body">{isUploading ? t("trips.uploadingPhotos") : t("trips.clickToUploadPhotos")}</span>
                 <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={isUploading} />
               </label>
               {photos.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-xs font-body text-muted-foreground">
-                    A primeira foto fica como capa. Usa as setas para reorganizar ou a estrela para trazer uma foto para primeiro lugar.
+                    {t("trips.photosHelp")}
                   </p>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                   {photos.map((photo, index) => (
@@ -653,13 +654,13 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                       <img src={photo} alt="" className="h-full w-full object-cover" />
                       {index === 0 && (
                         <span className="absolute left-1 top-1 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-body font-semibold uppercase tracking-[0.12em] text-foreground shadow-sm">
-                          Capa
+                          {t("trips.cover")}
                         </span>
                       )}
                       <div className="absolute inset-x-1 bottom-1 flex items-center justify-center gap-1 opacity-0 transition-opacity group-hover/photo:opacity-100 group-focus-within/photo:opacity-100">
                         <button
                           type="button"
-                          aria-label="Mover foto para a esquerda"
+                          aria-label={t("trips.movePhotoLeft")}
                           onClick={() => movePhoto(index, -1)}
                           disabled={index === 0}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/88 text-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
@@ -668,7 +669,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                         </button>
                         <button
                           type="button"
-                          aria-label="Definir como foto de capa"
+                          aria-label={t("trips.setAsCoverPhoto")}
                           onClick={() => setCoverPhoto(index)}
                           disabled={index === 0}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/88 text-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
@@ -677,7 +678,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                         </button>
                         <button
                           type="button"
-                          aria-label="Mover foto para a direita"
+                          aria-label={t("trips.movePhotoRight")}
                           onClick={() => movePhoto(index, 1)}
                           disabled={index === photos.length - 1}
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-background/88 text-foreground shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
@@ -689,7 +690,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                         type="button"
                         onClick={() => setPhotos((prev) => prev.filter((_, idx) => idx !== index))}
                         className="absolute right-1 top-1 rounded-full bg-foreground/70 p-0.5 opacity-0 transition-opacity group-hover/photo:opacity-100"
-                        aria-label="Remover foto"
+                        aria-label={t("trips.removePhoto")}
                       >
                         <X className="h-3 w-3 text-background" />
                       </button>
@@ -703,97 +704,97 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
             <section className="space-y-3">
               <div className="flex items-center gap-2 border-b border-border pb-2">
                 <Plane className="h-4 w-4 text-accent" />
-                <h3 className="font-display text-lg font-semibold">Voos</h3>
+                <h3 className="font-display text-lg font-semibold">{t("trips.flights")}</h3>
               </div>
 
               <div className="space-y-3">
-                <SectionHeader icon={Plane} title="Ida" onAdd={() => setOutbound((prev) => [emptyFlight(), ...prev])} addLabel="Voo" />
+                <SectionHeader icon={Plane} title={t("trips.outbound")} onAdd={() => setOutbound((prev) => [emptyFlight(), ...prev])} addLabel={t("trips.addFlight")} />
                 {outbound.map((leg, index) => (
                   <div key={`out-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                     <RemoveBtn onClick={() => removeFromArray(setOutbound, index)} />
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <Input placeholder="De" value={leg.from} onChange={(event) => updateArray(setOutbound, index, "from", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Para" value={leg.to} onChange={(event) => updateArray(setOutbound, index, "to", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Partida" value={leg.departure} onChange={(event) => updateArray(setOutbound, index, "departure", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Chegada" value={leg.arrival} onChange={(event) => updateArray(setOutbound, index, "arrival", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.from")} value={leg.from} onChange={(event) => updateArray(setOutbound, index, "from", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.to")} value={leg.to} onChange={(event) => updateArray(setOutbound, index, "to", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.departure")} value={leg.departure} onChange={(event) => updateArray(setOutbound, index, "departure", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.arrival")} value={leg.arrival} onChange={(event) => updateArray(setOutbound, index, "arrival", event.target.value)} className="rounded-lg text-sm" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <Input placeholder="Companhia" value={leg.carrier || ""} onChange={(event) => updateArray(setOutbound, index, "carrier", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="No Voo" value={leg.flightNumber || ""} onChange={(event) => updateArray(setOutbound, index, "flightNumber", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.airline")} value={leg.carrier || ""} onChange={(event) => updateArray(setOutbound, index, "carrier", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.flightNumber")} value={leg.flightNumber || ""} onChange={(event) => updateArray(setOutbound, index, "flightNumber", event.target.value)} className="rounded-lg text-sm" />
                     </div>
                   </div>
                 ))}
               </div>
 
               <div className="space-y-3">
-                <SectionHeader icon={Plane} title="Volta" onAdd={() => setReturnFlights((prev) => [emptyFlight(), ...prev])} addLabel="Voo" />
+                <SectionHeader icon={Plane} title={t("trips.return")} onAdd={() => setReturnFlights((prev) => [emptyFlight(), ...prev])} addLabel={t("trips.addFlight")} />
                 {returnFlights.map((leg, index) => (
                   <div key={`ret-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                     <RemoveBtn onClick={() => removeFromArray(setReturnFlights, index)} />
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <Input placeholder="De" value={leg.from} onChange={(event) => updateArray(setReturnFlights, index, "from", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Para" value={leg.to} onChange={(event) => updateArray(setReturnFlights, index, "to", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Partida" value={leg.departure} onChange={(event) => updateArray(setReturnFlights, index, "departure", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Chegada" value={leg.arrival} onChange={(event) => updateArray(setReturnFlights, index, "arrival", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.from")} value={leg.from} onChange={(event) => updateArray(setReturnFlights, index, "from", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.to")} value={leg.to} onChange={(event) => updateArray(setReturnFlights, index, "to", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.departure")} value={leg.departure} onChange={(event) => updateArray(setReturnFlights, index, "departure", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.arrival")} value={leg.arrival} onChange={(event) => updateArray(setReturnFlights, index, "arrival", event.target.value)} className="rounded-lg text-sm" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <Input placeholder="Companhia" value={leg.carrier || ""} onChange={(event) => updateArray(setReturnFlights, index, "carrier", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="No Voo" value={leg.flightNumber || ""} onChange={(event) => updateArray(setReturnFlights, index, "flightNumber", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.airline")} value={leg.carrier || ""} onChange={(event) => updateArray(setReturnFlights, index, "carrier", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.flightNumber")} value={leg.flightNumber || ""} onChange={(event) => updateArray(setReturnFlights, index, "flightNumber", event.target.value)} className="rounded-lg text-sm" />
                     </div>
                   </div>
                 ))}
               </div>
 
               <div className="max-w-xs space-y-2">
-                <Label className="font-body text-sm font-medium">Custo total voos (EUR)</Label>
+                <Label className="font-body text-sm font-medium">{t("trips.totalFlightCost")}</Label>
                 <Input type="number" step="0.01" value={travelCost} onChange={(event) => setTravelCost(event.target.value)} placeholder="2827.70" className="rounded-xl" />
               </div>
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={Ticket} title="Bilhetes / Eventos" onAdd={() => setTickets((prev) => [emptyTicket(), ...prev])} addLabel="Bilhete" />
+              <SectionHeader icon={Ticket} title={t("trips.eventsTickets")} onAdd={() => setTickets((prev) => [emptyTicket(), ...prev])} addLabel={t("trips.addTicket")} />
               {tickets.map((ticket, index) => (
                 <div key={`ticket-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                   <RemoveBtn onClick={() => removeFromArray(setTickets, index)} />
-                  <Input placeholder="Nome do evento" value={ticket.name} onChange={(event) => updateArray(setTickets, index, "name", event.target.value)} className="rounded-lg text-sm" />
+                  <Input placeholder={t("trips.eventName")} value={ticket.name} onChange={(event) => updateArray(setTickets, index, "name", event.target.value)} className="rounded-lg text-sm" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input placeholder="Local / Venue" value={ticket.venue || ""} onChange={(event) => updateArray(setTickets, index, "venue", event.target.value)} className="rounded-lg text-sm" />
-                    <Input placeholder="Morada" value={ticket.address || ""} onChange={(event) => updateArray(setTickets, index, "address", event.target.value)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.venue")} value={ticket.venue || ""} onChange={(event) => updateArray(setTickets, index, "venue", event.target.value)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.address")} value={ticket.address || ""} onChange={(event) => updateArray(setTickets, index, "address", event.target.value)} className="rounded-lg text-sm" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <Input placeholder="Lugares" value={ticket.seats || ""} onChange={(event) => updateArray(setTickets, index, "seats", event.target.value)} className="rounded-lg text-sm" />
-                    <Input type="number" step="0.01" placeholder="Custo (EUR)" value={ticket.cost || ""} onChange={(event) => updateArray(setTickets, index, "cost", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.seats")} value={ticket.seats || ""} onChange={(event) => updateArray(setTickets, index, "seats", event.target.value)} className="rounded-lg text-sm" />
+                    <Input type="number" step="0.01" placeholder={t("trips.costEur")} value={ticket.cost || ""} onChange={(event) => updateArray(setTickets, index, "cost", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
                   </div>
                 </div>
               ))}
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={Hotel} title="Hoteis / Alojamento" onAdd={() => setHotels((prev) => sortHotelsForForm([emptyHotel(), ...prev]))} addLabel="Hotel" />
+              <SectionHeader icon={Hotel} title={t("trips.accommodation")} onAdd={() => setHotels((prev) => sortHotelsForForm([emptyHotel(), ...prev]))} addLabel={t("trips.addHotel")} />
               {hotels.map((hotel, index) => (
                 <div key={`hotel-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                   <RemoveBtn onClick={() => removeHotel(index)} />
-                  <Input placeholder="Nome do hotel" value={hotel.name} onChange={(event) => updateHotel(index, "name", event.target.value)} className="rounded-lg text-sm" />
-                  <Input placeholder="Morada" value={hotel.address || ""} onChange={(event) => updateHotel(index, "address", event.target.value)} className="rounded-lg text-sm" />
+                  <Input placeholder={t("trips.hotelName")} value={hotel.name} onChange={(event) => updateHotel(index, "name", event.target.value)} className="rounded-lg text-sm" />
+                  <Input placeholder={t("trips.address")} value={hotel.address || ""} onChange={(event) => updateHotel(index, "address", event.target.value)} className="rounded-lg text-sm" />
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <Input type="date" value={hotel.checkIn || ""} onChange={(event) => updateHotel(index, "checkIn", event.target.value)} className="rounded-lg text-sm" />
                     <Input type="date" value={hotel.checkOut || ""} onChange={(event) => updateHotel(index, "checkOut", event.target.value)} className="rounded-lg text-sm" />
-                    <Input type="number" step="0.01" placeholder="Custo (EUR)" value={hotel.cost || ""} onChange={(event) => updateHotel(index, "cost", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
-                    <Input placeholder="Telefone" value={hotel.phone || ""} onChange={(event) => updateHotel(index, "phone", event.target.value)} className="rounded-lg text-sm" />
+                    <Input type="number" step="0.01" placeholder={t("trips.costEur")} value={hotel.cost || ""} onChange={(event) => updateHotel(index, "cost", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.phone")} value={hotel.phone || ""} onChange={(event) => updateHotel(index, "phone", event.target.value)} className="rounded-lg text-sm" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <Input placeholder="No Confirmacao" value={hotel.confirmationNumber || ""} onChange={(event) => updateHotel(index, "confirmationNumber", event.target.value)} className="rounded-lg text-sm" />
-                    <Input placeholder="Website (link)" value={hotel.link || ""} onChange={(event) => updateHotel(index, "link", event.target.value)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.confirmationNumber")} value={hotel.confirmationNumber || ""} onChange={(event) => updateHotel(index, "confirmationNumber", event.target.value)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.websiteLink")} value={hotel.link || ""} onChange={(event) => updateHotel(index, "link", event.target.value)} className="rounded-lg text-sm" />
                   </div>
                   <p className="text-xs font-body text-muted-foreground">
-                    O custo do hotel entra automaticamente na lista de despesas ao guardar.
+                    {t("trips.hotelExpenseHint")}
                   </p>
                 </div>
               ))}
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={UtensilsCrossed} title="Comidas" onAdd={() => setFoods((prev) => [emptyFood(), ...prev])} addLabel="Comida" />
+              <SectionHeader icon={UtensilsCrossed} title={t("trips.foods")} onAdd={() => setFoods((prev) => [emptyFood(), ...prev])} addLabel={t("trips.addFood")} />
               {foods.map((food, index) => (
                 <div key={`food-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
                   <RemoveBtn onClick={() => removeFromArray(setFoods, index)} />
@@ -803,16 +804,16 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                         {food.image ? (
                           <img
                             src={food.image}
-                            alt={food.name || "Comida"}
+                            alt={food.name || t("trips.foods")}
                             className="h-full w-full cursor-zoom-in object-cover"
-                            onClick={() => setSelectedFoodPreview({ src: food.image as string, alt: food.name || "Comida" })}
+                            onClick={() => setSelectedFoodPreview({ src: food.image as string, alt: food.name || t("trips.foods") })}
                           />
                         ) : (
                           <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
                       <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-border/60 px-2 py-1 text-[11px] font-body text-foreground/75 hover:bg-secondary/50">
-                        Miniatura
+                        {t("trips.thumbnail")}
                         <input
                           type="file"
                           accept="image/*"
@@ -823,33 +824,33 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
-                      <Input placeholder="Nome do prato" value={food.name} onChange={(event) => updateArray(setFoods, index, "name", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="Descricao" value={food.description || ""} onChange={(event) => updateArray(setFoods, index, "description", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder="URL da critica do restaurante" value={food.reviewUrl || ""} onChange={(event) => updateArray(setFoods, index, "reviewUrl", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.dishName")} value={food.name} onChange={(event) => updateArray(setFoods, index, "name", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.description")} value={food.description || ""} onChange={(event) => updateArray(setFoods, index, "description", event.target.value)} className="rounded-lg text-sm" />
+                      <Input placeholder={t("trips.restaurantReviewUrl")} value={food.reviewUrl || ""} onChange={(event) => updateArray(setFoods, index, "reviewUrl", event.target.value)} className="rounded-lg text-sm" />
                     </div>
                   </div>
-                  <p className="text-xs font-body text-muted-foreground">Se a descricao estiver vazia, tentamos enriquecer automaticamente ao guardar.</p>
+                  <p className="text-xs font-body text-muted-foreground">{t("trips.foodEnrichHint")}</p>
                 </div>
               ))}
             </section>
 
             <section className="space-y-3">
-              <SectionHeader icon={Receipt} title="Despesas" onAdd={() => setExpenses((prev) => [emptyExpense(), ...prev])} addLabel="Despesa" />
+              <SectionHeader icon={Receipt} title={t("common.expenses")} onAdd={() => setExpenses((prev) => [emptyExpense(), ...prev])} addLabel={t("trips.addExpense")} />
               <p className="text-xs font-body text-muted-foreground">
-                Usa esta secao para despesas extra. Os custos dos hoteis sao adicionados automaticamente a partir do alojamento.
+                {t("trips.extraExpensesHint")}
               </p>
               {expenses.map((expense, index) => (
                 <div key={`expense-${index}`} className="relative bg-secondary/30 rounded-xl p-3 border border-border/40">
                   <RemoveBtn onClick={() => removeFromArray(setExpenses, index)} />
                   <div className="grid grid-cols-3 gap-3">
-                    <Input placeholder="Descricao" value={expense.label} onChange={(event) => updateArray(setExpenses, index, "label", event.target.value)} className="rounded-lg text-sm col-span-2" />
-                    <Input type="number" step="0.01" placeholder="EUR" value={expense.amount || ""} onChange={(event) => updateArray(setExpenses, index, "amount", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
+                    <Input placeholder={t("trips.expenseDescription")} value={expense.label} onChange={(event) => updateArray(setExpenses, index, "label", event.target.value)} className="rounded-lg text-sm col-span-2" />
+                    <Input type="number" step="0.01" placeholder={t("trips.eur")} value={expense.amount || ""} onChange={(event) => updateArray(setExpenses, index, "amount", parseFloat(event.target.value) || 0)} className="rounded-lg text-sm" />
                   </div>
                 </div>
               ))}
               {mergedExpenses.length > 0 && (
                 <p className="text-sm font-body text-right text-muted-foreground">
-                  Total: <span className="font-semibold text-foreground">EUR {mergedExpenses.reduce((sum, item) => sum + (item.amount || 0), 0).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                  {t("common.total")}: <span className="font-semibold text-foreground">{formatCurrency(mergedExpenses.reduce((sum, item) => sum + (item.amount || 0), 0), "EUR", { minimumFractionDigits: 2 })}</span>
                 </p>
               )}
             </section>
@@ -861,7 +862,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
               >
                 <button
                   type="button"
-                  aria-label="Fechar preview"
+                  aria-label={t("trips.closePreview")}
                   onClick={(event) => {
                     event.stopPropagation();
                     setSelectedFoodPreview(null);

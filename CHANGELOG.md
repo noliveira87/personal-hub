@@ -6,11 +6,25 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 
 ## [Unreleased]
 
+## [v1.2.0-stable] - 2026-03-30
+
 ### Added
 - Versioning structure with `CHANGELOG.md` and release workflow guidance.
+- PT/EN internationalization layer for the Hub app with a shared provider, translation catalog and language switcher.
 
 ### Changed
 - Deployment script now skips dependency installation when `package-lock.json` is unchanged and keeps native dependency fallback checks for Linux builds.
+- Trips shell, dashboard, settings, not found and work-in-progress pages now follow the selected PT/EN language.
+- Trips cards, detail views, dialogs, forms and map labels now localize visible destination and title text based on the selected language.
+- Trips title localization now translates place names embedded in freeform titles, not only exact destination matches.
+- Trips dashboard destination totals now count non-Portugal locations only, excluding Portuguese stopovers inside international trips.
+- Trips world map counters were aligned with the actual pins rendered on the world map while preserving the separate Portugal mini-map behavior.
+
+### Fixed
+- Trips destination counting no longer relies on map-derived labels that could drift from the intended overall totals.
+- Mixed-language trip labels such as PT titles or pin labels appearing in EN mode.
+- Japan trip pins and labels falling back to overly specific district names such as Minato instead of the main destination.
+- Missing bidirectional translations for locations such as Germany/Alemanha and Berlin/Berlim in trip titles and pin labels.
 
 ## [v1.1.0-stable] - 2026-03-29
 

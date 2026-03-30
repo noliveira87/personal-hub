@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { geoContains, geoEqualEarth, geoPath } from "d3-geo";
+import { geoArea, geoContains, geoEqualEarth, geoMercator, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import worldTopology from "world-atlas/countries-110m.json";
+import worldTopologyHighRes from "world-atlas/countries-50m.json";
 import usStatesTopology from "us-atlas/states-10m.json";
 import { MapPin, ZoomIn, ZoomOut } from "lucide-react";
 import { Trip } from "@/features/trips/types/trip";
-import { getTripLocationSummaries } from "@/features/trips/utils/locations";
+import { useI18n } from "@/i18n/I18nProvider";
+import { getTripLocationSummaries, localizeTripLocationLabel } from "@/features/trips/utils/locations";
 
 type TripsWorldMapProps = {
   trips: Trip[];
@@ -35,6 +37,7 @@ const DESTINATION_FALLBACKS: Array<{ regex: RegExp; lat: number; lng: number }> 
   { regex: /malta|valletta|sliema/i, lat: 35.8989, lng: 14.5146 },
   { regex: /lisboa|lisbon/i, lat: 38.7223, lng: -9.1393 },
   { regex: /porto/i, lat: 41.1579, lng: -8.6291 },
+  { regex: /e?vora|évora/i, lat: 38.5714, lng: -7.9135 },
   { regex: /madrid/i, lat: 40.4168, lng: -3.7038 },
   { regex: /barcelona/i, lat: 41.3874, lng: 2.1686 },
   { regex: /london/i, lat: 51.5072, lng: -0.1276 },
@@ -53,6 +56,17 @@ const DESTINATION_FALLBACKS: Array<{ regex: RegExp; lat: number; lng: number }> 
   { regex: /singapore/i, lat: 1.3521, lng: 103.8198 },
   { regex: /dubai/i, lat: 25.2048, lng: 55.2708 },
 ];
+
+const normalizeLocationText = (value: string) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase();
+
+const PORTUGAL_QUERY_REGEX = /\b(portugal|lisboa|lisbon|porto|coimbra|faro|braga|aveiro|maia|sintra|cascais|setubal|evora)\b/i;
+
+const matchesPortugalLocation = (value: string) => PORTUGAL_QUERY_REGEX.test(normalizeLocationText(value));
+
+const isPortugalTripDestination = (trip: Trip) => matchesPortugalLocation(trip.destination);
 
 const readGeoCache = (): Record<string, CachedGeo> => {
   if (typeof window === "undefined") return {};
@@ -126,9 +140,11 @@ const geocodeDestination = async (destination: string): Promise<CachedGeo | null
 };
 
 export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
+  const { t, language } = useI18n();
   const [pointsById, setPointsById] = useState<Record<string, TripPoint>>({});
   const [loading, setLoading] = useState(false);
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
+  const [hoveredMap, setHoveredMap] = useState<"world" | "portugal" | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -145,6 +161,15 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
   const worldGeo = useMemo(() => {
     const topology = worldTopology as unknown as {
+      objects?: { countries?: unknown };
+    };
+    if (!topology.objects?.countries) return null;
+
+    return feature(topology as never, topology.objects.countries as never);
+  }, []);
+
+  const worldGeoHighRes = useMemo(() => {
+    const topology = worldTopologyHighRes as unknown as {
       objects?: { countries?: unknown };
     };
     if (!topology.objects?.countries) return null;
@@ -263,6 +288,60 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
   const points = useMemo(() => Object.values(pointsById), [pointsById]);
   const unresolvedCount = tripLocations.length - points.length;
+
+  const portugalFeature = useMemo(() => {
+    const sourceGeo = worldGeoHighRes ?? worldGeo;
+
+    if (!sourceGeo || !("features" in sourceGeo) || !Array.isArray(sourceGeo.features)) {
+      return null;
+    }
+
+    const byId = sourceGeo.features.find((geo) => String((geo as { id?: string | number }).id ?? "") === "620");
+    if (byId) return byId;
+
+    return sourceGeo.features.find((geo) => geoContains(geo as never, [-9.1393, 38.7223])) ?? null;
+  }, [worldGeo, worldGeoHighRes]);
+
+  const portugalMainlandFeature = useMemo(() => {
+    if (!portugalFeature) return null;
+
+    const geometry = (portugalFeature as { geometry?: { type?: string; coordinates?: unknown } }).geometry;
+    if (!geometry || geometry.type !== "MultiPolygon" || !Array.isArray(geometry.coordinates)) {
+      return portugalFeature;
+    }
+
+    const largestPolygon = geometry.coordinates
+      .filter((polygon) => Array.isArray(polygon))
+      .reduce<{ polygon: unknown[] | null; area: number }>((best, polygon) => {
+        const candidate = {
+          type: "Feature",
+          geometry: {
+            type: "Polygon",
+            coordinates: polygon,
+          },
+          properties: {},
+        } as const;
+
+        const area = geoArea(candidate as never);
+        if (area > best.area) {
+          return { polygon, area };
+        }
+        return best;
+      }, { polygon: null, area: -1 });
+
+    if (!largestPolygon.polygon) {
+      return portugalFeature;
+    }
+
+    return {
+      ...portugalFeature,
+      geometry: {
+        type: "Polygon",
+        coordinates: largestPolygon.polygon,
+      },
+    };
+  }, [portugalFeature]);
+
   const mapFeatures = useMemo(() => {
     if (!worldGeo || !("features" in worldGeo) || !Array.isArray(worldGeo.features)) {
       return [] as Array<{ d: string; id: string }>;
@@ -329,11 +408,56 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     return ids;
   }, [points, usStatesGeo]);
 
+  const portugalPathGenerator = useMemo(() => {
+    if (!portugalMainlandFeature) return null;
+    const projection = geoMercator().fitExtent([[30, 14], [330, 246]], portugalMainlandFeature as never);
+    return geoPath(projection);
+  }, [portugalMainlandFeature]);
+
+  const portugalPath = useMemo(() => {
+    if (!portugalMainlandFeature || !portugalPathGenerator) return "";
+    return portugalPathGenerator(portugalMainlandFeature as never) ?? "";
+  }, [portugalMainlandFeature, portugalPathGenerator]);
+
+  const portugalPoints = useMemo(() => {
+    const isPortugalPoint = (point: TripPoint) => {
+      if (!isPortugalTripDestination(point.trip)) return false;
+
+      const matchesQuery = matchesPortugalLocation(point.query) || matchesPortugalLocation(point.label);
+      const inMainlandBounds = point.lat >= 36.8 && point.lat <= 42.3 && point.lng >= -9.7 && point.lng <= -6.0;
+      const insideMainland = portugalMainlandFeature
+        ? geoContains(portugalMainlandFeature as never, [point.lng, point.lat])
+        : false;
+
+      return insideMainland || (matchesQuery && inMainlandBounds);
+    };
+
+    return points.filter(isPortugalPoint);
+  }, [points, portugalMainlandFeature]);
+
+  const portugalWorldExcludedPointIds = useMemo(() => {
+    const isPortugalLocatedPoint = (point: TripPoint) => {
+      const matchesQuery = matchesPortugalLocation(point.query) || matchesPortugalLocation(point.label);
+      const inMainlandBounds = point.lat >= 36.8 && point.lat <= 42.3 && point.lng >= -9.7 && point.lng <= -6.0;
+      const insideMainland = portugalMainlandFeature
+        ? geoContains(portugalMainlandFeature as never, [point.lng, point.lat])
+        : false;
+
+      return insideMainland || (matchesQuery && inMainlandBounds);
+    };
+
+    return new Set(points.filter(isPortugalLocatedPoint).map((point) => point.id));
+  }, [points, portugalMainlandFeature]);
+
+  const worldPinsPoints = useMemo(() => {
+    return points.filter((point) => !portugalWorldExcludedPointIds.has(point.id));
+  }, [points, portugalWorldExcludedPointIds]);
+
   const projectedPoints = useMemo(() => {
     if (!pathGenerator?.projection()) return [] as Array<{ point: TripPoint; x: number; y: number }>;
 
     const projection = pathGenerator.projection();
-    return points
+    return worldPinsPoints
       .map((point) => {
         const coords = projection([point.lng, point.lat]);
         if (!coords) return null;
@@ -344,13 +468,43 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
         };
       })
       .filter((item): item is { point: TripPoint; x: number; y: number } => Boolean(item));
-  }, [pathGenerator, points]);
+  }, [pathGenerator, worldPinsPoints]);
 
-  const hoveredPoint = useMemo(
-    () => projectedPoints.find(({ point }) => point.id === hoveredPointId) ?? null,
-    [hoveredPointId, projectedPoints],
+  const projectedPortugalPoints = useMemo(() => {
+    if (!portugalPathGenerator?.projection()) return [] as Array<{ point: TripPoint; x: number; y: number }>;
+
+    const projection = portugalPathGenerator.projection();
+    return portugalPoints
+      .map((point) => {
+        const coords = projection([point.lng, point.lat]);
+        if (!coords) return null;
+        return {
+          point,
+          x: coords[0],
+          y: coords[1],
+        };
+      })
+      .filter((item): item is { point: TripPoint; x: number; y: number } => Boolean(item));
+  }, [portugalPathGenerator, portugalPoints]);
+
+  const hoveredWorldPoint = useMemo(
+    () => (hoveredMap === "world"
+      ? projectedPoints.find(({ point }) => point.id === hoveredPointId) ?? null
+      : null),
+    [hoveredMap, hoveredPointId, projectedPoints],
   );
-  const hoveredLabelWidth = hoveredPoint ? measureHoverLabelWidth(hoveredPoint.point.label) : 0;
+
+  const hoveredPortugalPoint = useMemo(
+    () => (hoveredMap === "portugal"
+      ? projectedPortugalPoints.find(({ point }) => point.id === hoveredPointId) ?? null
+      : null),
+    [hoveredMap, hoveredPointId, projectedPortugalPoints],
+  );
+
+  const hoveredWorldLabel = hoveredWorldPoint ? localizeTripLocationLabel(hoveredWorldPoint.point.label, language) : "";
+  const hoveredPortugalLabel = hoveredPortugalPoint ? localizeTripLocationLabel(hoveredPortugalPoint.point.label, language) : "";
+  const hoveredLabelWidth = hoveredWorldLabel ? measureHoverLabelWidth(hoveredWorldLabel) : 0;
+  const hoveredPortugalLabelWidth = hoveredPortugalLabel ? measureHoverLabelWidth(hoveredPortugalLabel) : 0;
 
   const getPanBounds = (currentZoom: number) => ({
     x: Math.max(0, ((1000 * currentZoom) - 1000) / 2),
@@ -366,7 +520,6 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
   };
 
   const zoomTransform = `translate(${pan.x} ${pan.y}) translate(${500 - 500 * zoom} ${250 - 250 * zoom}) scale(${zoom})`;
-  // Pins shrink slightly as zoom increases, so dense areas stay readable.
   const pinScale = Number((0.9 / Math.pow(zoom, 1.2)).toFixed(4));
 
   const applyZoomDelta = (delta: number) => {
@@ -474,8 +627,8 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
   }, [pan.x, pan.y, zoom]);
 
   const mapInteractionHint = zoom > 1
-    ? "Pinch para zoom. Clica e arrasta para deslocar o mapa."
-    : "Pinch para fazer zoom no mapa.";
+    ? t("trips.map.interactionHintZoom")
+    : t("trips.map.interactionHintDefault");
 
   const isDarkTheme = typeof document !== "undefined"
     && document.documentElement.classList.contains("dark");
@@ -496,8 +649,8 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     <div className="rounded-3xl border border-border/60 bg-gradient-to-b from-secondary/40 to-background p-4 sm:p-5 lg:p-6 shadow-sm">
       <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-body uppercase tracking-[0.14em] text-muted-foreground">Mapa de Viagens</p>
-          <h3 className="font-display text-xl sm:text-2xl text-foreground">Pegadas pelo mundo</h3>
+          <p className="text-xs font-body uppercase tracking-[0.14em] text-muted-foreground">{t("trips.map.title")}</p>
+          <h3 className="font-display text-xl sm:text-2xl text-foreground">{t("trips.map.subtitle")}</h3>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 p-1 text-muted-foreground">
@@ -506,7 +659,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
               onClick={() => applyZoomDelta(-0.2)}
               disabled={zoom <= 1}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Diminuir zoom do mapa"
+              aria-label={t("trips.map.zoomOut")}
             >
               <ZoomOut className="h-3.5 w-3.5" />
             </button>
@@ -523,14 +676,14 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
               onClick={() => applyZoomDelta(0.2)}
               disabled={zoom >= 3}
               className="inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Aumentar zoom do mapa"
+              aria-label={t("trips.map.zoomIn")}
             >
               <ZoomIn className="h-3.5 w-3.5" />
             </button>
           </div>
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-body text-muted-foreground bg-background/70">
             <MapPin className="h-3.5 w-3.5" />
-            <span>{points.length} pins</span>
+            <span>{projectedPoints.length} {t("common.pins")}</span>
           </div>
         </div>
       </div>
@@ -546,7 +699,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
           role="img"
-          aria-label="Mapa do mundo com pins de viagens"
+          aria-label={t("trips.map.worldMapAria")}
         >
           <rect x="0" y="0" width="1000" height="500" fill="hsl(var(--background))" />
           <g transform={zoomTransform} style={{ transition: "transform 180ms ease" }}>
@@ -582,14 +735,20 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
                   if (suppressClickRef.current) return;
                   onSelectTrip?.(point.trip);
                 }}
-                onMouseEnter={() => setHoveredPointId(point.id)}
-                onMouseLeave={() => setHoveredPointId((prev) => (prev === point.id ? null : prev))}
+                onMouseEnter={() => {
+                  setHoveredMap("world");
+                  setHoveredPointId(point.id);
+                }}
+                onMouseLeave={() => {
+                  setHoveredPointId((prev) => (prev === point.id ? null : prev));
+                  setHoveredMap((prev) => (prev === "world" ? null : prev));
+                }}
                 style={{
                   cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : (onSelectTrip ? "pointer" : "default"),
                   transition: "transform 160ms ease",
                 }}
               >
-                <title>{point.label}</title>
+                <title>{localizeTripLocationLabel(point.label, language)}</title>
                 <circle
                   r={hoveredPointId === point.id ? "15" : "12"}
                   fill="hsl(var(--accent) / 0.22)"
@@ -610,9 +769,9 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
               </g>
             ))}
 
-            {hoveredPoint && (
+            {hoveredWorldPoint && (
               <g
-                transform={`translate(${hoveredPoint.x + 12}, ${hoveredPoint.y - 30}) scale(${pinScale})`}
+                transform={`translate(${hoveredWorldPoint.x + 12}, ${hoveredWorldPoint.y - 30}) scale(${pinScale})`}
                 style={{ pointerEvents: "none" }}
               >
                 <rect
@@ -632,7 +791,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
                   fontSize="12"
                   fontFamily="system-ui, sans-serif"
                 >
-                  {hoveredPoint.point.label}
+                  {hoveredWorldLabel}
                 </text>
               </g>
             )}
@@ -642,11 +801,75 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
       <p className="mt-2 text-[11px] font-body text-muted-foreground">{mapInteractionHint}</p>
 
+      {portugalPath && projectedPortugalPoints.length > 0 && (
+        <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-border/50 bg-background/70 p-2 sm:p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-body uppercase tracking-[0.12em] text-muted-foreground">{t("common.portugal")}</p>
+            <p className="text-xs font-body text-muted-foreground">{projectedPortugalPoints.length} {t("common.pins")}</p>
+          </div>
+          <svg viewBox="0 0 360 260" className="h-64 w-full" role="img" aria-label={t("trips.map.portugalMapAria")}>
+            <rect x="0" y="0" width="360" height="260" fill="hsl(var(--background))" />
+            <path
+              d={portugalPath}
+              fill="hsl(var(--secondary))"
+              stroke={visitedCountryStroke}
+              strokeWidth="1"
+            />
+
+            {projectedPortugalPoints.map(({ point, x, y }) => (
+              <g
+                key={`pt-${point.id}`}
+                transform={`translate(${x}, ${y})`}
+                onClick={() => onSelectTrip?.(point.trip)}
+                onMouseEnter={() => {
+                  setHoveredMap("portugal");
+                  setHoveredPointId(point.id);
+                }}
+                onMouseLeave={() => {
+                  setHoveredPointId((prev) => (prev === point.id ? null : prev));
+                  setHoveredMap((prev) => (prev === "portugal" ? null : prev));
+                }}
+                style={{ cursor: onSelectTrip ? "pointer" : "default" }}
+              >
+                <title>{localizeTripLocationLabel(point.label, language)}</title>
+                <circle r={hoveredPointId === point.id ? "11" : "9"} fill="hsl(var(--accent) / 0.2)" />
+                <circle r={hoveredPointId === point.id ? "6.6" : "5.6"} fill="#ef4444" stroke="hsl(var(--background))" strokeWidth="2.2" />
+                <circle r={hoveredPointId === point.id ? "2.3" : "2"} fill="hsl(var(--background))" />
+              </g>
+            ))}
+
+            {hoveredPortugalPoint && (
+              <g transform={`translate(${hoveredPortugalPoint.x + 10}, ${hoveredPortugalPoint.y - 26})`} style={{ pointerEvents: "none" }}>
+                <rect
+                  x="0"
+                  y="0"
+                  rx="8"
+                  ry="8"
+                  width={hoveredPortugalLabelWidth}
+                  height="24"
+                  fill="hsl(var(--foreground))"
+                  opacity="0.95"
+                />
+                <text
+                  x="9"
+                  y="16"
+                  fill="hsl(var(--background))"
+                  fontSize="12"
+                  fontFamily="system-ui, sans-serif"
+                >
+                  {hoveredPortugalLabel}
+                </text>
+              </g>
+            )}
+          </svg>
+        </div>
+      )}
+
       {(loading || unresolvedCount > 0) && (
         <p className="mt-3 text-xs font-body text-muted-foreground">
           {loading
-            ? "A localizar destinos no mapa..."
-            : `${unresolvedCount} ${unresolvedCount === 1 ? "destino ainda sem pin" : "destinos ainda sem pin"}`}
+            ? t("trips.map.locating")
+            : `${unresolvedCount} ${t(unresolvedCount === 1 ? "trips.map.unresolvedOne" : "trips.map.unresolvedMany")}`}
         </p>
       )}
     </div>

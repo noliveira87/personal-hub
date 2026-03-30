@@ -1,4 +1,6 @@
 import { ReactNode } from 'react';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,12 +20,14 @@ export default function AppSectionHeader({
   icon: Icon,
   actions,
   backTo = '/',
-  backLabel = 'Back to projects',
+  backLabel,
   showSettings = true,
 }: AppSectionHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggleDark } = useDarkMode();
+  const { t } = useI18n();
+  const resolvedBackLabel = backLabel ?? t('common.backToProjects');
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
@@ -35,7 +39,7 @@ export default function AppSectionHeader({
           className="gap-1.5"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">{backLabel}</span>
+          <span className="hidden sm:inline">{resolvedBackLabel}</span>
         </Button>
 
         <div className="hidden sm:flex items-center gap-3 flex-1 justify-center">
@@ -46,6 +50,7 @@ export default function AppSectionHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitcher compact />
           <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>

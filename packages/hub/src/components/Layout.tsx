@@ -1,19 +1,22 @@
 import { NavLink, useLocation, Link } from 'react-router-dom';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
 import { LayoutDashboard, CalendarDays, Bell, Menu, X, TrendingUp, Moon, Sun, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/alerts', label: 'Alerts', icon: Bell },
-  { to: '/insights', label: 'Insights', icon: TrendingUp },
+  { to: '/dashboard', labelKey: 'layout.nav.dashboard', icon: LayoutDashboard },
+  { to: '/calendar', labelKey: 'layout.nav.calendar', icon: CalendarDays },
+  { to: '/alerts', labelKey: 'layout.nav.alerts', icon: Bell },
+  { to: '/insights', labelKey: 'layout.nav.insights', icon: TrendingUp },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isDark, toggleDark } = useDarkMode();
+  const { t } = useI18n();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
   const isContractsPage = /^\/(dashboard|contracts|calendar|alerts|insights)/.test(location.pathname);
@@ -31,8 +34,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
-        <h1 className="text-center text-base font-semibold tracking-tight text-foreground">D12 Contracts</h1>
-        <div className="flex justify-end">
+        <h1 className="text-center text-base font-semibold tracking-tight text-foreground">{t('layout.contractsTitle')}</h1>
+        <div className="flex justify-end gap-2">
+          <LanguageSwitcher compact />
           <button onClick={toggleDark} className="p-2 rounded-lg text-muted-foreground transition-transform hover:bg-muted active:scale-95">
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -54,7 +58,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             >
               <item.icon className="w-4 h-4" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
@@ -64,10 +68,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-60 flex-col border-r bg-card/50 backdrop-blur-sm z-30">
         <div className="px-6 h-16 flex items-center justify-between border-b">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">D12 Contracts</h1>
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">{t('layout.contractsTitle')}</h1>
           <Link to="/" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-3 h-3" />
-            <span>Projects</span>
+            <span>{t('common.projects')}</span>
           </Link>
         </div>
         <nav className="flex-1 p-3 space-y-1">
@@ -83,20 +87,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             >
               <item.icon className="w-4 h-4" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
         <div className="p-4 border-t">
           <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            Back to projects
+            {t('common.backToProjects')}
           </Link>
         </div>
       </aside>
 
       {showDesktopHeaderToggle && (
-        <div className="hidden lg:flex fixed right-4 top-4 z-40">
+        <div className="hidden lg:flex fixed right-4 top-4 z-40 items-center gap-2">
+          <LanguageSwitcher compact />
           <button onClick={toggleDark} className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95">
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>

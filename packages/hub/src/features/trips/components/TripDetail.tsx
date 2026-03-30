@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil, X } from "lucide-react";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trip } from "@/features/trips/types/trip";
+import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
+import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
 
 interface TripDetailProps {
   trip: Trip;
@@ -56,10 +57,13 @@ const formatExternalUrl = (value?: string) => {
 };
 
 export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) {
+  const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
   const totalFromExpenses = trip.expenses?.reduce((sum, item) => sum + item.amount, 0);
-  const formatEuro = (value: number) => `${value.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
+  const formatEuro = (value: number) => formatCurrency(value, "EUR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const localizedTitle = getLocalizedTripTitle(trip, language);
+  const localizedDestination = getLocalizedTripDestination(trip.destination, language);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
@@ -67,14 +71,14 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
         <div className="container mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
             <Button variant="ghost" onClick={onBack} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-              <ArrowLeft className="h-4 w-4" />Voltar
+              <ArrowLeft className="h-4 w-4" />{t("trips.back")}
             </Button>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={onEdit} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-                <Pencil className="h-4 w-4" />Editar
+                <Pencil className="h-4 w-4" />{t("trips.edit")}
               </Button>
               <Button variant="ghost" onClick={() => onDelete(trip.id)} className="gap-2 font-body text-destructive hover:text-destructive rounded-full">
-                <Trash2 className="h-4 w-4" />Apagar
+                <Trash2 className="h-4 w-4" />{t("trips.delete")}
               </Button>
             </div>
           </div>
@@ -83,14 +87,14 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
 
       <div className="container mx-auto px-4 sm:px-6 pt-4 pb-6">
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-3">{trip.title}</h1>
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-3">{localizedTitle}</h1>
           <div className="flex flex-wrap items-center gap-2.5 font-body">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3 py-1.5 text-foreground/75">
-              <MapPin className="h-4 w-4" />{trip.destination}
+              <MapPin className="h-4 w-4" />{localizedDestination}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3 py-1.5 text-foreground/75">
               <Calendar className="h-4 w-4" />
-              {format(new Date(trip.startDate), "MMM d")} - {format(new Date(trip.endDate), "MMM d, yyyy")}
+              {formatDate(trip.startDate, { month: "short", day: "numeric" })} - {formatDate(trip.endDate, { month: "short", day: "numeric", year: "numeric" })}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-foreground text-background px-3 py-1.5 font-semibold shadow-sm">
               {formatEuro(totalFromExpenses || trip.cost)}
@@ -118,7 +122,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                 className={`overflow-hidden rounded-xl cursor-pointer ${index === 0 ? "col-span-2 row-span-2" : ""}`}
                 onClick={() => setSelectedPhoto(index)}
               >
-                <img src={optimizeTripPhotoUrl(photo, { width: index === 0 ? 1200 : 700, quality: 70 })} alt={`${trip.title} photo ${index + 1}`} className="w-full h-full object-cover aspect-square hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
+                <img src={optimizeTripPhotoUrl(photo, { width: index === 0 ? 1200 : 700, quality: 70 })} alt={`${localizedTitle} ${t("trips.photoAlt")} ${index + 1}`} className="w-full h-full object-cover aspect-square hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />
               </motion.div>
             ))}
           </div>
@@ -145,7 +149,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
         >
           <button
             type="button"
-            aria-label="Fechar preview"
+            aria-label={t("trips.closePreview")}
             onClick={(event) => {
               event.stopPropagation();
               setSelectedFoodImage(null);
@@ -168,16 +172,16 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
       <div className="container mx-auto px-4 sm:px-6 pb-20">
         <div className="max-w-3xl mx-auto space-y-12">
           {trip.notes && (
-            <Section icon={StickyNote} title="A Nossa Historia" delay={0.25}>
+            <Section icon={StickyNote} title={t("trips.ourStory")} delay={0.25}>
               <p className="font-body text-base leading-relaxed text-foreground/80 sm:text-lg">{trip.notes}</p>
             </Section>
           )}
 
           {trip.travel && (
-            <Section icon={Plane} title="Viagem" delay={0.3}>
+            <Section icon={Plane} title={t("common.travel")} delay={0.3}>
               <div className="space-y-4">
                 <InfoCard>
-                  <p className="mb-3 text-xs font-body font-semibold uppercase tracking-wider text-foreground/75">Ida - {format(new Date(trip.startDate), "d MMM yyyy")}</p>
+                  <p className="mb-3 text-xs font-body font-semibold uppercase tracking-wider text-foreground/75">{t("trips.outbound")} - {formatDate(trip.startDate, { day: "numeric", month: "short", year: "numeric" })}</p>
                   <div className="space-y-2">
                     {trip.travel.outbound.map((leg, index) => (
                       <div key={`out-${index}`} className="flex items-center gap-3 text-sm font-body">
@@ -191,7 +195,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                   </div>
                 </InfoCard>
                 <InfoCard>
-                  <p className="mb-3 text-xs font-body font-semibold uppercase tracking-wider text-foreground/75">Volta - {format(new Date(trip.endDate), "d MMM yyyy")}</p>
+                  <p className="mb-3 text-xs font-body font-semibold uppercase tracking-wider text-foreground/75">{t("trips.return")} - {formatDate(trip.endDate, { day: "numeric", month: "short", year: "numeric" })}</p>
                   <div className="space-y-2">
                     {trip.travel.returnTrip.map((leg, index) => (
                       <div key={`ret-${index}`} className="flex items-center gap-3 text-sm font-body">
@@ -209,7 +213,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
 
           {trip.tickets && trip.tickets.length > 0 && (
-            <Section icon={Ticket} title="Bilhetes" delay={0.35}>
+            <Section icon={Ticket} title={t("common.tickets")} delay={0.35}>
               {trip.tickets.map((ticket, index) => (
                 <InfoCard key={`${ticket.name}-${index}`}>
                   <p className="font-body font-medium text-foreground">{ticket.name}</p>
@@ -223,7 +227,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
 
           {trip.hotels.length > 0 && (
-            <Section icon={Hotel} title="Onde Ficamos" delay={0.4}>
+            <Section icon={Hotel} title={t("trips.whereWeStayed")} delay={0.4}>
               <div className="space-y-3">
                 {trip.hotels.map((hotel, index) => (
                   <InfoCard key={`${hotel.name}-${index}`}>
@@ -238,16 +242,16 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                             rel="noreferrer"
                             className="mt-1 inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
                           >
-                            Abrir link do hotel
+                            {t("trips.openHotelLink")}
                           </a>
                         )}
                         {hotel.checkIn && hotel.checkOut && (
                           <p className="mt-1 text-sm font-body text-foreground/70">
-                            {format(new Date(hotel.checkIn), "d MMM")} - {format(new Date(hotel.checkOut), "d MMM yyyy")}
+                            {formatDate(hotel.checkIn, { day: "numeric", month: "short" })} - {formatDate(hotel.checkOut, { day: "numeric", month: "short", year: "numeric" })}
                           </p>
                         )}
-                        {hotel.phone && <p className="mt-1 text-xs font-body text-foreground/65">Tel. {hotel.phone}</p>}
-                        {hotel.confirmationNumber && <p className="text-xs font-body text-foreground/65">Conf. #{hotel.confirmationNumber}</p>}
+                        {hotel.phone && <p className="mt-1 text-xs font-body text-foreground/65">{t("trips.phonePrefix")}{t("trips.phonePrefix").endsWith(".") ? " " : ": "}{hotel.phone}</p>}
+                        {hotel.confirmationNumber && <p className="text-xs font-body text-foreground/65">{t("trips.confirmationPrefix")} #{hotel.confirmationNumber}</p>}
                       </div>
                       {hotel.cost && <p className="text-sm font-semibold text-foreground whitespace-nowrap">{formatEuro(hotel.cost)}</p>}
                     </div>
@@ -258,7 +262,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
 
           {trip.foods.length > 0 && (
-            <Section icon={UtensilsCrossed} title="O Que Comemos" delay={0.45}>
+            <Section icon={UtensilsCrossed} title={t("trips.foodTitle")} delay={0.45}>
               <div className="grid gap-3">
                 {trip.foods.map((food, index) => (
                   <InfoCard key={`${food.name}-${index}`}>
@@ -270,7 +274,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                           className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0 cursor-zoom-in"
                           loading="lazy"
                           decoding="async"
-                          onClick={() => setSelectedFoodImage({ src: food.image as string, alt: food.name || "Food photo" })}
+                          onClick={() => setSelectedFoodImage({ src: food.image as string, alt: food.name || t("trips.foodPhoto") })}
                         />
                       ) : (
                         <div className="h-14 w-14 rounded-lg border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
@@ -285,7 +289,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                             rel="noreferrer"
                             className="mt-1 inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
                           >
-                            Ver critica do restaurante
+                            {t("trips.openRestaurantReview")}
                           </a>
                         )}
                       </div>
@@ -297,7 +301,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
 
           {trip.expenses && trip.expenses.length > 0 && (
-            <Section icon={Receipt} title="Despesas" delay={0.5}>
+            <Section icon={Receipt} title={t("common.expenses")} delay={0.5}>
               <InfoCard>
                 <div className="space-y-3">
                   {trip.expenses.map((expense, index) => (
@@ -307,7 +311,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                     </div>
                   ))}
                   <div className="border-t border-border pt-3 flex items-center justify-between font-body">
-                    <span className="font-semibold text-foreground">Total</span>
+                    <span className="font-semibold text-foreground">{t("common.total")}</span>
                     <span className="font-bold text-lg text-foreground">{formatEuro(totalFromExpenses || trip.cost)}</span>
                   </div>
                 </div>

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Calendar, Hotel, MapPin, Plane, Receipt, StickyNote, Ticket, Utensils, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trip, formatTripDateRange } from "@/features/trips/types/trip";
+import { Trip } from "@/features/trips/types/trip";
+import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
+import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
 
 interface TripDetailDialogProps {
   open: boolean;
@@ -26,17 +28,20 @@ const formatExternalUrl = (value?: string) => {
 };
 
 export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogProps) {
+  const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
 
   if (!trip) return null;
 
   const totalExpenses = (trip.expenses ?? []).reduce((sum, item) => sum + item.amount, 0);
+  const localizedTitle = getLocalizedTripTitle(trip, language);
+  const localizedDestination = getLocalizedTripDestination(trip.destination, language);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:max-w-3xl sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl">{trip.title}</DialogTitle>
+          <DialogTitle className="text-xl">{localizedTitle}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
@@ -44,24 +49,24 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-4 w-4" />
-                {trip.destination}
+                {localizedDestination}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {formatTripDateRange(trip.startDate, trip.endDate)}
+                {formatDate(trip.startDate, { day: "2-digit", month: "short", year: "numeric" })} - {formatDate(trip.endDate, { day: "2-digit", month: "short", year: "numeric" })}
               </span>
               <span className="font-semibold text-foreground">
-                EUR {trip.cost.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
+                {formatCurrency(trip.cost, "EUR", { minimumFractionDigits: 2 })}
               </span>
             </div>
           </div>
 
           {trip.photos.length ? (
             <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">Photos</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t("common.photos")}</h3>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {trip.photos.map((photo, index) => (
-                  <img key={`${photo}-${index}`} src={optimizeTripPhotoUrl(photo, { width: 420, quality: 68 })} alt={`${trip.title}-${index + 1}`} className="h-28 w-full rounded-xl object-cover" loading="lazy" decoding="async" />
+                  <img key={`${photo}-${index}`} src={optimizeTripPhotoUrl(photo, { width: 420, quality: 68 })} alt={`${localizedTitle} ${t("trips.photoAlt")} ${index + 1}`} className="h-28 w-full rounded-xl object-cover" loading="lazy" decoding="async" />
                 ))}
               </div>
             </section>
@@ -73,7 +78,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
                   <StickyNote className="h-3.5 w-3.5" />
                 </span>
-                Notes
+                {t("common.notes")}
               </h3>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{trip.notes}</p>
             </section>
@@ -85,11 +90,11 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
                   <Plane className="h-3.5 w-3.5" />
                 </span>
-                Travel
+                {t("common.travel")}
               </h3>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-xl border border-border/70 p-3">
-                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Outbound</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">{t("trips.outbound")}</p>
                   <div className="space-y-2">
                     {trip.travel.outbound.map((leg, idx) => (
                       <p key={`out-${idx}`} className="text-sm text-foreground">
@@ -99,7 +104,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                   </div>
                 </div>
                 <div className="rounded-xl border border-border/70 p-3">
-                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Return</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">{t("trips.return")}</p>
                   <div className="space-y-2">
                     {trip.travel.returnTrip.map((leg, idx) => (
                       <p key={`ret-${idx}`} className="text-sm text-foreground">
@@ -118,7 +123,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
                   <Hotel className="h-3.5 w-3.5" />
                 </span>
-                Hotels
+                {t("common.hotels")}
               </h3>
               <div className="space-y-2">
                 {trip.hotels.map((hotel, index) => (
@@ -132,12 +137,12 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                         rel="noreferrer"
                         className="mt-1 inline-flex font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
                       >
-                        Abrir link do hotel
+                        {t("trips.openHotelLink")}
                       </a>
                     ) : null}
                     <p className="text-muted-foreground">
                       {hotel.checkIn || "-"} {" -> "} {hotel.checkOut || "-"}
-                      {hotel.cost != null ? ` · EUR ${hotel.cost.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}` : ""}
+                      {hotel.cost != null ? ` · ${formatCurrency(hotel.cost, "EUR", { minimumFractionDigits: 2 })}` : ""}
                     </p>
                   </div>
                 ))}
@@ -151,7 +156,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
                   <Utensils className="h-3.5 w-3.5" />
                 </span>
-                Food highlights
+                {t("trips.foodTitle")}
               </h3>
               <div className="space-y-2">
                 {trip.foods.map((food, index) => (
@@ -164,7 +169,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                           className="h-12 w-12 rounded-md border border-border/60 object-cover shrink-0 cursor-zoom-in"
                           loading="lazy"
                           decoding="async"
-                          onClick={() => setSelectedFoodImage({ src: food.image, alt: food.name || "Food photo" })}
+                          onClick={() => setSelectedFoodImage({ src: food.image, alt: food.name || t("trips.foodPhoto") })}
                         />
                       ) : (
                         <div className="h-12 w-12 rounded-md border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
@@ -179,7 +184,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                             rel="noreferrer"
                             className="mt-1 inline-flex font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
                           >
-                            Ver critica do restaurante
+                            {t("trips.openRestaurantReview")}
                           </a>
                         ) : null}
                       </div>
@@ -196,7 +201,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
                   <Ticket className="h-3.5 w-3.5" />
                 </span>
-                Tickets
+                {t("common.tickets")}
               </h3>
               <div className="space-y-2">
                 {trip.tickets.map((ticket, index) => (
@@ -204,7 +209,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                     <p className="font-medium text-foreground">{ticket.name}</p>
                     {ticket.venue ? <p className="text-muted-foreground">{ticket.venue}</p> : null}
                     {ticket.cost != null ? (
-                      <p className="text-muted-foreground">EUR {ticket.cost.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</p>
+                      <p className="text-muted-foreground">{formatCurrency(ticket.cost, "EUR", { minimumFractionDigits: 2 })}</p>
                     ) : null}
                   </div>
                 ))}
@@ -218,18 +223,18 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-secondary/70 text-foreground/85">
                   <Receipt className="h-3.5 w-3.5" />
                 </span>
-                Expenses
+                {t("common.expenses")}
               </h3>
               <div className="rounded-xl border border-border/70 p-3 space-y-2 text-sm">
                 {trip.expenses.map((expense, index) => (
                   <div key={`${expense.label}-${index}`} className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">{expense.label}</span>
-                    <span className="text-foreground">EUR {expense.amount.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                    <span className="text-foreground">{formatCurrency(expense.amount, "EUR", { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
                 <div className="border-t border-border/70 pt-2 flex items-center justify-between font-semibold">
-                  <span>Total</span>
-                  <span>EUR {totalExpenses.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                  <span>{t("common.total")}</span>
+                  <span>{formatCurrency(totalExpenses, "EUR", { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </section>
@@ -242,7 +247,7 @@ export function TripDetailDialog({ open, onOpenChange, trip }: TripDetailDialogP
             >
               <button
                 type="button"
-                aria-label="Fechar preview"
+                aria-label={t("trips.closePreview")}
                 onClick={(event) => {
                   event.stopPropagation();
                   setSelectedFoodImage(null);

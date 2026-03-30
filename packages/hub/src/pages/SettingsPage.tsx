@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Send, Settings, Bell } from 'lucide-react';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation } from 'react-router-dom';
 import {
   getSettingsPersistenceMode,
@@ -18,6 +20,7 @@ import {
 } from '@/features/warranties/lib/notificationSettings';
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
   const isFromWarranties = locationState?.from === 'warranties';
@@ -79,7 +82,7 @@ export default function SettingsPage() {
     const chatId = telegramChatId.trim();
 
     if (!token || !chatId) {
-      setTestStatus({ type: 'error', message: 'Fill Bot Token and Chat ID first.' });
+      setTestStatus({ type: 'error', message: t('settingsPage.fillTelegramFirst') });
       return;
     }
 
@@ -90,9 +93,9 @@ export default function SettingsPage() {
       await persistTelegramConfig({ botToken: token, chatId });
       await sendTestMessage();
 
-      setTestStatus({ type: 'success', message: 'Test message sent successfully ✅' });
+      setTestStatus({ type: 'success', message: t('settingsPage.testSuccess') });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unexpected error while sending message.';
+      const message = error instanceof Error ? error.message : t('settingsPage.unexpectedTestError');
       setTestStatus({ type: 'error', message });
     } finally {
       setSendingTest(false);
@@ -113,11 +116,11 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <AppSectionHeader title="Settings" icon={Settings} showSettings={false} backTo={backToPath} backLabel="Back" />
+        <AppSectionHeader title={t('settingsPage.title')} icon={Settings} showSettings={false} backTo={backToPath} backLabel={t('common.back')} />
         <div className="mx-auto max-w-2xl space-y-6 px-4 pt-20 sm:px-6 lg:px-0">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Loading your preferences…</p>
+            <h1 className="text-2xl font-bold text-foreground">{t('settingsPage.title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t('settingsPage.loadingPreferences')}</p>
           </div>
         </div>
       </div>
@@ -126,15 +129,23 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppSectionHeader title="Settings" icon={Settings} showSettings={false} backTo={backToPath} backLabel="Back" />
+      <AppSectionHeader title={t('settingsPage.title')} icon={Settings} showSettings={false} backTo={backToPath} backLabel={t('common.back')} />
 
       <div className="mx-auto max-w-2xl space-y-6 px-4 pb-8 pt-20 sm:px-6 lg:px-0">
         <div className="animate-fade-up">
-          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Configure the shared Telegram integration used by feature-level notification modules</p>
+          <h1 className="text-2xl font-bold text-foreground">{t('settingsPage.title')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('settingsPage.description')}</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Storage mode: <span className="font-medium text-foreground">{storageMode === 'local' ? 'Local browser storage' : 'Database sync'}</span>
+            {t('settingsPage.storageMode')}: <span className="font-medium text-foreground">{storageMode === 'local' ? t('settingsPage.localStorage') : t('settingsPage.databaseSync')}</span>
           </p>
+        </div>
+
+        <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.languageCardTitle')}</h2>
+            <p className="text-xs text-muted-foreground">{t('settingsPage.languageCardDescription')}</p>
+          </div>
+          <LanguageSwitcher />
         </div>
 
         {/* Telegram */}
@@ -144,14 +155,14 @@ export default function SettingsPage() {
               <Send className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-foreground">Telegram Integration</h2>
-              <p className="text-xs text-muted-foreground">Shared bot credentials used by notifications inside each feature</p>
+              <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.telegramTitle')}</h2>
+              <p className="text-xs text-muted-foreground">{t('settingsPage.telegramDescription')}</p>
             </div>
           </div>
 
           <div className="space-y-3">
             <div>
-              <Label htmlFor="telegram-bot-token" className="mb-1.5 block">Bot Token</Label>
+              <Label htmlFor="telegram-bot-token" className="mb-1.5 block">{t('settingsPage.botToken')}</Label>
               <Input
                 id="telegram-bot-token"
                 value={telegramBotToken}
@@ -159,31 +170,31 @@ export default function SettingsPage() {
                 placeholder="123456:ABC-DEF..."
                 type="password"
               />
-              <p className="mt-1 text-xs text-muted-foreground">Get from @BotFather on Telegram</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.botTokenHint')}</p>
             </div>
             <div>
-              <Label htmlFor="telegram-chat-id" className="mb-1.5 block">Chat ID</Label>
+              <Label htmlFor="telegram-chat-id" className="mb-1.5 block">{t('settingsPage.chatId')}</Label>
               <Input
                 id="telegram-chat-id"
                 value={telegramChatId}
                 onChange={e => setTelegramChatId(e.target.value)}
-                placeholder="Your chat ID"
+                placeholder={t('settingsPage.yourChatId')}
               />
-              <p className="mt-1 text-xs text-muted-foreground">Send /start to @userinfobot to get your ID</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.chatIdHint')}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => void handleSave()}
                 className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
               >
-                {saved ? '✓ Saved!' : 'Save Settings'}
+                {saved ? t('settingsPage.saved') : t('settingsPage.saveSettings')}
               </button>
               <button
                 onClick={() => void handleSendTest()}
                 disabled={sendingTest}
                 className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted active:scale-95 disabled:opacity-60"
               >
-                {sendingTest ? 'Sending…' : 'Send Test Message'}
+                {sendingTest ? t('settingsPage.sending') : t('settingsPage.sendTestMessage')}
               </button>
             </div>
             {testStatus && (
@@ -201,16 +212,16 @@ export default function SettingsPage() {
                 <Bell className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Warranty Notifications</h2>
-                <p className="text-xs text-muted-foreground">Configure alerts for expiring products</p>
+                <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.warrantyTitle')}</h2>
+                <p className="text-xs text-muted-foreground">{t('settingsPage.warrantyDescription')}</p>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Enable warranty alerts</p>
-                  <p className="text-xs text-muted-foreground">Send Telegram messages for products nearing expiry</p>
+                  <p className="text-sm font-medium text-foreground">{t('settingsPage.warrantyEnabled')}</p>
+                  <p className="text-xs text-muted-foreground">{t('settingsPage.warrantyEnabledHint')}</p>
                 </div>
                 <input
                   type="checkbox"
@@ -221,7 +232,7 @@ export default function SettingsPage() {
               </div>
 
               <div>
-                <Label htmlFor="warranty-alert-days" className="mb-1.5 block">Alert lead time (days)</Label>
+                <Label htmlFor="warranty-alert-days" className="mb-1.5 block">{t('settingsPage.warrantyLeadTime')}</Label>
                 <Input
                   id="warranty-alert-days"
                   type="number"
@@ -230,7 +241,7 @@ export default function SettingsPage() {
                   value={warrantyNotificationSettings.alertDays}
                   onChange={(e) => setWarrantyNotificationSettings((prev) => ({ ...prev, alertDays: Math.max(1, Number(e.target.value) || 1) }))}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">Controls how far ahead alerts are triggered (1-365 days)</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.warrantyLeadTimeHint')}</p>
               </div>
 
               <button
@@ -238,15 +249,15 @@ export default function SettingsPage() {
                 disabled={savingWarrantyNotificationSettings}
                 className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-60"
               >
-                {savingWarrantyNotificationSettings ? 'Saving…' : warrantyNotificationSaved ? '✓ Saved!' : 'Save warranty settings'}
+                {savingWarrantyNotificationSettings ? t('settingsPage.savingWarranty') : warrantyNotificationSaved ? t('settingsPage.saved') : t('settingsPage.saveWarranty')}
               </button>
             </div>
           </div>
         )}
 
         <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: isFromWarranties ? '240ms' : '160ms' }}>
-          <p className="text-sm font-medium text-foreground">Feature-level notifications</p>
-          <p className="mt-1 text-xs text-muted-foreground">{isFromWarranties ? 'Warranty alerts are configured above.' : 'Each module owns its own notification switches, thresholds and send history.'}</p>
+          <p className="text-sm font-medium text-foreground">{t('settingsPage.featureNotificationsTitle')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{isFromWarranties ? t('settingsPage.featureNotificationsConfigured') : t('settingsPage.featureNotificationsDescription')}</p>
         </div>
       </div>
     </div>
