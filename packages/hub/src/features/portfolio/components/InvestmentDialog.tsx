@@ -19,6 +19,14 @@ interface InvestmentDialogProps {
 }
 
 export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur, onSave }: InvestmentDialogProps) {
+  const parseNumericInput = (value: string) => {
+    const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+    if (!normalized) return 0;
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const formatUnitInput = (value: number | null) => {
     if (!value || !Number.isFinite(value)) return "";
     return value.toFixed(8).replace(/\.?0+$/, "");
@@ -47,9 +55,9 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
   // Track whether currentValue was manually edited by the user
   const [currentValueEditedByUser, setCurrentValueEditedByUser] = useState(false);
 
-  const investedAmountValue = Number(investedAmount) || 0;
-  const enteredCurrentValue = Number(currentValue) || 0;
-  const cryptoUnitsValue = Number(cryptoUnits) || 0;
+  const investedAmountValue = parseNumericInput(investedAmount);
+  const enteredCurrentValue = parseNumericInput(currentValue);
+  const cryptoUnitsValue = parseNumericInput(cryptoUnits);
   const selectedAssetSpotEur = cryptoSpotEur?.[cryptoAsset] ?? null;
   const isCrypto = type === "crypto";
   const hasLiveCryptoSync = type === "crypto" && !hasCashback && cryptoUnitsValue > 0 && !!selectedAssetSpotEur;
@@ -121,11 +129,11 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
     const currentDelta = currentDeltaBase * direction;
 
     if (investedDelta !== 0) {
-      setInvestedAmount((value) => (Number(value) + investedDelta).toFixed(2));
+      setInvestedAmount((value) => (parseNumericInput(value) + investedDelta).toFixed(2));
     }
 
     if (!hasLiveCryptoSync && currentDelta !== 0) {
-      setCurrentValue((value) => (Number(value) + currentDelta).toFixed(2));
+      setCurrentValue((value) => (parseNumericInput(value) + currentDelta).toFixed(2));
     }
 
     const effectiveUnits = movement.units;
@@ -133,12 +141,12 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
     if (effectiveUnits) {
       if (!hasCashback && (movement.kind === "contribution" || movement.kind === "withdrawal")) {
         const unitsDelta = (movement.kind === "contribution" ? effectiveUnits : -effectiveUnits) * direction;
-        setCryptoUnits((value) => parseFloat((Math.max(0, Number(value) + unitsDelta)).toFixed(8)).toString());
+        setCryptoUnits((value) => parseFloat((Math.max(0, parseNumericInput(value) + unitsDelta)).toFixed(8)).toString());
       }
 
       if (type === "crypto" && hasCashback && (movement.kind === "adjustment" || movement.kind === "cashback")) {
         const cashbackDelta = effectiveUnits * direction;
-        setCashbackUnits((value) => parseFloat((Math.max(0, Number(value) + cashbackDelta)).toFixed(8)).toString());
+        setCashbackUnits((value) => parseFloat((Math.max(0, parseNumericInput(value) + cashbackDelta)).toFixed(8)).toString());
       }
     }
   };
@@ -172,9 +180,9 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
   const saveMovementEdit = () => {
     if (!editingMovementId) return;
 
-    const nextAmount = Number(editingMovementAmount);
+    const nextAmount = parseNumericInput(editingMovementAmount);
     if (!Number.isFinite(nextAmount)) return;
-    const parsedUnits = editingMovementUnits.trim() === "" ? undefined : Number(editingMovementUnits);
+    const parsedUnits = editingMovementUnits.trim() === "" ? undefined : parseNumericInput(editingMovementUnits);
     if (editingMovementUnits.trim() !== "" && !Number.isFinite(parsedUnits)) return;
 
     const current = movements.find((m) => m.id === editingMovementId);
@@ -199,14 +207,14 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedCryptoUnits = type === "crypto" && !hasCashback ? Number(cryptoUnits) || null : null;
-    const parsedCashbackUnits = type === "crypto" && hasCashback ? Number(cashbackUnits) || null : null;
-    const normalizedInvestedAmount = type === "crypto" && hasCashback ? 0 : parseFloat(investedAmount) || 0;
+    const parsedCryptoUnits = type === "crypto" && !hasCashback ? parseNumericInput(cryptoUnits) || null : null;
+    const parsedCashbackUnits = type === "crypto" && hasCashback ? parseNumericInput(cashbackUnits) || null : null;
+    const normalizedInvestedAmount = type === "crypto" && hasCashback ? 0 : parseNumericInput(investedAmount) || 0;
     const normalizedCurrentValue = type === "crypto" && hasCashback
       ? 0
       : hasLiveCryptoSync
         ? resolvedCurrentValue
-        : parseFloat(currentValue) || 0;
+        : parseNumericInput(currentValue) || 0;
 
     // investedAmount is updated in real-time via handleRemoveMovement delta adjustments.
     // Trust what's in the field.

@@ -10,7 +10,13 @@ import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
 import { Investment, InvestmentMovementKind, PortfolioEarning, calculateSummary } from "@/features/portfolio/types/investment";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useCryptoQuotes } from "@/features/portfolio/hooks/use-btc-quote";
-import { parseCryptoNotes, parseInvestmentMovements, resolveInvestmentCurrentValue, serializeInvestmentNotes } from "@/features/portfolio/lib/crypto";
+import {
+  buildSyntheticCryptoCashbackEarnings,
+  parseCryptoNotes,
+  parseInvestmentMovements,
+  resolveInvestmentCurrentValue,
+  serializeInvestmentNotes,
+} from "@/features/portfolio/lib/crypto";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const InvestmentDialog = lazy(() =>
@@ -69,6 +75,21 @@ const Index = () => {
     })),
     [longTerm, cryptoSpotEur],
   );
+
+  const portfolioEarnings = useMemo(() => {
+    const syntheticCryptoCashback = buildSyntheticCryptoCashbackEarnings(resolvedInvestments, cryptoSpotEur);
+    const existingKeys = new Set(
+      earnings.map((earning) => `${earning.kind}:${earning.title}:${earning.date}:${earning.cryptoAsset ?? ""}:${earning.cryptoUnits ?? ""}`),
+    );
+
+    return [
+      ...earnings,
+      ...syntheticCryptoCashback.filter((earning) => {
+        const key = `${earning.kind}:${earning.title}:${earning.date}:${earning.cryptoAsset ?? ""}:${earning.cryptoUnits ?? ""}`;
+        return !existingKeys.has(key);
+      }),
+    ];
+  }, [earnings, resolvedInvestments, cryptoSpotEur]);
 
   const summary = calculateSummary(resolvedInvestments);
 
@@ -372,7 +393,8 @@ const Index = () => {
                 </div>
 
                 <EarningsSection
-                  earnings={earnings}
+                  earnings={portfolioEarnings}
+                  cryptoSpotEur={cryptoSpotEur}
                   loading={earningsLoading}
                   onAdd={handleAddEarning}
                   onEdit={handleEditEarning}

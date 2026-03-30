@@ -5,7 +5,7 @@ import AppSectionHeader from "@/components/AppSectionHeader";
 import { MonthlyInsights } from "@/features/portfolio/components/MonthlyInsights";
 import { useInvestments } from "@/features/portfolio/hooks/useInvestments";
 import { useCryptoQuotes } from "@/features/portfolio/hooks/use-btc-quote";
-import { parseInvestmentMovements, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
+import { buildSyntheticCryptoCashbackEarnings, parseInvestmentMovements, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 
 export default function PortfolioInsightsPage() {
   const { investments, monthlySnapshots, earnings } = useInvestments();
@@ -15,6 +15,21 @@ export default function PortfolioInsightsPage() {
     ...investment,
     currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
   }));
+
+  const resolvedEarnings = useMemo(() => {
+    const syntheticCryptoCashback = buildSyntheticCryptoCashbackEarnings(resolvedInvestments, cryptoSpotEur);
+    const existingKeys = new Set(
+      earnings.map((earning) => `${earning.kind}:${earning.title}:${earning.date}:${earning.cryptoAsset ?? ""}:${earning.cryptoUnits ?? ""}`),
+    );
+
+    return [
+      ...earnings,
+      ...syntheticCryptoCashback.filter((earning) => {
+        const key = `${earning.kind}:${earning.title}:${earning.date}:${earning.cryptoAsset ?? ""}:${earning.cryptoUnits ?? ""}`;
+        return !existingKeys.has(key);
+      }),
+    ];
+  }, [earnings, resolvedInvestments, cryptoSpotEur]);
 
   const isNonInvestmentWithdrawal = (movement: { id?: string; kind: string; note?: string }) => {
     if (movement.kind !== "withdrawal") return false;
@@ -39,19 +54,19 @@ export default function PortfolioInsightsPage() {
     const monthSet = new Set<string>();
 
     monthlySnapshots.forEach((snapshot) => monthSet.add(snapshot.month));
-    earnings.forEach((earning) => monthSet.add(earning.date.slice(0, 7)));
+    resolvedEarnings.forEach((earning) => monthSet.add(earning.date.slice(0, 7)));
     movementRows.forEach((movement) => monthSet.add(movement.date.slice(0, 7)));
 
     const now = new Date();
     monthSet.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
 
     return Array.from(monthSet).sort();
-  }, [monthlySnapshots, earnings, movementRows]);
+  }, [monthlySnapshots, resolvedEarnings, movementRows]);
 
   const effectiveMonth = months[months.length - 1] ?? null;
 
   const monthMovements = movementRows.filter((movement) => effectiveMonth && movement.date.startsWith(effectiveMonth));
-  const monthEarnings = earnings
+  const monthEarnings = resolvedEarnings
     .filter((earning) => effectiveMonth && earning.date.startsWith(effectiveMonth))
     .reduce((sum, earning) => sum + earning.amountEur, 0);
 
@@ -80,7 +95,7 @@ export default function PortfolioInsightsPage() {
 
       <main className="pt-16 min-h-screen">
         <div className="container py-6 lg:py-8 space-y-6 lg:space-y-8">
-          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={earnings} netInvestedFlow={netInvestedFlow} monthlyPerformanceTotal={performanceTotal} monthEarnings={monthEarnings} />
+          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={resolvedEarnings} netInvestedFlow={netInvestedFlow} monthlyPerformanceTotal={performanceTotal} monthEarnings={monthEarnings} />
         </div>
       </main>
     </div>

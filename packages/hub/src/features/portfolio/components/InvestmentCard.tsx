@@ -52,6 +52,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const spotEur = cryptoSpotEur?.[previewAsset] ?? null;
   const cashbackSpotEur = cryptoSpotEur?.[cashbackAsset] ?? null;
   const hasLiveCryptoQuote = investment.type === "crypto" && !!units && !!spotEur;
+  const hasLiveCashbackQuote = investment.type === "crypto" && !!cashbackUnits && !!cashbackAsset && !!cashbackSpotEur;
   const hasCashback = investment.type === "crypto" && !!cashbackUnits;
   const isCashbackOnly = investment.type === "crypto" && investment.investedAmount === 0 && !units && !!cashbackUnits;
   const isCashbackOnlyQuickAdd = isCashbackOnly;
@@ -184,6 +185,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               {hasLiveCryptoQuote && (
                 <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
                   Live {CRYPTO_SYMBOL[asset] ?? ""} {asset}
+                </span>
+              )}
+              {!hasLiveCryptoQuote && hasLiveCashbackQuote && (
+                <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                  Live {CRYPTO_SYMBOL[cashbackAsset] ?? ""} {cashbackAsset}
                 </span>
               )}
             </div>

@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PortfolioEarning, formatCurrency, formatMonthLabel } from "@/features/portfolio/types/investment";
+import { CryptoQuoteMap } from "@/features/portfolio/lib/crypto";
 
 const PAGE_SIZE = 5;
 
 interface EarningsSectionProps {
   earnings: PortfolioEarning[];
+  cryptoSpotEur?: CryptoQuoteMap | null;
   loading?: boolean;
   onAdd: () => void;
   onEdit: (earning: PortfolioEarning) => void;
@@ -31,7 +33,7 @@ const offsetMonth = (monthKey: string, delta: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
-export function EarningsSection({ earnings, loading = false, onAdd, onEdit, onDelete }: EarningsSectionProps) {
+export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAdd, onEdit, onDelete }: EarningsSectionProps) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,7 +67,7 @@ export function EarningsSection({ earnings, loading = false, onAdd, onEdit, onDe
 
       if (earning.kind === "survey") allTime.survey += earning.amountEur;
       if (earning.kind === "social_media") allTime.social_media += earning.amountEur;
-      if (earning.kind === "cashback") allTime.cashback += earning.amountEur;
+      if (earning.kind === "cashback" || earning.kind === "crypto_cashback") allTime.cashback += earning.amountEur;
       if (earning.kind === "dividend") allTime.dividend += earning.amountEur;
     }
 
@@ -127,7 +129,7 @@ export function EarningsSection({ earnings, loading = false, onAdd, onEdit, onDe
         stats.socialMediaTotal += earning.amountEur;
       }
 
-      if (earning.kind === "cashback") {
+      if (earning.kind === "cashback" || earning.kind === "crypto_cashback") {
         stats.cashbackCount += 1;
         stats.cashbackTotal += earning.amountEur;
       }
@@ -175,8 +177,24 @@ export function EarningsSection({ earnings, loading = false, onAdd, onEdit, onDe
 
   const allTimeSurveyTotal = earningsData.allTime.survey;
   const allTimeSocialMediaTotal = earningsData.allTime.social_media;
-  const allTimeCashbackTotal = earningsData.allTime.cashback;
   const allTimeDividendTotal = earningsData.allTime.dividend;
+  const allTimeCashbackTotal = useMemo(() => {
+    return sortedEarnings.reduce((sum, earning) => {
+      if (earning.kind === "cashback") {
+        return sum + earning.amountEur;
+      }
+
+      if (earning.kind === "crypto_cashback") {
+        const liveSpot = earning.cryptoAsset ? cryptoSpotEur?.[earning.cryptoAsset] : null;
+        if (earning.cryptoUnits && liveSpot && liveSpot > 0) {
+          return sum + (earning.cryptoUnits * liveSpot);
+        }
+        return sum + earning.amountEur;
+      }
+
+      return sum;
+    }, 0);
+  }, [cryptoSpotEur, sortedEarnings]);
 
   const monthTrackedTotal = monthSurveyTotal + monthSocialMediaTotal + monthCashbackTotal + monthDividendTotal;
   const monthSurveyRatio = monthTrackedTotal > 0 ? (monthSurveyTotal / monthTrackedTotal) * 100 : 0;
@@ -240,7 +258,6 @@ export function EarningsSection({ earnings, loading = false, onAdd, onEdit, onDe
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/8 px-3 py-1.5 text-xs font-medium text-orange-600/85">
               <span>Cashback</span>
               <span className="font-bold">{formatCurrency(allTimeCashbackTotal)}</span>
-              <span className="text-[11px] text-orange-600/70">· all-time</span>
             </span>
             <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-purple-500/25 bg-purple-500/8 px-3 py-1.5 text-xs font-medium text-purple-600/85">
               <span>Surveys</span>

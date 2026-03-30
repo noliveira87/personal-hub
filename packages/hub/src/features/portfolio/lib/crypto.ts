@@ -1,4 +1,4 @@
-import { Investment, InvestmentMovement } from "@/features/portfolio/types/investment";
+import { Investment, InvestmentMovement, PortfolioEarning } from "@/features/portfolio/types/investment";
 
 const LEGACY_BTC_UNITS_PREFIX = "BTC_UNITS:";
 const CRYPTO_ASSET_PREFIX = "CRYPTO_ASSET:";
@@ -35,6 +35,12 @@ export interface SerializeInvestmentNotesInput {
   userNotes?: string;
 }
 
+const parseLooseNumber = (value: string) => {
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
 export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
   if (!notes) {
     return {
@@ -52,7 +58,7 @@ export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
     const firstLineEnd = trimmed.indexOf("\n");
     const header = firstLineEnd === -1 ? trimmed : trimmed.slice(0, firstLineEnd);
     const valueRaw = header.slice(LEGACY_BTC_UNITS_PREFIX.length).trim();
-    const parsed = Number(valueRaw);
+    const parsed = parseLooseNumber(valueRaw);
 
     const userNotes = firstLineEnd === -1 ? "" : trimmed.slice(firstLineEnd + 1).trim();
 
@@ -87,7 +93,7 @@ export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
 
     if (line.startsWith(CRYPTO_UNITS_PREFIX)) {
       const valueRaw = line.slice(CRYPTO_UNITS_PREFIX.length).trim();
-      const parsed = Number(valueRaw);
+      const parsed = parseLooseNumber(valueRaw);
       units = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
       continue;
     }
@@ -102,7 +108,7 @@ export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
 
     if (line.startsWith(CRYPTO_CASHBACK_UNITS_PREFIX)) {
       const valueRaw = line.slice(CRYPTO_CASHBACK_UNITS_PREFIX.length).trim();
-      const parsed = Number(valueRaw);
+      const parsed = parseLooseNumber(valueRaw);
       cashbackUnits = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
       continue;
     }
@@ -271,6 +277,48 @@ export function resolveCashbackCurrentValue(investment: Investment, cryptoSpotEu
   }
 
   return cashbackUnits * spotEur;
+}
+
+export function buildSyntheticCryptoCashbackEarnings(
+  investments: Investment[],
+  cryptoSpotEur?: CryptoQuoteMap | null,
+): PortfolioEarning[] {
+  return investments.flatMap((investment) => {
+    if (investment.type !== "crypto") {
+      return [];
+    }
+
+    const { cashbackAsset, userNotes } = parseCryptoNotes(investment.notes);
+    const cashbackMovements = parseInvestmentMovements(investment.notes)
+      .filter((movement) => (
+        movement.note !== "Initial position"
+        && (movement.kind === "adjustment" || movement.kind === "cashback")
+        && !!movement.units
+        && movement.units > 0
+        && movement.amount > 0
+      ));
+
+    if (!cashbackMovements.length) {
+      return [];
+    }
+
+    return cashbackMovements.map((movement) => ({
+      id: `synthetic-crypto-cashback-${investment.id}-${movement.id}`,
+      title: investment.name,
+      provider: undefined,
+      kind: "crypto_cashback" as const,
+      date: movement.date,
+      amountEur: Math.round(movement.amount * 100) / 100,
+      cryptoAsset: cashbackAsset,
+      cryptoUnits: movement.units ?? null,
+      spotEurAtEarned: movement.units && movement.amount > 0
+        ? Math.round((movement.amount / movement.units) * 100) / 100
+        : (cryptoSpotEur?.[cashbackAsset] ? Math.round(Number(cryptoSpotEur[cashbackAsset]) * 100) / 100 : null),
+      notes: movement.note === "Profit / Return" ? userNotes || undefined : movement.note,
+      createdAt: investment.createdAt,
+      updatedAt: investment.updatedAt,
+    }));
+  });
 }
 
 export async function fetchCryptoEurQuotes(signal?: AbortSignal): Promise<CryptoQuotes> {
