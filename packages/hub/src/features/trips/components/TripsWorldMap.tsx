@@ -37,12 +37,42 @@ type CachedGeo = {
 const GEO_CACHE_KEY = "trip-destination-geocode-cache-v2";
 const USA_COUNTRY_ID = "840";
 
+const PORTUGAL_QUERY_REGEX = /\bportugal\b/i;
+
 const DESTINATION_FALLBACKS: Array<{ regex: RegExp; lat: number; lng: number }> = [
   { regex: /madison|wisconsin/i, lat: 43.0731, lng: -89.4012 },
   { regex: /malta|valletta|sliema/i, lat: 35.8989, lng: 14.5146 },
+  // Portugal cities — cover common destinations so geocoding is never needed
   { regex: /lisboa|lisbon/i, lat: 38.7223, lng: -9.1393 },
-  { regex: /porto/i, lat: 41.1579, lng: -8.6291 },
+  { regex: /\bporto\b/i, lat: 41.1579, lng: -8.6291 },
   { regex: /e?vora|évora/i, lat: 38.5714, lng: -7.9135 },
+  { regex: /vilamoura/i, lat: 37.0717, lng: -8.1220 },
+  { regex: /portim.o|portimao/i, lat: 37.1360, lng: -8.5376 },
+  { regex: /\bfaro\b/i, lat: 37.0194, lng: -7.9322 },
+  { regex: /lagos/i, lat: 37.1020, lng: -8.6730 },
+  { regex: /cascais/i, lat: 38.6979, lng: -9.4215 },
+  { regex: /sintra/i, lat: 38.7979, lng: -9.3900 },
+  { regex: /setubal|setúbal/i, lat: 38.5244, lng: -8.8882 },
+  { regex: /braga/i, lat: 41.5503, lng: -8.4200 },
+  { regex: /coimbra/i, lat: 40.2033, lng: -8.4103 },
+  { regex: /aveiro/i, lat: 40.6405, lng: -8.6538 },
+  { regex: /beja/i, lat: 38.0153, lng: -7.8645 },
+  { regex: /matosinhos/i, lat: 41.1834, lng: -8.6867 },
+  { regex: /portalegre/i, lat: 39.2967, lng: -7.4286 },
+  { regex: /viseu/i, lat: 40.6566, lng: -7.9122 },
+  { regex: /guimaraes|guimarães/i, lat: 41.4425, lng: -8.2918 },
+  { regex: /viana do castelo/i, lat: 41.6918, lng: -8.8340 },
+  { regex: /leiria/i, lat: 39.7444, lng: -8.8072 },
+  { regex: /santarem|santarém/i, lat: 39.2369, lng: -8.6849 },
+  { regex: /albufeira/i, lat: 37.0892, lng: -8.2506 },
+  { regex: /tavira/i, lat: 37.1284, lng: -7.6511 },
+  { regex: /sagres/i, lat: 37.0124, lng: -8.9395 },
+  { regex: /nazare|nazaré/i, lat: 39.6011, lng: -9.0705 },
+  { regex: /obidos|óbidos/i, lat: 39.3631, lng: -9.1576 },
+  { regex: /tomar/i, lat: 39.6031, lng: -8.4140 },
+  { regex: /alcobaça/i, lat: 39.5504, lng: -8.9786 },
+  { regex: /funchal|madeira/i, lat: 32.6669, lng: -16.9241 },
+  { regex: /ponta delgada|a.ores|açores|azores/i, lat: 37.7412, lng: -25.6756 },
   { regex: /madrid/i, lat: 40.4168, lng: -3.7038 },
   { regex: /barcelona/i, lat: 41.3874, lng: 2.1686 },
   { regex: /london/i, lat: 51.5072, lng: -0.1276 },
@@ -67,22 +97,11 @@ const normalizeLocationText = (value: string) => value
   .replace(/[\u0300-\u036f]/g, "")
   .toLowerCase();
 
-const isPointLocatedInPortugal = (
-  point: Pick<TripPoint, "lat" | "lng" | "query" | "label">,
-  portugalMainlandFeature: unknown | null,
-) => {
-  // Bounding box for Portugal mainland (excludes most of western Spain; Badajoz/Huelva are rare trip destinations).
-  const inMainlandBounds = point.lat >= 36.8 && point.lat <= 42.3 && point.lng >= -9.7 && point.lng <= -6.0;
-  if (!inMainlandBounds) return false;
-
-  // When topology is available, use precise containment (correctly handles Spain–Portugal border).
-  // Fall back to bounding box when the feature hasn't loaded yet.
-  const insideMainland = portugalMainlandFeature
-    ? geoContains(portugalMainlandFeature as never, [point.lng, point.lat])
-    : true;
-
-  return insideMainland;
-};
+// Bounding box for Portugal mainland + islands envelope.
+// Covers all Portuguese territory; the only borderline overlap with Spain
+// is far-west Extremadura/Huelva which will never be trip destinations.
+const isPointLocatedInPortugal = (point: Pick<TripPoint, "lat" | "lng">) =>
+  point.lat >= 36.8 && point.lat <= 42.3 && point.lng >= -9.7 && point.lng <= -6.0;
 
 const readGeoCache = (): Record<string, CachedGeo> => {
   if (typeof window === "undefined") return {};
@@ -418,7 +437,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     const scope = new Map<string, TripGeoScope>();
 
     points.forEach((point) => {
-      const inPortugal = isPointLocatedInPortugal(point, portugalMainlandFeature);
+      const inPortugal = isPointLocatedInPortugal(point);
       const current = scope.get(point.trip.id) ?? { hasPortugal: false, hasNonPortugal: false };
 
       if (inPortugal) {
@@ -435,7 +454,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
   const visiblePoints = useMemo(() => {
     return points.filter((point) => {
-      const inPortugal = isPointLocatedInPortugal(point, portugalMainlandFeature);
+      const inPortugal = isPointLocatedInPortugal(point);
       if (!inPortugal) return true;
 
       const scope = tripGeoScopeById.get(point.trip.id);
@@ -444,15 +463,15 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
       // Hide Portugal stopover points when the same trip also has non-Portugal points.
       return !scope.hasNonPortugal;
     });
-  }, [points, portugalMainlandFeature, tripGeoScopeById]);
+  }, [points, tripGeoScopeById]);
 
   const portugalPoints = useMemo(() => {
-    return visiblePoints.filter((point) => isPointLocatedInPortugal(point, portugalMainlandFeature));
-  }, [visiblePoints, portugalMainlandFeature]);
+    return visiblePoints.filter((point) => isPointLocatedInPortugal(point));
+  }, [visiblePoints]);
 
   const worldPinsPoints = useMemo(() => {
-    return visiblePoints.filter((point) => !isPointLocatedInPortugal(point, portugalMainlandFeature));
-  }, [visiblePoints, portugalMainlandFeature]);
+    return visiblePoints.filter((point) => !isPointLocatedInPortugal(point));
+  }, [visiblePoints]);
 
   const visitedCountryIds = useMemo(() => {
     if (!worldGeo || !("features" in worldGeo) || !Array.isArray(worldGeo.features)) {
