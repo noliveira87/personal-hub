@@ -34,7 +34,7 @@ type CachedGeo = {
   lng: number;
 };
 
-const GEO_CACHE_KEY = "trip-destination-geocode-cache-v1";
+const GEO_CACHE_KEY = "trip-destination-geocode-cache-v2";
 const USA_COUNTRY_ID = "840";
 
 const DESTINATION_FALLBACKS: Array<{ regex: RegExp; lat: number; lng: number }> = [
@@ -67,21 +67,21 @@ const normalizeLocationText = (value: string) => value
   .replace(/[\u0300-\u036f]/g, "")
   .toLowerCase();
 
-const PORTUGAL_QUERY_REGEX = /\bportugal\b/i;
-
-const matchesPortugalLocation = (value: string) => PORTUGAL_QUERY_REGEX.test(normalizeLocationText(value));
-
 const isPointLocatedInPortugal = (
   point: Pick<TripPoint, "lat" | "lng" | "query" | "label">,
   portugalMainlandFeature: unknown | null,
 ) => {
-  const matchesQuery = matchesPortugalLocation(point.query) || matchesPortugalLocation(point.label);
+  // Bounding box for Portugal mainland (excludes most of western Spain; Badajoz/Huelva are rare trip destinations).
   const inMainlandBounds = point.lat >= 36.8 && point.lat <= 42.3 && point.lng >= -9.7 && point.lng <= -6.0;
+  if (!inMainlandBounds) return false;
+
+  // When topology is available, use precise containment (correctly handles Spain–Portugal border).
+  // Fall back to bounding box when the feature hasn't loaded yet.
   const insideMainland = portugalMainlandFeature
     ? geoContains(portugalMainlandFeature as never, [point.lng, point.lat])
-    : false;
+    : true;
 
-  return insideMainland || (matchesQuery && inMainlandBounds);
+  return insideMainland;
 };
 
 const readGeoCache = (): Record<string, CachedGeo> => {
@@ -241,19 +241,22 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
       const unresolved: string[] = [];
 
       locationQueries.forEach((destination) => {
+        const fallback = findFallback(destination);
+        if (fallback) {
+          destinationCoords[destination] = { ...fallback, source: "fallback" };
+          cache[destination] = fallback;
+          return;
+        }
+
         if (cache[destination]) {
           destinationCoords[destination] = { ...cache[destination], source: "cache" };
           return;
         }
 
-        const fallback = findFallback(destination);
-        if (fallback) {
-          destinationCoords[destination] = { ...fallback, source: "fallback" };
-          return;
-        }
-
         unresolved.push(destination);
       });
+
+      writeGeoCache(cache);
 
       const firstPass: Record<string, TripPoint> = {};
       tripLocations.forEach((location) => {
@@ -443,6 +446,14 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     });
   }, [points, portugalMainlandFeature, tripGeoScopeById]);
 
+  const portugalPoints = useMemo(() => {
+    return visiblePoints.filter((point) => isPointLocatedInPortugal(point, portugalMainlandFeature));
+  }, [visiblePoints, portugalMainlandFeature]);
+
+  const worldPinsPoints = useMemo(() => {
+    return visiblePoints.filter((point) => !isPointLocatedInPortugal(point, portugalMainlandFeature));
+  }, [visiblePoints, portugalMainlandFeature]);
+
   const visitedCountryIds = useMemo(() => {
     if (!worldGeo || !("features" in worldGeo) || !Array.isArray(worldGeo.features)) {
       return new Set<string>();
@@ -452,14 +463,14 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
     worldGeo.features.forEach((geo, index) => {
       const id = String((geo as { id?: string | number }).id ?? index);
-      const visited = visiblePoints.some((point) => geoContains(geo as never, [point.lng, point.lat]));
+      const visited = worldPinsPoints.some((point) => geoContains(geo as never, [point.lng, point.lat]));
       if (visited) {
         ids.add(id);
       }
     });
 
     return ids;
-  }, [visiblePoints, worldGeo]);
+  }, [worldGeo, worldPinsPoints]);
 
   const visitedUsStateIds = useMemo(() => {
     if (!usStatesGeo || !("features" in usStatesGeo) || !Array.isArray(usStatesGeo.features)) {
@@ -470,30 +481,14 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
     usStatesGeo.features.forEach((geo, index) => {
       const id = String((geo as { id?: string | number }).id ?? index);
-      const visited = visiblePoints.some((point) => geoContains(geo as never, [point.lng, point.lat]));
+      const visited = worldPinsPoints.some((point) => geoContains(geo as never, [point.lng, point.lat]));
       if (visited) {
         ids.add(id);
       }
     });
 
     return ids;
-  }, [visiblePoints, usStatesGeo]);
-
-  const portugalPoints = useMemo(() => {
-    return visiblePoints.filter((point) => isPointLocatedInPortugal(point, portugalMainlandFeature));
-  }, [visiblePoints, portugalMainlandFeature]);
-
-  const portugalWorldExcludedPointIds = useMemo(() => {
-    return new Set(
-      visiblePoints
-        .filter((point) => isPointLocatedInPortugal(point, portugalMainlandFeature))
-        .map((point) => point.id),
-    );
-  }, [visiblePoints, portugalMainlandFeature]);
-
-  const worldPinsPoints = useMemo(() => {
-    return visiblePoints.filter((point) => !portugalWorldExcludedPointIds.has(point.id));
-  }, [visiblePoints, portugalWorldExcludedPointIds]);
+  }, [usStatesGeo, worldPinsPoints]);
 
   const projectedPoints = useMemo(() => {
     if (!pathGenerator?.projection()) return [] as Array<{ point: TripPoint; x: number; y: number }>;
