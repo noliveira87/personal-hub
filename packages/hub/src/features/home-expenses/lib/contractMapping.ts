@@ -28,7 +28,7 @@ export function mapContractCategoryToExpenseCategory(
     'software': 'other', // Software subscriptions
     'maintenance': 'other', // General maintenance
     'security-alarm': 'other', // Security services
-    'other': 'other',
+    'other': 'other' as const,
   };
 
   return mapping[contractCategory];
