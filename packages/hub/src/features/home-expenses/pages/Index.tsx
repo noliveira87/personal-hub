@@ -33,22 +33,18 @@ export default function Index() {
 
       <SummaryCards />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
-        <div className="space-y-4 lg:col-span-8">
-          <div className="min-h-[30rem]">
-            <BalanceChart />
-          </div>
-          <div>
-            <AnnualSummarySection />
-          </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-stretch">
+        <div className="order-1 lg:order-1 lg:col-span-8 lg:h-[30rem]">
+          <BalanceChart />
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:col-span-4">
-          <div>
-            <ExpensePieChart />
-          </div>
-          <div>
-            <HighlightsPanel />
-          </div>
+        <div className="order-2 lg:order-2 lg:col-span-4 lg:h-[30rem]">
+          <ExpensePieChart />
+        </div>
+        <div className="order-3 lg:order-3 lg:col-span-8">
+          <AnnualSummarySection />
+        </div>
+        <div className="order-4 lg:order-4 lg:col-span-4">
+          <HighlightsPanel />
         </div>
       </div>
     </div>
