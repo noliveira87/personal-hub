@@ -435,10 +435,12 @@ export function getTripLocationSummaries(trips: Trip[]): TripLocationSummary[] {
       });
     }
 
-    // If trip has exactly one location, use trip title without year and add US state when applicable.
+    // For single-location trips, the destination field is the source of truth for map pins.
+    // This prevents stale pins when destination is edited but old hotel/address text remains.
     if (tripLocations.length === 1 && !prefersTripDestinationLabel(trip.destination)) {
-      const titleWithoutYear = trip.title.replace(/\s*\d{4}\s*$/, "").trim();
-      tripLocations[0].label = addStateToUsLabel(titleWithoutYear);
+      const destinationLabel = addStateToUsLabel(trip.destination);
+      tripLocations[0].label = destinationLabel;
+      tripLocations[0].query = destinationLabel;
     }
 
     locations.push(...tripLocations);
