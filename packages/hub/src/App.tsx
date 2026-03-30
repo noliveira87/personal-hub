@@ -7,6 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ContractProvider } from "@/features/contracts/context/ContractContext";
 import { I18nProvider, useI18n } from "@/i18n/I18nProvider";
 import Layout from "@/components/Layout";
+import { DataProvider } from "@/features/home-expenses/lib/DataContext";
+import HomeExpensesLayout from "@/features/home-expenses/components/Layout";
 
 const Index = lazy(() => import("@/pages/Index"));
 const Dashboard = lazy(() => import("@/pages/hub/Dashboard"));
@@ -21,12 +23,23 @@ const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/Portfo
 const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
 const WarrantiesPage = lazy(() => import("@/pages/warranties/WarrantiesPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
-const WorkInProgress = lazy(() => import("@/pages/WorkInProgress"));
+const HomeExpensesIndexPage = lazy(() => import("@/features/home-expenses/pages/Index"));
+const HomeExpensesTransactionsPage = lazy(() => import("@/features/home-expenses/pages/Transactions"));
+const HomeExpensesMonthlyPage = lazy(() => import("@/features/home-expenses/pages/Monthly"));
+const HomeExpensesInsightsPage = lazy(() => import("@/features/home-expenses/pages/Insights"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
 
-const ContractsScope = () => (
+const HomeExpensesScope = () => (
+  <DataProvider>
+    <HomeExpensesLayout>
+      <Outlet />
+    </HomeExpensesLayout>
+  </DataProvider>
+);
+
+const RepositoriesScope = () => (
   <ContractProvider>
     <Outlet />
   </ContractProvider>
@@ -43,9 +56,12 @@ const AppRoutes = () => {
             {/* Hub */}
             <Route path="/" element={<Index />} />
 
-            {/* Contracts + Dashboard (needs ContractProvider) */}
-            <Route element={<ContractsScope />}>
+            {/* All routes that need ContractProvider (Contracts, Dashboard, HomeExpenses) */}
+            <Route element={<RepositoriesScope />}>
+              {/* Dashboard (needs ContractProvider) */}
               <Route path="/dashboard" element={<Dashboard />} />
+
+              {/* Contracts */}
               <Route path="/contracts" element={<ContractsList />} />
               <Route path="/contracts/new" element={<ContractForm />} />
               <Route path="/contracts/edit/:id" element={<ContractForm />} />
@@ -53,7 +69,16 @@ const AppRoutes = () => {
               <Route path="/contracts/calendar" element={<CalendarPage />} />
               <Route path="/contracts/alerts" element={<AlertsPage />} />
               <Route path="/contracts/insights" element={<InsightsPage />} />
+
+              {/* Home Expenses (needs ContractProvider for income from contracts) */}
+              <Route element={<HomeExpensesScope />}>
+                <Route path="/home-expenses" element={<HomeExpensesIndexPage />} />
+                <Route path="/home-expenses/transactions" element={<HomeExpensesTransactionsPage />} />
+                <Route path="/home-expenses/monthly" element={<HomeExpensesMonthlyPage />} />
+                <Route path="/home-expenses/insights" element={<HomeExpensesInsightsPage />} />
+              </Route>
             </Route>
+
             {/* Portfolio */}
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/portfolio/insights" element={<PortfolioMonthlyInsightsPage />} />
@@ -66,9 +91,6 @@ const AppRoutes = () => {
 
             {/* Settings */}
             <Route path="/settings" element={<SettingsPage />} />
-
-            {/* Work in Progress */}
-            <Route path="/home-expenses" element={<WorkInProgress />} />
 
             {/* Not found */}
             <Route path="*" element={<NotFound />} />

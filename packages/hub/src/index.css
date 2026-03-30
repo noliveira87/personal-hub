@@ -37,6 +37,15 @@
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
 
+    --income: 221 83% 53%;
+    --income-foreground: 210 40% 98%;
+    --expense: 0 84% 60%;
+    --expense-foreground: 210 40% 98%;
+    --positive: 152 60% 42%;
+    --positive-foreground: 0 0% 100%;
+    --negative: 0 72% 51%;
+    --negative-foreground: 0 0% 100%;
+
     --urgent: 0 72% 51%;
     --urgent-foreground: 0 0% 100%;
 
@@ -90,6 +99,15 @@
     --success: 152 55% 48%;
     --success-foreground: 0 0% 100%;
 
+    --income: 221 83% 62%;
+    --income-foreground: 210 40% 98%;
+    --expense: 0 72% 51%;
+    --expense-foreground: 210 40% 98%;
+    --positive: 152 55% 48%;
+    --positive-foreground: 0 0% 100%;
+    --negative: 0 72% 51%;
+    --negative-foreground: 0 0% 100%;
+
     --urgent: 0 62% 50%;
     --urgent-foreground: 0 0% 100%;
 
@@ -140,6 +158,38 @@
 
   .font-body {
     font-family: var(--font-body);
+  }
+
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-lg;
+  }
+
+  .text-income {
+    color: hsl(var(--income));
+  }
+
+  .text-expense {
+    color: hsl(var(--expense));
+  }
+
+  .text-positive {
+    color: hsl(var(--positive));
+  }
+
+  .text-negative {
+    color: hsl(var(--negative));
+  }
+
+  .bg-income {
+    background-color: hsl(var(--income));
+  }
+
+  .bg-expense {
+    background-color: hsl(var(--expense));
+  }
+
+  .bg-positive {
+    background-color: hsl(var(--positive));
   }
 }
 

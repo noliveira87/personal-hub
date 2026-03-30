@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Contract } from '@/features/contracts/types/contract';
+import { Contract, PriceHistory } from '@/features/contracts/types/contract';
 import * as contractsDB from '@/features/contracts/lib/contracts';
 
 interface ContractContextType {
   contracts: Contract[];
+  allPriceHistory: PriceHistory[];
   loading: boolean;
   error: string | null;
   addContract: (contract: Omit<Contract, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Contract>;
@@ -17,6 +18,7 @@ const ContractContext = createContext<ContractContextType | undefined>(undefined
 
 export function ContractProvider({ children }: { children: React.ReactNode }) {
   const [contracts, setContracts] = useState<Contract[]>([]);
+    const [allPriceHistory, setAllPriceHistory] = useState<PriceHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +28,8 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       const data = await contractsDB.loadContracts();
       setContracts(data);
+      const history = await contractsDB.loadAllPriceHistory();
+      setAllPriceHistory(history);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load contracts';
       setError(message);
@@ -79,7 +83,7 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
   }, [contracts]);
 
   return (
-    <ContractContext.Provider value={{ contracts, loading, error, addContract, updateContract, deleteContract, getContract, refresh }}>
+    <ContractContext.Provider value={{ contracts, allPriceHistory, loading, error, addContract, updateContract, deleteContract, getContract, refresh }}>
       {children}
     </ContractContext.Provider>
   );

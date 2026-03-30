@@ -187,6 +187,20 @@ export async function loadPriceHistoryForContract(contractId: string): Promise<P
   return (data ?? []).map(mapRowToPriceHistory);
 }
 
+export async function loadAllPriceHistory(): Promise<PriceHistory[]> {
+  const { data, error } = await supabase
+    .from('contract_price_history')
+    .select('*')
+    .order('date', { ascending: true });
+
+  if (error) {
+    console.error('Error loading all price history:', error);
+    throw new Error(`Failed to load all price history: ${error.message}`);
+  }
+
+  return (data ?? []).map(mapRowToPriceHistory);
+}
+
 export async function addPriceHistoryEntry(
   contractId: string,
   price: number,

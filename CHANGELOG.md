@@ -6,6 +6,25 @@ This project follows a lightweight Keep a Changelog style and uses semantic vers
 
 ## [Unreleased]
 
+## [v1.5.0-stable] - 2026-03-30
+
+### Added
+- New Home Expenses module under `packages/hub/src/features/home-expenses` with dedicated routes and pages for Dashboard, Transactions, Monthly View and Insights.
+- Automatic expense generation from active contracts, including contract-aware transaction metadata and monthly mapping logic.
+- Home Expenses diagnostics and analytics improvements: yearly summary section, richer insights trend chart (income/expenses/savings), and monthly diagnostics cards.
+- Audit utility script for contract-to-expense reconciliation in `packages/hub/scripts/audit-contract-expenses.mjs`.
+
+### Changed
+- Home Expenses visual system was aligned with Portfolio-style cards, section headers and responsive layout behavior.
+- Home Expenses now fully supports PT/EN translations across layout, forms, charts, tables and insights labels.
+- Monthly selectors, monthly table, monthly balance chart and insights trend now adapt visible months for the current year to months with expenses.
+- Dashboard sizing and spacing were tuned for better parity between monthly balance, expense distribution, annual summary and highlights sections.
+
+### Fixed
+- Navigation active-state bug where Dashboard could appear active simultaneously with nested Home Expenses routes.
+- Multiple date/month allocation edge cases affecting contract-derived monthly expenses and chart/table consistency.
+- Expense distribution and dashboard card spacing/alignment issues on desktop layout.
+
 ## [v1.4.0-stable] - 2026-03-30
 
 ### Added
