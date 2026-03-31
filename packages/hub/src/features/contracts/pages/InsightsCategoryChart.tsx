@@ -16,6 +16,8 @@ interface InsightsCategoryChartProps {
 }
 
 export default function InsightsCategoryChart({ data }: InsightsCategoryChartProps) {
+  const { formatCurrency } = useI18n();
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">

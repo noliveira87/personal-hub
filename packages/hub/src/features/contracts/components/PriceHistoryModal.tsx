@@ -21,6 +21,7 @@ export function PriceHistoryModal({
   onClose,
 }: PriceHistoryModalProps) {
   const { history, loading, error } = usePriceHistory(contractId);
+  const { formatCurrency } = useI18n();
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     history.forEach((entry) => {

@@ -5,6 +5,7 @@ import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/features/co
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { useI18n } from '@/i18n/I18nProvider';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));

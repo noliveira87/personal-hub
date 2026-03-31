@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface LatestPrice {
   price: number;
@@ -14,6 +15,7 @@ interface LatestPrice {
 
 export function ContractCard({ contract, index = 0, latestPrice }: { contract: Contract; index?: number; latestPrice?: LatestPrice }) {
   const navigate = useNavigate();
+  const { formatCurrency } = useI18n();
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
   
