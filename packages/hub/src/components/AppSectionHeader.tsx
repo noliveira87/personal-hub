@@ -143,7 +143,7 @@ export default function AppSectionHeader({
                     {unreadContractsCount === 0 ? (
                       <p className="px-2 py-3 text-sm text-muted-foreground">No unread alerts.</p>
                     ) : (
-                      unreadAlerts.slice(0, 8).map(item => (
+                      unreadAlerts.map(item => (
                         <button
                           key={item.signature}
                           type="button"

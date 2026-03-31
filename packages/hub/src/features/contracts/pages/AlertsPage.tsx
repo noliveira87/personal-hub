@@ -9,6 +9,11 @@ import { Bell, BellRing, FileText, Loader, Pencil, Plus, Send } from 'lucide-rea
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { toast } from '@/components/ui/sonner';
+import {
+  markContractAlertsAsRead,
+  markOccurredAppAlertsAsRead,
+  getUnreadOccurredAppAlerts,
+} from '@/features/contracts/lib/alertReadState';
 
 type EditableAlertKind = 'days-before' | 'specific-date';
 
@@ -235,7 +240,6 @@ export default function AlertsPage() {
           }
 
           const dateDiff = differenceInCalendarDays(targetDate, today);
-          if (dateDiff < 0) return;
 
           const triggerLabel = dateDiff === 0
             ? `Today (${format(targetDate, 'MMM d, yyyy')})`
@@ -261,9 +265,6 @@ export default function AlertsPage() {
 
         const targetDate = subDays(expiryDate, alert.daysBefore);
         const dateDiff = differenceInCalendarDays(targetDate, today);
-        if (dateDiff < 0) {
-          return;
-        }
 
         if (daysLeft >= 0) {
           items.push({
@@ -297,10 +298,74 @@ export default function AlertsPage() {
       }
     });
 
-    return items.sort((a, b) => a.daysUntilTrigger - b.daysUntilTrigger);
+    return items.sort((a, b) => {
+      const aAbs = Math.abs(a.daysUntilTrigger);
+      const bAbs = Math.abs(b.daysUntilTrigger);
+      if (aAbs !== bAbs) return aAbs - bAbs;
+      return a.daysUntilTrigger - b.daysUntilTrigger;
+    });
   }, [contracts]);
 
   const dueNowCount = alerts.filter(item => item.daysUntilTrigger === 0).length;
+
+
+  // Ocorridos (histórico)
+  // Derivar todos os ocorridos a partir dos lidos + não lidos
+  const unreadOccurredList = getUnreadOccurredAppAlerts(contracts);
+  const unreadOccurred = useMemo(() => new Set(unreadOccurredList.map(a => a.signature)), [unreadOccurredList]);
+  // Para todos os ocorridos, unir os não lidos + lidos
+  const occurredAlerts = useMemo(() => {
+    // Pega todos os não lidos
+    const unread = unreadOccurredList;
+    // Para os lidos, derivar a partir dos que já ocorreram mas não estão em unread
+    const today = new Date();
+    // Função auxiliar local (cópia da original do alertReadState)
+    function getOccurredAppAlertsForContract(contract, today) {
+      if (!contract || !(contract.status === 'active' || contract.status === 'pending-cancellation')) return [];
+      const occurred = [];
+      contract.alerts.forEach((alert, index) => {
+        if (!alert.enabled) return;
+        let triggerDate = null;
+        if (alert.kind === 'specific-date') {
+          if (!alert.specificDate) return;
+          const parsed = parseISO(alert.specificDate);
+          if (!isValid(parsed)) return;
+          triggerDate = parsed;
+        } else {
+          if (!contract.endDate) return;
+          const expiryDate = parseISO(contract.endDate);
+          if (!isValid(expiryDate)) return;
+          triggerDate = subDays(expiryDate, alert.daysBefore);
+        }
+        if (!triggerDate || triggerDate > today) return;
+        occurred.push({
+          signature: `${contract.id}:${index}:${format(triggerDate, 'yyyy-MM-dd')}`,
+          contractId: contract.id,
+          contractName: contract.name,
+          provider: contract.provider,
+          triggerDate,
+          triggerLabel: alert.kind === 'specific-date'
+            ? format(triggerDate, 'MMM d, yyyy')
+            : `${alert.daysBefore} days before expiry`,
+          reason: alert.reason?.trim() || null,
+        });
+      });
+      return occurred;
+    }
+    const allOccurred = contracts
+      .flatMap(contract => getOccurredAppAlertsForContract(contract, today));
+    // Remover duplicados por signature
+    const allMap = new Map();
+    allOccurred.forEach(a => allMap.set(a.signature, a));
+    // Garantir que os não lidos aparecem primeiro
+    return Array.from(allMap.values()).sort((a, b) => b.triggerDate.getTime() - a.triggerDate.getTime());
+  }, [contracts, unreadOccurredList]);
+
+  // Handler para marcar todos como lidos
+  const handleMarkAllOccurredAsRead = () => {
+    markOccurredAppAlertsAsRead(contracts);
+    toast.success('Todos os alertas ocorridos marcados como lidos.');
+  };
 
   return (
     <div className="space-y-6 pt-16">
@@ -475,13 +540,14 @@ export default function AlertsPage() {
                 <div className="text-right flex-shrink-0">
                   <p className={cn(
                     'text-sm font-bold tabular-nums',
-                    urgency === 'critical' && 'text-urgent',
-                    urgency === 'warning' && 'text-warning',
-                    urgency === 'normal' && 'text-foreground',
+                    item.daysUntilTrigger < 0 && 'text-muted-foreground',
+                    item.daysUntilTrigger >= 0 && urgency === 'critical' && 'text-urgent',
+                    item.daysUntilTrigger >= 0 && urgency === 'warning' && 'text-warning',
+                    item.daysUntilTrigger >= 0 && urgency === 'normal' && 'text-foreground',
                   )}>
-                    {item.daysUntilTrigger}d
+                    {item.daysUntilTrigger < 0 ? `${Math.abs(item.daysUntilTrigger)}d` : `${item.daysUntilTrigger}d`}
                   </p>
-                  <p className="text-xs text-muted-foreground">until alert</p>
+                  <p className="text-xs text-muted-foreground">{item.daysUntilTrigger < 0 ? 'ago' : 'until alert'}</p>
                   <div className="mt-2 flex justify-end gap-2">
                     {item.alertIndex >= 0 && (
                       <button
@@ -507,6 +573,71 @@ export default function AlertsPage() {
           })}
         </div>
       )}
+
+      {/* Seção de Alertas Ocorridos */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-foreground">Alertas Ocorridos</h2>
+          {occurredAlerts.length > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAllOccurredAsRead}
+              className="text-xs px-3 py-1 rounded border bg-card hover:bg-muted"
+            >
+              Marcar todos como lidos
+            </button>
+          )}
+        </div>
+        {occurredAlerts.length === 0 ? (
+          <p className="text-muted-foreground text-sm">Nenhum alerta disparado ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {occurredAlerts.map(alert => (
+              <div
+                key={alert.signature}
+                className={cn(
+                  'bg-card rounded-lg border p-3 flex items-center gap-4',
+                  unreadOccurred.has(alert.signature) ? 'border-warning/40' : 'border-muted',
+                )}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground text-sm truncate">{alert.contractName}</span>
+                    <span className="text-xs text-muted-foreground">{alert.provider}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {alert.triggerLabel} · {format(alert.triggerDate, 'dd/MM/yyyy')}
+                    {alert.reason ? ` · ${alert.reason}` : ''}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={cn(
+                    'text-xs',
+                    unreadOccurred.has(alert.signature) ? 'text-warning font-semibold' : 'text-muted-foreground',
+                  )}>
+                    {unreadOccurred.has(alert.signature) ? 'Não lido' : 'Lido'}
+                  </span>
+                  {unreadOccurred.has(alert.signature) && (
+                    <button
+                      type="button"
+                      className="text-xs underline text-warning"
+                      onClick={() => {
+                        const contract = contracts.find(c => c.id === alert.contractId);
+                        if (contract) {
+                          markContractAlertsAsRead(contract);
+                          toast.success('Alerta marcado como lido.');
+                        }
+                      }}
+                    >
+                      Marcar como lido
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
