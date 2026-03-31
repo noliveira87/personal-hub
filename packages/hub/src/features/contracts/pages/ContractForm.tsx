@@ -123,7 +123,7 @@ export default function ContractForm() {
       } else {
         await addContract(submitData);
       }
-      navigate('/contracts');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Error saving contract:', err);
       alert('Failed to save contract. Please try again.');

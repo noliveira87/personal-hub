@@ -114,7 +114,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     }
   };
 
-  const showLinkedContract = type === 'expense' && category !== 'other';
+  const showLinkedContract = type === 'expense';
 
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
@@ -194,7 +194,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
                       }
 
                       const mappedCategory = mapContractCategoryToExpenseCategory(contract.category);
-                      if (mappedCategory) {
+                      if (mappedCategory && mappedCategory !== 'other') {
                         setCategory(mappedCategory);
                       }
 
