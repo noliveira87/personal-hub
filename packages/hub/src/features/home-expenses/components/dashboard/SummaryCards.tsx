@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
-import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/store';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { Wallet, TrendingDown, TrendingUp, Percent } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useI18n } from '@/i18n/I18nProvider';
 
 export default function SummaryCards() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
-  const { t, hideAmounts } = useI18n();
+  const { t, hideAmounts, formatCurrency } = useI18n();
 
   const data = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {

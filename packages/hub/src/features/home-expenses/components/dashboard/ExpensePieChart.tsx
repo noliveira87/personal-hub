@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { EXPENSE_CATEGORIES } from '@/features/home-expenses/lib/types';
-import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/store';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -32,7 +32,7 @@ function CustomPieTooltip({ active, payload, fallbackTitle }: { active?: boolean
 
 export default function ExpensePieChart() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
-  const { t, hideAmounts } = useI18n();
+  const { t, hideAmounts, formatCurrency } = useI18n();
 
   const data = useMemo(() => {
     const monthExpenses = allTransactions.filter((t) => {

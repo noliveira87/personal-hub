@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
-import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/store';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { EXPENSE_CATEGORIES, Transaction } from '@/features/home-expenses/lib/types';
 import { Pencil, Trash2, RotateCcw, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 export default function TransactionList() {
   const { allTransactions, deleteTx, selectedYear, selectedMonth } = useData();
-  const { t, locale, hideAmounts } = useI18n();
+  const { t, locale, hideAmounts, formatCurrency } = useI18n();
   const [editTx, setEditTx] = useState<Transaction | null>(null);
 
   const filtered = useMemo(() => {

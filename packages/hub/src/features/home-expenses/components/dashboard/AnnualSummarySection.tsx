@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
-import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/store';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { useI18n } from '@/i18n/I18nProvider';
 
 export default function AnnualSummarySection() {
   const { allTransactions, selectedYear } = useData();
-  const { t, hideAmounts } = useI18n();
+  const { t, hideAmounts, formatCurrency } = useI18n();
 
   const totals = useMemo(() => {
     const yearTxs = allTransactions.filter((tx) => {
