@@ -9,7 +9,7 @@ export default function SummaryCards() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
 
-  const data = useMemo(() => {
+  const cards = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {
       const d = parseLocalDate(t.date);
       return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
@@ -18,15 +18,14 @@ export default function SummaryCards() {
     const expenses = monthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const balance = income - expenses;
     const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
-    return { income, expenses, balance, savingsRate };
-  }, [allTransactions, selectedYear, selectedMonth, hideAmounts]);
 
-  const cards = [
-    { label: t('homeExpenses.summary.monthlyIncome'), value: formatCurrency(data.income), icon: Wallet, colorClass: 'text-income' },
-    { label: t('homeExpenses.summary.monthlyExpenses'), value: formatCurrency(data.expenses), icon: TrendingDown, colorClass: 'text-expense' },
-    { label: t('homeExpenses.summary.netBalance'), value: formatCurrency(data.balance), icon: TrendingUp, colorClass: data.balance >= 0 ? 'text-positive' : 'text-negative' },
-    { label: t('homeExpenses.summary.savingsRate'), value: `${data.savingsRate.toFixed(1)}%`, icon: Percent, colorClass: data.savingsRate >= 0 ? 'text-positive' : 'text-negative' },
-  ];
+    return [
+      { label: t('homeExpenses.summary.monthlyIncome'), value: formatCurrency(income), icon: Wallet, colorClass: 'text-income' },
+      { label: t('homeExpenses.summary.monthlyExpenses'), value: formatCurrency(expenses), icon: TrendingDown, colorClass: 'text-expense' },
+      { label: t('homeExpenses.summary.netBalance'), value: formatCurrency(balance), icon: TrendingUp, colorClass: balance >= 0 ? 'text-positive' : 'text-negative' },
+      { label: t('homeExpenses.summary.savingsRate'), value: `${savingsRate.toFixed(1)}%`, icon: Percent, colorClass: savingsRate >= 0 ? 'text-positive' : 'text-negative' },
+    ];
+  }, [allTransactions, selectedYear, selectedMonth, hideAmounts, t, formatCurrency]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

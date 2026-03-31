@@ -15,7 +15,7 @@ const COLORS = [
   'hsl(330, 80%, 60%)',
 ];
 
-function CustomPieTooltip({ active, payload, fallbackTitle }: { active?: boolean; payload?: Array<{ name?: string; value?: number }>; fallbackTitle: string }) {
+function CustomPieTooltip({ active, payload, fallbackTitle, formatCurrency }: { active?: boolean; payload?: Array<{ name?: string; value?: number }>; fallbackTitle: string; formatCurrency: (value: number) => string }) {
   if (!active || !payload || payload.length === 0) return null;
 
   const item = payload[0];
@@ -88,7 +88,7 @@ export default function ExpensePieChart() {
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip content={<CustomPieTooltip fallbackTitle={t('homeExpenses.form.expense')} />} />
+            <Tooltip content={<CustomPieTooltip fallbackTitle={t('homeExpenses.form.expense')} formatCurrency={formatCurrency} />} />
           </PieChart>
         </ResponsiveContainer>
       </div>

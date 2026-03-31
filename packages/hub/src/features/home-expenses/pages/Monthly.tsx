@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
-import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/store';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { MONTHS, EXPENSE_CATEGORIES, Transaction } from '@/features/home-expenses/lib/types';
 import { Input } from '@/components/ui/input';
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
@@ -27,7 +27,7 @@ const MONTH_KEYS = [
 
 export default function Monthly() {
   const { allTransactions, updateTx, selectedYear, selectedMonth } = useData();
-  const { t } = useI18n();
+  const { t, hideAmounts, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
   const initialDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
 
@@ -58,7 +58,7 @@ export default function Monthly() {
       const expenses = monthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
       return { name: t(MONTH_KEYS[i]) || name, month: i, income, expenses, balance: income - expenses, transactions: monthTxs };
     });
-  }, [allTransactions, selectedYear, t, currentYear]);
+  }, [allTransactions, selectedYear, t, currentYear, hideAmounts]);
 
   const [editingCell, setEditingCell] = useState<{ txId: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');

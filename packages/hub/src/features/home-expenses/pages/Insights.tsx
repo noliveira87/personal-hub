@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
-import { formatCurrency, parseLocalDate } from '@/features/home-expenses/lib/store';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { MONTHS } from '@/features/home-expenses/lib/types';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, AlertTriangle, Target, PiggyBank, Activity } from 'lucide-react';
@@ -26,7 +26,7 @@ const MONTH_KEYS = [
 
 export default function Insights() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
-  const { t } = useI18n();
+  const { t, hideAmounts, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
 
   const data = useMemo(() => {
@@ -146,7 +146,7 @@ export default function Insights() {
       maxSavingsMonth,
       expenseVolatility,
     };
-  }, [allTransactions, selectedYear, selectedMonth, t, currentYear]);
+  }, [allTransactions, selectedYear, selectedMonth, t, currentYear, hideAmounts]);
 
   const cards = [
     { icon: PiggyBank, label: t('homeExpenses.insights.monthlySavings'), value: formatCurrency(data.balance), sub: t('homeExpenses.insights.savingsRateSub', { value: `${data.savingsRate.toFixed(1)}%` }), color: data.balance >= 0 ? 'text-positive' : 'text-negative' },

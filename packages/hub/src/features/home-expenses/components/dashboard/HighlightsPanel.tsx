@@ -9,7 +9,7 @@ export default function HighlightsPanel() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
 
-  const insights = useMemo(() => {
+  const items = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {
       const d = parseLocalDate(t.date);
       return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
@@ -33,29 +33,27 @@ export default function HighlightsPanel() {
 
     const expenseChange = prevExpenses > 0 ? ((totalExpenses - prevExpenses) / prevExpenses) * 100 : 0;
 
-    return { biggestExpense, totalExpenses, expenseChange, moneyAfterFixed, prevExpenses };
-  }, [allTransactions, selectedYear, selectedMonth, hideAmounts]);
-
-  const items = [
-    insights.biggestExpense && {
-      icon: Award,
-      label: t('homeExpenses.highlights.biggestExpense'),
-      value: `${insights.biggestExpense.name} — ${formatCurrency(insights.biggestExpense.amount)}`,
-      colorClass: 'text-expense',
-    },
-    {
-      icon: insights.moneyAfterFixed >= 0 ? TrendingUp : TrendingDown,
-      label: t('homeExpenses.highlights.afterFixedExpenses'),
-      value: formatCurrency(insights.moneyAfterFixed),
-      colorClass: insights.moneyAfterFixed >= 0 ? 'text-positive' : 'text-negative',
-    },
-    insights.prevExpenses > 0 && {
-      icon: insights.expenseChange > 0 ? AlertTriangle : TrendingDown,
-      label: t('homeExpenses.highlights.vsLastMonth'),
-      value: `${insights.expenseChange > 0 ? '+' : ''}${insights.expenseChange.toFixed(1)}%`,
-      colorClass: insights.expenseChange > 0 ? 'text-expense' : 'text-positive',
-    },
-  ].filter(Boolean) as { icon: typeof Award; label: string; value: string; colorClass: string }[];
+    return [
+      biggestExpense && {
+        icon: Award,
+        label: t('homeExpenses.highlights.biggestExpense'),
+        value: `${biggestExpense.name} — ${formatCurrency(biggestExpense.amount)}`,
+        colorClass: 'text-expense',
+      },
+      {
+        icon: moneyAfterFixed >= 0 ? TrendingUp : TrendingDown,
+        label: t('homeExpenses.highlights.afterFixedExpenses'),
+        value: formatCurrency(moneyAfterFixed),
+        colorClass: moneyAfterFixed >= 0 ? 'text-positive' : 'text-negative',
+      },
+      prevExpenses > 0 && {
+        icon: expenseChange > 0 ? AlertTriangle : TrendingDown,
+        label: t('homeExpenses.highlights.vsLastMonth'),
+        value: `${expenseChange > 0 ? '+' : ''}${expenseChange.toFixed(1)}%`,
+        colorClass: expenseChange > 0 ? 'text-expense' : 'text-positive',
+      },
+    ].filter(Boolean) as { icon: typeof Award; label: string; value: string; colorClass: string }[];
+  }, [allTransactions, selectedYear, selectedMonth, hideAmounts, t, formatCurrency]);
 
   return (
     <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
