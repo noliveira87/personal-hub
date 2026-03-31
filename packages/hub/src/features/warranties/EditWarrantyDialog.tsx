@@ -86,6 +86,15 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
       }
 
       if (receiptFile) {
+        // Delete old receipt if it exists and is being replaced
+        if (currentReceiptUrl) {
+          try {
+            await deleteReceiptByUrl(currentReceiptUrl);
+          } catch (error) {
+            console.error("Error deleting old receipt:", error);
+            // Continue with upload even if old receipt deletion fails
+          }
+        }
         receiptUrl = await uploadReceipt(receiptFile, warranty.id, name.trim());
       }
 
