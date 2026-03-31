@@ -13,6 +13,17 @@ import { useState, useMemo } from 'react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 
+function formatAlertSummary(alert: { kind: 'days-before' | 'specific-date'; daysBefore: number; specificDate: string | null; reason: string | null }): string {
+  if (alert.kind === 'specific-date') {
+    if (!alert.specificDate) return 'Specific date alert';
+    const parsed = parseISO(alert.specificDate);
+    const dateLabel = Number.isNaN(parsed.getTime()) ? alert.specificDate : format(parsed, 'MMM d, yyyy');
+    return alert.reason ? `${dateLabel} · ${alert.reason}` : dateLabel;
+  }
+
+  return `${alert.daysBefore} days before`;
+}
+
 export default function ContractDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -199,13 +210,22 @@ export default function ContractDetail() {
         <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
           <Bell className="w-4 h-4" /> Alert Settings
         </h2>
+        <div className="mb-4">
+          <Link
+            to={`/contracts/alerts?contractId=${contract.id}`}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm hover:bg-muted transition-colors"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            New custom alert
+          </Link>
+        </div>
         {contract.alerts.length === 0 ? (
           <p className="text-sm text-muted-foreground">No alerts configured.</p>
         ) : (
           <div className="space-y-2">
             {contract.alerts.map((alert, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
-                <span className="text-sm text-foreground">{alert.daysBefore} days before</span>
+                <span className="text-sm text-foreground">{formatAlertSummary(alert)}</span>
                 <div className="flex gap-3 text-xs">
                   <span className={alert.enabled ? 'text-success' : 'text-muted-foreground'}>
                     {alert.enabled ? '✓ App' : '✗ App'}

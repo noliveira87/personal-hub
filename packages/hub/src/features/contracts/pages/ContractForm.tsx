@@ -3,12 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import {
   Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus,
-  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting, HOUSING_USAGE_LABELS,
+  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting, HOUSING_USAGE_LABELS, normalizeAlertSetting,
 } from '@/features/contracts/types/contract';
-import { Plus, X, Loader, FileText } from 'lucide-react';
+import { Plus, X, Loader, FileText, Send } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { sendTelegramMessage } from '@/lib/telegram';
 
-const defaultAlert = (): AlertSetting => ({ daysBefore: 30, enabled: true, telegramEnabled: false });
+const defaultAlert = (kind: AlertSetting['kind'] = 'days-before'): AlertSetting => ({
+  kind,
+  daysBefore: 30,
+  specificDate: kind === 'specific-date' ? new Date().toISOString().split('T')[0] : null,
+  reason: null,
+  enabled: true,
+  telegramEnabled: false,
+});
 
 const defaultMortgageDetails = () => ({
   principalAmount: null,
@@ -65,6 +73,7 @@ export default function ContractForm() {
   const { addContract, updateContract, getContract } = useContracts();
   const isEdit = !!id;
   const [submitting, setSubmitting] = useState(false);
+  const [testingAlertIndex, setTestingAlertIndex] = useState<number | null>(null);
 
   const [form, setForm] = useState(emptyContract());
   const defaultEndDate = useState(() => new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0])[0];
@@ -75,7 +84,10 @@ export default function ContractForm() {
       const existing = getContract(id!);
       if (existing) {
         const { id: _, createdAt, updatedAt, ...rest } = existing;
-        setForm(rest);
+        setForm({
+          ...rest,
+          alerts: rest.alerts.map(normalizeAlertSetting),
+        });
       }
     }
   }, [id, isEdit, getContract]);
@@ -108,6 +120,14 @@ export default function ContractForm() {
         return;
       }
 
+      const hasInvalidSpecificAlert = form.alerts.some(
+        (alert) => alert.kind === 'specific-date' && (!alert.specificDate || !alert.reason?.trim()),
+      );
+      if (hasInvalidSpecificAlert) {
+        alert('Specific-date alerts require both date and reason.');
+        return;
+      }
+
       // Always set price to 0 - prices are managed only through price history
       const submitData = {
         ...form,
@@ -136,6 +156,72 @@ export default function ContractForm() {
   const removeAlert = (i: number) => set('alerts', form.alerts.filter((_, idx) => idx !== i));
   const updateAlert = (i: number, patch: Partial<AlertSetting>) =>
     set('alerts', form.alerts.map((a, idx) => idx === i ? { ...a, ...patch } : a));
+
+  const updateAlertKind = (i: number, kind: AlertSetting['kind']) => {
+    set('alerts', form.alerts.map((alert, idx) => {
+      if (idx !== i) return alert;
+      if (kind === 'specific-date') {
+        return {
+          ...alert,
+          kind,
+          specificDate: alert.specificDate ?? new Date().toISOString().split('T')[0],
+        };
+      }
+
+      return {
+        ...alert,
+        kind,
+        specificDate: null,
+      };
+    }));
+  };
+
+  const buildAlertTestMessage = (alertConfig: AlertSetting): string => {
+    const contractName = form.name.trim() || 'Unnamed contract';
+    const provider = form.provider.trim() || 'Unknown provider';
+    const triggerText = alertConfig.kind === 'specific-date'
+      ? `Specific date: ${alertConfig.specificDate ?? 'n/a'}`
+      : `${alertConfig.daysBefore} days before expiration`;
+    const reasonText = alertConfig.reason?.trim() ? `\nReason: ${alertConfig.reason.trim()}` : '';
+
+    return `🧪 <b>D12 Contracts — Alert Test</b>\n\nContract: <b>${contractName}</b>\nProvider: ${provider}\nTrigger: ${triggerText}${reasonText}`;
+  };
+
+  const testAlert = async (alertConfig: AlertSetting, index: number) => {
+    if (!alertConfig.enabled && !alertConfig.telegramEnabled) {
+      window.alert('Enable at least one channel (App or Telegram) before testing.');
+      return;
+    }
+
+    const preview = `Alert test for ${form.name.trim() || 'Unnamed contract'}\n${
+      alertConfig.kind === 'specific-date'
+        ? `Specific date: ${alertConfig.specificDate ?? 'n/a'}\nReason: ${alertConfig.reason ?? 'n/a'}`
+        : `${alertConfig.daysBefore} days before expiration`
+    }`;
+
+    try {
+      setTestingAlertIndex(index);
+
+      if (alertConfig.enabled) {
+        window.alert(preview);
+      }
+
+      if (alertConfig.telegramEnabled) {
+        if (!form.telegramAlertEnabled) {
+          throw new Error('Enable Telegram notifications for this contract first.');
+        }
+        await sendTelegramMessage(buildAlertTestMessage(alertConfig));
+      }
+
+      window.alert('Test alert sent successfully.');
+    } catch (error) {
+      console.error('Failed to test alert:', error);
+      const message = error instanceof Error ? error.message : 'Failed to send test alert.';
+      window.alert(message);
+    } finally {
+      setTestingAlertIndex(null);
+    }
+  };
 
   const updateMortgage = <K extends keyof NonNullable<typeof form.mortgageDetails>>(key: K, value: NonNullable<typeof form.mortgageDetails>[K]) =>
     setForm(prev => ({
@@ -374,28 +460,80 @@ export default function ContractForm() {
             <input type="checkbox" checked={form.telegramAlertEnabled} onChange={e => set('telegramAlertEnabled', e.target.checked)} disabled={submitting} className="rounded" />
             <label className="text-sm text-foreground">Enable Telegram notifications</label>
           </div>
-          {form.alerts.map((alert, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-              <input
-                type="number"
-                min="1"
-                value={alert.daysBefore}
-                onChange={e => updateAlert(i, { daysBefore: parseInt(e.target.value) || 1 })}
-                disabled={submitting}
-                className="w-20 px-2 py-1.5 rounded border bg-card text-sm text-center"
-              />
-              <span className="text-sm text-muted-foreground">days before</span>
-              <label className="flex items-center gap-1.5 text-xs ml-auto">
-                <input type="checkbox" checked={alert.enabled} onChange={e => updateAlert(i, { enabled: e.target.checked })} disabled={submitting} />
-                App
-              </label>
-              <label className="flex items-center gap-1.5 text-xs">
-                <input type="checkbox" checked={alert.telegramEnabled} onChange={e => updateAlert(i, { telegramEnabled: e.target.checked })} disabled={submitting} />
-                Telegram
-              </label>
-              <button type="button" onClick={() => removeAlert(i)} disabled={submitting} className="p-1 hover:bg-muted rounded active:scale-95 disabled:opacity-50">
-                <X className="w-3 h-3 text-muted-foreground" />
-              </button>
+          {form.alerts.map((alertItem, i) => (
+            <div key={i} className="space-y-3 p-3 rounded-lg bg-muted/50 border">
+              <div className="flex items-center gap-2">
+                <select
+                  value={alertItem.kind}
+                  onChange={e => updateAlertKind(i, e.target.value as AlertSetting['kind'])}
+                  disabled={submitting}
+                  className="px-2 py-1.5 rounded border bg-card text-sm"
+                >
+                  <option value="days-before">Days before expiration</option>
+                  <option value="specific-date">Specific date</option>
+                </select>
+
+                {alertItem.kind === 'days-before' ? (
+                  <>
+                    <input
+                      type="number"
+                      min="1"
+                      value={alertItem.daysBefore}
+                      onChange={e => updateAlert(i, { daysBefore: parseInt(e.target.value, 10) || 1 })}
+                      disabled={submitting}
+                      className="w-20 px-2 py-1.5 rounded border bg-card text-sm text-center"
+                    />
+                    <span className="text-sm text-muted-foreground">days before</span>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="date"
+                      value={alertItem.specificDate ?? ''}
+                      onChange={e => updateAlert(i, { specificDate: e.target.value || null })}
+                      disabled={submitting}
+                      className="px-2 py-1.5 rounded border bg-card text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={alertItem.reason ?? ''}
+                      onChange={e => updateAlert(i, { reason: e.target.value || null })}
+                      disabled={submitting}
+                      className="flex-1 min-w-[180px] px-2 py-1.5 rounded border bg-card text-sm"
+                      placeholder="Reason for this alert"
+                    />
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => removeAlert(i)}
+                  disabled={submitting}
+                  className="p-1 hover:bg-muted rounded active:scale-95 disabled:opacity-50"
+                >
+                  <X className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs">
+                  <input type="checkbox" checked={alertItem.enabled} onChange={e => updateAlert(i, { enabled: e.target.checked })} disabled={submitting} />
+                  App
+                </label>
+                <label className="flex items-center gap-1.5 text-xs">
+                  <input type="checkbox" checked={alertItem.telegramEnabled} onChange={e => updateAlert(i, { telegramEnabled: e.target.checked })} disabled={submitting} />
+                  Telegram
+                </label>
+                <button
+                  type="button"
+                  onClick={() => testAlert(alertItem, i)}
+                  disabled={submitting || testingAlertIndex === i}
+                  className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded border bg-card hover:bg-muted disabled:opacity-50"
+                >
+                  {testingAlertIndex === i ? <Loader className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                  Test
+                </button>
+              </div>
             </div>
           ))}
         </div>

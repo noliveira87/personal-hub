@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Contract, PriceHistory } from '@/features/contracts/types/contract';
+import { Contract, PriceHistory, normalizeAlertSetting } from '@/features/contracts/types/contract';
 
 type ContractRow = {
   id: string;
@@ -46,7 +46,9 @@ function mapRowToContract(row: ContractRow): Contract {
     currency: row.currency,
     notes: row.notes,
     status: row.status as Contract['status'],
-    alerts: Array.isArray(row.alerts) ? row.alerts as Contract['alerts'] : [],
+    alerts: Array.isArray(row.alerts)
+      ? row.alerts.map(normalizeAlertSetting)
+      : [],
     telegramAlertEnabled: row.telegram_alert_enabled,
     documentLinks: row.document_links,
     priceHistoryEnabled: row.price_history_enabled ?? true, // Default to true if null

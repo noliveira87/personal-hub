@@ -34,9 +34,39 @@ export interface MortgageDetails {
 }
 
 export interface AlertSetting {
+  kind: 'days-before' | 'specific-date';
   daysBefore: number;
+  specificDate: string | null;
+  reason: string | null;
   enabled: boolean;
   telegramEnabled: boolean;
+}
+
+export function normalizeAlertSetting(value: unknown): AlertSetting {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const kind = raw.kind === 'specific-date' || typeof raw.specificDate === 'string'
+    ? 'specific-date'
+    : 'days-before';
+
+  const rawDaysBefore = Number(raw.daysBefore);
+  const daysBefore = Number.isFinite(rawDaysBefore) && rawDaysBefore > 0 ? Math.floor(rawDaysBefore) : 30;
+
+  const specificDate = typeof raw.specificDate === 'string' && raw.specificDate.trim()
+    ? raw.specificDate
+    : null;
+
+  const reason = typeof raw.reason === 'string' && raw.reason.trim()
+    ? raw.reason.trim()
+    : null;
+
+  return {
+    kind,
+    daysBefore,
+    specificDate: kind === 'specific-date' ? specificDate : null,
+    reason,
+    enabled: raw.enabled !== false,
+    telegramEnabled: raw.telegramEnabled === true,
+  };
 }
 
 export interface Contract {
