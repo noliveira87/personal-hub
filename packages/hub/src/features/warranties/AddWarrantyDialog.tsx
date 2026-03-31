@@ -9,11 +9,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Upload, Image, Package, CalendarDays, Clock, Store, Tag, Banknote } from "lucide-react";
-import { calculateExpiration, type Warranty, type WarrantyCategory, uploadReceipt } from "@/lib/warranties";
+import { calculateExpiration, deleteReceiptByUrl, type Warranty, type WarrantyCategory, uploadReceipt } from "@/lib/warranties";
 import { generateUUID } from "@/lib/utils";
 
 interface Props {
-  onAdd: (warranty: Warranty) => void;
+  onAdd: (warranty: Warranty) => Promise<void> | void;
 }
 
 const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
@@ -59,9 +59,10 @@ export function AddWarrantyDialog({ onAdd }: Props) {
 
     setIsUploading(true);
 
+    let receiptUrl: string | null = null;
+
     try {
       const warrantyId = generateUUID();
-      let receiptUrl: string | null = null;
 
       if (receiptFile) {
         receiptUrl = await uploadReceipt(receiptFile, warrantyId, name.trim());
@@ -80,10 +81,17 @@ export function AddWarrantyDialog({ onAdd }: Props) {
         createdAt: new Date().toISOString(),
       };
 
-      onAdd(warranty);
+      await Promise.resolve(onAdd(warranty));
       reset();
       setOpen(false);
     } catch (error) {
+      if (receiptUrl) {
+        try {
+          await deleteReceiptByUrl(receiptUrl);
+        } catch (cleanupError) {
+          console.error("Error cleaning up uploaded receipt:", cleanupError);
+        }
+      }
       console.error("Error:", error);
       alert("Failed to upload receipt. Please try again.");
     } finally {

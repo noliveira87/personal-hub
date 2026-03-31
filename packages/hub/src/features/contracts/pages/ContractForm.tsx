@@ -151,7 +151,7 @@ export default function ContractForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pt-16">
-      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/contracts" backLabel="Back" />
+      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/dashboard" backLabel="Back" />
 
       <h1 className="text-2xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '60ms' }}>
         {isEdit ? 'Edit Contract' : 'Add Contract'}

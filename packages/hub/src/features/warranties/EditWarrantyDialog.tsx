@@ -14,7 +14,7 @@ interface Props {
   warranty: Warranty;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (updated: Warranty) => void;
+  onSave: (updated: Warranty) => Promise<void> | void;
 }
 
 const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
@@ -77,28 +77,15 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
 
     setIsUploading(true);
 
+    const originalReceiptUrl = warranty.receiptDataUrl;
+    let receiptUrl = removeCurrentReceipt ? undefined : currentReceiptUrl;
+
     try {
-      let receiptUrl = currentReceiptUrl;
-
-      if (removeCurrentReceipt && warranty.receiptDataUrl) {
-        await deleteReceiptByUrl(warranty.receiptDataUrl);
-        receiptUrl = undefined;
-      }
-
       if (receiptFile) {
-        // Delete old receipt if it exists and is being replaced
-        if (currentReceiptUrl) {
-          try {
-            await deleteReceiptByUrl(currentReceiptUrl);
-          } catch (error) {
-            console.error("Error deleting old receipt:", error);
-            // Continue with upload even if old receipt deletion fails
-          }
-        }
         receiptUrl = await uploadReceipt(receiptFile, warranty.id, name.trim());
       }
 
-      onSave({
+      await Promise.resolve(onSave({
         ...warranty,
         productName: name.trim(),
         category,
@@ -108,9 +95,32 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
         warrantyYears: years,
         expirationDate: calculateExpiration(date, years),
         receiptDataUrl: receiptUrl ?? undefined,
-      });
+      }));
+
+      const shouldDeleteOriginalReceipt = Boolean(
+        originalReceiptUrl && (
+          removeCurrentReceipt ||
+          (receiptFile && receiptUrl && receiptUrl !== originalReceiptUrl)
+        )
+      );
+
+      if (shouldDeleteOriginalReceipt && originalReceiptUrl) {
+        try {
+          await deleteReceiptByUrl(originalReceiptUrl);
+        } catch (error) {
+          console.error("Error deleting old receipt:", error);
+        }
+      }
+
       onOpenChange(false);
     } catch (error) {
+      if (receiptFile && receiptUrl && receiptUrl !== originalReceiptUrl) {
+        try {
+          await deleteReceiptByUrl(receiptUrl);
+        } catch (cleanupError) {
+          console.error("Error cleaning up uploaded receipt:", cleanupError);
+        }
+      }
       console.error("Error:", error);
       alert(
         error instanceof Error

@@ -67,7 +67,7 @@ export default function ContractDetail() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pt-16">
-      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/contracts" backLabel="Back" />
+      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/dashboard" backLabel="Back" />
 
       {/* Header */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '60ms' }}>

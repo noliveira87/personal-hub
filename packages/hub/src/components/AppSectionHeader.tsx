@@ -19,7 +19,7 @@ export default function AppSectionHeader({
   title,
   icon: Icon,
   actions,
-  backTo = '/',
+  backTo,
   backLabel,
   showSettings = true,
 }: AppSectionHeaderProps) {
@@ -30,6 +30,13 @@ export default function AppSectionHeader({
   const resolvedBackLabel = backLabel ?? t('common.backToProjects');
   const isContractsLayoutPath = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
   const isHomeExpensesLayoutPath = /^\/home-expenses(\/|$)/.test(location.pathname);
+  const resolvedBackTo = backTo ?? (
+    location.pathname === '/dashboard'
+      ? '/'
+      : isContractsLayoutPath
+        ? '/dashboard'
+        : '/'
+  );
 
   return (
     <header
@@ -45,7 +52,7 @@ export default function AppSectionHeader({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate(backTo)}
+          onClick={() => navigate(resolvedBackTo)}
           className="gap-1.5"
         >
           <ArrowLeft className="h-4 w-4" />
