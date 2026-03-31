@@ -6,8 +6,8 @@ import { ArrowLeft, Bell, Eye, EyeOff, Moon, Settings, Sun, type LucideIcon } fr
 import { Button } from '@/components/ui/button';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import { useOptionalContracts } from '@/features/contracts/context/ContractContext';
-import { hasUnreadContractAlerts } from '@/features/contracts/lib/alertReadState';
-import { format, isValid, parseISO } from 'date-fns';
+import { getUnreadOccurredAppAlerts, markOccurredAppAlertsAsRead } from '@/features/contracts/lib/alertReadState';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface AppSectionHeaderProps {
@@ -33,43 +33,18 @@ export default function AppSectionHeader({
   const { hideAmounts, t, toggleHideAmounts } = useI18n();
   const contractsContext = useOptionalContracts();
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [alertsVersion, setAlertsVersion] = useState(0);
   const bellMenuRef = useRef<HTMLDivElement | null>(null);
   const resolvedBackLabel = backLabel ?? t('common.backToProjects');
   const isContractsLayoutPath = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
   const isHomeExpensesLayoutPath = /^\/home-expenses(\/|$)/.test(location.pathname);
 
-  const unreadContracts = useMemo(() => {
+  const unreadAlerts = useMemo(() => {
     if (!contractsContext) return [];
+    return getUnreadOccurredAppAlerts(contractsContext.contracts);
+  }, [contractsContext, alertsVersion]);
 
-    return contractsContext.contracts
-      .filter(hasUnreadContractAlerts)
-      .map(contract => {
-        const firstEnabled = contract.alerts.find(alert => alert.enabled) ?? null;
-        let trigger = 'Alert configured';
-
-        if (firstEnabled) {
-          if (firstEnabled.kind === 'specific-date' && firstEnabled.specificDate) {
-            const parsed = parseISO(firstEnabled.specificDate);
-            trigger = isValid(parsed)
-              ? format(parsed, 'MMM d, yyyy')
-              : firstEnabled.specificDate;
-          } else {
-            trigger = `${firstEnabled.daysBefore} days before expiry`;
-          }
-        }
-
-        const reason = firstEnabled?.reason?.trim() || null;
-        return {
-          id: contract.id,
-          name: contract.name,
-          provider: contract.provider,
-          trigger,
-          reason,
-        };
-      });
-  }, [contractsContext]);
-
-  const unreadContractsCount = unreadContracts.length;
+  const unreadContractsCount = unreadAlerts.length;
 
   useEffect(() => {
     setAlertsOpen(false);
@@ -168,12 +143,12 @@ export default function AppSectionHeader({
                     {unreadContractsCount === 0 ? (
                       <p className="px-2 py-3 text-sm text-muted-foreground">No unread alerts.</p>
                     ) : (
-                      unreadContracts.slice(0, 8).map(item => (
+                      unreadAlerts.slice(0, 8).map(item => (
                         <button
-                          key={item.id}
+                          key={item.signature}
                           type="button"
                           onClick={() => {
-                            navigate(`/contracts/${item.id}`);
+                            navigate(`/contracts/${item.contractId}`);
                             setAlertsOpen(false);
                           }}
                           className={cn(
@@ -181,13 +156,29 @@ export default function AppSectionHeader({
                             'hover:bg-muted'
                           )}
                         >
-                          <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{item.provider} · {item.trigger}</p>
+                          <p className="text-sm font-medium text-foreground truncate">{item.contractName}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {item.provider} · {item.triggerLabel} · occurred {format(item.triggerDate, 'MMM d, yyyy')}
+                          </p>
                           {item.reason && <p className="text-xs text-muted-foreground truncate">{item.reason}</p>}
                         </button>
                       ))
                     )}
                   </div>
+
+                  {unreadContractsCount > 0 && contractsContext && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markOccurredAppAlertsAsRead(contractsContext.contracts);
+                        setAlertsVersion(prev => prev + 1);
+                        setAlertsOpen(false);
+                      }}
+                      className="w-full mt-1 rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
 
                   <button
                     type="button"

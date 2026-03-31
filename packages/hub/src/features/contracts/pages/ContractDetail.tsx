@@ -3,14 +3,13 @@ import { useContracts } from '@/features/contracts/context/ContractContext';
 import { StatusBadge } from '@/features/contracts/components/StatusBadge';
 import { CategoryBadge } from '@/features/contracts/components/CategoryBadge';
 import { PriceHistoryModal } from '@/features/contracts/components/PriceHistoryModal';
-import { markContractAlertsAsRead } from '@/features/contracts/lib/alertReadState';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS, HOUSING_USAGE_LABELS } from '@/features/contracts/types/contract';
 import { format, parseISO } from 'date-fns';
 import { Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -32,11 +31,6 @@ export default function ContractDetail() {
   const { formatCurrency, hideAmounts } = useI18n();
   const contract = getContract(id!);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
-
-  useEffect(() => {
-    if (!contract) return;
-    markContractAlertsAsRead(contract);
-  }, [contract]);
 
   // Fetch latest price from history
   const { priceMap } = usePriceHistoryMap(contract ? [contract.id] : []);
