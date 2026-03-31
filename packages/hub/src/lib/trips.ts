@@ -13,6 +13,7 @@ type TripRow = {
   id: string;
   title: string;
   destination: string;
+  destinations: unknown;
   start_date: string;
   end_date: string;
   cost: number | null;
@@ -29,6 +30,17 @@ type TripRow = {
 };
 
 type TripUpdateInput = Partial<Omit<Trip, "id" | "createdAt" | "updatedAt">>;
+
+const isMissingDestinationsColumnError = (error: { message?: string } | null) => {
+  const message = error?.message ?? "";
+  return /destinations/i.test(message) && /does not exist/i.test(message);
+};
+
+const stripDestinationsField = <T extends Record<string, unknown>>(payload: T): T => {
+  const next = { ...payload };
+  delete next.destinations;
+  return next;
+};
 
 const parseStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -161,6 +173,9 @@ const mapRowToTrip = (row: TripRow): Trip => ({
   id: row.id,
   title: row.title,
   destination: row.destination,
+  destinations: parseStringArray(row.destinations).length
+    ? parseStringArray(row.destinations)
+    : [row.destination],
   startDate: row.start_date,
   endDate: row.end_date,
   cost: parseNumber(row.cost, 0),
@@ -180,6 +195,7 @@ const mapTripToRow = (trip: Trip) => ({
   id: trip.id,
   title: trip.title,
   destination: trip.destination,
+  destinations: trip.destinations?.length ? trip.destinations : [trip.destination],
   start_date: trip.startDate,
   end_date: trip.endDate,
   cost: trip.cost,
@@ -202,6 +218,7 @@ const mapTripUpdateToRow = (changes: TripUpdateInput, updatedAt: string) => {
 
   if (changes.title !== undefined) row.title = changes.title;
   if (changes.destination !== undefined) row.destination = changes.destination;
+  if (changes.destinations !== undefined) row.destinations = changes.destinations;
   if (changes.startDate !== undefined) row.start_date = changes.startDate;
   if (changes.endDate !== undefined) row.end_date = changes.endDate;
   if (changes.cost !== undefined) row.cost = changes.cost;
@@ -242,11 +259,22 @@ export async function createTrip(tripData: Omit<Trip, "id" | "createdAt" | "upda
     updatedAt: now,
   };
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("trips")
     .insert(mapTripToRow(trip))
     .select("*")
     .single();
+
+  if (isMissingDestinationsColumnError(error)) {
+    const fallbackPayload = stripDestinationsField(mapTripToRow(trip));
+    const retry = await supabase
+      .from("trips")
+      .insert(fallbackPayload)
+      .select("*")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     console.error("Error creating trip:", error);
@@ -260,10 +288,19 @@ export async function updateTrip(id: string, changes: TripUpdateInput): Promise<
   const updatedAt = new Date().toISOString();
   const payload = mapTripUpdateToRow(changes, updatedAt);
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from("trips")
     .update(payload)
     .eq("id", id);
+
+  if (isMissingDestinationsColumnError(error)) {
+    const fallbackPayload = stripDestinationsField(payload);
+    const retry = await supabase
+      .from("trips")
+      .update(fallbackPayload)
+      .eq("id", id);
+    error = retry.error;
+  }
 
   if (error) {
     console.error("Error updating trip:", error);

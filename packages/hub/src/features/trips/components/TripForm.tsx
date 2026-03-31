@@ -20,6 +20,46 @@ interface TripFormProps {
 const MAX_IMAGE_DIMENSION = 1280;
 const IMAGE_QUALITY = 0.78;
 const STORAGE_BUCKET = "trip-photos";
+const INTERNATIONAL_SCOPE_TAG = "scope:international";
+const DOMESTIC_SCOPE_TAG = "scope:domestic";
+
+type TripScope = "auto" | "international" | "domestic";
+
+const getScopeFromTags = (tripTags: string[]): TripScope => {
+  const normalized = tripTags.map((tag) => tag.trim().toLowerCase());
+  if (normalized.includes(DOMESTIC_SCOPE_TAG)) return "domestic";
+  if (normalized.includes(INTERNATIONAL_SCOPE_TAG)) return "international";
+  return "auto";
+};
+
+const applyScopeToTags = (tripTags: string[], scope: TripScope): string[] => {
+  const cleaned = tripTags
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .filter((tag) => {
+      const normalized = tag.toLowerCase();
+      return normalized !== INTERNATIONAL_SCOPE_TAG && normalized !== DOMESTIC_SCOPE_TAG;
+    });
+
+  if (scope === "international") {
+    return [...cleaned, INTERNATIONAL_SCOPE_TAG];
+  }
+
+  if (scope === "domestic") {
+    return [...cleaned, DOMESTIC_SCOPE_TAG];
+  }
+
+  return cleaned;
+};
+
+const formatEditableTags = (tripTags: string[]) => tripTags
+  .map((tag) => tag.trim())
+  .filter(Boolean)
+  .filter((tag) => {
+    const normalized = tag.toLowerCase();
+    return normalized !== INTERNATIONAL_SCOPE_TAG && normalized !== DOMESTIC_SCOPE_TAG;
+  })
+  .join(", ");
 
 const readAsDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -337,11 +377,14 @@ const RemoveBtn = ({ onClick }: { onClick: () => void }) => (
 export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
   const { t, formatCurrency } = useI18n();
   const [title, setTitle] = useState(trip?.title || "");
-  const [destination, setDestination] = useState(trip?.destination || "");
+  const [destinations, setDestinations] = useState<string[]>(
+    trip?.destinations?.length ? trip.destinations : [trip?.destination || ""],
+  );
   const [startDate, setStartDate] = useState(trip?.startDate || "");
   const [endDate, setEndDate] = useState(trip?.endDate || "");
   const [notes, setNotes] = useState(trip?.notes || "");
-  const [tags, setTags] = useState(trip?.tags.join(", ") || "");
+  const [tags, setTags] = useState(formatEditableTags(trip?.tags || []));
+  const [tripScope, setTripScope] = useState<TripScope>(getScopeFromTags(trip?.tags || []));
   const [photos, setPhotos] = useState<string[]>(trip?.photos || []);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingFoodThumb, setIsUploadingFoodThumb] = useState(false);
@@ -361,11 +404,12 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
 
   useEffect(() => {
     setTitle(trip?.title || "");
-    setDestination(trip?.destination || "");
+    setDestinations(trip?.destinations?.length ? trip.destinations : [trip?.destination || ""]);
     setStartDate(trip?.startDate || "");
     setEndDate(trip?.endDate || "");
     setNotes(trip?.notes || "");
-    setTags(trip?.tags.join(", ") || "");
+    setTags(formatEditableTags(trip?.tags || []));
+    setTripScope(getScopeFromTags(trip?.tags || []));
     setPhotos(trip?.photos || []);
 
     setOutbound(trip?.travel?.outbound || []);
@@ -471,16 +515,22 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!title || !destination || !startDate || !endDate) return;
+    const normalizedDestinations = destinations.map((value) => value.trim()).filter(Boolean);
+    const primaryDestination = normalizedDestinations[0] || "";
+    if (!title || !primaryDestination || !startDate || !endDate) return;
 
     setIsEnriching(true);
     try {
       const normalizedHotels = hotels.filter((hotel) => hotel.name.trim());
-      const enrichedHotels = sortHotelsByDate(await enrichHotels(normalizedHotels, destination));
+      const enrichedHotels = sortHotelsByDate(await enrichHotels(normalizedHotels, primaryDestination));
       setHotels(enrichedHotels);
 
       const normalizedFoods = foods.filter((food) => food.name.trim());
-      const enrichedFoods = await enrichFoods(normalizedFoods, destination, t("trips.fallbackFoodDescription", { destination }));
+      const enrichedFoods = await enrichFoods(
+        normalizedFoods,
+        primaryDestination,
+        t("trips.fallbackFoodDescription", { destination: primaryDestination }),
+      );
       setFoods(enrichedFoods);
 
       const parsedTravelCost = parseFloat(travelCost) || 0;
@@ -491,9 +541,15 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
         + parsedTravelCost
         + getTicketsTotal(normalizedTickets);
 
+      const parsedTags = tags
+        ? tags.split(",").map((tag) => tag.trim()).filter(Boolean)
+        : [];
+      const finalTags = applyScopeToTags(parsedTags, tripScope);
+
       onSave({
       title,
-      destination,
+      destination: primaryDestination,
+      destinations: normalizedDestinations,
       startDate,
       endDate,
       cost: totalCost || 0,
@@ -501,7 +557,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       hotels: enrichedHotels,
       foods: enrichedFoods,
       notes,
-      tags: tags ? tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
+      tags: finalTags,
       travel: outbound.length > 0 || returnFlights.length > 0
         ? {
           outbound: outbound.filter((item) => item.from && item.to),
@@ -553,15 +609,45 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
           <form id="trip-form" onSubmit={handleSubmit} className="max-w-3xl space-y-10 pb-20">
             <section className="space-y-4">
               <h3 className="font-display text-lg font-semibold border-b border-border pb-2">{t("trips.generalInfo")}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="font-body text-sm font-medium">{t("trips.title")}</Label>
-                  <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("trips.titlePlaceholder")} required className="rounded-xl" />
+              <div className="space-y-2">
+                <Label className="font-body text-sm font-medium">{t("trips.title")}</Label>
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("trips.titlePlaceholder")} required className="rounded-xl" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="font-body text-sm font-medium">Destinations</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => setDestinations((prev) => [...prev, ""])}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add destination
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label className="font-body text-sm font-medium">{t("trips.destination")}</Label>
-                  <Input value={destination} onChange={(event) => setDestination(event.target.value)} placeholder={t("trips.destinationPlaceholder")} required className="rounded-xl" />
-                </div>
+                {destinations.map((destination, index) => (
+                  <div key={`destination-${index}`} className="flex items-center gap-2">
+                    <Input
+                      value={destination}
+                      onChange={(event) => setDestinations((prev) => prev.map((item, i) => (i === index ? event.target.value : item)))}
+                      placeholder={index === 0 ? `${t("trips.destinationPlaceholder")} (primary)` : t("trips.destinationPlaceholder")}
+                      required={index === 0}
+                      className="rounded-xl"
+                    />
+                    {destinations.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDestinations((prev) => prev.filter((_, i) => i !== index))}
+                        aria-label="Remove destination"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -576,6 +662,38 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                   <Label className="font-body text-sm font-medium">{t("trips.tags")}</Label>
                   <Input value={tags} onChange={(event) => setTags(event.target.value)} placeholder={t("trips.tagsPlaceholder")} className="rounded-xl" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-body text-sm font-medium">{t("trips.scope.label")}</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={tripScope === "auto" ? "default" : "outline"}
+                    className="rounded-full"
+                    onClick={() => setTripScope("auto")}
+                  >
+                    {t("trips.scope.auto")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={tripScope === "international" ? "default" : "outline"}
+                    className="rounded-full"
+                    onClick={() => setTripScope("international")}
+                  >
+                    {t("trips.scope.international")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={tripScope === "domestic" ? "default" : "outline"}
+                    className="rounded-full"
+                    onClick={() => setTripScope("domestic")}
+                  >
+                    {t("trips.scope.domestic")}
+                  </Button>
+                </div>
+                <p className="text-xs font-body text-muted-foreground">
+                  {t("trips.scope.hint")}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label className="font-body text-sm font-medium">{t("trips.notesLabel")}</Label>

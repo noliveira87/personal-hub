@@ -97,12 +97,6 @@ const normalizeLocationText = (value: string) => value
   .replace(/[\u0300-\u036f]/g, "")
   .toLowerCase();
 
-// Bounding box for Portugal mainland + islands envelope.
-// Covers all Portuguese territory; the only borderline overlap with Spain
-// is far-west Extremadura/Huelva which will never be trip destinations.
-const isPointLocatedInPortugal = (point: Pick<TripPoint, "lat" | "lng">) =>
-  point.lat >= 36.8 && point.lat <= 42.3 && point.lng >= -9.7 && point.lng <= -6.0;
-
 const readGeoCache = (): Record<string, CachedGeo> => {
   if (typeof window === "undefined") return {};
 
@@ -132,7 +126,7 @@ let labelMeasureContext: CanvasRenderingContext2D | null | undefined;
 
 const measureHoverLabelWidth = (label: string): number => {
   if (typeof document === "undefined") {
-    return Math.max(80, label.length * 7);
+    return Math.max(80, label.length * 6);
   }
 
   if (labelMeasureContext === undefined) {
@@ -141,10 +135,10 @@ const measureHoverLabelWidth = (label: string): number => {
   }
 
   if (!labelMeasureContext) {
-    return Math.max(80, label.length * 7);
+    return Math.max(80, label.length * 6);
   }
 
-  labelMeasureContext.font = "12px system-ui, sans-serif";
+  labelMeasureContext.font = "10px system-ui, sans-serif";
   return Math.ceil(labelMeasureContext.measureText(label).width + 18);
 };
 
@@ -194,8 +188,12 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
   const [hoveredMap, setHoveredMap] = useState<"world" | "portugal" | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [portugaltZoom, setPortugalZoom] = useState(1);
+  const [portugalPan, setPortugalPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isPortugalDragging, setIsPortugalDragging] = useState(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const portugalSvgRef = useRef<SVGSVGElement | null>(null);
   const dragStateRef = useRef<{
     pointerId: number;
     startX: number;
@@ -204,7 +202,16 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     originY: number;
     moved: boolean;
   } | null>(null);
+  const portugalDragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
   const suppressClickRef = useRef(false);
+  const suppressPortugalClickRef = useRef(false);
 
   const worldGeo = useMemo(() => {
     const topology = worldTopology as unknown as {
@@ -352,46 +359,6 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     return sourceGeo.features.find((geo) => geoContains(geo as never, [-9.1393, 38.7223])) ?? null;
   }, [worldGeo, worldGeoHighRes]);
 
-  const portugalMainlandFeature = useMemo(() => {
-    if (!portugalFeature) return null;
-
-    const geometry = (portugalFeature as { geometry?: { type?: string; coordinates?: unknown } }).geometry;
-    if (!geometry || geometry.type !== "MultiPolygon" || !Array.isArray(geometry.coordinates)) {
-      return portugalFeature;
-    }
-
-    const largestPolygon = geometry.coordinates
-      .filter((polygon) => Array.isArray(polygon))
-      .reduce<{ polygon: unknown[] | null; area: number }>((best, polygon) => {
-        const candidate = {
-          type: "Feature",
-          geometry: {
-            type: "Polygon",
-            coordinates: polygon,
-          },
-          properties: {},
-        } as const;
-
-        const area = geoArea(candidate as never);
-        if (area > best.area) {
-          return { polygon, area };
-        }
-        return best;
-      }, { polygon: null, area: -1 });
-
-    if (!largestPolygon.polygon) {
-      return portugalFeature;
-    }
-
-    return {
-      ...portugalFeature,
-      geometry: {
-        type: "Polygon",
-        coordinates: largestPolygon.polygon,
-      },
-    };
-  }, [portugalFeature]);
-
   const mapFeatures = useMemo(() => {
     if (!worldGeo || !("features" in worldGeo) || !Array.isArray(worldGeo.features)) {
       return [] as Array<{ d: string; id: string }>;
@@ -423,15 +390,22 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
   }, [pathGenerator, usStatesGeo]);
 
   const portugalPathGenerator = useMemo(() => {
-    if (!portugalMainlandFeature) return null;
-    const projection = geoMercator().fitExtent([[30, 14], [330, 246]], portugalMainlandFeature as never);
+    if (!portugalFeature) return null;
+    const projection = geoMercator().fitExtent([[1, 0], [359, 260]], portugalFeature as never);
     return geoPath(projection);
-  }, [portugalMainlandFeature]);
+  }, [portugalFeature]);
 
   const portugalPath = useMemo(() => {
-    if (!portugalMainlandFeature || !portugalPathGenerator) return "";
-    return portugalPathGenerator(portugalMainlandFeature as never) ?? "";
-  }, [portugalMainlandFeature, portugalPathGenerator]);
+    if (!portugalFeature || !portugalPathGenerator) return "";
+    return portugalPathGenerator(portugalFeature as never) ?? "";
+  }, [portugalFeature, portugalPathGenerator]);
+
+  const isPointLocatedInPortugal = useMemo(() => {
+    return (point: Pick<TripPoint, "lat" | "lng">) => {
+      if (!portugalFeature) return false;
+      return geoContains(portugalFeature as never, [point.lng, point.lat]);
+    };
+  }, [portugalFeature]);
 
   const tripGeoScopeById = useMemo(() => {
     const scope = new Map<string, TripGeoScope>();
@@ -450,7 +424,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     });
 
     return scope;
-  }, [points, portugalMainlandFeature]);
+  }, [points, isPointLocatedInPortugal]);
 
   const visiblePoints = useMemo(() => {
     return points.filter((point) => {
@@ -575,13 +549,37 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     };
   };
 
+  const getPanBoundsPT = (currentZoom: number) => ({
+    x: Math.max(0, ((360 * currentZoom) - 360) / 2),
+    y: Math.max(0, ((260 * currentZoom) - 260) / 2),
+  });
+
+  const clampPanPT = (nextPan: { x: number; y: number }, nextZoom: number) => {
+    const bounds = getPanBoundsPT(nextZoom);
+    return {
+      x: Math.max(-bounds.x, Math.min(bounds.x, nextPan.x)),
+      y: Math.max(-bounds.y, Math.min(bounds.y, nextPan.y)),
+    };
+  };
+
   const zoomTransform = `translate(${pan.x} ${pan.y}) translate(${500 - 500 * zoom} ${250 - 250 * zoom}) scale(${zoom})`;
   const pinScale = Number((0.9 / Math.pow(zoom, 1.2)).toFixed(4));
+
+  const zoomTransformPT = `translate(${portugalPan.x} ${portugalPan.y}) translate(${180 - 180 * portugaltZoom} ${130 - 130 * portugaltZoom}) scale(${portugaltZoom})`;
+  const pinScalePT = Number((0.9 / Math.pow(portugaltZoom, 1.2)).toFixed(4));
 
   const applyZoomDelta = (delta: number) => {
     setZoom((current) => {
       const nextZoom = Math.min(3, Math.max(1, Number((current + delta).toFixed(2))));
       setPan((currentPan) => clampPan(currentPan, nextZoom));
+      return nextZoom;
+    });
+  };
+
+  const applyZoomDeltaPT = (delta: number) => {
+    setPortugalZoom((current) => {
+      const nextZoom = Math.min(3, Math.max(1, Number((current + delta).toFixed(2))));
+      setPortugalPan((currentPan) => clampPanPT(currentPan, nextZoom));
       return nextZoom;
     });
   };
@@ -602,14 +600,40 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     }, zoom));
   };
 
+  const handleWheelZoomPT = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    if (event.ctrlKey || event.metaKey) {
+      applyZoomDeltaPT(event.deltaY < 0 ? 0.18 : -0.18);
+      return;
+    }
+
+    if (portugaltZoom <= 1) return;
+
+    setPortugalPan((current) => clampPanPT({
+      x: current.x - event.deltaX,
+      y: current.y - event.deltaY,
+    }, portugaltZoom));
+  };
+
   const resetView = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
   };
 
+  const resetViewPT = () => {
+    setPortugalZoom(1);
+    setPortugalPan({ x: 0, y: 0 });
+  };
+
   const endDrag = () => {
     dragStateRef.current = null;
     setIsDragging(false);
+  };
+
+  const endDragPT = () => {
+    portugalDragStateRef.current = null;
+    setIsPortugalDragging(false);
   };
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -625,6 +649,22 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     };
     suppressClickRef.current = false;
     setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerDownPT = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (portugaltZoom <= 1 || event.button !== 0) return;
+
+    portugalDragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: portugalPan.x,
+      originY: portugalPan.y,
+      moved: false,
+    };
+    suppressPortugalClickRef.current = false;
+    setIsPortugalDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -647,6 +687,25 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     }, zoom));
   };
 
+  const handlePointerMovePT = (event: React.PointerEvent<SVGSVGElement>) => {
+    const dragState = portugalDragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+    const moved = Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3;
+
+    if (moved) {
+      dragState.moved = true;
+      suppressPortugalClickRef.current = true;
+    }
+
+    setPortugalPan(clampPanPT({
+      x: dragState.originX + deltaX,
+      y: dragState.originY + deltaY,
+    }, portugaltZoom));
+  };
+
   const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) return;
@@ -664,6 +723,23 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     }
   };
 
+  const handlePointerUpPT = (event: React.PointerEvent<SVGSVGElement>) => {
+    const dragState = portugalDragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    endDragPT();
+
+    if (dragState.moved) {
+      window.setTimeout(() => {
+        suppressPortugalClickRef.current = false;
+      }, 0);
+    }
+  };
+
   const handlePointerCancel = (event: React.PointerEvent<SVGSVGElement>) => {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) return;
@@ -676,11 +752,29 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
     endDrag();
   };
 
+  const handlePointerCancelPT = (event: React.PointerEvent<SVGSVGElement>) => {
+    const dragState = portugalDragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    suppressPortugalClickRef.current = false;
+    endDragPT();
+  };
+
   useEffect(() => {
     if (zoom === 1 && (pan.x !== 0 || pan.y !== 0)) {
       setPan({ x: 0, y: 0 });
     }
   }, [pan.x, pan.y, zoom]);
+
+  useEffect(() => {
+    if (portugaltZoom === 1 && (portugalPan.x !== 0 || portugalPan.y !== 0)) {
+      setPortugalPan({ x: 0, y: 0 });
+    }
+  }, [portugalPan.x, portugalPan.y, portugaltZoom]);
 
   const mapInteractionHint = zoom > 1
     ? t("trips.map.interactionHintZoom")
@@ -698,6 +792,12 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
   const handleWheelCapture = (event: React.WheelEvent<HTMLDivElement>) => {
     if (event.ctrlKey || event.metaKey || zoom > 1) {
       handleWheelZoom(event);
+    }
+  };
+
+  const handleWheelCapturePT = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey || portugaltZoom > 1) {
+      handleWheelZoomPT(event);
     }
   };
 
@@ -791,6 +891,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
                   if (suppressClickRef.current) return;
                   onSelectTrip?.(point.trip);
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 onMouseEnter={() => {
                   setHoveredMap("world");
                   setHoveredPointId(point.id);
@@ -827,28 +928,46 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
             {hoveredWorldPoint && (
               <g
-                transform={`translate(${hoveredWorldPoint.x + 12}, ${hoveredWorldPoint.y - 30}) scale(${pinScale})`}
                 style={{ pointerEvents: "none" }}
               >
-                <rect
-                  x="0"
-                  y="0"
-                  rx="8"
-                  ry="8"
-                  width={hoveredLabelWidth}
-                  height="24"
-                  fill="hsl(var(--foreground))"
-                  opacity="0.95"
-                />
-                <text
-                  x="9"
-                  y="16"
-                  fill="hsl(var(--background))"
-                  fontSize="12"
-                  fontFamily="system-ui, sans-serif"
-                >
-                  {hoveredWorldLabel}
-                </text>
+                {(() => {
+                  const labelWidth = hoveredLabelWidth;
+                  const labelPadding = 4;
+                  const labelFontSize = 10;
+                  const labelHeight = labelPadding + labelFontSize + labelPadding;
+                  let x = hoveredWorldPoint.x + 12;
+                  let y = hoveredWorldPoint.y - 30;
+                  
+                  // Constrain to SVG bounds (viewBox: 0 0 1000 500)
+                  if (x + labelWidth > 1000) x = hoveredWorldPoint.x - labelWidth - 5;
+                  if (x < 0) x = 5;
+                  if (y < 0) y = hoveredWorldPoint.y + 15;
+                  if (y + labelHeight > 500) y = hoveredWorldPoint.y - labelHeight - 5;
+                  
+                  return (
+                    <g transform={`translate(${x}, ${y}) scale(${pinScale})`}>
+                      <rect
+                        x="0"
+                        y="0"
+                        rx="8"
+                        ry="8"
+                        width={labelWidth}
+                        height={labelHeight}
+                        fill="hsl(var(--foreground))"
+                        opacity="0.95"
+                      />
+                          <text
+                            x="9"
+                            y={labelPadding + labelFontSize}
+                            fill="hsl(var(--background))"
+                            fontSize={labelFontSize}
+                            fontFamily="system-ui, sans-serif"
+                          >
+                            {hoveredWorldLabel}
+                          </text>
+                    </g>
+                  );
+                })()}
               </g>
             )}
           </g>
@@ -861,63 +980,138 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
         <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-border/50 bg-background/70 p-2 sm:p-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-body uppercase tracking-[0.12em] text-muted-foreground">{t("common.portugal")}</p>
-            <p className="text-xs font-body text-muted-foreground">{projectedPortugalPoints.length} {t("common.pins")}</p>
-          </div>
-          <svg viewBox="0 0 360 260" className="h-64 w-full" role="img" aria-label={t("trips.map.portugalMapAria")}>
-            <rect x="0" y="0" width="360" height="260" fill="hsl(var(--background))" />
-            <path
-              d={portugalPath}
-              fill="hsl(var(--secondary))"
-              stroke={visitedCountryStroke}
-              strokeWidth="1"
-            />
-
-            {projectedPortugalPoints.map(({ point, x, y }) => (
-              <g
-                key={`pt-${point.id}`}
-                transform={`translate(${x}, ${y})`}
-                onClick={() => onSelectTrip?.(point.trip)}
-                onMouseEnter={() => {
-                  setHoveredMap("portugal");
-                  setHoveredPointId(point.id);
-                }}
-                onMouseLeave={() => {
-                  setHoveredPointId((prev) => (prev === point.id ? null : prev));
-                  setHoveredMap((prev) => (prev === "portugal" ? null : prev));
-                }}
-                style={{ cursor: onSelectTrip ? "pointer" : "default" }}
-              >
-                <title>{localizeTripLocationLabel(point.label, language)}</title>
-                <circle r={hoveredPointId === point.id ? "11" : "9"} fill="hsl(var(--accent) / 0.2)" />
-                <circle r={hoveredPointId === point.id ? "6.6" : "5.6"} fill="#ef4444" stroke="hsl(var(--background))" strokeWidth="2.2" />
-                <circle r={hoveredPointId === point.id ? "2.3" : "2"} fill="hsl(var(--background))" />
-              </g>
-            ))}
-
-            {hoveredPortugalPoint && (
-              <g transform={`translate(${hoveredPortugalPoint.x + 10}, ${hoveredPortugalPoint.y - 26})`} style={{ pointerEvents: "none" }}>
-                <rect
-                  x="0"
-                  y="0"
-                  rx="8"
-                  ry="8"
-                  width={hoveredPortugalLabelWidth}
-                  height="24"
-                  fill="hsl(var(--foreground))"
-                  opacity="0.95"
-                />
-                <text
-                  x="9"
-                  y="16"
-                  fill="hsl(var(--background))"
-                  fontSize="12"
-                  fontFamily="system-ui, sans-serif"
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 p-1 text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => applyZoomDeltaPT(-0.2)}
+                  disabled={portugaltZoom <= 1}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label={t("trips.map.zoomOut")}
                 >
-                  {hoveredPortugalLabel}
-                </text>
+                  <ZoomOut className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={resetViewPT}
+                  disabled={portugaltZoom === 1 && portugalPan.x === 0 && portugalPan.y === 0}
+                  className="rounded-full px-1.5 py-0.5 text-[10px] font-body hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {Math.round(portugaltZoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyZoomDeltaPT(0.2)}
+                  disabled={portugaltZoom >= 3}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label={t("trips.map.zoomIn")}
+                >
+                  <ZoomIn className="h-3 w-3" />
+                </button>
+              </div>
+              <p className="text-xs font-body text-muted-foreground">{projectedPortugalPoints.length} {t("common.pins")}</p>
+            </div>
+          </div>
+          <div onWheel={handleWheelCapturePT} className="rounded-2xl border border-border/50 bg-background/70 p-2 overflow-hidden">
+            <svg
+              ref={portugalSvgRef}
+              viewBox="0 0 360 260"
+              className="h-96 w-full touch-none select-none"
+              style={{ cursor: portugaltZoom > 1 ? (isPortugalDragging ? "grabbing" : "grab") : "default" }}
+              onPointerDown={handlePointerDownPT}
+              onPointerMove={handlePointerMovePT}
+              onPointerUp={handlePointerUpPT}
+              onPointerCancel={handlePointerCancelPT}
+              role="img"
+              aria-label={t("trips.map.portugalMapAria")}
+            >
+              <rect x="0" y="0" width="360" height="260" fill="hsl(var(--background))" />
+              <g transform={zoomTransformPT} style={{ transition: "transform 180ms ease" }}>
+                <path
+                  d={portugalPath}
+                  fill="hsl(var(--secondary))"
+                  stroke={visitedCountryStroke}
+                  strokeWidth="1"
+                />
+
+                {projectedPortugalPoints.map(({ point, x, y }) => (
+                  <g
+                    key={`pt-${point.id}`}
+                    transform={`translate(${x}, ${y}) scale(${pinScalePT})`}
+                    onClick={() => {
+                      if (suppressPortugalClickRef.current) return;
+                      onSelectTrip?.(point.trip);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseEnter={() => {
+                      setHoveredMap("portugal");
+                      setHoveredPointId(point.id);
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredPointId((prev) => (prev === point.id ? null : prev));
+                      setHoveredMap((prev) => (prev === "portugal" ? null : prev));
+                    }}
+                    style={{ 
+                      cursor: portugaltZoom > 1 ? (isPortugalDragging ? "grabbing" : "grab") : (onSelectTrip ? "pointer" : "default"),
+                      transition: "transform 160ms ease",
+                    }}
+                  >
+                    <title>{localizeTripLocationLabel(point.label, language)}</title>
+                    <circle r={hoveredPointId === point.id ? "11" : "8"} fill="hsl(var(--accent) / 0.2)" style={{ transition: "r 160ms ease" }} />
+                    <circle r={hoveredPointId === point.id ? "6.6" : "5.6"} fill="#ef4444" stroke="hsl(var(--background))" strokeWidth="2.2" style={{ transition: "r 160ms ease, stroke-width 160ms ease" }} />
+                    <circle r={hoveredPointId === point.id ? "2.3" : "2"} fill="hsl(var(--background))" style={{ transition: "r 160ms ease" }} />
+                  </g>
+                ))}
+
+                {hoveredPortugalPoint && (
+                  <g
+                    style={{ pointerEvents: "none" }}
+                  >
+                    {(() => {
+                      const labelWidth = hoveredPortugalLabelWidth;
+                      const labelPadding = 4;
+                      const labelFontSize = 10;
+                      const labelHeight = labelPadding + labelFontSize + labelPadding;
+                      let x = hoveredPortugalPoint.x + 10;
+                      let y = hoveredPortugalPoint.y - 26;
+                      
+                      // Constrain to SVG bounds (viewBox: 0 0 360 260)
+                      if (x + labelWidth > 360) x = hoveredPortugalPoint.x - labelWidth - 5;
+                      if (x < 0) x = 5;
+                      if (y < 0) y = hoveredPortugalPoint.y + 15;
+                      if (y + labelHeight > 260) y = hoveredPortugalPoint.y - labelHeight - 5;
+                      
+                      return (
+                        <g transform={`translate(${x}, ${y}) scale(${pinScalePT})`}>
+                          <rect
+                            x="0"
+                            y="0"
+                            rx="8"
+                            ry="8"
+                            width={labelWidth}
+                            height={labelHeight}
+                            fill="hsl(var(--foreground))"
+                            opacity="0.95"
+                          />\n                          <text
+                            x="9"
+                            y={labelPadding + labelFontSize}
+                            fill="hsl(var(--background))"
+                            fontSize={labelFontSize}
+                            fontFamily="system-ui, sans-serif"
+                          >
+                            {hoveredPortugalLabel}
+                          </text>
+                        </g>
+                      );
+                    })()}
+                  </g>
+                )}
               </g>
-            )}
-          </svg>
+            </svg>
+          </div>
+          <p className="mt-1.5 text-[10px] font-body text-muted-foreground">
+            {portugaltZoom > 1 ? t("trips.map.interactionHintZoom") : t("trips.map.interactionHintDefault")}
+          </p>
         </div>
       )}
 

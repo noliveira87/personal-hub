@@ -15,7 +15,8 @@ import {
   getLocalizedTripDestination,
   getLocalizedTripTitle,
   getTripDestinationCount,
-  getTripsOutsidePortugalCount,
+  getTripLocationSummaries,
+  isInternationalTrip,
 } from "@/features/trips/utils/locations";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getTripTotal } from "@/features/trips/utils/totals";
@@ -25,6 +26,7 @@ type EditableTripFields = Omit<Trip, "id" | "createdAt" | "updatedAt">;
 const EDITABLE_TRIP_KEYS: Array<keyof EditableTripFields> = [
   "title",
   "destination",
+  "destinations",
   "startDate",
   "endDate",
   "cost",
@@ -45,6 +47,7 @@ const buildTripChanges = (current: Trip, next: EditableTripFields): Partial<Edit
   const currentEditable: Record<keyof EditableTripFields, unknown> = {
     title: current.title,
     destination: current.destination,
+    destinations: current.destinations,
     startDate: current.startDate,
     endDate: current.endDate,
     cost: current.cost,
@@ -107,15 +110,30 @@ export function TripsApp() {
       || getLocalizedTripDestination(trip.destination, language).toLowerCase().includes(query)
       || trip.title.toLowerCase().includes(query)
       || trip.destination.toLowerCase().includes(query)
+      || (trip.destinations ?? []).some((destination) => destination.toLowerCase().includes(query))
       || trip.tags.some((tag) => tag.toLowerCase().includes(query))
     ));
   }, [trips, search, language]);
 
-  const { totalTrips, totalDestinations, totalSpent } = useMemo(() => ({
-    totalTrips: getTripsOutsidePortugalCount(trips),
-    totalDestinations: getTripDestinationCount(trips),
-    totalSpent: trips.reduce((sum, trip) => sum + getTripTotal(trip), 0),
-  }), [trips]);
+  const occurredTrips = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return trips.filter((trip) => trip.endDate <= today);
+  }, [trips]);
+
+  const { totalTrips, totalDestinations, totalSpent, nationalTrips, nationalDestinations, nationalSpent } = useMemo(() => {
+    const internationalTrips = occurredTrips.filter(isInternationalTrip);
+    const domesticTrips = occurredTrips.filter((trip) => !isInternationalTrip(trip));
+    const domesticLocations = getTripLocationSummaries(domesticTrips);
+    
+    return {
+      totalTrips: internationalTrips.length,
+      totalDestinations: getTripDestinationCount(occurredTrips),
+      totalSpent: internationalTrips.reduce((sum, trip) => sum + getTripTotal(trip), 0),
+      nationalTrips: domesticTrips.length,
+      nationalDestinations: domesticLocations.length,
+      nationalSpent: domesticTrips.reduce((sum, trip) => sum + getTripTotal(trip), 0),
+    };
+  }, [occurredTrips]);
 
   const handleDelete = async (id: string) => {
     const confirmed = window.confirm(t("trips.confirmDelete"));
@@ -251,23 +269,48 @@ export function TripsApp() {
                   initial={{ opacity: 0, y: 26 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2, duration: 0.6 }}
-                  className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                  className="space-y-3"
                 >
-                  <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
-                    <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
-                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalTrips}</p>
-                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.trips")}</p>
+                  <div className="space-y-2 rounded-2xl border border-border/50 bg-background/70 p-2.5 sm:p-3">
+                    <p className="px-1 text-[10px] font-body uppercase tracking-[0.2em] text-foreground/55">{t("trips.stats.internationalSummary")}</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
+                        <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
+                        <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalTrips}</p>
+                        <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.trips")}</p>
+                      </div>
+                      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
+                        <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
+                        <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalDestinations}</p>
+                        <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.destinations")}</p>
+                      </div>
+                      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
+                        <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
+                        <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(totalSpent, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                        <p className="mt-0.5 text-xs font-body uppercase tracking-[0.12em] text-foreground/65">{t("trips.stats.invested")}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
-                    <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
-                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{totalDestinations}</p>
-                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.destinations")}</p>
-                  </div>
-                  <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-[linear-gradient(150deg,hsl(var(--background)/0.92),hsl(var(--secondary)/0.46))] px-4 py-3 backdrop-blur-sm shadow-[0_12px_26px_hsl(var(--foreground)/0.08)]">
-                    <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
-                    <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(totalSpent, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                    <p className="mt-0.5 text-xs font-body uppercase tracking-[0.12em] text-foreground/65">{t("trips.stats.invested")}</p>
-                  </div>
+
+                  {nationalTrips > 0 && (
+                    <div className="space-y-2 rounded-2xl border border-border/50 bg-[linear-gradient(160deg,hsl(var(--secondary)/0.42),hsl(var(--background)/0.9))] p-2.5 sm:max-w-2xl sm:p-3">
+                      <p className="px-1 text-xs font-body font-semibold tracking-[0.08em] text-foreground/70">{t("trips.stats.nationalSummary")}</p>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl border border-border/50 bg-background/78 px-3 py-2.5 shadow-[0_6px_14px_hsl(var(--foreground)/0.05)]">
+                          <p className="font-display text-xl font-semibold tracking-tight text-foreground">{nationalTrips}</p>
+                          <p className="mt-0.5 text-xs font-body text-foreground/72">{t("trips.stats.nationalTrips")}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-background/78 px-3 py-2.5 shadow-[0_6px_14px_hsl(var(--foreground)/0.05)]">
+                          <p className="font-display text-xl font-semibold tracking-tight text-foreground">{nationalDestinations}</p>
+                          <p className="mt-0.5 text-xs font-body text-foreground/72">{t("trips.stats.nationalDestinations")}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-background/78 px-3 py-2.5 shadow-[0_6px_14px_hsl(var(--foreground)/0.05)]">
+                          <p className="font-display text-xl font-semibold tracking-tight text-foreground">{formatCurrency(nationalSpent, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                          <p className="mt-0.5 text-xs font-body text-foreground/72">{t("trips.stats.nationalSpent")}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </div>

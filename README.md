@@ -86,7 +86,7 @@ See [SUPABASE_SETUP.md](packages/hub/SUPABASE_SETUP.md) for detailed schema.
 
 ## 📦 Deployment
 
-Production is deployed on the NAS with PM2 serving the SPA from `packages/hub/dist` on port `8081`.
+Production is deployed on the Home Server with PM2 serving the SPA from `packages/hub/dist` on port `8081`.
 
 ### Option A: Deploy directly on the server
 

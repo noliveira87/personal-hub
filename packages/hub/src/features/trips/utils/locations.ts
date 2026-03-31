@@ -16,7 +16,9 @@ const normalizeDestinationKey = (value: string) => value
   .replace(/\s+/g, " ")
   .trim();
 
-const PORTUGAL_DESTINATION_REGEX = /\b(portugal|lisboa|lisbon|porto|coimbra|faro|braga|aveiro|maia|sintra|cascais|setubal|evora|matosinhos|portalegre)\b/;
+const PORTUGAL_DESTINATION_REGEX = /\b(portugal|portugal continental|lisboa|lisbon|porto|coimbra|faro|braga|aveiro|maia|sintra|cascais|setubal|evora|matosinhos|portalegre|vilamoura|quarteira|portimao|lagos|algarve|beja|viseu|guimaraes|viana do castelo|leiria|santarem|albufeira|tavira|sagres|nazare|obidos|tomar|alcobaca|funchal|madeira|ponta delgada|acores|azores|ilha da madeira|ilha de madeira|ilha de sao miguel|sao miguel)\b/;
+
+const NON_PORTUGAL_DESTINATION_REGEX = /\b(brasil|brazil|porto alegre|rio de janeiro|sao paulo|espanha|spain|franca|france|italia|italy|alemanha|germany|japao|japan|usa|united states|estados unidos|reino unido|united kingdom|england|holanda|netherlands|malta)\b/;
 
 const ADDRESS_LABEL_EXCLUSIONS = new Set([
   "usa",
@@ -164,6 +166,9 @@ const COUNTRY_LABEL_DESTINATION_TOKENS = [
   "japao",
 ] as const;
 
+const INTERNATIONAL_SCOPE_TAG = "scope:international";
+const DOMESTIC_SCOPE_TAG = "scope:domestic";
+
 const LOCATION_TEXT_PATTERNS: Array<{ regex: RegExp; key: string }> = [
   { regex: /\b(minato city|minato)\b/gi, key: "minato city" },
   { regex: /\b(nova iorque|new york)\b/gi, key: "new york" },
@@ -274,20 +279,21 @@ export function getLocalizedTripDestination(destination: string, language: Langu
 
 export function getLocalizedTripTitle(trip: Trip, language: Language): string {
   const trimmedTitle = trip.title.trim();
-  if (!trimmedTitle) return getLocalizedTripDestination(trip.destination, language);
+  const primaryDestination = (trip.destinations?.find((value) => value.trim()) ?? trip.destination).trim();
+  if (!trimmedTitle) return getLocalizedTripDestination(primaryDestination, language);
 
   const yearMatch = trimmedTitle.match(/\s*\d{4}\s*$/);
   const yearSuffix = yearMatch?.[0]?.trim() ?? "";
   const titleWithoutYear = trimmedTitle.replace(/\s*\d{4}\s*$/, "").trim();
-  const localizedDestination = getLocalizedTripDestination(trip.destination, language);
+  const localizedDestination = getLocalizedTripDestination(primaryDestination, language);
 
   if (!titleWithoutYear) {
     return yearSuffix ? `${localizedDestination} ${yearSuffix}` : localizedDestination;
   }
 
   const normalizedTitle = normalizeDestinationKey(titleWithoutYear);
-  const normalizedDestination = normalizeDestinationKey(trip.destination);
-  const normalizedDestinationWithState = normalizeDestinationKey(addStateToUsLabel(trip.destination));
+  const normalizedDestination = normalizeDestinationKey(primaryDestination);
+  const normalizedDestinationWithState = normalizeDestinationKey(addStateToUsLabel(primaryDestination));
 
   if (
     normalizedTitle === normalizedDestination
@@ -297,7 +303,7 @@ export function getLocalizedTripTitle(trip: Trip, language: Language): string {
   }
 
   let localizedTitle = localizeLocationTermsInText(titleWithoutYear, language);
-  const replacementCandidates = [addStateToUsLabel(trip.destination), trip.destination]
+  const replacementCandidates = [addStateToUsLabel(primaryDestination), primaryDestination]
     .map((value) => value.trim())
     .filter(Boolean)
     .sort((left, right) => right.length - left.length);
@@ -312,7 +318,20 @@ export function getLocalizedTripTitle(trip: Trip, language: Language): string {
   return yearSuffix ? `${localizedTitle} ${yearSuffix}` : localizedTitle;
 }
 
-const isPortugalDestination = (destination: string) => PORTUGAL_DESTINATION_REGEX.test(normalizeDestinationKey(destination));
+export const isPortugalDestination = (destination: string) => {
+  const normalized = normalizeDestinationKey(destination);
+  if (!normalized) return false;
+
+  if (normalized.includes("portugal")) {
+    return true;
+  }
+
+  if (NON_PORTUGAL_DESTINATION_REGEX.test(normalized)) {
+    return false;
+  }
+
+  return PORTUGAL_DESTINATION_REGEX.test(normalized);
+};
 
 const isPortugalLocationLabel = (label: string) => isPortugalDestination(label);
 
@@ -327,13 +346,38 @@ const prefersTripDestinationLabel = (destination: string) => {
 
 const formatTripDestinationForCounting = (destination: string) => addStateToUsLabel(destination.trim());
 
+export const getTripDestinations = (trip: Trip): string[] => {
+  const explicit = (trip.destinations ?? []).map((value) => value.trim()).filter(Boolean);
+  if (explicit.length > 0) {
+    return explicit;
+  }
+  const fallback = trip.destination?.trim();
+  return fallback ? [fallback] : [];
+};
+
+const normalizeTripTag = (value: string) => value.trim().toLowerCase();
+
+const hasTag = (trip: Trip, tag: string) => trip.tags.some((value) => normalizeTripTag(value) === tag);
+
+export function isInternationalTrip(trip: Trip): boolean {
+  if (hasTag(trip, DOMESTIC_SCOPE_TAG)) {
+    return false;
+  }
+
+  if (hasTag(trip, INTERNATIONAL_SCOPE_TAG)) {
+    return true;
+  }
+
+  return getTripDestinations(trip).some((destination) => !isPortugalDestination(destination));
+}
+
 export function getTripsOutsidePortugalCount(trips: Trip[]): number {
-  return trips.filter((trip) => !isPortugalDestination(trip.destination)).length;
+  return trips.filter(isInternationalTrip).length;
 }
 
 export function getCountedTripLocations(trips: Trip[]): TripLocationSummary[] {
   return trips
-    .filter((trip) => !isPortugalDestination(trip.destination))
+    .filter(isInternationalTrip)
     .flatMap((trip) => {
       const countedLocations = getTripLocationSummaries([trip])
         .filter((location) => !isPortugalLocation(location));
@@ -342,7 +386,7 @@ export function getCountedTripLocations(trips: Trip[]): TripLocationSummary[] {
         return countedLocations;
       }
 
-      const fallbackLabel = formatTripDestinationForCounting(trip.destination);
+      const fallbackLabel = formatTripDestinationForCounting(getTripDestinations(trip)[0] ?? trip.destination);
       return [{
         id: `${trip.id}:fallback-destination`,
         trip,
@@ -373,7 +417,6 @@ export function getTripLocationSummaries(trips: Trip[]): TripLocationSummary[] {
 
   trips.forEach((trip) => {
     const seen = new Set<string>();
-    let addedSpecificLocation = false;
     const tripLocations: TripLocationSummary[] = [];
 
     const add = (query: string, label: string) => {
@@ -393,55 +436,14 @@ export function getTripLocationSummaries(trips: Trip[]): TripLocationSummary[] {
       });
     };
 
-    trip.hotels.forEach((hotel) => {
-      if (hotel.address?.trim()) {
-        const extractedLabel = extractCityLabelFromAddress(hotel.address);
-        const inferredHotelCity = inferCityLabelFromHotel(hotel.name ?? "");
-        const rawCityLabel = extractedLabel && !isHotelLikeLabel(extractedLabel, hotel.name ?? "")
-          ? extractedLabel
-          : inferredHotelCity ?? addStateToUsLabel(trip.destination);
-        const cityLabel = prefersTripDestinationLabel(trip.destination)
-          ? addStateToUsLabel(trip.destination)
-          : rawCityLabel;
-        add(`${hotel.name}, ${hotel.address}`, cityLabel);
-        addedSpecificLocation = true;
-        return;
-      }
+    getTripDestinations(trip).forEach((destination, index) => {
+      const label = addStateToUsLabel(destination);
+      add(label, label);
 
-      if (hotel.name?.trim()) {
-        const inferredCityLabel = inferCityLabelFromHotel(hotel.name);
-        const rawCityLabel = inferredCityLabel ?? trip.destination;
-        const cityLabel = prefersTripDestinationLabel(trip.destination)
-          ? addStateToUsLabel(trip.destination)
-          : rawCityLabel;
-        const geocodeQuery = cityLabel === trip.destination
-          ? `${hotel.name}, ${trip.destination}`
-          : inferredCityLabel
-          ? cityLabel
-          : `${hotel.name}, ${cityLabel}, USA`;
-        add(geocodeQuery, cityLabel);
-        addedSpecificLocation = true;
+      if (index === 0 && tripLocations.length === 1 && prefersTripDestinationLabel(destination)) {
+        tripLocations[0].label = label;
       }
     });
-
-    if (!addedSpecificLocation) {
-      add(trip.destination, addStateToUsLabel(trip.destination));
-    }
-
-    if (prefersTripDestinationLabel(trip.destination)) {
-      const destinationLabel = addStateToUsLabel(trip.destination);
-      tripLocations.forEach((location) => {
-        location.label = destinationLabel;
-      });
-    }
-
-    // For single-location trips, the destination field is the source of truth for map pins.
-    // This prevents stale pins when destination is edited but old hotel/address text remains.
-    if (tripLocations.length === 1 && !prefersTripDestinationLabel(trip.destination)) {
-      const destinationLabel = addStateToUsLabel(trip.destination);
-      tripLocations[0].label = destinationLabel;
-      tripLocations[0].query = destinationLabel;
-    }
 
     locations.push(...tripLocations);
   });

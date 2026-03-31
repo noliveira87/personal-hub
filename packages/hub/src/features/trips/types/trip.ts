@@ -48,6 +48,7 @@ export interface Trip {
   id: string;
   title: string;
   destination: string;
+  destinations?: string[];
   startDate: string;
   endDate: string;
   cost: number;

@@ -3,6 +3,7 @@ create table if not exists public.trips (
   id uuid primary key,
   title text not null,
   destination text not null,
+  destinations jsonb not null default '[]'::jsonb,
   start_date date not null,
   end_date date not null,
   cost numeric(12,2) not null default 0,
