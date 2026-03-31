@@ -148,12 +148,12 @@ export default function Insights() {
     };
   }, [allTransactions, selectedYear, selectedMonth, t, currentYear, hideAmounts]);
 
-  const cards = [
+  const cards = useMemo(() => [
     { icon: PiggyBank, label: t('homeExpenses.insights.monthlySavings'), value: formatCurrency(data.balance), sub: t('homeExpenses.insights.savingsRateSub', { value: `${data.savingsRate.toFixed(1)}%` }), color: data.balance >= 0 ? 'text-positive' : 'text-negative' },
     { icon: Activity, label: t('homeExpenses.insights.avgMonthlyExpenses'), value: formatCurrency(data.avgExpenses), sub: t('homeExpenses.insights.thisYearAverage'), color: 'text-expense' },
     { icon: Target, label: t('homeExpenses.insights.afterFixedExpenses'), value: formatCurrency(data.moneyAfterFixed), sub: `${t('homeExpenses.insights.fixedPrefix')}: ${formatCurrency(data.fixedExpenses)}`, color: data.moneyAfterFixed >= 0 ? 'text-positive' : 'text-negative' },
     { icon: TrendingUp, label: t('homeExpenses.insights.endOfMonthForecast'), value: formatCurrency(data.forecastBalance), sub: `${t('homeExpenses.insights.estimatedExpensesPrefix')}: ${formatCurrency(data.forecastExpenses)}`, color: data.forecastBalance >= 0 ? 'text-positive' : 'text-negative' },
-  ];
+  ], [data, t, formatCurrency]);
 
   return (
     <div className="space-y-6 pt-16">
