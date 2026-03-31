@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
 const navItems = [
-  { to: '/dashboard', labelKey: 'layout.nav.dashboard', icon: LayoutDashboard },
+  { to: '/dashboard', labelKey: 'contracts.menu', icon: LayoutDashboard },
   { to: '/contracts/calendar', labelKey: 'layout.nav.calendar', icon: CalendarDays },
   { to: '/contracts/alerts', labelKey: 'layout.nav.alerts', icon: Bell },
   { to: '/contracts/insights', labelKey: 'layout.nav.insights', icon: TrendingUp },

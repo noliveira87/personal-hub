@@ -11,5 +11,9 @@
   "scripts": {
     "dev": "npm --prefix packages/hub run dev -- --port 3000",
     "build": "npm --prefix packages/hub run build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
+    "dotenv": "^17.3.1"
   }
 }

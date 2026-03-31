@@ -12,6 +12,7 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 
 export default function Dashboard() {
+  const { t } = useI18n();
   const CARDS_PER_ROW = 3;
   const INITIAL_VISIBLE = CARDS_PER_ROW * 3;
   const { contracts, loading, error } = useContracts();
@@ -99,7 +100,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8 pt-16">
       <AppSectionHeader
-        title="D12 Contracts"
+        title={t('contracts.menu')}
         icon={LayoutDashboard}
         actions={(
           <Link
@@ -107,33 +108,33 @@ export default function Dashboard() {
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Contract</span>
+            <span className="hidden sm:inline">{t('contracts.addContract')}</span>
           </Link>
         )}
       />
 
       <div className="animate-fade-up" style={{ animationDelay: '60ms' }}>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Overview of active contracts and renewals</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('contracts.menu')}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t('contracts.overview')}</p>
       </div>
 
       {/* Stats row */}
       <div className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard label="Active Contracts" value={active.length} sublabel={`${contracts.length} total`} />
-          <StatsCard label="Monthly Baseline" value={formatCurrency(monthlyTotal)} sublabel="normalized recurring cost" />
-          <StatsCard label="Current Month" value={formatCurrency(currentMonthTotal)} sublabel={currentMonthLabel} />
+          <StatsCard label={t('contracts.active')} value={active.length} sublabel={`${contracts.length} ${t('contracts.total')}`} />
+          <StatsCard label={t('contracts.monthlyBaseline')} value={formatCurrency(monthlyTotal)} sublabel={t('contracts.monthlyBaseline')} />
+          <StatsCard label={t('contracts.currentMonth')} value={formatCurrency(currentMonthTotal)} sublabel={currentMonthLabel} />
           <StatsCard
-            label="Expiring ≤ 30 days"
+            label={t('contracts.expiring')}
             value={within30}
             variant={within7 > 0 ? 'urgent' : within15 > 0 ? 'warning' : 'default'}
-            sublabel={within7 > 0 ? `${within7} within 7 days!` : undefined}
+            sublabel={within7 > 0 ? `${within7} ≤ 7` : undefined}
           />
         </div>
         <div className="mt-4 rounded-lg border border-border/70 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">Monthly Baseline</span> = recurring normalized monthly average.
+          <span className="font-medium text-foreground">{t('contracts.monthlyBaseline')}</span> = {t('contracts.monthlyBaselineDesc')}
           <span className="mx-1">•</span>
-          <span className="font-medium text-foreground">Current Month</span> = charges expected this month based on billing cycle.
+          <span className="font-medium text-foreground">{t('contracts.currentMonth')}</span> = {t('contracts.currentMonthDesc')}
         </div>
       </div>
 

@@ -11,9 +11,10 @@ export type ContractCategory =
   | 'software'
   | 'maintenance'
   | 'security-alarm'
+  | 'car'
   | 'other';
 
-export type ContractType = 'mortgage' | 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'other';
+export type ContractType = 'mortgage' | 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'car' | 'other';
 export type HousingUsage = 'primary-residence' | 'secondary-home';
 export type RenewalType = 'manual' | 'auto-renew' | 'no-renewal';
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
@@ -117,6 +118,7 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   'software': 'Software',
   'maintenance': 'Maintenance',
   'security-alarm': 'Security / Alarm',
+  'car': 'Carro',
   'other': 'Other',
 };
 
@@ -131,9 +133,10 @@ export const CATEGORY_ICONS: Record<ContractCategory, string> = {
   'water': '💧',
   'tv-streaming': '📺',
   'software': '💻',
-  'maintenance': '🔧',
-  'security-alarm': '🔒',
-  'other': '📋',
+  'maintenance': '🛠️',
+  'security-alarm': '🚨',
+  'car': '🚗',
+  'other': '❓',
 };
 
 export const TYPE_LABELS: Record<ContractType, string> = {
@@ -143,6 +146,7 @@ export const TYPE_LABELS: Record<ContractType, string> = {
   telecom: 'Telecom',
   subscription: 'Subscription',
   maintenance: 'Maintenance',
+  car: 'Car',
   other: 'Other',
 };
 

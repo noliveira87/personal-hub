@@ -8,6 +8,7 @@ import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS, HOUSING_USAGE_LABELS } from '@/features/contracts/types/contract';
 import { format, parseISO } from 'date-fns';
 import { Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
+import CarElectricityChart from '../components/CarElectricityChart';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -156,6 +157,13 @@ export default function ContractDetail() {
           ))}
         </div>
       </div>
+
+      {contract.type === 'car' && (
+        <>
+          <div className="text-xs text-muted-foreground mb-2">Contract ID: {contract.id}</div>
+          <CarElectricityChart contractId={contract.id} />
+        </>
+      )}
 
       {contract.type === 'mortgage' && contract.mortgageDetails && (
         <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '170ms' }}>

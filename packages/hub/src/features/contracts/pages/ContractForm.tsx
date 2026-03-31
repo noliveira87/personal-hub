@@ -7,6 +7,7 @@ import {
 } from '@/features/contracts/types/contract';
 import { Plus, X, Loader, FileText, Send } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { useI18n } from '@/i18n/I18nProvider';
 import { sendTelegramMessage } from '@/lib/telegram';
 
 const defaultAlert = (kind: AlertSetting['kind'] = 'days-before'): AlertSetting => ({
@@ -52,6 +53,7 @@ const TYPE_CATEGORY_OPTIONS: Record<ContractType, ContractCategory[]> = {
   telecom: ['internet', 'mobile'],
   subscription: ['tv-streaming', 'software'],
   maintenance: ['maintenance', 'security-alarm'],
+  car: ['car'],
   other: ['other'],
 };
 
@@ -68,6 +70,7 @@ function isCategoryAllowed(type: ContractType, category: ContractCategory): bool
 }
 
 export default function ContractForm() {
+  const { t } = useI18n();
   const { id } = useParams();
   const navigate = useNavigate();
   const { addContract, updateContract, getContract } = useContracts();
@@ -237,11 +240,22 @@ export default function ContractForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pt-16">
-      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/dashboard" backLabel="Back" />
 
-      <h1 className="text-2xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '60ms' }}>
-        {isEdit ? 'Edit Contract' : 'Add Contract'}
-      </h1>
+      <AppSectionHeader title={t('contracts.menu')} icon={FileText} backTo="/contracts" backLabel={t('contracts.backToContracts')} />
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '60ms' }}>
+          {isEdit ? t('common.edit') + ' ' + t('contracts.menu').toLowerCase() : t('contracts.addContract')}
+        </h1>
+        <button
+          type="button"
+          aria-label={t('common.close')}
+          className="ml-2 p-2 rounded-full hover:bg-muted transition-colors"
+          onClick={() => navigate(-1)}
+          disabled={submitting}
+        >
+          <X className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6 animate-fade-up" style={{ animationDelay: '120ms' }}>
         {/* Basic info */}
@@ -249,12 +263,12 @@ export default function ContractForm() {
           <h2 className="text-sm font-semibold text-foreground">Basic Information</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Name *</label>
-              <input className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} required placeholder="e.g. Home Insurance" disabled={submitting} />
+              <label className={labelClass}>{t('common.name')} *</label>
+              <input className={inputClass} value={form.name} onChange={e => set('name', e.target.value)} required placeholder={t('contracts.namePlaceholder') ?? 'e.g. Home Insurance'} disabled={submitting} />
             </div>
             <div>
-              <label className={labelClass}>Provider *</label>
-              <input className={inputClass} value={form.provider} onChange={e => set('provider', e.target.value)} required placeholder="e.g. Allianz" disabled={submitting} />
+              <label className={labelClass}>{t('contracts.provider')} *</label>
+              <input className={inputClass} value={form.provider} onChange={e => set('provider', e.target.value)} required placeholder={t('contracts.providerPlaceholder') ?? 'e.g. Allianz'} disabled={submitting} />
             </div>
             <div>
               <label className={labelClass}>Type</label>
@@ -544,7 +558,7 @@ export default function ContractForm() {
           className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors active:scale-[0.98] shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {submitting && <Loader className="w-4 h-4 animate-spin" />}
-          {submitting ? 'Saving...' : isEdit ? 'Update Contract' : 'Add Contract'}
+          {submitting ? t('common.save') + '...' : isEdit ? t('common.save') : t('contracts.addContract')}
         </button>
       </form>
     </div>

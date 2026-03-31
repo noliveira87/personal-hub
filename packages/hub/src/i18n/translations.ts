@@ -1,3 +1,6 @@
+
+
+
 export type Language = "pt" | "en";
 
 export const LANGUAGE_STORAGE_KEY = "personal-hub-language";
@@ -35,6 +38,35 @@ export const translations = {
       pins: "pins",
       hideAmounts: "Ocultar valores",
       showAmounts: "Mostrar valores",
+        name: "Nome",
+        close: "Fechar",
+    },
+    contracts: {
+      menu: "Contratos",
+      backToContracts: "Voltar aos contratos",
+      addContract: "Adicionar Contrato",
+      allContracts: "Todos os Contratos",
+      errorLoading: "Erro ao carregar contratos",
+      loading: "A carregar contratos...",
+      retry: "Tentar novamente",
+      overview: "Visão geral dos contratos e renovações",
+      active: "Contratos Ativos",
+      monthlyBaseline: "Base Mensal",
+      currentMonth: "Mês Atual",
+      expiring: "A expirar ≤ 30 dias",
+      total: "total",
+      allCategories: "Todas as Categorias",
+      allStatuses: "Todos os Estados",
+      sortByRenewal: "Ordenar por Renovação",
+      sortByPrice: "Ordenar por Preço",
+      sortByName: "Ordenar por Nome",
+      noContractsFound: "Nenhum contrato encontrado.",
+      addFirstContract: "Adicionar o primeiro contrato →",
+      namePlaceholder: "ex: Seguro Casa",
+      provider: "Fornecedor",
+      providerPlaceholder: "ex: Allianz",
+      monthlyBaselineDesc: "média mensal normalizada recorrente.",
+      currentMonthDesc: "valores esperados este mês segundo o ciclo de faturação.",
     },
     app: {
       loadingRoute: "A carregar...",
