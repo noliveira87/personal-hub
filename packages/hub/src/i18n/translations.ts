@@ -33,6 +33,8 @@ export const translations = {
       expenses: "Despesas",
       portugal: "Portugal",
       pins: "pins",
+      hideAmounts: "Ocultar valores",
+      showAmounts: "Mostrar valores",
     },
     app: {
       loadingRoute: "A carregar...",
@@ -382,6 +384,8 @@ export const translations = {
       expenses: "Expenses",
       portugal: "Portugal",
       pins: "pins",
+      hideAmounts: "Hide amounts",
+      showAmounts: "Show amounts",
     },
     app: {
       loadingRoute: "Loading...",

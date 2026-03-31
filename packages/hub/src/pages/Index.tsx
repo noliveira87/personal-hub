@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ChartLine, FileCheck2, House, Map, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
+import { ChartLine, Eye, EyeOff, FileCheck2, House, Map, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
 import { useDarkMode } from "@shared-ui/use-dark-mode";
 
 const projectDefinitions = [
@@ -15,7 +15,7 @@ const projectDefinitions = [
 
 const Index = () => {
 	const { isDark, toggleDark } = useDarkMode();
-	const { t } = useI18n();
+	const { hideAmounts, t, toggleHideAmounts } = useI18n();
 
 	const projects = projectDefinitions.map((project) => ({
 	  ...project,
@@ -29,6 +29,16 @@ const Index = () => {
 			<LanguageSwitcher compact />
 			<Button variant="outline" size="icon" onClick={toggleDark} className="h-9 w-9 rounded-lg bg-card/90">
 				{isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+			</Button>
+			<Button
+				variant="outline"
+				size="icon"
+				onClick={toggleHideAmounts}
+				className="h-9 w-9 rounded-lg bg-card/90"
+				aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+				title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+			>
+				{hideAmounts ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
 			</Button>
 			<Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-lg bg-card/90">
 				<Link to="/settings" state={{ fromPath: '/' }} aria-label={t("index.openSettings")}>

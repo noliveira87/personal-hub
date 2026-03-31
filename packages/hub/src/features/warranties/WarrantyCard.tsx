@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getStatus, getDaysLeft, type Warranty } from "@/lib/warranties";
+import { formatHiddenAmount, isHideAmountsEnabled } from "@/lib/moneyPrivacy";
 import { ChevronDown, Trash2, FileText, Pencil, Archive } from "lucide-react";
 import { EditWarrantyDialog } from "./EditWarrantyDialog";
 
@@ -38,11 +39,16 @@ export function WarrantyCard({ warranty, onDelete, onEdit, onArchive, onUnarchiv
       day: "numeric",
     });
 
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat("en-US", {
+  const formatPrice = (price: number) => {
+    if (isHideAmountsEnabled()) {
+      return formatHiddenAmount("EUR");
+    }
+
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "EUR",
     }).format(price);
+  };
 
   return (
     <>

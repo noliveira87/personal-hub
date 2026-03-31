@@ -1,4 +1,5 @@
 import { Contract } from '@/features/contracts/types/contract';
+import { formatHiddenAmount, isHideAmountsEnabled } from '@/lib/moneyPrivacy';
 import { differenceInDays, parseISO } from 'date-fns';
 
 export function getDaysUntilExpiry(contract: Contract): number {
@@ -84,6 +85,10 @@ export function formatExpiryCountdown(contract: Contract, compact: boolean = fal
 }
 
 export function formatCurrency(amount: number, currency: string = 'EUR'): string {
+  if (isHideAmountsEnabled()) {
+    return formatHiddenAmount(currency);
+  }
+
   return new Intl.NumberFormat('en-EU', {
     style: 'currency',
     currency,

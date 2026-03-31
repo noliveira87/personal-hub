@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
@@ -26,7 +26,7 @@ export default function AppSectionHeader({
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggleDark } = useDarkMode();
-  const { t } = useI18n();
+  const { hideAmounts, t, toggleHideAmounts } = useI18n();
   const resolvedBackLabel = backLabel ?? t('common.backToProjects');
   const isContractsLayoutPath = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
   const isHomeExpensesLayoutPath = /^\/home-expenses(\/|$)/.test(location.pathname);
@@ -63,6 +63,16 @@ export default function AppSectionHeader({
           <LanguageSwitcher compact />
           <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleHideAmounts}
+            className="text-muted-foreground"
+            aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+            title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+          >
+            {hideAmounts ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </Button>
           {showSettings && (
             <Button

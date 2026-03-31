@@ -1,3 +1,4 @@
+import { formatHiddenAmount, isHideAmountsEnabled } from '@/lib/moneyPrivacy';
 import { supabase } from '@/lib/supabase';
 import { Transaction } from './types';
 
@@ -107,5 +108,9 @@ export function parseLocalDate(dateStr: string): Date {
 }
 
 export function formatCurrency(value: number): string {
+  if (isHideAmountsEnabled()) {
+    return formatHiddenAmount('EUR');
+  }
+
   return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value);
 }

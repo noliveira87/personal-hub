@@ -1,3 +1,5 @@
+import { formatHiddenAmount, isHideAmountsEnabled } from "@/lib/moneyPrivacy";
+
 export type InvestmentCategory = "short-term" | "long-term";
 export type InvestmentType = "cash" | "aforro" | "etf" | "crypto" | "p2p" | "ppr";
 export type InvestmentMovementKind = "contribution" | "withdrawal" | "cashback" | "adjustment";
@@ -100,6 +102,10 @@ export function calculateInvestedFromMovements(movements: InvestmentMovement[]) 
 }
 
 export function formatCurrency(value: number): string {
+  if (isHideAmountsEnabled()) {
+    return formatHiddenAmount("EUR");
+  }
+
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency: "EUR",

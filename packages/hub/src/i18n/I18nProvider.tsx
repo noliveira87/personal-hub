@@ -6,6 +6,11 @@ import {
   translations,
   type Language,
 } from "@/i18n/translations";
+import {
+  formatHiddenAmount,
+  getInitialHideAmounts,
+  setHideAmountsPreference,
+} from "@/lib/moneyPrivacy";
 
 type TranslateValues = Record<string, string | number>;
 
@@ -18,6 +23,8 @@ type I18nContextValue = {
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
   formatCurrency: (value: number, currency?: string, options?: Intl.NumberFormatOptions) => string;
   formatMonthYear: (value: Date | string | number) => string;
+  hideAmounts: boolean;
+  toggleHideAmounts: () => void;
 };
 
 const I18nContext = createContext<I18nContextValue | null>(null);
@@ -49,6 +56,7 @@ const getInitialLanguage = (): Language => {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+  const [hideAmounts, setHideAmounts] = useState<boolean>(getInitialHideAmounts);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -59,6 +67,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       document.documentElement.lang = language;
     }
   }, [language]);
+
+  useEffect(() => {
+    setHideAmountsPreference(hideAmounts);
+  }, [hideAmounts]);
 
   const value = useMemo<I18nContextValue>(() => {
     const locale = LOCALES_BY_LANGUAGE[language];
@@ -73,14 +85,22 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       },
       formatDate: (value, options) => new Intl.DateTimeFormat(locale, options).format(new Date(value)),
       formatNumber: (value, options) => new Intl.NumberFormat(locale, options).format(value),
-      formatCurrency: (value, currency = "EUR", options) => new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency,
-        ...options,
-      }).format(value),
+      formatCurrency: (value, currency = "EUR", options) => {
+        if (hideAmounts) {
+          return formatHiddenAmount(currency);
+        }
+
+        return new Intl.NumberFormat(locale, {
+          style: "currency",
+          currency,
+          ...options,
+        }).format(value);
+      },
       formatMonthYear: (value) => new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(new Date(value)),
+      hideAmounts,
+      toggleHideAmounts: () => setHideAmounts((current) => !current),
     };
-  }, [language]);
+  }, [language, hideAmounts]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

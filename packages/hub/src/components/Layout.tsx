@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarDays, Bell, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bell, Eye, EyeOff, Menu, X, TrendingUp, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 
@@ -16,7 +16,7 @@ const navItems = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isDark, toggleDark } = useDarkMode();
-  const { t } = useI18n();
+  const { hideAmounts, t, toggleHideAmounts } = useI18n();
   const location = useLocation();
   const isLandingPage = location.pathname === '/' || location.pathname === '/home-expenses';
   const isContractsPage = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
@@ -37,8 +37,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <h1 className="text-center text-base font-semibold tracking-tight text-foreground">{t('layout.contractsTitle')}</h1>
         <div className="flex justify-end gap-2">
           <LanguageSwitcher compact />
-          <button onClick={toggleDark} className="p-2 rounded-lg text-muted-foreground transition-transform hover:bg-muted active:scale-95">
+          <button
+            onClick={toggleDark}
+            className="p-2 rounded-lg text-muted-foreground transition-transform hover:bg-muted active:scale-95"
+          >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={toggleHideAmounts}
+            className="p-2 rounded-lg text-muted-foreground transition-transform hover:bg-muted active:scale-95"
+            aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+            title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+          >
+            {hideAmounts ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </button>
         </div>
       </header>
@@ -89,8 +100,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {showDesktopHeaderToggle && (
         <div className="hidden lg:flex fixed right-4 top-4 z-40 items-center gap-2">
           <LanguageSwitcher compact />
-          <button onClick={toggleDark} className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95">
+          <button
+            onClick={toggleDark}
+            className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95"
+          >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={toggleHideAmounts}
+            className="rounded-lg border bg-card/80 p-2 text-muted-foreground shadow-sm backdrop-blur-sm transition-transform hover:bg-muted active:scale-95"
+            aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+            title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
+          >
+            {hideAmounts ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </button>
         </div>
       )}
