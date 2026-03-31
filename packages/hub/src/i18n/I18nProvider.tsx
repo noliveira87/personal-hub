@@ -68,9 +68,21 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, [language]);
 
+  // Sync hideAmounts state with localStorage and HTML attribute
   useEffect(() => {
     setHideAmountsPreference(hideAmounts);
   }, [hideAmounts]);
+
+  // Ensure state is synced from localStorage on mount and when navigating back
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = getInitialHideAmounts();
+      setHideAmounts(stored);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const value = useMemo<I18nContextValue>(() => {
     const locale = LOCALES_BY_LANGUAGE[language];

@@ -38,7 +38,7 @@ const Index = () => {
 				aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
 				title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
 			>
-				{hideAmounts ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+				{hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
 			</Button>
 			<Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-lg bg-card/90">
 				<Link to="/settings" state={{ fromPath: '/' }} aria-label={t("index.openSettings")}>

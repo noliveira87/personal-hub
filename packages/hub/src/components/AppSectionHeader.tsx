@@ -72,7 +72,7 @@ export default function AppSectionHeader({
             aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
             title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
           >
-            {hideAmounts ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
           {showSettings && (
             <Button
