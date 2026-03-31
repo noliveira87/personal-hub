@@ -32,7 +32,7 @@ function CustomPieTooltip({ active, payload, fallbackTitle }: { active?: boolean
 
 export default function ExpensePieChart() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
-  const { t } = useI18n();
+  const { t, hideAmounts } = useI18n();
 
   const data = useMemo(() => {
     const monthExpenses = allTransactions.filter((t) => {
@@ -53,7 +53,7 @@ export default function ExpensePieChart() {
         share: totalExpenses > 0 ? (item.value / totalExpenses) * 100 : 0,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [allTransactions, selectedYear, selectedMonth, t]);
+  }, [allTransactions, selectedYear, selectedMonth, t, hideAmounts]);
 
   const chartHeight = useMemo(() => {
     if (data.length <= 2) return 180;

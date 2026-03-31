@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 export default function AnnualSummarySection() {
   const { allTransactions, selectedYear } = useData();
-  const { t } = useI18n();
+  const { t, hideAmounts } = useI18n();
 
   const totals = useMemo(() => {
     const yearTxs = allTransactions.filter((tx) => {
@@ -21,7 +21,7 @@ export default function AnnualSummarySection() {
       expenses,
       net: income - expenses,
     };
-  }, [allTransactions, selectedYear]);
+  }, [allTransactions, selectedYear, hideAmounts]);
 
   return (
     <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col justify-center">

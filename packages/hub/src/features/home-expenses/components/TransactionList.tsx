@@ -10,7 +10,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 export default function TransactionList() {
   const { allTransactions, deleteTx, selectedYear, selectedMonth } = useData();
-  const { t, locale } = useI18n();
+  const { t, locale, hideAmounts } = useI18n();
   const [editTx, setEditTx] = useState<Transaction | null>(null);
 
   const filtered = useMemo(() => {
@@ -20,7 +20,7 @@ export default function TransactionList() {
         return d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [allTransactions, selectedYear, selectedMonth]);
+  }, [allTransactions, selectedYear, selectedMonth, hideAmounts]);
 
   const handleDelete = (id: string) => {
     deleteTx(id);

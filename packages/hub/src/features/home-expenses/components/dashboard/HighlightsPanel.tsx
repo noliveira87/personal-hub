@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 export default function HighlightsPanel() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
-  const { t } = useI18n();
+  const { t, hideAmounts } = useI18n();
 
   const insights = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {
@@ -34,7 +34,7 @@ export default function HighlightsPanel() {
     const expenseChange = prevExpenses > 0 ? ((totalExpenses - prevExpenses) / prevExpenses) * 100 : 0;
 
     return { biggestExpense, totalExpenses, expenseChange, moneyAfterFixed, prevExpenses };
-  }, [allTransactions, selectedYear, selectedMonth]);
+  }, [allTransactions, selectedYear, selectedMonth, hideAmounts]);
 
   const items = [
     insights.biggestExpense && {

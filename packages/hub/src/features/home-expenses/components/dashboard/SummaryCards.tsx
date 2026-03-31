@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 export default function SummaryCards() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
-  const { t } = useI18n();
+  const { t, hideAmounts } = useI18n();
 
   const data = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {
@@ -19,7 +19,7 @@ export default function SummaryCards() {
     const balance = income - expenses;
     const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
     return { income, expenses, balance, savingsRate };
-  }, [allTransactions, selectedYear, selectedMonth]);
+  }, [allTransactions, selectedYear, selectedMonth, hideAmounts]);
 
   const cards = [
     { label: t('homeExpenses.summary.monthlyIncome'), value: formatCurrency(data.income), icon: Wallet, colorClass: 'text-income' },
