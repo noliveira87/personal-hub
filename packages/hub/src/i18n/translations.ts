@@ -349,6 +349,8 @@ export const translations = {
         noTransactionsThisMonth: "Sem movimentos neste mes. Adiciona o primeiro!",
         fromContractManager: "Vem do Contract Manager",
         contractTag: "(contrato)",
+        linkedContract: "Contrato ligado",
+        recurring: "Recorrente",
       },
     },
     notFound: {
@@ -700,6 +702,8 @@ export const translations = {
         noTransactionsThisMonth: "No transactions this month. Add one to get started!",
         fromContractManager: "From Contract Manager",
         contractTag: "(contract)",
+        linkedContract: "Linked contract",
+        recurring: "Recurring",
       },
     },
     notFound: {

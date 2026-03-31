@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
@@ -12,6 +12,8 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 
 export default function Dashboard() {
+  const CARDS_PER_ROW = 3;
+  const INITIAL_VISIBLE = CARDS_PER_ROW * 3;
   const { contracts, loading, error } = useContracts();
   const { formatCurrency, hideAmounts } = useI18n();
   const contractIds = useMemo(() => contracts.map((contract) => contract.id), [contracts]);
@@ -68,6 +70,8 @@ export default function Dashboard() {
   const within7 = expiringSoon.filter(c => c.daysLeft <= 7).length;
   const within15 = expiringSoon.filter(c => c.daysLeft <= 15).length;
   const within30 = expiringSoon.filter(c => c.daysLeft <= 30).length;
+  const [visibleMonthly, setVisibleMonthly] = useState(INITIAL_VISIBLE);
+  const [visibleYearly, setVisibleYearly] = useState(INITIAL_VISIBLE);
 
   if (loading) {
     return (
@@ -186,10 +190,21 @@ export default function Dashboard() {
           <div className="mb-5">
             <p className="text-base font-bold text-foreground mb-3 pl-3 border-l-4 border-primary">Monthly</p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeMonthly.slice(0, 6).map((contract, i) => (
+              {activeMonthly.slice(0, visibleMonthly).map((contract, i) => (
                 <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
               ))}
             </div>
+            {activeMonthly.length > visibleMonthly && (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleMonthly((current) => current + CARDS_PER_ROW)}
+                >
+                  Carregar mais
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -198,10 +213,21 @@ export default function Dashboard() {
           <div>
             <p className="text-base font-bold text-foreground mb-3 pl-3 border-l-4 border-primary">Yearly</p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeYearly.slice(0, 6).map((contract, i) => (
+              {activeYearly.slice(0, visibleYearly).map((contract, i) => (
                 <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
               ))}
             </div>
+            {activeYearly.length > visibleYearly && (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleYearly((current) => current + CARDS_PER_ROW)}
+                >
+                  Carregar mais
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </section>

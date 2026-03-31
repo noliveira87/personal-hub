@@ -47,11 +47,23 @@ export default function TransactionList() {
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm text-foreground truncate">{tx.name}</span>
                 {isContractTx(tx) && (
-                  <span title="Linked contract" className="text-muted-foreground">
+                  <span
+                    title={t('homeExpenses.list.linkedContract')}
+                    aria-label={t('homeExpenses.list.linkedContract')}
+                    className="text-muted-foreground"
+                  >
                     <Link2 className="w-3 h-3" />
                   </span>
                 )}
-                {tx.recurring && <RotateCcw className="w-3 h-3 text-muted-foreground" />}
+                {tx.recurring && (
+                  <span
+                    title={t('homeExpenses.list.recurring')}
+                    aria-label={t('homeExpenses.list.recurring')}
+                    className="text-muted-foreground"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                  </span>
+                )}
               </div>
               <span className="text-xs text-muted-foreground">
                 {tx.type === 'expense' && getCategoryLabel(tx.category)}
