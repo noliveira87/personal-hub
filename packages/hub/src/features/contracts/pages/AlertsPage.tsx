@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getDaysUntilExpiry, getUrgencyLevel } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_ICONS } from '@/features/contracts/types/contract';
-import { differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, isValid, parseISO, subDays } from 'date-fns';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Bell, BellRing, FileText, Loader, Pencil, Plus, Send } from 'lucide-react';
@@ -205,7 +205,17 @@ export default function AlertsPage() {
 
   const alerts = useMemo(() => {
     const active = contracts.filter(c => c.status === 'active' || c.status === 'pending-cancellation');
-    const items: { contract: typeof active[0]; daysLeft: number; alertDay: number; triggerLabel: string; reason: string | null; alertIndex: number }[] = [];
+    const today = new Date();
+    const items: {
+      contract: typeof active[0];
+      daysLeft: number;
+      alertDay: number;
+      triggerLabel: string;
+      reason: string | null;
+      alertIndex: number;
+      triggerDate: Date;
+      daysUntilTrigger: number;
+    }[] = [];
 
     active.forEach(c => {
       const daysLeft = getDaysUntilExpiry(c);
@@ -224,40 +234,73 @@ export default function AlertsPage() {
             return;
           }
 
-          const dateDiff = differenceInCalendarDays(targetDate, new Date());
-          if (dateDiff === 0) {
-            items.push({
-              contract: c,
-              daysLeft,
-              alertDay: 0,
-              triggerLabel: `Today (${format(targetDate, 'MMM d, yyyy')})`,
-              reason: alert.reason,
-              alertIndex,
-            });
-          }
+          const dateDiff = differenceInCalendarDays(targetDate, today);
+          if (dateDiff < 0) return;
+
+          const triggerLabel = dateDiff === 0
+            ? `Today (${format(targetDate, 'MMM d, yyyy')})`
+            : format(targetDate, 'MMM d, yyyy');
+
+          items.push({
+            contract: c,
+            daysLeft,
+            alertDay: 0,
+            triggerLabel,
+            reason: alert.reason,
+            alertIndex,
+            triggerDate: targetDate,
+            daysUntilTrigger: dateDiff,
+          });
 
           return;
         }
 
-        if (daysLeft <= alert.daysBefore && daysLeft >= 0) {
+        if (!c.endDate) return;
+        const expiryDate = parseISO(c.endDate);
+        if (!isValid(expiryDate)) return;
+
+        const targetDate = subDays(expiryDate, alert.daysBefore);
+        const dateDiff = differenceInCalendarDays(targetDate, today);
+        if (dateDiff < 0) {
+          return;
+        }
+
+        if (daysLeft >= 0) {
           items.push({
             contract: c,
             daysLeft,
             alertDay: alert.daysBefore,
-            triggerLabel: `${alert.daysBefore} days before`,
+            triggerLabel: `${alert.daysBefore} days before (${format(targetDate, 'MMM d, yyyy')})`,
             reason: alert.reason,
             alertIndex,
+            triggerDate: targetDate,
+            daysUntilTrigger: dateDiff,
           });
         }
       });
       // Also show contracts expiring within 30 days even without explicit alerts
       if (daysLeft >= 0 && daysLeft <= 30 && c.alerts.length === 0) {
-        items.push({ contract: c, daysLeft, alertDay: 0, triggerLabel: 'Upcoming expiry', reason: null, alertIndex: -1 });
+        if (!c.endDate) return;
+        const targetDate = parseISO(c.endDate);
+        if (!isValid(targetDate)) return;
+        const dateDiff = differenceInCalendarDays(targetDate, today);
+        items.push({
+          contract: c,
+          daysLeft,
+          alertDay: 0,
+          triggerLabel: 'Upcoming expiry',
+          reason: null,
+          alertIndex: -1,
+          triggerDate: targetDate,
+          daysUntilTrigger: dateDiff,
+        });
       }
     });
 
-    return items.sort((a, b) => a.daysLeft - b.daysLeft);
+    return items.sort((a, b) => a.daysUntilTrigger - b.daysUntilTrigger);
   }, [contracts]);
+
+  const dueNowCount = alerts.filter(item => item.daysUntilTrigger === 0).length;
 
   return (
     <div className="space-y-6 pt-16">
@@ -280,7 +323,7 @@ export default function AlertsPage() {
             {editingTarget ? 'Cancel edit' : 'New Custom Alert'}
           </button>
         </div>
-        <p className="text-muted-foreground text-sm mt-1">{alerts.length} active alerts</p>
+        <p className="text-muted-foreground text-sm mt-1">{alerts.length} scheduled · {dueNowCount} due today</p>
       </div>
 
       {showCreateForm && (
@@ -391,7 +434,7 @@ export default function AlertsPage() {
       ) : (
         <div className="space-y-3">
           {alerts.map((item, i) => {
-            const urgency = getUrgencyLevel(item.daysLeft);
+            const urgency = getUrgencyLevel(item.daysUntilTrigger);
             return (
               <div
                 key={`${item.contract.id}-${item.alertDay}-${i}`}
@@ -436,9 +479,9 @@ export default function AlertsPage() {
                     urgency === 'warning' && 'text-warning',
                     urgency === 'normal' && 'text-foreground',
                   )}>
-                    {item.daysLeft}d
+                    {item.daysUntilTrigger}d
                   </p>
-                  <p className="text-xs text-muted-foreground">remaining</p>
+                  <p className="text-xs text-muted-foreground">until alert</p>
                   <div className="mt-2 flex justify-end gap-2">
                     {item.alertIndex >= 0 && (
                       <button

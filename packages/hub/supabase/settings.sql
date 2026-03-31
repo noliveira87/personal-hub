@@ -10,12 +10,16 @@ create table if not exists public.app_settings (
   portfolio_enabled boolean not null default false,
   warranty_alert_days integer not null default 30,
   warranty_alerts_sent jsonb not null default '{}'::jsonb,
+  contracts_alerts_sent jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
   constraint app_settings_singleton check (id = 'global')
 );
 
 alter table public.app_settings
   add column if not exists warranty_alerts_sent jsonb not null default '{}'::jsonb;
+
+alter table public.app_settings
+  add column if not exists contracts_alerts_sent jsonb not null default '{}'::jsonb;
 
 alter table public.app_settings enable row level security;
 
