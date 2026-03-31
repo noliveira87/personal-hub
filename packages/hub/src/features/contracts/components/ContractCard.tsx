@@ -1,9 +1,10 @@
 import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/features/contracts/types/contract';
 import { StatusBadge } from './StatusBadge';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
+import { hasUnreadContractAlerts } from '@/features/contracts/lib/alertReadState';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays } from 'lucide-react';
+import { Bell, BellDot, CalendarDays } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -18,6 +19,8 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   const { formatCurrency } = useI18n();
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
+  const hasAlerts = contract.alerts.length > 0;
+  const hasUnreadAlerts = hasUnreadContractAlerts(contract);
   
   // Use latest price from history, fallback to contract price
   const displayPrice = latestPrice?.price ?? contract.price;
@@ -43,7 +46,20 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
             <p className="text-xs text-muted-foreground truncate">{contract.provider}</p>
           </div>
         </div>
-        <StatusBadge status={contract.status} />
+        <div className="flex items-center gap-2">
+          {hasAlerts && (
+            <span
+              className={cn(
+                'inline-flex items-center justify-center w-7 h-7 rounded-full border',
+                hasUnreadAlerts ? 'text-primary border-primary/40 bg-primary/10' : 'text-muted-foreground border-border bg-muted/40',
+              )}
+              title={hasUnreadAlerts ? 'Unread alerts' : 'Alerts'}
+            >
+              {hasUnreadAlerts ? <BellDot className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+            </span>
+          )}
+          <StatusBadge status={contract.status} />
+        </div>
       </div>
 
       <div className="mt-4 flex items-end justify-between">

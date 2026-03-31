@@ -94,3 +94,7 @@ export function useContracts() {
   if (!context) throw new Error('useContracts must be used within ContractProvider');
   return context;
 }
+
+export function useOptionalContracts() {
+  return useContext(ContractContext);
+}

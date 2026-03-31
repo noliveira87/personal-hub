@@ -2,9 +2,11 @@ import { ReactNode } from 'react';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Bell, Eye, EyeOff, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
+import { useOptionalContracts } from '@/features/contracts/context/ContractContext';
+import { hasUnreadContractAlerts } from '@/features/contracts/lib/alertReadState';
 
 interface AppSectionHeaderProps {
   title: string;
@@ -27,9 +29,13 @@ export default function AppSectionHeader({
   const location = useLocation();
   const { isDark, toggleDark } = useDarkMode();
   const { hideAmounts, t, toggleHideAmounts } = useI18n();
+  const contractsContext = useOptionalContracts();
   const resolvedBackLabel = backLabel ?? t('common.backToProjects');
   const isContractsLayoutPath = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
   const isHomeExpensesLayoutPath = /^\/home-expenses(\/|$)/.test(location.pathname);
+  const unreadContractsCount = contractsContext
+    ? contractsContext.contracts.filter(hasUnreadContractAlerts).length
+    : 0;
   const resolvedBackTo = backTo ?? (
     location.pathname === '/dashboard'
       ? '/'
@@ -81,6 +87,23 @@ export default function AppSectionHeader({
           >
             {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
+          {isContractsLayoutPath && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/contracts/alerts')}
+              className="text-muted-foreground relative"
+              aria-label="Open alerts"
+              title="Open alerts"
+            >
+              <Bell className="h-4 w-4" />
+              {unreadContractsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-4 text-center font-semibold">
+                  {unreadContractsCount > 9 ? '9+' : unreadContractsCount}
+                </span>
+              )}
+            </Button>
+          )}
           {showSettings && (
             <Button
               variant="ghost"
