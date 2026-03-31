@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Investment, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
 import { CryptoQuoteMap, parseCryptoNotes, resolveCashbackCurrentValue, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/I18nProvider";
 
 interface InvestmentCardProps {
   investment: Investment;
@@ -35,6 +36,7 @@ const CRYPTO_SYMBOL: Record<string, string> = {
 };
 
 export function InvestmentCard({ investment, onEdit, onDelete, onQuickContribution, onMove, canMoveUp, canMoveDown, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
+  const { hideAmounts } = useI18n();
   const defaultQuickMode: "contribution" | "value_update" = investment.category === "long-term" ? "value_update" : "contribution";
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickMode, setQuickMode] = useState<"contribution" | "value_update">(defaultQuickMode);

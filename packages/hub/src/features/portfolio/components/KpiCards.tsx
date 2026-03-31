@@ -1,14 +1,19 @@
+import { useMemo } from "react";
 import { TrendingUp, TrendingDown, Wallet, PiggyBank } from "lucide-react";
 import { InvestmentSummary, formatCurrency, formatPercentage } from "@/features/portfolio/types/investment";
+import { useI18n } from "@/i18n/I18nProvider";
 
 interface KpiCardsProps {
   summary: InvestmentSummary;
 }
 
 export function KpiCards({ summary }: KpiCardsProps) {
-  const isPositive = summary.totalProfitLoss >= 0;
+  const { hideAmounts } = useI18n();
+  
+  const cards = useMemo(() => {
+    const isPositive = summary.totalProfitLoss >= 0;
 
-  const cards = [
+    return [
     {
       label: "Current Value",
       value: formatCurrency(summary.totalCurrentValue),
@@ -33,7 +38,8 @@ export function KpiCards({ summary }: KpiCardsProps) {
       icon: isPositive ? TrendingUp : TrendingDown,
       accent: isPositive ? "profit" as const : "loss" as const,
     },
-  ];
+    ];
+  }, [summary, hideAmounts]);
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-5">

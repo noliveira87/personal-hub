@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Investment, formatCurrency } from "@/features/portfolio/types/investment";
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
+import { useI18n } from "@/i18n/I18nProvider";
 
 interface RecentMovementsSectionProps {
   investments: Investment[];
 }
 
 export function RecentMovementsSection({ investments }: RecentMovementsSectionProps) {
+  const { hideAmounts } = useI18n();
   const [expandedCategories, setExpandedCategories] = useState<Record<"long-term" | "short-term", boolean>>({
     "long-term": false,
     "short-term": false,
