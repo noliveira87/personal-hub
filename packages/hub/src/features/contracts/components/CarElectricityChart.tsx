@@ -59,8 +59,11 @@ export default function CarElectricityChart({ contractId }: CarElectricityChartP
   }
 
   // Edit handler for monthly value
+  // Mensagem de sucesso para edição
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setEditSuccess(null);
     if (!editMonth) return;
     setEditSubmitting(true);
     setEditError(null);
@@ -71,24 +74,15 @@ export default function CarElectricityChart({ contractId }: CarElectricityChartP
       setEditSubmitting(false);
       return;
     }
-    // Apagar todos os dias desse mês e inserir um novo (dia=1)
-    const { error: delError } = await supabase
+    console.log('[CarElectricityChart] Apagar mês:', { contractId, year: yearStr, month: monthStr });
+    // Upsert: substitui o valor desse mês/ano/contrato (day fixo a 1)
+    const { error: upsertError } = await supabase
       .from('car_electricity_history')
-      .delete()
-      .eq('contract_id', contractId)
-      .eq('year', Number(yearStr))
-      .eq('month', Number(monthStr));
-    if (delError) {
-      setEditError(delError.message);
-      setEditSubmitting(false);
-      return;
-    }
-    const { error: insError } = await supabase
-      .from('car_electricity_history')
-      .insert({ contract_id: contractId, year: Number(yearStr), month: Number(monthStr), day: 1, value_eur: numericValue });
-    if (insError) {
-      setEditError(insError.message);
+      .upsert({ contract_id: contractId, year: Number(yearStr), month: Number(monthStr), day: 1, value_eur: numericValue }, { onConflict: 'contract_id,year,month' });
+    if (upsertError) {
+      setEditError('Erro ao inserir valor: ' + upsertError.message);
     } else {
+      setEditSuccess('Valor atualizado com sucesso!');
       setEditMonth(null);
       setEditValue('');
       fetchData();
@@ -159,22 +153,37 @@ export default function CarElectricityChart({ contractId }: CarElectricityChartP
   if (error) return <div className="py-4 text-sm text-destructive">Erro: {error}</div>;
 
 
-  // Agrupar por mês/ano e somar valores
+  // Agrupar por mês/ano e mostrar apenas o valor do registo mais recente (ou do dia 1) desse mês
   const monthlyData: { [key: string]: number } = {};
+  const monthlyTimestamps: { [key: string]: number } = {};
   data.forEach(d => {
     const key = `${d.year}-${String(d.month).padStart(2, '0')}`;
-    if (!monthlyData[key]) monthlyData[key] = 0;
-    monthlyData[key] += d.value_eur;
+    // Preferir o registo do dia 1, senão o mais recente (maior dia)
+    if (
+      !monthlyData[key] ||
+      d.day === 1 ||
+      (monthlyTimestamps[key] !== undefined && d.day > monthlyTimestamps[key])
+    ) {
+      monthlyData[key] = d.value_eur;
+      monthlyTimestamps[key] = d.day;
+    }
   });
 
-  // Ordenar as chaves (ano-mês)
-  const sortedKeys = Object.keys(monthlyData).sort();
-  const visibleKeys = sortedKeys.slice(-visibleMonths);
+  // Ordenar as chaves (ano-mês) do mais recente para o mais antigo
+  const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
+    // Descendente: mais recente primeiro
+    const [aYear, aMonth] = a.split('-').map(Number);
+    const [bYear, bMonth] = b.split('-').map(Number);
+    if (aYear !== bYear) return bYear - aYear;
+    return bMonth - aMonth;
+  });
+  const visibleKeys = sortedKeys.slice(0, visibleMonths); // pegar os mais recentes
   // Meses abreviados em pt
   const monthLabels = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+  // Mostrar mês + ano
   const labels = sortedKeys.map(key => {
     const [year, month] = key.split('-');
-    return `${monthLabels[Number(month) - 1]}`;
+    return `${monthLabels[Number(month) - 1]} ${year}`;
   });
   const values = sortedKeys.map(key => monthlyData[key]);
 
@@ -196,7 +205,7 @@ export default function CarElectricityChart({ contractId }: CarElectricityChartP
         </div>
         <div>
           <label className="block text-xs mb-1" htmlFor="elec-value">Valor (€)</label>
-          <Input id="elec-value" type="number" step="0.01" className="w-24" value={value} onChange={e => setValue(e.target.value)} disabled={submitting} ref={valueInputRef} />
+          <Input id="elec-value" type="text" inputMode="decimal" pattern="[0-9]+([\.,][0-9]{1,2})?" className="w-24" value={value} onChange={e => setValue(e.target.value)} disabled={submitting} ref={valueInputRef} />
         </div>
         <Button type="submit" size="sm" variant="default" className="flex items-center gap-2 shadow-md" disabled={submitting}>
           {submitting && <span className="loader w-3 h-3 border-2 border-t-transparent rounded-full animate-spin" />}
@@ -211,63 +220,68 @@ export default function CarElectricityChart({ contractId }: CarElectricityChartP
           <TableCaption>Editar valores mensais</TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead>Mês/Ano</TableHead>
-              <TableHead>Valor Total (€)</TableHead>
-              <TableHead>Ações</TableHead>
+              <TableHead className="bg-muted px-4 py-2 text-left">Mês/Ano</TableHead>
+              <TableHead className="bg-muted px-4 py-2 text-left">Valor Total (€)</TableHead>
+              <TableHead className="bg-muted px-4 py-2 text-left">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedKeys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">Sem dados de eletricidade.</TableCell>
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-6">Sem dados de eletricidade.</TableCell>
               </TableRow>
             ) : (
-              visibleKeys.map(key => (
-                <TableRow key={key}>
-                  <TableCell>{labels[sortedKeys.indexOf(key)]}</TableCell>
-                  <TableCell>
-                    {editMonth === key ? (
-                      <form className="flex gap-2 items-center" onSubmit={handleEditSubmit}>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          className="w-24"
-                          value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          disabled={editSubmitting}
-                          autoFocus
-                        />
-                        <Button type="submit" size="sm" variant="default" className="shadow-md" disabled={editSubmitting}>
-                          Guardar
+              visibleKeys.map(key => {
+                const [year, month] = key.split('-');
+                return (
+                  <TableRow key={key} className="align-middle hover:bg-accent/40 transition">
+                    <TableCell className="px-4 py-3 font-medium text-base">{`${monthLabels[Number(month) - 1]} ${year}`}</TableCell>
+                    <TableCell className="px-4 py-3">
+                      {editMonth === key ? (
+                        <form className="flex gap-2 items-center" onSubmit={handleEditSubmit}>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            pattern="[0-9]+([\.,][0-9]{1,2})?"
+                            className="w-24 text-base"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            disabled={editSubmitting}
+                            autoFocus
+                          />
+                          <Button type="submit" size="sm" variant="default" className="px-3 py-1 rounded-md text-xs font-semibold shadow-sm" disabled={editSubmitting}>
+                            Guardar
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" className="px-3 py-1 rounded-md text-xs font-semibold shadow-none" onClick={() => setEditMonth(null)} disabled={editSubmitting}>
+                            Cancelar
+                          </Button>
+                          {editError && <span className="text-xs text-destructive ml-2">{editError}</span>}
+                          {editSuccess && <span className="text-xs text-green-600 ml-2">{editSuccess}</span>}
+                        </form>
+                      ) : (
+                        <span className="text-base">{getMonthlyValue(key).toFixed(2)}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      {editMonth === key ? null : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="px-3 py-1 rounded-md text-xs font-semibold shadow-sm border-muted-foreground/30"
+                          onClick={() => {
+                            setEditMonth(key);
+                            setEditValue(getMonthlyValue(key).toString());
+                            setEditError(null);
+                          }}
+                        >
+                          Editar
                         </Button>
-                        <Button type="button" size="sm" variant="ghost" className="shadow-none" onClick={() => setEditMonth(null)} disabled={editSubmitting}>
-                          Cancelar
-                        </Button>
-                        {editError && <span className="text-xs text-destructive ml-2">{editError}</span>}
-                      </form>
-                    ) : (
-                      <span>{getMonthlyValue(key).toFixed(2)}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editMonth === key ? null : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shadow-sm"
-                        onClick={() => {
-                          setEditMonth(key);
-                          setEditValue(getMonthlyValue(key).toString());
-                          setEditError(null);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -277,7 +291,7 @@ export default function CarElectricityChart({ contractId }: CarElectricityChartP
               type="button"
               size="sm"
               variant="secondary"
-              className="shadow-sm"
+              className="shadow-sm px-4 py-1 text-xs font-semibold"
               onClick={() => setVisibleMonths(v => v + 3)}
             >
               Carregar mais
