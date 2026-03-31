@@ -1,6 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ContractCategory } from "@/features/contracts/types/contract";
-import { formatCurrency } from "@/features/contracts/lib/contractUtils";
+import { useI18n } from '@/i18n/I18nProvider';
 
 const COLORS = ["#3b8574", "#4a9e8a", "#5ab89f", "#6bd1b5", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1"];
 

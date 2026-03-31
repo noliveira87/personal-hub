@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { usePriceHistory } from '@/hooks/use-price-history';
-import { formatCurrency } from '@/features/contracts/lib/contractUtils';
+import { useI18n } from '@/i18n/I18nProvider';
 import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';

@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
-import { getDaysUntilExpiry, formatCurrency } from '@/features/contracts/lib/contractUtils';
+import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_ICONS } from '@/features/contracts/types/contract';
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, addMonths } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export default function CalendarPage() {
   const { contracts } = useContracts();
+  const { formatCurrency, hideAmounts } = useI18n();
   const navigate = useNavigate();
 
   const months = useMemo(() => {

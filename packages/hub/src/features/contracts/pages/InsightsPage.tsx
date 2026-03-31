@@ -1,6 +1,6 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
-import { getAnnualEquivalent, getMonthlyEquivalent, formatCurrency } from '@/features/contracts/lib/contractUtils';
+import { getAnnualEquivalent, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { FileText } from 'lucide-react';
@@ -11,6 +11,7 @@ const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/Insi
 
 export default function InsightsPage() {
   const { contracts, allPriceHistory } = useContracts();
+  const { formatCurrency, hideAmounts } = useI18n();
 
   const active = contracts.filter(c => c.status === 'active');
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);

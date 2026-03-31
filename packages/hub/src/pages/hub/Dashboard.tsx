@@ -2,16 +2,18 @@ import { useMemo } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
-import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost, formatCurrency } from '@/features/contracts/lib/contractUtils';
+import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost } from '@/features/contracts/lib/contractUtils';
 import { Link } from 'react-router-dom';
 import { Plus, ArrowRight, LayoutDashboard, Loader } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { parseISO } from 'date-fns';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export default function Dashboard() {
   const { contracts, loading, error } = useContracts();
+  const { formatCurrency, hideAmounts } = useI18n();
   const contractIds = useMemo(() => contracts.map((contract) => contract.id), [contracts]);
   const { priceMap } = usePriceHistoryMap(contractIds);
   const currentMonthLabel = useMemo(
@@ -50,37 +52,41 @@ export default function Dashboard() {
     .filter(c => c.daysLeft >= 0 && c.daysLeft <= 60)
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  const monthlyTotal = active.reduce((sum, contract) => {
-    const latestPrice = priceMap.get(contract.id);
-    const priceResolvedContract = {
-      ...contract,
-      price: latestPrice?.price ?? contract.price,
-      currency: latestPrice?.currency ?? contract.currency,
-    };
+  const { monthlyTotal, currentMonthTotal } = useMemo(() => {
+    const monthlyTotal = active.reduce((sum, contract) => {
+      const latestPrice = priceMap.get(contract.id);
+      const priceResolvedContract = {
+        ...contract,
+        price: latestPrice?.price ?? contract.price,
+        currency: latestPrice?.currency ?? contract.currency,
+      };
 
-    return sum + getMonthlyEquivalent(priceResolvedContract);
-  }, 0);
+      return sum + getMonthlyEquivalent(priceResolvedContract);
+    }, 0);
 
-  const currentMonthTotal = active.reduce((sum, contract) => {
-    const latestPrice = priceMap.get(contract.id);
-    const priceResolvedContract = {
-      ...contract,
-      price: latestPrice?.price ?? contract.price,
-      currency: latestPrice?.currency ?? contract.currency,
-    };
+    const currentMonthTotal = active.reduce((sum, contract) => {
+      const latestPrice = priceMap.get(contract.id);
+      const priceResolvedContract = {
+        ...contract,
+        price: latestPrice?.price ?? contract.price,
+        currency: latestPrice?.currency ?? contract.currency,
+      };
 
-    if (latestPrice) {
-      const entryDate = parseISO(latestPrice.date);
-      const now = new Date();
-      const isCurrentMonthEntry =
-        entryDate.getFullYear() === now.getFullYear() &&
-        entryDate.getMonth() === now.getMonth();
+      if (latestPrice) {
+        const entryDate = parseISO(latestPrice.date);
+        const now = new Date();
+        const isCurrentMonthEntry =
+          entryDate.getFullYear() === now.getFullYear() &&
+          entryDate.getMonth() === now.getMonth();
 
-      return sum + (isCurrentMonthEntry ? latestPrice.price : 0);
-    }
+        return sum + (isCurrentMonthEntry ? latestPrice.price : 0);
+      }
 
-    return sum + getCurrentMonthCost(priceResolvedContract, new Date(), priceResolvedContract.price);
-  }, 0);
+      return sum + getCurrentMonthCost(priceResolvedContract, new Date(), priceResolvedContract.price);
+    }, 0);
+
+    return { monthlyTotal, currentMonthTotal };
+  }, [active, priceMap, hideAmounts]);
 
   const within7 = expiringSoon.filter(c => c.daysLeft <= 7).length;
   const within15 = expiringSoon.filter(c => c.daysLeft <= 15).length;
