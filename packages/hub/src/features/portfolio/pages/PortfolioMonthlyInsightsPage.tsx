@@ -82,6 +82,16 @@ export default function PortfolioInsightsPage() {
     .filter((movement) => movement.kind === "adjustment" || movement.kind === "cashback")
     .reduce((sum, movement) => sum + movement.amount, 0);
 
+  // Live crypto market move: only crypto should fluctuate "by itself" between manual updates.
+  // We compare resolved (spot-based) value with stored value for crypto rows.
+  const liveCryptoPerformance = resolvedInvestments
+    .filter((investment) => investment.type === "crypto")
+    .reduce((sum, investment) => {
+      const original = investments.find((item) => item.id === investment.id);
+      if (!original) return sum;
+      return sum + (investment.currentValue - original.currentValue);
+    }, 0);
+
   const netInvestedFlow = contributionsTotal - withdrawalsTotal;
 
   return (
@@ -95,7 +105,7 @@ export default function PortfolioInsightsPage() {
 
       <main className="pt-16 min-h-screen">
         <div className="container py-6 lg:py-8 space-y-6 lg:space-y-8">
-          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={resolvedEarnings} netInvestedFlow={netInvestedFlow} monthlyPerformanceTotal={performanceTotal} monthEarnings={monthEarnings} />
+          <MonthlyInsights snapshots={monthlySnapshots} investments={resolvedInvestments} earnings={resolvedEarnings} netInvestedFlow={netInvestedFlow} monthlyPerformanceTotal={performanceTotal} monthEarnings={monthEarnings} liveCryptoPerformance={liveCryptoPerformance} />
         </div>
       </main>
     </div>

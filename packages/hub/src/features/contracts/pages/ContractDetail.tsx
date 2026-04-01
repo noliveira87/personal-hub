@@ -160,7 +160,6 @@ export default function ContractDetail() {
 
       {contract.type === 'car' && (
         <>
-          <div className="text-xs text-muted-foreground mb-2">Contract ID: {contract.id}</div>
           <CarElectricityChart contractId={contract.id} />
         </>
       )}

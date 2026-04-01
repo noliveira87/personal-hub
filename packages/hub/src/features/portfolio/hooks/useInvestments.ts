@@ -196,10 +196,20 @@ export function useInvestments(options: UseInvestmentsOptions = {}) {
 
       const normalizedInvestments = (remoteInvestments ?? []).map((investment) => {
         const normalizedName = investment.name.trim().toLowerCase();
-        if (normalizedName === "aforro" && investment.category !== "long-term") {
-          return { ...investment, category: "long-term" as const };
+        let normalized = { ...investment };
+        // Normalize category for aforro
+        if (normalizedName.includes("aforro") && normalized.category !== "long-term") {
+          normalized = { ...normalized, category: "long-term" as const };
         }
-        return investment;
+        // Normalize type: if name suggests a type but DB still has 'cash' (default), infer type from name
+        if (normalized.type === "cash") {
+          if (normalizedName.includes("aforro")) normalized = { ...normalized, type: "aforro" as const };
+          else if (normalizedName.includes("etf")) normalized = { ...normalized, type: "etf" as const };
+          else if (normalizedName.includes("ppr")) normalized = { ...normalized, type: "ppr" as const };
+          else if (normalizedName.includes("p2p") || normalizedName.includes("goparity")) normalized = { ...normalized, type: "p2p" as const };
+          else if (normalizedName.includes("crypto") || normalizedName.includes("bitcoin") || normalizedName.includes("btc") || normalizedName.includes("eth")) normalized = { ...normalized, type: "crypto" as const };
+        }
+        return normalized;
       });
 
       setInvestments(normalizedInvestments);

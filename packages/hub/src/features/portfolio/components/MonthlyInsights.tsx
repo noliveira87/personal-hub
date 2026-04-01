@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
+import { useI18n } from "@/i18n/I18nProvider";
 
 interface MonthlyInsightsProps {
   snapshots: MonthlySnapshot[];
@@ -13,9 +14,11 @@ interface MonthlyInsightsProps {
   netInvestedFlow?: number;
   monthlyPerformanceTotal?: number;
   monthEarnings?: number;
+  liveCryptoPerformance?: number;
 }
 
-export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0 }: MonthlyInsightsProps) {
+export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0, liveCryptoPerformance = 0 }: MonthlyInsightsProps) {
+  const { t } = useI18n();
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAnnualYear, setSelectedAnnualYear] = useState<string | null>(null);
@@ -58,15 +61,16 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     return acc;
   }, {});
 
-  const earningsByKindMonth = earnings.reduce<Record<string, { surveys: number; cashback: number; social_media: number; dividend: number }>>((acc, earning) => {
+  const earningsByKindMonth = earnings.reduce<Record<string, { surveys: number; cashback: number; social_media: number; dividend: number; crypto_cashback: number }>>((acc, earning) => {
     const month = earning.date.slice(0, 7);
     if (!isValidMonthKey(month)) return acc;
 
-    acc[month] ??= { surveys: 0, cashback: 0, social_media: 0, dividend: 0 };
+    acc[month] ??= { surveys: 0, cashback: 0, social_media: 0, dividend: 0, crypto_cashback: 0 };
     if (earning.kind === "survey") acc[month].surveys += earning.amountEur;
     if (earning.kind === "cashback") acc[month].cashback += earning.amountEur;
     if (earning.kind === "social_media") acc[month].social_media += earning.amountEur;
     if (earning.kind === "dividend") acc[month].dividend += earning.amountEur;
+    if (earning.kind === "crypto_cashback") acc[month].crypto_cashback += earning.amountEur;
     return acc;
   }, {});
 
@@ -116,11 +120,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         : previousSnapshot
           ? snapshot.totalInvested - previousSnapshot.totalInvested
           : snapshot.totalInvested;
-      const monthlyPerformance = Number.isFinite(snapshot.monthlyPerformance)
-        ? snapshot.monthlyPerformance
-        : previousSnapshot
-          ? snapshot.totalCurrentValue - previousSnapshot.totalCurrentValue - monthlyInflow
-          : snapshot.totalProfitLoss;
+      const monthMovementStats = movementStatsByMonth[snapshot.month];
+      const movementPerformance = monthMovementStats?.performance ?? 0;
+      const monthlyPerformance = movementPerformance;
       const monthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + monthlyInflow : monthlyInflow;
       const monthlyReturnPct = Number.isFinite(snapshot.monthlyReturnPct)
         ? snapshot.monthlyReturnPct
@@ -128,14 +130,20 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           ? (monthlyPerformance / monthlyBase) * 100
           : 0;
 
-      const liveMonthlyInflow = previousSnapshot ? currentMonthInflow : liveSummary.totalInvested;
-      const liveMonthlyPerformance = previousSnapshot
-        ? liveSummary.totalCurrentValue - previousSnapshot.totalCurrentValue - liveMonthlyInflow
-        : liveSummary.totalProfitLoss;
+      const liveMonthlyInflow = monthMovementStats?.inflow ?? (snapshot.month === currentMonth ? netInvestedFlow : monthlyInflow);
+
+      // `monthlyPerformanceTotal` can already include earnings for current month.
+      // Remove the explicit `monthEarnings` prop here and add earnings once below.
+      const currentMonthPerformanceExEarnings = monthlyPerformanceTotal - monthEarnings;
+      const liveMonthlyPerformance = monthMovementStats?.performance
+        ?? (snapshot.month === currentMonth ? currentMonthPerformanceExEarnings : monthlyPerformance);
+      const liveCryptoDelta = snapshot.month === currentMonth ? liveCryptoPerformance : 0;
       const liveMonthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + liveMonthlyInflow : liveSummary.totalInvested;
-      const earningsAmount = earningsByMonth[snapshot.month] ?? 0;
-      const adjustedMonthlyPerformance = monthlyPerformance;
-      const adjustedLiveMonthlyPerformance = liveMonthlyPerformance;
+      const earningsAmount = snapshot.month === currentMonth
+        ? (earningsByMonth[snapshot.month] ?? monthEarnings)
+        : (earningsByMonth[snapshot.month] ?? 0);
+      const adjustedMonthlyPerformance = monthlyPerformance + earningsAmount + liveCryptoDelta;
+      const adjustedLiveMonthlyPerformance = liveMonthlyPerformance + earningsAmount + liveCryptoDelta;
       const adjustedMonthlyReturnPct = monthlyBase > 0 ? (adjustedMonthlyPerformance / monthlyBase) * 100 : 0;
       const adjustedLiveMonthlyReturnPct = liveMonthlyBase > 0 ? (adjustedLiveMonthlyPerformance / liveMonthlyBase) * 100 : 0;
 
@@ -185,8 +193,14 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     .reverse()
     .map((month) => {
       const existing = snapshotByMonth.get(month);
+      const isCurrentReconstructedMonth = month === currentMonth;
       const monthlyInflow = existing?.monthlyInflow ?? movementStatsByMonth[month]?.inflow ?? 0;
-      const monthlyPerformance = existing?.monthlyPerformance ?? (movementStatsByMonth[month]?.performance ?? 0);
+      const movementPerformance = movementStatsByMonth[month]?.performance ?? 0;
+      const monthlyEarnings = earningsByMonth[month] ?? 0;
+      const monthlyLiveCryptoDelta = isCurrentReconstructedMonth ? liveCryptoPerformance : 0;
+      const monthlyPerformance = isCurrentReconstructedMonth
+        ? movementPerformance + monthlyEarnings + monthlyLiveCryptoDelta
+        : (existing?.monthlyPerformance ?? movementPerformance + monthlyEarnings);
       const totalInvested = existing?.totalInvested ?? endInvested;
       const totalCurrent = month === currentMonth
         ? liveSummary.totalCurrentValue
@@ -204,7 +218,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         monthlyPerformance,
         monthlyReturnPct,
         updatedAt: existing?.updatedAt ?? new Date().toISOString(),
-        earningsAmount: earningsByMonth[month] ?? 0,
+        earningsAmount: monthlyEarnings,
       };
 
       endInvested = totalInvested - monthlyInflow;
@@ -225,8 +239,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
   const selectedMonth = selected.month;
   const isCurrentMonthSelected = selectedMonth === currentMonth;
-  const latestMonthEarnings = earningsByMonth[selectedMonth] ?? 0;
-
   const nonCryptoMonthlyPerformance = investments
     .filter((investment) => investment.type !== "crypto")
     .reduce((total, investment) => {
@@ -412,6 +424,47 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     .sort((a, b) => a.netPerformance - b.netPerformance)
     .slice(0, 5);
 
+  const selectedMonthMovementBreakdown = investments
+    .map((investment) => {
+      const monthAmount = parseInvestmentMovements(investment.notes)
+        .filter(
+          (movement) =>
+            movement.date.startsWith(selectedMonth) &&
+            movement.note !== "Initial position" &&
+            (movement.kind === "adjustment" || movement.kind === "cashback"),
+        )
+        .reduce((sum, movement) => sum + movement.amount, 0);
+
+      return {
+        label: investment.name,
+        amount: monthAmount,
+      };
+    })
+    .filter((item) => Math.abs(item.amount) > 0.000001)
+    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+
+  const selectedMonthEarningsBreakdownRaw = earningsByKindMonth[selectedMonth] ?? {
+    surveys: 0,
+    cashback: 0,
+    social_media: 0,
+    dividend: 0,
+    crypto_cashback: 0,
+  };
+
+  const selectedMonthEarningsBreakdown = [
+    { label: t("portfolioInsights.labels.surveys"), amount: selectedMonthEarningsBreakdownRaw.surveys },
+    { label: t("portfolioInsights.labels.cashback"), amount: selectedMonthEarningsBreakdownRaw.cashback },
+    { label: t("portfolioInsights.labels.cryptoCashback"), amount: selectedMonthEarningsBreakdownRaw.crypto_cashback },
+    { label: t("portfolioInsights.labels.socialMedia"), amount: selectedMonthEarningsBreakdownRaw.social_media },
+    { label: t("portfolioInsights.labels.dividends"), amount: selectedMonthEarningsBreakdownRaw.dividend },
+  ].filter((item) => Math.abs(item.amount) > 0.000001);
+
+  const selectedMonthMovementSubtotal = selectedMonthMovementBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const selectedMonthEarningsSubtotal = selectedMonthEarningsBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const selectedMonthLiveCryptoContribution = isCurrentMonthSelected ? liveCryptoPerformance : 0;
+  const selectedMonthExplainedTotal = selectedMonthMovementSubtotal + selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution;
+  const selectedMonthUnexplainedDelta = selected.monthlyPerformance - selectedMonthExplainedTotal;
+
   const annualYears = annualInsights.map((item) => item.year);
   const annualFocusYear = selectedAnnualYear && annualYears.includes(selectedAnnualYear)
     ? selectedAnnualYear
@@ -536,6 +589,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       monthLabel: formatShortMonthLabel(snapshot.month),
       surveys: earningsByKindMonth[snapshot.month]?.surveys ?? 0,
       cashback: earningsByKindMonth[snapshot.month]?.cashback ?? 0,
+      crypto_cashback: earningsByKindMonth[snapshot.month]?.crypto_cashback ?? 0,
       social_media: earningsByKindMonth[snapshot.month]?.social_media ?? 0,
       dividend: earningsByKindMonth[snapshot.month]?.dividend ?? 0,
     }));
@@ -566,18 +620,18 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
   const formatTypeName = (type: string): string => {
     const names: Record<string, string> = {
-      cash: "Cash",
-      aforro: "Savings",
+      cash: t("portfolioInsights.typeNames.cash"),
+      aforro: t("portfolioInsights.typeNames.aforro"),
       etf: "ETFs",
-      crypto: "Crypto",
+      crypto: t("portfolioInsights.typeNames.crypto"),
       p2p: "P2P",
       ppr: "PPR",
-      surveys: "Surveys",
-      social_media: "Social media",
-      cashback: "Cashback",
-      dividend: "Dividend",
-      crypto_cashback: "Crypto Cashback",
-      other: "Other",
+      surveys: t("portfolioInsights.typeNames.surveys"),
+      social_media: t("portfolioInsights.typeNames.socialMedia"),
+      cashback: t("portfolioInsights.typeNames.cashback"),
+      dividend: t("portfolioInsights.typeNames.dividend"),
+      crypto_cashback: t("portfolioInsights.typeNames.cryptoCashback"),
+      other: t("portfolioInsights.typeNames.other"),
     };
     return names[type] || type.charAt(0).toUpperCase() + type.slice(1);
   };
@@ -587,8 +641,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       {/* ── Monthly insights card ── */}
       <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-          <CardTitle>Monthly insights</CardTitle>
-          <CardDescription>Month-by-month performance tracking.</CardDescription>
+          <CardTitle>{t("portfolioInsights.monthly.title")}</CardTitle>
+          <CardDescription>{t("portfolioInsights.monthly.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
           {/* Month navigator */}
@@ -603,12 +657,12 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">
                 {isCurrentMonthSelected
-                  ? `This month · ${formatMonthLabel(selectedMonth)}`
+                  ? t("portfolioInsights.monthly.thisMonthWithLabel", { month: formatMonthLabel(selectedMonth) })
                   : formatMonthLabel(selectedMonth)}
               </span>
               {!isCurrentMonthSelected ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMonthKey(currentMonth)}>
-                  Current month
+                  {t("portfolioInsights.monthly.currentMonth")}
                 </Button>
               ) : null}
             </div>
@@ -625,7 +679,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                {isCurrentMonthSelected ? "This month return" : `${formatMonthLabel(selectedMonth)} return`}
+                {isCurrentMonthSelected
+                  ? t("portfolioInsights.monthly.thisMonthReturn")
+                  : t("portfolioInsights.monthly.monthReturn", { month: formatMonthLabel(selectedMonth) })}
               </p>
               <p className={`mt-2 text-xl font-semibold ${selected.monthlyReturnPct >= 0 ? "text-success" : "text-urgent"}`}>
                 {formatPercentage(selected.monthlyReturnPct)}
@@ -633,13 +689,17 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
             <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                {isCurrentMonthSelected ? "This month invested" : `${formatMonthLabel(selectedMonth)} invested`}
+                {isCurrentMonthSelected
+                  ? t("portfolioInsights.monthly.thisMonthInvested")
+                  : t("portfolioInsights.monthly.monthInvested", { month: formatMonthLabel(selectedMonth) })}
               </p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatCurrency(selected.monthlyInflow)}</p>
             </div>
             <div className="rounded-2xl border border-border/80 bg-muted/30 p-4 sm:p-5">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                {isCurrentMonthSelected ? "This month performance" : `${formatMonthLabel(selectedMonth)} performance`}
+                {isCurrentMonthSelected
+                  ? t("portfolioInsights.monthly.thisMonthPerformance")
+                  : t("portfolioInsights.monthly.monthPerformance", { month: formatMonthLabel(selectedMonth) })}
               </p>
               <p className={`mt-2 text-xl font-semibold ${selected.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
                 {formatCurrency(selected.monthlyPerformance)}
@@ -651,7 +711,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           {reconstructedActiveSorted.length > 1 && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Best month</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.bestMonth")}</p>
                 <div className="mt-2 flex items-center gap-2 text-success">
                   <TrendingUp className="h-4 w-4" />
                   <span className="font-medium">{formatMonthLabel(bestMonth.month)}</span>
@@ -659,7 +719,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(bestMonth.monthlyPerformance)}</p>
               </div>
               <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst month</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.worstMonth")}</p>
                 <div className="mt-2 flex items-center gap-2 text-urgent">
                   <TrendingDown className="h-4 w-4" />
                   <span className="font-medium">{formatMonthLabel(worstMonth.month)}</span>
@@ -672,15 +732,17 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           {/* Performance by type */}
           {(topGainers.length > 0 || topLosers.length > 0) && (
             <div className="space-y-5 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
-              <h3 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">Performance by type</h3>
+              <h3 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">{t("portfolioInsights.monthly.performanceByType")}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                {isCurrentMonthSelected ? "This month's" : `${formatMonthLabel(selectedMonth)}`} performance by investment type and earnings.
+                {isCurrentMonthSelected
+                  ? t("portfolioInsights.monthly.performanceByTypeDescThis")
+                  : t("portfolioInsights.monthly.performanceByTypeDescMonth", { month: formatMonthLabel(selectedMonth) })}
               </p>
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 {/* Top gainers */}
                 {topGainers.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-base font-bold text-success">Top gainers</h4>
+                    <h4 className="text-base font-bold text-success">{t("portfolioInsights.monthly.topGainers")}</h4>
                     <div className="space-y-2">
                       {topGainers.map((item) => (
                         <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
@@ -700,7 +762,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 {/* Top losers */}
                 {topLosers.length > 0 && (
                   <div className="space-y-3">
-                    <h4 className="text-base font-bold text-urgent">Top losers</h4>
+                    <h4 className="text-base font-bold text-urgent">{t("portfolioInsights.monthly.topLosers")}</h4>
                     <div className="space-y-2">
                       {topLosers.map((item) => (
                         <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
@@ -720,6 +782,103 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           )}
 
+          {/* Performance breakdown */}
+          <div className="space-y-4 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-foreground">
+                {isCurrentMonthSelected ? "What is driving this month performance" : `What drove ${formatMonthLabel(selectedMonth)} performance`}
+                {isCurrentMonthSelected
+                  ? t("portfolioInsights.monthly.driversTitleThis")
+                  : t("portfolioInsights.monthly.driversTitleMonth", { month: formatMonthLabel(selectedMonth) })}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {t("portfolioInsights.monthly.driversSubtitle")}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.investmentMovements")}</p>
+                {selectedMonthMovementBreakdown.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noProfitMovements")}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedMonthMovementBreakdown.map((item) => (
+                      <div key={`movement-${item.label}`} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
+                        <span className="text-foreground">{item.label}</span>
+                        <span className={item.amount >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
+                          {item.amount >= 0 ? "+" : ""}{formatCurrency(item.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
+                  <span className="font-medium text-foreground">{t("portfolioInsights.monthly.movementsSubtotal")}</span>
+                  <span className={selectedMonthMovementSubtotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                    {selectedMonthMovementSubtotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthMovementSubtotal)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.earningsAndMarket")}</p>
+                {selectedMonthEarningsBreakdown.length === 0 && Math.abs(selectedMonthLiveCryptoContribution) < 0.000001 ? (
+                  <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noEarningsAndMarket")}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedMonthEarningsBreakdown.map((item) => (
+                      <div key={`earning-${item.label}`} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
+                        <span className="text-foreground">{item.label}</span>
+                        <span className={item.amount >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
+                          {item.amount >= 0 ? "+" : ""}{formatCurrency(item.amount)}
+                        </span>
+                      </div>
+                    ))}
+                    {Math.abs(selectedMonthLiveCryptoContribution) > 0.000001 && (
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
+                        <span className="text-foreground">{t("portfolioInsights.monthly.liveCryptoDelta")}</span>
+                        <span className={selectedMonthLiveCryptoContribution >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
+                          {selectedMonthLiveCryptoContribution >= 0 ? "+" : ""}{formatCurrency(selectedMonthLiveCryptoContribution)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
+                  <span className="font-medium text-foreground">{t("portfolioInsights.monthly.earningsCryptoSubtotal")}</span>
+                  <span className={(selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution) >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                    {(selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution) >= 0 ? "+" : ""}
+                    {formatCurrency(selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-border/70 bg-background/60 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{t("portfolioInsights.monthly.explainedTotal")}</span>
+                <span className={selectedMonthExplainedTotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                  {selectedMonthExplainedTotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthExplainedTotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{t("portfolioInsights.monthly.cardPerformance")}</span>
+                <span className={selected.monthlyPerformance >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                  {selected.monthlyPerformance >= 0 ? "+" : ""}{formatCurrency(selected.monthlyPerformance)}
+                </span>
+              </div>
+              {Math.abs(selectedMonthUnexplainedDelta) > 0.01 ? (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.deltaNotExplained")}</span>
+                  <span className={selectedMonthUnexplainedDelta >= 0 ? "font-semibold text-warning" : "font-semibold text-urgent"}>
+                    {selectedMonthUnexplainedDelta >= 0 ? "+" : ""}{formatCurrency(selectedMonthUnexplainedDelta)}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
         </CardContent>
       </Card>
 
@@ -728,8 +887,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-2">
-              <CardTitle>Annual insights</CardTitle>
-              <CardDescription>Year-to-date performance overview.</CardDescription>
+              <CardTitle>{t("portfolioInsights.annual.title")}</CardTitle>
+              <CardDescription>{t("portfolioInsights.annual.description")}</CardDescription>
             </div>
             {annualYears.length > 1 ? (
               <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-muted/20 p-1">
@@ -783,7 +942,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           {annualInsights.length > 1 && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Best year</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.annual.bestYear")}</p>
                 <div className="mt-2 flex items-center gap-2 text-success">
                   <TrendingUp className="h-4 w-4" />
                   <span className="font-medium">{bestYear.year}</span>
@@ -793,7 +952,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 </p>
               </div>
               <div className="rounded-2xl border border-border/80 p-4 sm:p-5">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Worst year</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.annual.worstYear")}</p>
                 <div className="mt-2 flex items-center gap-2 text-urgent">
                   <TrendingDown className="h-4 w-4" />
                   <span className="font-medium">{worstYear.year}</span>
@@ -811,14 +970,14 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             return (
               <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
                 <div>
-                  <p className="text-sm font-medium text-foreground">{annualFocusYear} growth drivers</p>
-                  <p className="mt-1 text-xs text-muted-foreground">What contributed most to growth during {annualFocusYear}.</p>
+                  <p className="text-sm font-medium text-foreground">{t("portfolioInsights.annual.growthDrivers", { year: annualFocusYear })}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("portfolioInsights.annual.growthDriversDesc", { year: annualFocusYear })}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                   {annualTopGainers.length > 0 ? (
                     <div className="space-y-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Top growth</p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.annual.topGrowth")}</p>
                       {annualTopGainers.map((item) => {
                         const barPct = Math.max(4, (item.netPerformance / maxGain) * 100);
                         return (
@@ -838,7 +997,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
                   {annualTopLosers.length > 0 ? (
                     <div className="space-y-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Largest drags</p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.annual.largestDrags")}</p>
                       {annualTopLosers.map((item) => {
                         const barPct = Math.max(4, (Math.abs(item.netPerformance) / maxLoss) * 100);
                         return (
@@ -863,7 +1022,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           {/* Yearly evolution */}
           {annualInsights.length > 1 && (
             <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-sm font-medium text-foreground">Yearly evolution</p>
+              <p className="text-sm font-medium text-foreground">{t("portfolioInsights.annual.yearlyEvolution")}</p>
               {annualInsights.map((yearData) => {
                 const ratio = Math.max(3, (Math.abs(yearData.annualPerformance) / maxAbsAnnualPerformance) * 100);
                 const isPositive = yearData.annualPerformance >= 0;
@@ -887,7 +1046,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           {/* Monthly evolution */}
           {reconstructedActiveSorted.length > 1 && (
             <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
-              <p className="text-sm font-medium text-foreground">Monthly evolution</p>
+              <p className="text-sm font-medium text-foreground">{t("portfolioInsights.annual.monthlyEvolution")}</p>
               {visibleMonthlyRows.map((snapshot) => {
                 const ratio = Math.max(3, (Math.abs(snapshot.monthlyPerformance) / maxAbsPerformance) * 100);
                 const isPositive = snapshot.monthlyPerformance >= 0;
@@ -907,12 +1066,12 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               })}
               {remainingMonthlyRows > 0 && (
                 <button type="button" onClick={() => setVisibleMonthsCount((c) => c + 9)} className="text-xs font-medium text-primary hover:underline">
-                  {`Load ${Math.min(9, remainingMonthlyRows)} more month${Math.min(9, remainingMonthlyRows) === 1 ? "" : "s"}`}
+                  {t("portfolioInsights.annual.loadMoreMonths", { count: Math.min(9, remainingMonthlyRows) })}
                 </button>
               )}
               {visibleMonthsCount > 3 && (
                 <button type="button" onClick={() => setVisibleMonthsCount(3)} className="text-xs font-medium text-primary hover:underline">
-                  Show only last 3 months
+                  {t("portfolioInsights.annual.showLast3Months")}
                 </button>
               )}
             </div>
@@ -924,14 +1083,17 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1) && (
         <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
           <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-            <CardTitle>Performance charts</CardTitle>
-            <CardDescription>Monthly trend and annual comparison based on recorded snapshots.</CardDescription>
+            <CardTitle>{t("portfolioInsights.charts.title")}</CardTitle>
+            <CardDescription>{t("portfolioInsights.charts.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {monthlyChartData.length > 1 && (
-                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Monthly performance trend (last 12 months)</p>
+                <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.monthlyTrendTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("portfolioInsights.charts.monthlyTrendDesc")}</p>
+                  </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={monthlyChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
@@ -940,19 +1102,31 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                         <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
                         <Tooltip
                           formatter={(value: number, name: string) => {
-                            if (name === "performance") return [formatCurrency(value), "Performance"];
-                            if (name === "inflow") return [formatCurrency(value), "Invested"];
+                            if (name === "performance") return [formatCurrency(value), t("portfolioInsights.labels.performance")];
+                            if (name === "inflow") return [formatCurrency(value), t("portfolioInsights.labels.invested")];
                             return [value, name];
                           }}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                         />
+                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
                         <Line
                           type="monotone"
                           dataKey="performance"
+                          name={t("portfolioInsights.labels.performance")}
                           stroke="hsl(var(--success))"
                           strokeWidth={2.5}
                           dot={{ r: 2 }}
                           activeDot={{ r: 4 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="inflow"
+                          name={t("portfolioInsights.labels.invested")}
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          strokeDasharray="4 4"
+                          dot={false}
+                          activeDot={{ r: 3 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -961,8 +1135,11 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               )}
 
               {annualChartData.length > 0 && (
-                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Annual performance comparison</p>
+                <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.annualComparisonTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("portfolioInsights.charts.annualComparisonDesc")}</p>
+                  </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={annualChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
@@ -973,12 +1150,13 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                           formatter={(value: number, name: string, item) => {
                             if (name === "performance") {
                               const returnPct = item.payload.returnPct;
-                              return [`${formatCurrency(value)} (${formatPercentage(returnPct)})`, "Performance"];
+                              return [`${formatCurrency(value)} (${formatPercentage(returnPct)})`, t("portfolioInsights.labels.performance")];
                             }
                             return [value, name];
                           }}
                         />
-                        <Bar dataKey="performance" radius={[6, 6, 0, 0]}>
+                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                        <Bar dataKey="performance" name={t("portfolioInsights.labels.performance")} radius={[6, 6, 0, 0]}>
                           {annualChartData.map((entry) => (
                             <Cell key={entry.year} fill={entry.performance >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
                           ))}
@@ -990,8 +1168,11 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               )}
 
               {earningsEvolutionChartData.length > 1 && (
-                <div className="space-y-3 rounded-2xl border border-border/80 p-4 sm:p-5">
-                  <p className="text-sm font-medium text-foreground">Earnings evolution (surveys vs cashback vs social media vs dividends)</p>
+                <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.earningsEvolutionTitle")}</p>
+                    <p className="text-xs text-muted-foreground">{t("portfolioInsights.charts.earningsEvolutionDesc")}</p>
+                  </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={earningsEvolutionChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
@@ -1000,18 +1181,19 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                         <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
                         <Tooltip
                           formatter={(value: number, name: string) => {
-                            if (name === "surveys") return [formatCurrency(value), "Surveys"];
-                            if (name === "cashback") return [formatCurrency(value), "Cashback"];
-                            if (name === "social_media") return [formatCurrency(value), "Social media"];
-                            if (name === "dividend") return [formatCurrency(value), "Dividends"];
+                            if (name === "surveys") return [formatCurrency(value), t("portfolioInsights.labels.surveys")];
+                            if (name === "cashback") return [formatCurrency(value), t("portfolioInsights.labels.cashback")];
+                            if (name === "social_media") return [formatCurrency(value), t("portfolioInsights.labels.socialMedia")];
+                            if (name === "dividend") return [formatCurrency(value), t("portfolioInsights.labels.dividends")];
                             return [value, name];
                           }}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                         />
-                        <Line type="monotone" dataKey="surveys" name="Surveys" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                        <Line type="monotone" dataKey="cashback" name="Cashback" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                        <Line type="monotone" dataKey="social_media" name="Social media" stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                        <Line type="monotone" dataKey="dividend" name="Dividends" stroke="hsl(var(--accent-foreground))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                        <Line type="monotone" dataKey="surveys" name={t("portfolioInsights.labels.surveys")} stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="cashback" name={t("portfolioInsights.labels.cashback")} stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="social_media" name={t("portfolioInsights.labels.socialMedia")} stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="dividend" name={t("portfolioInsights.labels.dividends")} stroke="hsl(var(--accent-foreground))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -1020,12 +1202,12 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
 
             {categoryGrowthChartData.length > 1 && (
-              <div className="space-y-4 rounded-2xl border border-border/80 p-4 sm:p-5">
+              <div className="space-y-4 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-foreground">Long-term vs Short-term growth</p>
+                  <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.longVsShortTitle")}</p>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-success/10 px-2.5 py-1 font-medium text-success">Long: {formatCurrency(longTermProfit)} ({formatPercentage(longTermReturn)})</span>
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">Short: {formatCurrency(shortTermProfit)} ({formatPercentage(shortTermReturn)})</span>
+                    <span className="rounded-full bg-success/10 px-2.5 py-1 font-medium text-success">{t("portfolioInsights.labels.long")} {formatCurrency(longTermProfit)} ({formatPercentage(longTermReturn)})</span>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary">{t("portfolioInsights.labels.short")} {formatCurrency(shortTermProfit)} ({formatPercentage(shortTermReturn)})</span>
                   </div>
                 </div>
                 <div className="h-64">
@@ -1036,14 +1218,15 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                       <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
                       <Tooltip
                         formatter={(value: number, name: string) => {
-                          if (name === "longPerformance") return [formatCurrency(value), "Long-term"];
-                          if (name === "shortPerformance") return [formatCurrency(value), "Short-term"];
+                          if (name === "longPerformance") return [formatCurrency(value), t("portfolioInsights.labels.longTerm")];
+                          if (name === "shortPerformance") return [formatCurrency(value), t("portfolioInsights.labels.shortTerm")];
                           return [value, name];
                         }}
                         labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                       />
-                      <Line type="monotone" dataKey="longPerformance" name="Long-term" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="shortPerformance" name="Short-term" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                      <Line type="monotone" dataKey="longPerformance" name={t("portfolioInsights.labels.longTerm")} stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="shortPerformance" name={t("portfolioInsights.labels.shortTerm")} stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
