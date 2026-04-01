@@ -928,15 +928,15 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             <div className="space-y-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:p-5">
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">
-                  Invested breakdown ({formatMonthLabel(selectedMonth)})
+                  {t("portfolioInsights.monthly.investedBreakdownTitle", { month: formatMonthLabel(selectedMonth) })}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Dev only. Source movements used to explain the Invested card value.
+                  {t("portfolioInsights.monthly.investedBreakdownSubtitle")}
                 </p>
               </div>
 
               {selectedMonthInvestedBreakdown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No invested movements found for this month.</p>
+                <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noInvestedMovements")}</p>
               ) : (
                 <div className="space-y-2">
                   {selectedMonthInvestedBreakdown.map((item) => (
@@ -948,8 +948,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                         </span>
                       </div>
                       <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                        <span>Contributions: {formatCurrency(item.contributions)}</span>
-                        <span>Withdrawals: {formatCurrency(item.withdrawals)}</span>
+                        <span>{t("portfolioInsights.monthly.contributions")}: {formatCurrency(item.contributions)}</span>
+                        <span>{t("portfolioInsights.monthly.withdrawals")}: {formatCurrency(item.withdrawals)}</span>
                       </div>
                     </div>
                   ))}
@@ -958,14 +958,16 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
               <div className="space-y-2 rounded-xl border border-border/70 bg-background/60 p-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Card invested source</span>
+                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.cardInvestedSource")}</span>
                   <span className="font-medium text-foreground">
-                    {selectedMonthInvestedSource === "movements" ? "Movements" : "Snapshot fallback"}
+                    {selectedMonthInvestedSource === "movements"
+                      ? t("portfolioInsights.monthly.movementsSource")
+                      : t("portfolioInsights.monthly.snapshotFallback")}
                   </span>
                 </div>
                 {selectedMonthInvestedSource === "snapshot" && selectedMonthSnapshotInflow != null ? (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Snapshot monthly inflow</span>
+                    <span className="text-muted-foreground">{t("portfolioInsights.monthly.snapshotMonthlyInflow")}</span>
                     <span className={selectedMonthSnapshotInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
                       {selectedMonthSnapshotInflow >= 0 ? "+" : ""}{formatCurrency(selectedMonthSnapshotInflow)}
                     </span>
@@ -973,27 +975,27 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 ) : null}
                 {selectedMonthInvestedSource === "movements" && selectedMonthMovementInflow != null ? (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Movement-derived inflow</span>
+                    <span className="text-muted-foreground">{t("portfolioInsights.monthly.movementDerivedInflow")}</span>
                     <span className={selectedMonthMovementInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
                       {selectedMonthMovementInflow >= 0 ? "+" : ""}{formatCurrency(selectedMonthMovementInflow)}
                     </span>
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Explained invested</span>
+                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.explainedInvested")}</span>
                   <span className={selectedMonthInvestedExplainedTotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
                     {selectedMonthInvestedExplainedTotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthInvestedExplainedTotal)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Card invested</span>
+                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.cardInvested")}</span>
                   <span className={selected.monthlyInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
                     {selected.monthlyInflow >= 0 ? "+" : ""}{formatCurrency(selected.monthlyInflow)}
                   </span>
                 </div>
                 {Math.abs(selectedMonthInvestedUnexplainedDelta) > 0.01 ? (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Delta not yet explained</span>
+                    <span className="text-muted-foreground">{t("portfolioInsights.monthly.deltaNotYetExplained")}</span>
                     <span className={selectedMonthInvestedUnexplainedDelta >= 0 ? "font-semibold text-warning" : "font-semibold text-urgent"}>
                       {selectedMonthInvestedUnexplainedDelta >= 0 ? "+" : ""}{formatCurrency(selectedMonthInvestedUnexplainedDelta)}
                     </span>
