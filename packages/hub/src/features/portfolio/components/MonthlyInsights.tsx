@@ -924,8 +924,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
             </div>
           </div>
 
-          {import.meta.env.DEV ? (
-            <div className="space-y-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:p-5">
+          <div className="space-y-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:p-5">
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">
                   {t("portfolioInsights.monthly.investedBreakdownTitle", { month: formatMonthLabel(selectedMonth) })}
@@ -1003,7 +1002,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 ) : null}
               </div>
             </div>
-          ) : null}
 
         </CardContent>
       </Card>
