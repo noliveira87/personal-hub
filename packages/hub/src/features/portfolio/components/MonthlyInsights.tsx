@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 import { useI18n } from "@/i18n/I18nProvider";
+import { LOCALES_BY_LANGUAGE } from "@/i18n/translations";
 
 interface MonthlyInsightsProps {
   snapshots: MonthlySnapshot[];
@@ -18,7 +19,7 @@ interface MonthlyInsightsProps {
 }
 
 export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0, liveCryptoPerformance = 0 }: MonthlyInsightsProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAnnualYear, setSelectedAnnualYear] = useState<string | null>(null);
@@ -27,7 +28,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const formatShortMonthLabel = (monthKey: string) => {
     if (!isValidMonthKey(monthKey)) return monthKey;
     const [year, month] = monthKey.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "short" });
+    return new Date(year, month - 1, 1).toLocaleDateString(LOCALES_BY_LANGUAGE[language], { month: "short" });
   };
 
   const isNonInvestmentWithdrawal = (movement: { id?: string; kind: string; note?: string }) => {
@@ -115,12 +116,21 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       const previousSnapshot = index > 0 ? arr[index - 1] : null;
       const isCurrentMonth = snapshot.month === currentMonth;
 
-      const monthlyInflow = Number.isFinite(snapshot.monthlyInflow)
+      const monthMovementStats = movementStatsByMonth[snapshot.month];
+      // Use movement-derived inflow when available; when movements exist for
+      // this month but net is 0, honour that 0 instead of falling back to
+      // a stale snapshot value from a previous month.
+      const movementInflow = monthMovementStats !== undefined
+        ? (monthMovementStats.inflow ?? 0)
+        : undefined;
+      const snapshotInflow = Number.isFinite(snapshot.monthlyInflow)
         ? snapshot.monthlyInflow
         : previousSnapshot
           ? snapshot.totalInvested - previousSnapshot.totalInvested
           : snapshot.totalInvested;
-      const monthMovementStats = movementStatsByMonth[snapshot.month];
+      // If there are movements for this month, always use that value (even 0).
+      // Only fall back to snapshot if there are genuinely no movement records.
+      const monthlyInflow = movementInflow !== undefined ? movementInflow : snapshotInflow;
       const movementPerformance = monthMovementStats?.performance ?? 0;
       const monthlyPerformance = movementPerformance;
       const monthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + monthlyInflow : monthlyInflow;
@@ -465,6 +475,42 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const selectedMonthExplainedTotal = selectedMonthMovementSubtotal + selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution;
   const selectedMonthUnexplainedDelta = selected.monthlyPerformance - selectedMonthExplainedTotal;
 
+  const selectedMonthInvestedBreakdown = investments
+    .map((investment) => {
+      const movements = parseInvestmentMovements(investment.notes).filter(
+        (movement) =>
+          movement.date.startsWith(selectedMonth) &&
+          movement.note !== "Initial position" &&
+          (movement.kind === "contribution" || movement.kind === "withdrawal") &&
+          !isNonInvestmentWithdrawal(movement),
+      );
+
+      const contributions = movements
+        .filter((movement) => movement.kind === "contribution")
+        .reduce((sum, movement) => sum + movement.amount, 0);
+
+      const withdrawals = movements
+        .filter((movement) => movement.kind === "withdrawal")
+        .reduce((sum, movement) => sum + movement.amount, 0);
+
+      const net = contributions - withdrawals;
+
+      return {
+        label: investment.name,
+        contributions,
+        withdrawals,
+        net,
+      };
+    })
+    .filter((item) => Math.abs(item.contributions) > 0.000001 || Math.abs(item.withdrawals) > 0.000001)
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+  const selectedMonthInvestedExplainedTotal = selectedMonthInvestedBreakdown.reduce((sum, item) => sum + item.net, 0);
+  const selectedMonthInvestedUnexplainedDelta = selected.monthlyInflow - selectedMonthInvestedExplainedTotal;
+  const selectedMonthMovementInflow = movementStatsByMonth[selectedMonth]?.inflow;
+  const selectedMonthSnapshotInflow = snapshotByMonth.get(selectedMonth)?.monthlyInflow;
+  const selectedMonthInvestedSource = selectedMonthMovementInflow != null ? "movements" : "snapshot";
+
   const annualYears = annualInsights.map((item) => item.year);
   const annualFocusYear = selectedAnnualYear && annualYears.includes(selectedAnnualYear)
     ? selectedAnnualYear
@@ -786,7 +832,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           <div className="space-y-4 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-foreground">
-                {isCurrentMonthSelected ? "What is driving this month performance" : `What drove ${formatMonthLabel(selectedMonth)} performance`}
                 {isCurrentMonthSelected
                   ? t("portfolioInsights.monthly.driversTitleThis")
                   : t("portfolioInsights.monthly.driversTitleMonth", { month: formatMonthLabel(selectedMonth) })}
@@ -878,6 +923,85 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               ) : null}
             </div>
           </div>
+
+          {import.meta.env.DEV ? (
+            <div className="space-y-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:p-5">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">
+                  Invested breakdown ({formatMonthLabel(selectedMonth)})
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Dev only. Source movements used to explain the Invested card value.
+                </p>
+              </div>
+
+              {selectedMonthInvestedBreakdown.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No invested movements found for this month.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedMonthInvestedBreakdown.map((item) => (
+                    <div key={`invested-${item.label}`} className="rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-foreground">{item.label}</span>
+                        <span className={item.net >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                          {item.net >= 0 ? "+" : ""}{formatCurrency(item.net)}
+                        </span>
+                      </div>
+                      <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <span>Contributions: {formatCurrency(item.contributions)}</span>
+                        <span>Withdrawals: {formatCurrency(item.withdrawals)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2 rounded-xl border border-border/70 bg-background/60 p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Card invested source</span>
+                  <span className="font-medium text-foreground">
+                    {selectedMonthInvestedSource === "movements" ? "Movements" : "Snapshot fallback"}
+                  </span>
+                </div>
+                {selectedMonthInvestedSource === "snapshot" && selectedMonthSnapshotInflow != null ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Snapshot monthly inflow</span>
+                    <span className={selectedMonthSnapshotInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                      {selectedMonthSnapshotInflow >= 0 ? "+" : ""}{formatCurrency(selectedMonthSnapshotInflow)}
+                    </span>
+                  </div>
+                ) : null}
+                {selectedMonthInvestedSource === "movements" && selectedMonthMovementInflow != null ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Movement-derived inflow</span>
+                    <span className={selectedMonthMovementInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                      {selectedMonthMovementInflow >= 0 ? "+" : ""}{formatCurrency(selectedMonthMovementInflow)}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Explained invested</span>
+                  <span className={selectedMonthInvestedExplainedTotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                    {selectedMonthInvestedExplainedTotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthInvestedExplainedTotal)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Card invested</span>
+                  <span className={selected.monthlyInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
+                    {selected.monthlyInflow >= 0 ? "+" : ""}{formatCurrency(selected.monthlyInflow)}
+                  </span>
+                </div>
+                {Math.abs(selectedMonthInvestedUnexplainedDelta) > 0.01 ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Delta not yet explained</span>
+                    <span className={selectedMonthInvestedUnexplainedDelta >= 0 ? "font-semibold text-warning" : "font-semibold text-urgent"}>
+                      {selectedMonthInvestedUnexplainedDelta >= 0 ? "+" : ""}{formatCurrency(selectedMonthInvestedUnexplainedDelta)}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
         </CardContent>
       </Card>
