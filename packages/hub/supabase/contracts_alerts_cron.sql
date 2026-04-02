@@ -20,6 +20,7 @@ declare
   v_signature text;
   v_sent_today text[];
   v_reason_text text;
+  v_expiry_hint text;
   v_item record;
 begin
   select
@@ -62,18 +63,21 @@ begin
         c.provider,
         c.end_date,
         a.alert,
-        a.alert_index
+        a.alert_index,
+        c.telegram_alert_enabled
       from public.contracts c
       cross join lateral jsonb_array_elements(coalesce(c.alerts, '[]'::jsonb)) with ordinality as a(alert, alert_index)
       where c.status in ('active', 'pending-cancellation')
-        and coalesce(c.telegram_alert_enabled, false) = true
     ),
     normalized as (
       select
         e.id,
         e.name,
         e.provider,
-        e.end_date,
+        case
+          when coalesce(e.end_date::text, '') ~ '^\d{4}-\d{2}-\d{2}$' then e.end_date::date
+          else null
+        end as end_date,
         e.alert_index,
         coalesce(e.alert->>'kind', 'days-before') as kind,
         case
@@ -86,7 +90,9 @@ begin
         end as specific_date,
         coalesce(nullif(e.alert->>'reason', ''), '') as reason,
         coalesce((e.alert->>'enabled')::boolean, true) as app_enabled,
-        coalesce((e.alert->>'telegramEnabled')::boolean, false) as telegram_enabled
+        -- Corrigido: transforma string "true"/"false" em boolean
+        (coalesce(nullif(lower(e.alert->>'telegramEnabled'), ''), 'false') = 'true') as telegram_enabled,
+        e.telegram_alert_enabled
       from expanded e
     ),
     due_today as (
@@ -97,6 +103,8 @@ begin
         n.end_date,
         n.alert_index,
         n.reason,
+        n.telegram_alert_enabled,
+        n.telegram_enabled,
         case
           when n.kind = 'specific-date' then n.specific_date
           when n.end_date is not null then (n.end_date - n.days_before)
@@ -108,6 +116,7 @@ begin
         end as trigger_label
       from normalized n
       where n.telegram_enabled = true
+        and n.telegram_alert_enabled = true
     )
     select
       d.id,
@@ -130,7 +139,12 @@ begin
 
     v_reason_text := case
       when btrim(v_item.reason) = '' then ''
-      else E'\nReason: ' || v_item.reason
+      else E'\n📝 Reason: ' || v_item.reason
+    end;
+
+    v_expiry_hint := case
+      when v_item.end_date is null then ''
+      else E'\n📅 Expires on: ' || to_char(v_item.end_date, 'DD/MM/YYYY')
     end;
 
     perform net.http_post(
@@ -140,15 +154,12 @@ begin
         'chat_id', v_chat_id,
         'text',
           '🔔 D12 Contracts Alert' || E'\n\n' ||
-          'Contract: ' || v_item.name || E'\n' ||
-          'Provider: ' || coalesce(nullif(v_item.provider, ''), '—') || E'\n' ||
-          'Trigger: ' || v_item.trigger_label || ' (' || to_char(v_item.trigger_date, 'DD/MM/YYYY') || ')' ||
-          case
-            when v_item.end_date is null then ''
-            else E'\nExpires on: ' || to_char(v_item.end_date, 'DD/MM/YYYY')
-          end ||
+          '📄 Contract: ' || v_item.name || E'\n' ||
+          '🏢 Provider: ' || coalesce(nullif(v_item.provider, ''), '—') || E'\n' ||
+          '🗓 Trigger: ' || v_item.trigger_label || ' (' || to_char(v_item.trigger_date, 'DD/MM/YYYY') || ')' ||
+          v_expiry_hint ||
           v_reason_text || E'\n\n' ||
-          'Open alerts: https://hub.cafofo12.ddns.net/contracts/alerts',
+          '👉 Open alerts: https://hub.cafofo12.ddns.net/contracts/alerts',
         'disable_web_page_preview', true
       )
     );
@@ -183,5 +194,5 @@ select cron.schedule(
   $$select public.send_contract_scheduled_alerts();$$
 );
 
--- Manual test (optional):
+-- Manual test:
 -- select public.send_contract_scheduled_alerts();

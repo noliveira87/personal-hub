@@ -92,7 +92,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 pt-16 lg:pt-0">
+      <main className="flex-1 lg:ml-64 pt-16">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
           {children}
         </div>

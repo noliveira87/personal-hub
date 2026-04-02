@@ -81,7 +81,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <main className={cn('min-h-screen', showSidebar && 'lg:pl-60 pt-16 lg:pt-0')}>
+      <main className={cn('min-h-screen', showSidebar && 'lg:pl-60 pt-16')}>
         {!showSidebar ? (
           <>{children}</>
         ) : (

@@ -98,9 +98,12 @@ begin
         'text',
           '🛡️ <b>Warranty Expiry Alert</b>' || E'\n\n' ||
           '📦 <b>Product:</b> ' || v_item.product_name || E'\n' ||
+          '🗂️ <b>Category:</b> ' || coalesce(nullif(v_item.category, ''), '—') || E'\n' ||
           '📅 <b>Expires on:</b> ' || v_expiration_text || E'\n' ||
+          '⏳ <b>Days left:</b> ' || v_days_left::text || E'\n' ||
           '🏬 <b>Store:</b> ' || coalesce(nullif(v_item.purchased_from, ''), '—') || E'\n' ||
-          '<a href="https://hub.cafofo12.ddns.net/warranties?status=expiring">Open expiring warranties</a>',
+          E'\n' ||
+          '👉 <a href="https://hub.cafofo12.ddns.net/warranties?status=expiring">Open expiring warranties</a>',
         'parse_mode', 'HTML',
         'disable_web_page_preview', true
       )
