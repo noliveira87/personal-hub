@@ -5,10 +5,20 @@ import { CATEGORY_ICONS } from '@/features/contracts/types/contract';
 import { differenceInCalendarDays, format, isValid, parseISO, subDays } from 'date-fns';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { Bell, BellRing, FileText, Loader, Pencil, Plus, Send } from 'lucide-react';
+import { Bell, BellRing, FileText, Loader, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { toast } from '@/components/ui/sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   markContractAlertsAsRead,
   markOccurredAppAlertsAsRead,
@@ -34,6 +44,7 @@ export default function AlertsPage() {
   const [appEnabled, setAppEnabled] = useState(true);
   const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [readStateVersion, setReadStateVersion] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<{ contractId: string; alertIndex: number } | null>(null);
 
   useEffect(() => subscribeContractAlertReadState(() => setReadStateVersion((prev) => prev + 1)), []);
 
@@ -139,6 +150,42 @@ export default function AlertsPage() {
     } catch (error) {
       console.error('Failed to create custom alert:', error);
       const errMessage = error instanceof Error ? error.message : 'Failed to create custom alert.';
+      toast.error(errMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCustomAlert = async (contractId: string, alertIndex: number) => {
+    const contract = contracts.find(c => c.id === contractId);
+    if (!contract) {
+      toast.error('Contract not found.');
+      return;
+    }
+
+    const targetAlert = contract.alerts[alertIndex];
+    if (!targetAlert) {
+      toast.error('Alert not found.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const nextAlerts = contract.alerts.filter((_, index) => index !== alertIndex);
+      await updateContract({
+        ...contract,
+        alerts: nextAlerts,
+      });
+
+      if (editingTarget?.contractId === contractId && editingTarget.alertIndex === alertIndex) {
+        resetCreateForm();
+        setShowCreateForm(false);
+      }
+
+      toast.success('Custom alert deleted successfully.');
+    } catch (error) {
+      console.error('Failed to delete custom alert:', error);
+      const errMessage = error instanceof Error ? error.message : 'Failed to delete custom alert.';
       toast.error(errMessage);
     } finally {
       setSaving(false);
@@ -554,14 +601,25 @@ export default function AlertsPage() {
                   <p className="text-xs text-muted-foreground">{item.daysUntilTrigger < 0 ? 'ago' : 'until alert'}</p>
                   <div className="mt-2 flex justify-end gap-2">
                     {item.alertIndex >= 0 && (
-                      <button
-                        type="button"
-                        onClick={() => startEditingAlert(item.contract.id, item.alertIndex)}
-                        className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
-                      >
-                        <Pencil className="w-3 h-3" />
-                        Edit
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEditingAlert(item.contract.id, item.alertIndex)}
+                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget({ contractId: item.contract.id, alertIndex: item.alertIndex })}
+                          disabled={saving}
+                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Delete
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -642,6 +700,32 @@ export default function AlertsPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete custom alert?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action removes the custom alert from the contract. You can create it again later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={saving || !deleteTarget}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async (event) => {
+                event.preventDefault();
+                if (!deleteTarget) return;
+                await handleDeleteCustomAlert(deleteTarget.contractId, deleteTarget.alertIndex);
+                setDeleteTarget(null);
+              }}
+            >
+              {saving ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

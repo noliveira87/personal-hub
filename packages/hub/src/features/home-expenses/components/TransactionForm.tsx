@@ -76,9 +76,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     if (!name.trim() || isNaN(parsed) || parsed <= 0) return;
     setSubmitError(null);
 
-    const nextCategory = type === 'expense'
-      ? (selectedContract ? (mapContractCategoryToExpenseCategory(selectedContract.category) ?? 'other') : category)
-      : undefined;
+    const nextCategory = type === 'expense' ? category : undefined;
     const nextNotes = type === 'expense' && nextCategory === 'other' ? (notes.trim() || undefined) : undefined;
     const nextContractId = type === 'expense' && selectedContract ? selectedContract.id : undefined;
 
