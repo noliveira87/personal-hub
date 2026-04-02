@@ -1,7 +1,17 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ChartLine, FileCheck2, House, Map, Settings, ShieldCheck } from "lucide-react";
+import { ChartLine, Eye, EyeOff, FileCheck2, House, Map, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
+import { useDarkMode } from '@shared-ui/use-dark-mode';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const projectDefinitions = [
   { key: "homeExpenses", to: "/home-expenses", icon: House },
@@ -12,7 +22,8 @@ const projectDefinitions = [
 ] as const;
 
 const Index = () => {
-	const { t } = useI18n();
+	const { t, hideAmounts, language, setLanguage, toggleHideAmounts } = useI18n();
+	const { isDark, toggleDark } = useDarkMode();
 
 	const projects = projectDefinitions.map((project) => ({
 	  ...project,
@@ -23,11 +34,67 @@ const Index = () => {
 	return (
 	<main className="min-h-screen bg-background">
 		<div className="fixed right-4 top-4 z-40 flex items-center gap-2">
-			<Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-lg bg-card/90">
-				<Link to="/settings" state={{ fromPath: '/' }} aria-label={t("index.openSettings")}>
-					<Settings className="h-4 w-4" />
-				</Link>
-			</Button>
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="outline" size="icon" className="h-10 w-10 rounded-xl bg-card/90" aria-label={t("common.settings")}>
+						<Settings className="h-4 w-4" />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="w-72">
+					<div className="px-2 py-3">
+						<p className="text-xs font-semibold text-muted-foreground uppercase mb-2">{t('common.language')}</p>
+						<div className="flex gap-2">
+							<Badge
+								variant={language === 'pt' ? 'default' : 'outline'}
+								className="cursor-pointer transition-all"
+								onClick={() => setLanguage('pt')}
+							>
+								{t('common.portuguese')}
+							</Badge>
+							<Badge
+								variant={language === 'en' ? 'default' : 'outline'}
+								className="cursor-pointer transition-all"
+								onClick={() => setLanguage('en')}
+							>
+								{t('common.english')}
+							</Badge>
+						</div>
+					</div>
+
+					<DropdownMenuSeparator />
+
+					<div className="px-2 py-3 flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							{isDark ? <Moon className="h-4 w-4 text-muted-foreground" /> : <Sun className="h-4 w-4 text-muted-foreground" />}
+							<label htmlFor="index-theme-switch" className="text-sm font-medium cursor-pointer">
+								{isDark ? t('common.darkMode') : t('common.lightMode')}
+							</label>
+						</div>
+						<Switch id="index-theme-switch" checked={isDark} onCheckedChange={toggleDark} />
+					</div>
+
+					<DropdownMenuSeparator />
+
+					<div className="px-2 py-3 flex items-center justify-between">
+						<div className="flex items-center gap-2">
+							{hideAmounts ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+							<label htmlFor="index-amounts-switch" className="text-sm font-medium cursor-pointer">
+								{hideAmounts ? t('common.hideAmounts') : t('common.showAmounts')}
+							</label>
+						</div>
+						<Switch id="index-amounts-switch" checked={hideAmounts} onCheckedChange={toggleHideAmounts} />
+					</div>
+
+					<DropdownMenuSeparator />
+
+					<DropdownMenuItem asChild>
+						<Link to="/settings" state={{ fromPath: '/' }} aria-label={t("index.openSettings")}>
+							<Settings className="h-4 w-4 mr-2" />
+							<span>{t('settingsPage.title')}</span>
+						</Link>
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 
 		<section className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-4 pt-14 pb-4 sm:px-6 sm:py-8">

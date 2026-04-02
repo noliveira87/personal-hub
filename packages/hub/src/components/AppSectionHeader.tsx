@@ -288,15 +288,15 @@ export default function AppSectionHeader({
                     </label>
                   </div>
                   <Switch id="amounts-switch" checked={hideAmounts} onCheckedChange={toggleHideAmounts} />
-
-                                <DropdownMenuSeparator />
-
-                                {/* Settings Link */}
-                                <DropdownMenuItem onClick={() => navigate('/settings')}>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  <span>{t('settingsPage.title')}</span>
-                                </DropdownMenuItem>
                 </div>
+
+                <DropdownMenuSeparator />
+
+                {/* Settings Link */}
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  <span>{t('settingsPage.title')}</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}

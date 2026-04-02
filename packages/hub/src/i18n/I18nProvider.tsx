@@ -68,10 +68,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, [language]);
 
-  // Sync hideAmounts state with localStorage and HTML attribute
+  // Ensure initial DOM/storage sync for privacy flag
   useEffect(() => {
     setHideAmountsPreference(hideAmounts);
-  }, [hideAmounts]);
+    // Run once on mount with initial state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Ensure state is synced from localStorage on mount and when navigating back
   useEffect(() => {
@@ -110,7 +112,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       },
       formatMonthYear: (value) => new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(new Date(value)),
       hideAmounts,
-      toggleHideAmounts: () => setHideAmounts((current) => !current),
+      toggleHideAmounts: () => setHideAmounts((current) => {
+        const next = !current;
+        setHideAmountsPreference(next);
+        return next;
+      }),
     };
   }, [language, hideAmounts]);
 
