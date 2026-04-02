@@ -31,7 +31,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
     <div
       onClick={() => navigate(`/contracts/${contract.id}`)}
       className={cn(
-        'bg-card rounded-xl p-5 border-2 border-border cursor-pointer transition-all duration-300',
+        'w-full min-w-0 overflow-hidden bg-card rounded-xl p-5 border-2 border-border cursor-pointer transition-all duration-300',
         'hover:shadow-lg hover:border-border hover:-translate-y-0.5 active:scale-[0.98]',
         urgency === 'critical' && 'border-urgent/40 shadow-urgent/10',
         urgency === 'warning' && 'border-warning/40 shadow-warning/10',
@@ -62,22 +62,24 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
         </div>
       </div>
 
-      <div className="mt-4 flex items-end justify-between">
-        <div>
-          <p className="text-lg font-bold tabular-nums text-foreground">
+      <div className="mt-4 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-lg font-bold tabular-nums text-foreground">
             {formatCurrency(displayPrice, displayCurrency)}
             {priceDate && (
               <span className="text-xs font-normal text-muted-foreground ml-2">
                 • {format(parseISO(priceDate), 'MMM d')}
               </span>
             )}
-            <span className="text-xs font-normal text-muted-foreground ml-1">/ {BILLING_LABELS[contract.billingFrequency].toLowerCase()}</span>
+            <span className="block text-xs font-normal text-muted-foreground sm:inline sm:ml-1">
+              / {BILLING_LABELS[contract.billingFrequency].toLowerCase()}
+            </span>
           </p>
         </div>
-        <div className="text-right">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="min-w-0 sm:text-right">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground sm:justify-end">
             <CalendarDays className="w-3 h-3" />
-            <span>{contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No date'}</span>
+            <span className="truncate">{contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No date'}</span>
           </div>
           {contract.status !== 'archived' && contract.status !== 'expired' && (
             <p className={cn(

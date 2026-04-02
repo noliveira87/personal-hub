@@ -157,7 +157,7 @@ export default function AppSectionHeader({
               </Button>
 
               {alertsOpen && (
-                <div className="fixed top-16 left-1/2 -translate-x-1/2 w-[min(85vw,300px)] sm:w-[300px] rounded-xl border bg-card shadow-lg p-2 z-[60]">
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 w-[min(82vw,272px)] sm:w-[320px] rounded-xl border bg-card shadow-lg p-2 z-[60]">
                   <div className="px-2 pb-2 border-b border-border/60">
                     <p className="text-sm font-semibold text-foreground">Contract Alerts</p>
                     <p className="text-xs text-muted-foreground">
