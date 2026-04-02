@@ -277,13 +277,16 @@ export function useInvestments(options: UseInvestmentsOptions = {}) {
   }, [shortTermOrder, longTermOrder, coreHydrated]);
 
   useEffect(() => {
-    if (isSupabaseConfigured && !snapshotsHydrated) {
+    if (isSupabaseConfigured && (!snapshotsHydrated || !earningsHydrated)) {
       return;
     }
 
     const summary = calculateSummary(investments);
     const currentMonth = getMonthKey();
     const baselineMonth = getPreviousMonthKey(currentMonth);
+    const currentMonthEarnings = earnings
+      .filter((earning) => earning.date.startsWith(currentMonth))
+      .reduce((total, earning) => total + earning.amountEur, 0);
 
     // Compute total contribution/withdrawal inflows for this month from movement history.
     // Used to reconstruct the baseline value (portfolio at start of month before any contributions).
@@ -328,9 +331,10 @@ export function useInvestments(options: UseInvestmentsOptions = {}) {
       const previousSnapshot = existingIndex > 0 ? next[existingIndex - 1] : next[next.length - 1];
 
       const monthlyInflow = previousSnapshot ? summary.totalInvested - previousSnapshot.totalInvested : summary.totalInvested;
-      const monthlyPerformance = previousSnapshot
+      const marketOnlyMonthlyPerformance = previousSnapshot
         ? summary.totalCurrentValue - previousSnapshot.totalCurrentValue - monthlyInflow
         : summary.totalProfitLoss;
+      const monthlyPerformance = marketOnlyMonthlyPerformance + currentMonthEarnings;
       const monthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + monthlyInflow : summary.totalInvested;
       const monthlyReturnPct = monthlyBase > 0 ? (monthlyPerformance / monthlyBase) * 100 : 0;
 
@@ -359,7 +363,7 @@ export function useInvestments(options: UseInvestmentsOptions = {}) {
 
       return sameSnapshots(sorted, next) ? prev : next;
     });
-  }, [investments, snapshotsHydrated]);
+  }, [investments, earnings, snapshotsHydrated, earningsHydrated]);
 
   useEffect(() => {
     if (isSupabaseConfigured && snapshotsHydrated) {
