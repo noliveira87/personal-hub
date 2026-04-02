@@ -12,6 +12,7 @@ export type ContractCategory =
   | 'maintenance'
   | 'security-alarm'
   | 'car'
+  | 'gym'
   | 'other';
 
 export type ContractType = 'mortgage' | 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'car' | 'other';
@@ -119,6 +120,7 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   'maintenance': 'Maintenance',
   'security-alarm': 'Security / Alarm',
   'car': 'Carro',
+  'gym': 'Gym',
   'other': 'Other',
 };
 
@@ -136,6 +138,7 @@ export const CATEGORY_ICONS: Record<ContractCategory, string> = {
   'maintenance': '🛠️',
   'security-alarm': '🚨',
   'car': '🚗',
+  'gym': '💪',
   'other': '❓',
 };
 
