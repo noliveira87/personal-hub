@@ -139,7 +139,7 @@ export default function AppSectionHeader({
 
         <div className="flex items-center gap-2">
           {isContractsLayoutPath && (
-            <div className="relative hidden sm:block" ref={bellMenuRef}>
+            <div className="relative block" ref={bellMenuRef}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -157,7 +157,7 @@ export default function AppSectionHeader({
               </Button>
 
               {alertsOpen && (
-                <div className="absolute right-0 mt-2 w-[320px] rounded-xl border bg-card shadow-lg p-2 z-[60]">
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 w-[min(85vw,300px)] sm:w-[300px] rounded-xl border bg-card shadow-lg p-2 z-[60]">
                   <div className="px-2 pb-2 border-b border-border/60">
                     <p className="text-sm font-semibold text-foreground">Contract Alerts</p>
                     <p className="text-xs text-muted-foreground">
@@ -182,11 +182,11 @@ export default function AppSectionHeader({
                             'hover:bg-muted'
                           )}
                         >
-                          <p className="text-sm font-medium text-foreground truncate">{item.contractName}</p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-sm font-medium text-foreground line-clamp-1">{item.contractName}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {item.provider} · {item.triggerLabel} · occurred {format(item.triggerDate, 'MMM d, yyyy')}
                           </p>
-                          {item.reason && <p className="text-xs text-muted-foreground truncate">{item.reason}</p>}
+                          {item.reason && <p className="text-xs text-muted-foreground line-clamp-2 break-words">{item.reason}</p>}
                         </button>
                       ))
                     )}
