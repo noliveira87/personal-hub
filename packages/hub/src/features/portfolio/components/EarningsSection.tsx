@@ -283,7 +283,7 @@ export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAd
                 {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
               </span>
             </span>
-            <Button onClick={onAdd} size="sm" className="gap-1.5">
+            <Button type="button" size="sm" onClick={onAdd} className="h-9 gap-1.5 rounded-lg px-3">
               <Plus className="h-4 w-4" />
               <span>Add earning</span>
             </Button>

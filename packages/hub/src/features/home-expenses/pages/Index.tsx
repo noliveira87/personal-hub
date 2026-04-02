@@ -7,7 +7,8 @@ import AnnualSummarySection from '@/features/home-expenses/components/dashboard/
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
-import { House } from 'lucide-react';
+import { House, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nProvider';
 
 export default function Index() {
@@ -28,22 +29,35 @@ export default function Index() {
   }, []);
 
   return (
-    <div className="space-y-6 pt-16">
+    <div className="space-y-6">
       <AppSectionHeader
         title={t('homeExpenses.appTitle')}
         icon={House}
         backTo="/"
         actions={(
-          <div className="flex items-center gap-2">
-            <MonthYearSelector />
-            <TransactionForm />
-          </div>
+          <TransactionForm
+            trigger={(
+              <Button
+                size="sm"
+                className="h-10 w-10 rounded-xl px-0 gap-2 sm:h-9 sm:w-auto sm:px-3"
+                aria-label={t('homeExpenses.form.addTransaction')}
+                title={t('homeExpenses.form.addTransaction')}
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('homeExpenses.form.addTransaction')}</span>
+              </Button>
+            )}
+          />
         )}
       />
 
       <div className="flex flex-col items-start gap-2">
         <h2 className="text-2xl font-bold text-foreground">{t('homeExpenses.pages.dashboard.title')}</h2>
         <p className="text-sm text-muted-foreground">{t('homeExpenses.pages.dashboard.subtitle')}</p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <MonthYearSelector />
       </div>
 
       <SummaryCards />

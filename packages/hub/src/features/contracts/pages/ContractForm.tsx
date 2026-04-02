@@ -239,7 +239,7 @@ export default function ContractForm() {
   const labelClass = 'text-sm font-medium text-foreground mb-1.5 block';
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pt-16">
+    <div className="max-w-2xl mx-auto space-y-6">
 
       <AppSectionHeader title={t('contracts.menu')} icon={FileText} backTo="/contracts" backLabel={t('contracts.backToContracts')} />
       <div className="flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { Transaction, EXPENSE_CATEGORIES, TransactionType, ExpenseCategory } from '@/features/home-expenses/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -18,9 +18,10 @@ interface Props {
   onClose?: () => void;
   open?: boolean;
   initialDate?: string;
+  trigger?: ReactNode;
 }
 
-export default function TransactionForm({ editTx, onClose, open: controlledOpen, initialDate }: Props) {
+export default function TransactionForm({ editTx, onClose, open: controlledOpen, initialDate, trigger }: Props) {
   const { addTx, updateTx } = useData();
   const { contracts } = useContracts();
   const { t } = useI18n();
@@ -120,10 +121,12 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     <Dialog open={isOpen} onOpenChange={setOpen}>
       {!editTx && (
         <DialogTrigger asChild>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            {t('homeExpenses.form.addTransaction')}
-          </Button>
+          {trigger ?? (
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              {t('homeExpenses.form.addTransaction')}
+            </Button>
+          )}
         </DialogTrigger>
       )}
       <DialogContent className="sm:max-w-md">

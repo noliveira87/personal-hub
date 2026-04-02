@@ -459,8 +459,8 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
               <p className="text-sm font-medium text-foreground">Movement history</p>
               <p className="text-xs text-muted-foreground">
                 {hasCashback
-                  ? "Record of cashback and manual adjustments. Use the + button on each card to add new entries."
-                  : "Record of contributions and withdrawals. Use the + button on each card to add new entries."}
+                  ? "Record of cashback and manual adjustments. Use the Add Movement action in the page header to add new entries."
+                  : "Record of contributions and withdrawals. Use the Add Movement action in the page header to add new entries."}
               </p>
             </div>
 

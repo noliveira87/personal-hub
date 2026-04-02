@@ -98,7 +98,7 @@ export default function CalendarPage() {
   }, [contracts, months]);
 
   return (
-    <div className="space-y-6 pt-16">
+    <div className="space-y-6">
       <AppSectionHeader title="D12 Contracts" icon={FileText} />
 
       <div className="animate-fade-up">

@@ -1,14 +1,25 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bell, Eye, EyeOff, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Bell, Eye, EyeOff, Menu, Moon, Settings, Sun, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import { useOptionalContracts } from '@/features/contracts/context/ContractContext';
 import { getUnreadOccurredAppAlerts, markOccurredAppAlertsAsRead } from '@/features/contracts/lib/alertReadState';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useHomeExpensesMobileNav } from '@/features/home-expenses/components/Layout';
+import { useContractsMobileNav } from '@/components/Layout';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface AppSectionHeaderProps {
   title: string;
@@ -30,7 +41,7 @@ export default function AppSectionHeader({
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggleDark } = useDarkMode();
-  const { hideAmounts, t, toggleHideAmounts } = useI18n();
+  const { hideAmounts, language, setLanguage, t, toggleHideAmounts } = useI18n();
   const contractsContext = useOptionalContracts();
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [alertsVersion, setAlertsVersion] = useState(0);
@@ -38,6 +49,8 @@ export default function AppSectionHeader({
   const resolvedBackLabel = backLabel ?? t('common.backToProjects');
   const isContractsLayoutPath = /^\/(dashboard|contracts)(\/|$)/.test(location.pathname);
   const isHomeExpensesLayoutPath = /^\/home-expenses(\/|$)/.test(location.pathname);
+  const homeExpensesMobileNav = useHomeExpensesMobileNav();
+  const contractsMobileNav = useContractsMobileNav();
 
   const unreadAlerts = useMemo(() => {
     if (!contractsContext) return [];
@@ -68,27 +81,54 @@ export default function AppSectionHeader({
         ? '/dashboard'
         : '/'
   );
-
   return (
     <header
       className={`fixed right-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg ${
         isContractsLayoutPath
-          ? 'top-14 left-0 lg:top-0 lg:left-0'
+          ? 'top-0 left-0'
           : isHomeExpensesLayoutPath
-            ? 'top-14 left-0 lg:top-0 lg:left-0'
+            ? 'top-0 left-0 lg:top-0 lg:left-0'
             : 'top-0 left-0'
       }`}
     >
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate(resolvedBackTo)}
-          className="gap-1.5"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">{resolvedBackLabel}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {isContractsLayoutPath && contractsMobileNav && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => contractsMobileNav.setMobileOpen((prev) => !prev)}
+              className="h-10 w-10 rounded-xl lg:hidden"
+              aria-label={contractsMobileNav.mobileOpen ? 'Close navigation' : 'Open navigation'}
+              title={contractsMobileNav.mobileOpen ? 'Close navigation' : 'Open navigation'}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          {isHomeExpensesLayoutPath && homeExpensesMobileNav && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => homeExpensesMobileNav.setMobileOpen((prev) => !prev)}
+              className="h-10 w-10 rounded-xl lg:hidden"
+              aria-label={homeExpensesMobileNav.mobileOpen ? 'Close navigation' : 'Open navigation'}
+              title={homeExpensesMobileNav.mobileOpen ? 'Close navigation' : 'Open navigation'}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(resolvedBackTo)}
+            className="gap-1.5"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">{resolvedBackLabel}</span>
+          </Button>
+        </div>
 
         <div className="hidden sm:flex items-center gap-3 flex-1 justify-center">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -98,22 +138,8 @@ export default function AppSectionHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          <LanguageSwitcher compact />
-          <Button variant="ghost" size="icon" onClick={toggleDark} className="text-muted-foreground">
-            {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleHideAmounts}
-            className="text-muted-foreground"
-            aria-label={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
-            title={hideAmounts ? t("common.showAmounts") : t("common.hideAmounts")}
-          >
-            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
           {isContractsLayoutPath && (
-            <div className="relative" ref={bellMenuRef}>
+            <div className="relative hidden sm:block" ref={bellMenuRef}>
               <Button
                 variant="ghost"
                 size="icon"
@@ -195,14 +221,84 @@ export default function AppSectionHeader({
             </div>
           )}
           {showSettings && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/settings', { state: { fromPath: location.pathname } })}
-              className="text-muted-foreground"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-xl text-muted-foreground"
+                  aria-label={t('common.settings')}
+                  title={t('common.settings')}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                
+                {/* Language Selection */}
+                <div className="px-2 py-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">{t('common.language')}</p>
+                  <div className="flex gap-2">
+                    <Badge 
+                      variant={language === 'pt' ? 'default' : 'outline'}
+                      className="cursor-pointer transition-all"
+                      onClick={() => setLanguage('pt')}
+                    >
+                      {t('common.portuguese')}
+                    </Badge>
+                    <Badge 
+                      variant={language === 'en' ? 'default' : 'outline'}
+                      className="cursor-pointer transition-all"
+                      onClick={() => setLanguage('en')}
+                    >
+                      {t('common.english')}
+                    </Badge>
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator />
+                
+                {/* Theme Toggle */}
+                <div className="px-2 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isDark ? (
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Sun className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <label htmlFor="theme-switch" className="text-sm font-medium cursor-pointer">
+                      {isDark ? t('common.darkMode') : t('common.lightMode')}
+                    </label>
+                  </div>
+                  <Switch id="theme-switch" checked={isDark} onCheckedChange={toggleDark} />
+                </div>
+
+                <DropdownMenuSeparator />
+                
+                {/* Hide Amounts Toggle */}
+                <div className="px-2 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {hideAmounts ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <label htmlFor="amounts-switch" className="text-sm font-medium cursor-pointer">
+                      {hideAmounts ? t('common.hideAmounts') : t('common.showAmounts')}
+                    </label>
+                  </div>
+                  <Switch id="amounts-switch" checked={hideAmounts} onCheckedChange={toggleHideAmounts} />
+
+                                <DropdownMenuSeparator />
+
+                                {/* Settings Link */}
+                                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                                  <Settings className="h-4 w-4 mr-2" />
+                                  <span>{t('settingsPage.title')}</span>
+                                </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {actions}
         </div>

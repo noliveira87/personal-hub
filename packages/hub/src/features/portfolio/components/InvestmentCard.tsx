@@ -219,12 +219,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
           <div className="h-6 w-px bg-border/80" />
           <div className="flex items-center gap-1 pl-1.5">
             <button
-              onClick={() => {
-                setQuickMode(defaultQuickMode);
-                setQuickAddOpen(true);
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:h-8 sm:w-8"
-              title="Add contribution"
+              onClick={() => setQuickAddOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
+              title="Add movement"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>

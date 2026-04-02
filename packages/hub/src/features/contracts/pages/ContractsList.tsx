@@ -65,7 +65,7 @@ export default function ContractsList() {
   }
 
   return (
-    <div className="space-y-6 pt-16">
+    <div className="space-y-6">
       <AppSectionHeader
         title={t('contracts.menu')}
         icon={FileText}

@@ -17,7 +17,7 @@ import { AddWarrantyDialog } from "./AddWarrantyDialog";
 import { WarrantyCard } from "./WarrantyCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Settings, ShieldCheck } from "lucide-react";
+import { Plus, Search, ShieldCheck } from "lucide-react";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
@@ -227,23 +227,19 @@ export function WarrantyApp() {
         title="D12 Warranties"
         icon={ShieldCheck}
         actions={(
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/settings", { state: { from: "warranties", fromPath: "/warranties" } })}
-              className="text-muted-foreground"
-              aria-label="Warranty settings"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <AddWarrantyDialog onAdd={addWarranty} />
-          </>
+          <AddWarrantyDialog
+            onAdd={addWarranty}
+            trigger={(
+              <Button className="h-10 w-10 rounded-xl sm:h-9 sm:w-auto sm:rounded-lg sm:px-3" aria-label="Add product" title="Add product">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add product</span>
+              </Button>
+            )}
+          />
         )}
-        showSettings={false}
       />
 
-      <div className="max-w-lg mx-auto px-4 pt-20 pb-24">
+      <div className="max-w-lg mx-auto px-4 pt-16 pb-24">
         <div className="fade-in-up mb-6 rounded-2xl border bg-card p-4 space-y-4" style={{ animationDelay: "80ms" }}>
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">

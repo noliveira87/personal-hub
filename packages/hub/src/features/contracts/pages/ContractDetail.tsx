@@ -78,7 +78,7 @@ export default function ContractDetail() {
   const formatPercent = (value: number | null | undefined) => value == null ? '—' : `${String(value).replace('.', ',')}%`;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pt-16">
+    <div className="max-w-3xl mx-auto space-y-6">
       <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/dashboard" backLabel="Back" />
 
       {/* Header */}

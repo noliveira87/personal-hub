@@ -3,11 +3,13 @@ import { useData } from '@/features/home-expenses/lib/DataContext';
 import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { MONTHS } from '@/features/home-expenses/lib/types';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, AlertTriangle, Target, PiggyBank, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Target, PiggyBank, Activity, Plus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
+import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
+import { Button } from '@/components/ui/button';
 
 const MONTH_KEYS = [
   'homeExpenses.months.january',
@@ -28,6 +30,7 @@ export default function Insights() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
+  const initialDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
 
   const data = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {
@@ -156,17 +159,36 @@ export default function Insights() {
   ], [data, t, formatCurrency]);
 
   return (
-    <div className="space-y-6 pt-16">
+    <div className="space-y-6">
       <AppSectionHeader
         title={t('homeExpenses.appTitle')}
         icon={TrendingUp}
         backTo="/"
-        actions={<MonthYearSelector />}
+        actions={(
+          <TransactionForm
+            initialDate={initialDate}
+            trigger={(
+              <Button
+                size="sm"
+                className="h-10 w-10 rounded-xl px-0 gap-2 sm:h-9 sm:w-auto sm:px-3"
+                aria-label={t('homeExpenses.form.addTransaction')}
+                title={t('homeExpenses.form.addTransaction')}
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('homeExpenses.form.addTransaction')}</span>
+              </Button>
+            )}
+          />
+        )}
       />
 
       <div className="flex flex-col items-start gap-2">
         <h2 className="text-2xl font-bold text-foreground">{t('homeExpenses.pages.insights.title')}</h2>
         <p className="text-sm text-muted-foreground">{t('homeExpenses.pages.insights.subtitle')}</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <MonthYearSelector />
       </div>
 
       {data.prevExpenses > 0 && data.expenseChange > 5 && (

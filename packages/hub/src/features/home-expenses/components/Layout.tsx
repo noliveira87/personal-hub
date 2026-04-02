@@ -1,6 +1,6 @@
+import { createContext, useContext, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowUpDown, CalendarDays, TrendingUp, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { LayoutDashboard, ArrowUpDown, CalendarDays, TrendingUp, X } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 
 const links = [
@@ -10,12 +10,25 @@ const links = [
   { to: '/home-expenses/insights', labelKey: 'homeExpenses.layout.nav.insights', icon: TrendingUp },
 ];
 
+type HomeExpensesMobileNavContextValue = {
+  mobileOpen: boolean;
+  setMobileOpen: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+const HomeExpensesMobileNavContext = createContext<HomeExpensesMobileNavContextValue | null>(null);
+
+export function useHomeExpensesMobileNav() {
+  return useContext(HomeExpensesMobileNavContext);
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useI18n();
+  const contextValue = useMemo(() => ({ mobileOpen, setMobileOpen }), [mobileOpen]);
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <HomeExpensesMobileNavContext.Provider value={contextValue}>
+      <div className="min-h-screen bg-background flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card/50 backdrop-blur-xl fixed h-full z-30 pt-16">
         <nav className="flex-1 p-4 space-y-1 border-t border-border">
@@ -39,38 +52,41 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-foreground">
-          <span className="text-primary">Fin</span>Flow
-        </h1>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-foreground">
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </div>
-
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-30 bg-background/80 backdrop-blur-sm" onClick={() => setMobileOpen(false)}>
-          <div className="absolute top-14 left-0 right-0 bg-card border-b border-border p-4 space-y-1" onClick={(e) => e.stopPropagation()}>
-            {links.map((l) => (
-              <NavLink
-                key={l.to}
-                to={l.to}
-                end={l.end}
+        <div className="lg:hidden fixed inset-0 z-[70] bg-background/92 backdrop-blur-xl" onClick={() => setMobileOpen(false)}>
+          <div className="absolute inset-x-0 top-0 border-b border-border bg-card/98 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-end px-4 py-4">
+              <button
+                type="button"
                 onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                  }`
-                }
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background text-foreground shadow-sm"
+                aria-label="Close navigation"
               >
-                <l.icon className="w-4 h-4" />
-                {t(l.labelKey)}
-              </NavLink>
-            ))}
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="space-y-2 px-4 pb-5">
+              {links.map((l) => (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  end={l.end}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium transition-all ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`
+                  }
+                >
+                  <l.icon className="h-5 w-5" />
+                  {t(l.labelKey)}
+                </NavLink>
+              ))}
+            </nav>
           </div>
         </div>
       )}
@@ -81,6 +97,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
-    </div>
+      </div>
+    </HomeExpensesMobileNavContext.Provider>
   );
 }

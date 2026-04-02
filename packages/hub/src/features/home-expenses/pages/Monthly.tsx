@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { isContractTransaction } from '@/features/home-expenses/lib/contractMapping';
 import { useI18n } from '@/i18n/I18nProvider';
+import { Button } from '@/components/ui/button';
 
 const MONTH_KEYS = [
   'homeExpenses.months.january',
@@ -78,22 +79,36 @@ export default function Monthly() {
   };
 
   return (
-    <div className="space-y-6 pt-16">
+    <div className="space-y-6">
       <AppSectionHeader
         title={t('homeExpenses.appTitle')}
         icon={CalendarDays}
         backTo="/"
         actions={(
-          <div className="flex items-center gap-2">
-            <MonthYearSelector />
-            <TransactionForm initialDate={initialDate} />
-          </div>
+          <TransactionForm
+            initialDate={initialDate}
+            trigger={(
+              <Button
+                size="sm"
+                className="h-10 w-10 rounded-xl px-0 gap-2 sm:h-9 sm:w-auto sm:px-3"
+                aria-label={t('homeExpenses.form.addTransaction')}
+                title={t('homeExpenses.form.addTransaction')}
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('homeExpenses.form.addTransaction')}</span>
+              </Button>
+            )}
+          />
         )}
       />
 
       <div>
         <h2 className="text-2xl font-bold text-foreground">{t('homeExpenses.pages.monthly.title')} — {selectedYear}</h2>
         <p className="text-sm text-muted-foreground">{t('homeExpenses.pages.monthly.subtitle')}</p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <MonthYearSelector />
       </div>
 
       <div className="overflow-x-auto">

@@ -128,7 +128,7 @@ export default function InsightsPage() {
   const chartCurrency = selectedContract?.currency ?? 'EUR';
 
   return (
-    <div className="space-y-8 pt-16">
+    <div className="space-y-8">
       <AppSectionHeader title="D12 Contracts" icon={FileText} />
 
       <div className="animate-fade-up">

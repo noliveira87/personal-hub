@@ -240,9 +240,22 @@ export function TripsApp() {
     return <TripForm trip={current} onSave={(trip) => { void handleSaveEdit(trip); }} onCancel={() => setView("detail")} />;
   }
 
+  const headerActions = (
+    <Button
+      onClick={() => setView("add")}
+      size="sm"
+      className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
+      aria-label={t("trips.newTrip")}
+      title={t("trips.newTrip")}
+    >
+      <Plus className="h-4 w-4" />
+      <span className="hidden sm:inline">{t("trips.newTrip")}</span>
+    </Button>
+  );
+
   return (
     <>
-      <Header />
+      <Header actions={headerActions} />
       <main className="min-h-screen">
         <section className="relative overflow-hidden border-b border-border/40">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,hsl(var(--accent)/0.18),transparent_40%),radial-gradient(circle_at_85%_20%,hsl(var(--primary)/0.14),transparent_42%),linear-gradient(110deg,hsl(var(--background))_0%,hsl(var(--secondary)/0.32)_45%,hsl(var(--background))_100%)]" />
@@ -350,13 +363,6 @@ export function TripsApp() {
                 className="pl-11 h-11 rounded-full bg-secondary/50 border-border/50 font-body"
               />
             </div>
-            <Button
-              onClick={() => setView("add")}
-              className="gap-2 rounded-full px-6 h-11 bg-foreground text-background hover:bg-foreground/90 font-body shadow-lg hover:shadow-xl transition-shadow"
-            >
-              <Plus className="h-4 w-4" />
-              {t("trips.newTrip")}
-            </Button>
           </motion.div>
 
           <AnimatePresence mode="popLayout">

@@ -240,12 +240,36 @@ const Index = () => {
         icon={ChartLine}
         actions={(
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/portfolio/insights">Insights</Link>
-            </Button>
-            <Button onClick={handleAdd} size="sm" className="gap-1.5">
+            <Button
+              onClick={handleAdd}
+              size="sm"
+              className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
+              aria-label="Add Investment"
+              title="Add Investment"
+            >
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Investment</span>
+            </Button>
+
+            {/* Desktop actions */}
+            <div className="hidden sm:flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild className="gap-1.5">
+                <Link to="/portfolio/insights" aria-label="Open insights" title="Insights" className="flex items-center gap-1.5">
+                  <ChartLine className="h-4 w-4" />
+                  <span>Insights</span>
+                </Link>
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl sm:hidden"
+              asChild
+              aria-label="Insights"
+            >
+              <Link to="/portfolio/insights" title="Insights">
+                <ChartLine className="h-4 w-4" />
+              </Link>
             </Button>
           </div>
         )}

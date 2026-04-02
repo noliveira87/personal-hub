@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Send, Settings, Bell } from 'lucide-react';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { Send, Settings, Bell, Moon, Sun, Eye, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation } from 'react-router-dom';
+import { useDarkMode } from '@shared-ui/use-dark-mode';
 import {
   getSettingsPersistenceMode,
   loadTelegramConfig,
@@ -20,7 +23,8 @@ import {
 } from '@/features/warranties/lib/notificationSettings';
 
 export default function SettingsPage() {
-  const { t } = useI18n();
+  const { hideAmounts, language, setLanguage, t, toggleHideAmounts } = useI18n();
+  const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
   const isFromWarranties = locationState?.from === 'warranties';
@@ -145,7 +149,51 @@ export default function SettingsPage() {
             <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.languageCardTitle')}</h2>
             <p className="text-xs text-muted-foreground">{t('settingsPage.languageCardDescription')}</p>
           </div>
-          <LanguageSwitcher />
+          <div className="flex gap-2">
+            <Badge
+              variant={language === 'pt' ? 'default' : 'outline'}
+              className="cursor-pointer px-3 py-1.5 transition-all"
+              onClick={() => setLanguage('pt')}
+            >
+              {t('common.portuguese')}
+            </Badge>
+            <Badge
+              variant={language === 'en' ? 'default' : 'outline'}
+              className="cursor-pointer px-3 py-1.5 transition-all"
+              onClick={() => setLanguage('en')}
+            >
+              {t('common.english')}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '40ms' }}>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">{t('common.settings')}</h2>
+            <p className="text-xs text-muted-foreground">{t('settingsPage.languageCardDescription')}</p>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                {isDark ? <Moon className="h-4 w-4 text-muted-foreground" /> : <Sun className="h-4 w-4 text-muted-foreground" />}
+                <div>
+                  <p className="text-sm font-medium text-foreground">{t('common.darkMode')}</p>
+                  <p className="text-xs text-muted-foreground">{isDark ? t('common.lightMode') : t('common.darkMode')}</p>
+                </div>
+              </div>
+              <Switch checked={isDark} onCheckedChange={toggleDark} aria-label={t('common.darkMode')} />
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                {hideAmounts ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                <div>
+                  <p className="text-sm font-medium text-foreground">{t('common.hideAmounts')}</p>
+                  <p className="text-xs text-muted-foreground">{hideAmounts ? t('common.showAmounts') : t('common.hideAmounts')}</p>
+                </div>
+              </div>
+              <Switch checked={hideAmounts} onCheckedChange={toggleHideAmounts} aria-label={t('common.hideAmounts')} />
+            </div>
+          </div>
         </div>
 
         {/* Telegram */}

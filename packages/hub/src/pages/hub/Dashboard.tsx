@@ -98,7 +98,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 pt-16">
+    <div className="space-y-8">
       <AppSectionHeader
         title={t('contracts.menu')}
         icon={LayoutDashboard}

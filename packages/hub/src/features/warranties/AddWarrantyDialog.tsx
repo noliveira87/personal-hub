@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { generateUUID } from "@/lib/utils";
 
 interface Props {
   onAdd: (warranty: Warranty) => Promise<void> | void;
+  trigger?: ReactNode;
 }
 
 const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
@@ -22,7 +23,7 @@ const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
   { value: "others", label: "Others" },
 ];
 
-export function AddWarrantyDialog({ onAdd }: Props) {
+export function AddWarrantyDialog({ onAdd, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<WarrantyCategory>("others");
@@ -108,10 +109,12 @@ export function AddWarrantyDialog({ onAdd }: Props) {
       }}
     >
       <DialogTrigger asChild>
-        <Button size="lg" className="shrink-0 gap-2 shadow-md shadow-primary/20 active:scale-[0.97] transition-transform">
-          <Plus className="h-5 w-5" />
-          Add product
-        </Button>
+        {trigger ?? (
+          <Button size="lg" className="shrink-0 gap-2 shadow-md shadow-primary/20 active:scale-[0.97] transition-transform">
+            <Plus className="h-5 w-5" />
+            Add product
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-md">
