@@ -456,7 +456,7 @@ export const translations = {
         savingsRate: "Taxa de Poupanca",
       },
       charts: {
-        monthlyBalance: "Saldo Mensal",
+        monthlyBalance: "Distribuição de Despesas",
         expenseDistribution: "Distribuicao de Despesas",
         noExpensesThisMonth: "Sem despesas neste mes",
         income: "Rendimento",
