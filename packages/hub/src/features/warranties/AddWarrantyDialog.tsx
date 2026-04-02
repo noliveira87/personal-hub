@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Upload, Image, Package, CalendarDays, Clock, Store, Tag, Banknote } from "lucide-react";
 import { calculateExpiration, deleteReceiptByUrl, type Warranty, type WarrantyCategory, uploadReceipt } from "@/lib/warranties";
 import { generateUUID } from "@/lib/utils";
+import { DEFAULT_WARRANTY_DEFAULTS_SETTINGS, loadWarrantyDefaultsSettings, type WarrantyDefaultsSettings } from "./lib/defaultSettings";
 
 interface Props {
   onAdd: (warranty: Warranty) => Promise<void> | void;
@@ -25,27 +26,47 @@ const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
 
 export function AddWarrantyDialog({ onAdd, trigger }: Props) {
   const [open, setOpen] = useState(false);
+  const [defaultSettings, setDefaultSettings] = useState<WarrantyDefaultsSettings>(DEFAULT_WARRANTY_DEFAULTS_SETTINGS);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<WarrantyCategory>("others");
+  const [category, setCategory] = useState<WarrantyCategory>(DEFAULT_WARRANTY_DEFAULTS_SETTINGS.defaultCategory);
   const [price, setPrice] = useState("");
   const [purchasedFrom, setPurchasedFrom] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [years, setYears] = useState<2 | 3>(3);
+  const [years, setYears] = useState<2 | 3>(DEFAULT_WARRANTY_DEFAULTS_SETTINGS.defaultYears);
   const [receiptFile, setReceiptFile] = useState<File | undefined>();
   const [receiptName, setReceiptName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => {
+  const reset = (settings: WarrantyDefaultsSettings = defaultSettings) => {
     setName("");
-    setCategory("others");
+    setCategory(settings.defaultCategory);
     setPrice("");
     setPurchasedFrom("");
     setDate(new Date().toISOString().split("T")[0]);
-    setYears(3);
+    setYears(settings.defaultYears);
     setReceiptFile(undefined);
     setReceiptName("");
   };
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    const loadDefaults = async () => {
+      const settings = await loadWarrantyDefaultsSettings();
+      if (cancelled) return;
+      setDefaultSettings(settings);
+      reset(settings);
+    };
+
+    void loadDefaults();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

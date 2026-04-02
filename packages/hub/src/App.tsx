@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,6 +9,7 @@ import { I18nProvider, useI18n } from "@/i18n/I18nProvider";
 import Layout from "@/components/Layout";
 import { DataProvider } from "@/features/home-expenses/lib/DataContext";
 import HomeExpensesLayout from "@/features/home-expenses/components/Layout";
+import { hydrateContractAlertReadState } from "@/features/contracts/lib/alertReadState";
 
 const Index = lazy(() => import("@/pages/Index"));
 const Dashboard = lazy(() => import("@/pages/hub/Dashboard"));
@@ -47,6 +48,10 @@ const RepositoriesScope = () => (
 
 const AppRoutes = () => {
   const { t } = useI18n();
+
+  useEffect(() => {
+    void hydrateContractAlertReadState();
+  }, []);
 
   return (
     <BrowserRouter>

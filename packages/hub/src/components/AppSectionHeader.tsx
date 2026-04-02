@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import { useOptionalContracts } from '@/features/contracts/context/ContractContext';
-import { getUnreadOccurredAppAlerts, markOccurredAppAlertsAsRead } from '@/features/contracts/lib/alertReadState';
+import { getUnreadOccurredAppAlerts, markOccurredAppAlertsAsRead, subscribeContractAlertReadState } from '@/features/contracts/lib/alertReadState';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useHomeExpensesMobileNav } from '@/features/home-expenses/components/Layout';
@@ -28,6 +28,7 @@ interface AppSectionHeaderProps {
   backTo?: string | number;
   backLabel?: string;
   showSettings?: boolean;
+  settingsExtraContent?: ReactNode;
 }
 
 export default function AppSectionHeader({
@@ -37,6 +38,7 @@ export default function AppSectionHeader({
   backTo,
   backLabel,
   showSettings = true,
+  settingsExtraContent,
 }: AppSectionHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,6 +76,9 @@ export default function AppSectionHeader({
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
+
+  useEffect(() => subscribeContractAlertReadState(() => setAlertsVersion((prev) => prev + 1)), []);
+
   const resolvedBackTo = backTo ?? (
     location.pathname === '/dashboard'
       ? '/'
@@ -81,6 +86,16 @@ export default function AppSectionHeader({
         ? '/dashboard'
         : '/'
   );
+
+  const handleBack = () => {
+    if (typeof resolvedBackTo === 'number') {
+      navigate(resolvedBackTo);
+      return;
+    }
+
+    navigate(resolvedBackTo);
+  };
+
   return (
     <header
       className={`fixed right-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg ${
@@ -122,7 +137,7 @@ export default function AppSectionHeader({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate(resolvedBackTo)}
+            onClick={handleBack}
             className="gap-1.5"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -233,7 +248,7 @@ export default function AppSectionHeader({
                   <Settings className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuContent align="end" className={cn('w-72', settingsExtraContent && 'w-80')}>
                 
                 {/* Language Selection */}
                 <div className="px-2 py-3">
@@ -292,8 +307,24 @@ export default function AppSectionHeader({
 
                 <DropdownMenuSeparator />
 
+                {settingsExtraContent && (
+                  <>
+                    <div className="px-2 py-2">{settingsExtraContent}</div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
                 {/* Settings Link */}
-                <DropdownMenuItem onClick={() => navigate('/settings')}>
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigate('/settings', {
+                      state: {
+                        fromPath: location.pathname,
+                        from: location.pathname.startsWith('/warranties') ? 'warranties' : undefined,
+                      },
+                    })
+                  }
+                >
                   <Settings className="h-4 w-4 mr-2" />
                   <span>{t('settingsPage.title')}</span>
                 </DropdownMenuItem>

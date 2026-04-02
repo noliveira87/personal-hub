@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/features/contracts/types/contract';
 import { StatusBadge } from './StatusBadge';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
-import { hasUnreadContractAlerts } from '@/features/contracts/lib/alertReadState';
+import { hasUnreadContractAlerts, subscribeContractAlertReadState } from '@/features/contracts/lib/alertReadState';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Bell, BellDot, CalendarDays } from 'lucide-react';
@@ -17,6 +18,7 @@ interface LatestPrice {
 export function ContractCard({ contract, index = 0, latestPrice }: { contract: Contract; index?: number; latestPrice?: LatestPrice }) {
   const navigate = useNavigate();
   const { formatCurrency } = useI18n();
+  const [, setReadStateVersion] = useState(0);
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
   const hasAlerts = contract.alerts.length > 0;
@@ -26,6 +28,8 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   const displayPrice = latestPrice?.price ?? contract.price;
   const displayCurrency = latestPrice?.currency || contract.currency;
   const priceDate = latestPrice?.date;
+
+  useEffect(() => subscribeContractAlertReadState(() => setReadStateVersion((prev) => prev + 1)), []);
 
   return (
     <div

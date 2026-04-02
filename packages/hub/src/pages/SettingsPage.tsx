@@ -21,13 +21,25 @@ import {
   persistWarrantyNotificationSettings,
   type WarrantyNotificationSettings,
 } from '@/features/warranties/lib/notificationSettings';
+import {
+  DEFAULT_WARRANTY_DEFAULTS_SETTINGS,
+  loadWarrantyDefaultsSettings,
+  persistWarrantyDefaultsSettings,
+  type WarrantyDefaultsSettings,
+} from '@/features/warranties/lib/defaultSettings';
+import type { WarrantyCategory } from '@/lib/warranties';
+
+const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string }> = [
+  { value: 'tech', label: 'Tech' },
+  { value: 'appliances', label: 'Appliances' },
+  { value: 'others', label: 'Others' },
+];
 
 export default function SettingsPage() {
   const { hideAmounts, language, setLanguage, t, toggleHideAmounts } = useI18n();
   const { isDark, toggleDark } = useDarkMode();
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
-  const isFromWarranties = locationState?.from === 'warranties';
   const backToPath: string | number = locationState?.fromPath ?? (window.history.length > 1 ? -1 : '/');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramBotToken, setTelegramBotToken] = useState('');
@@ -36,9 +48,24 @@ export default function SettingsPage() {
   const [sendingTest, setSendingTest] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [warrantyNotificationSettings, setWarrantyNotificationSettings] = useState<WarrantyNotificationSettings>(DEFAULT_WARRANTY_NOTIFICATION_SETTINGS);
+  const [warrantyDefaults, setWarrantyDefaults] = useState<WarrantyDefaultsSettings>(DEFAULT_WARRANTY_DEFAULTS_SETTINGS);
+  const [initialTelegramConfig, setInitialTelegramConfig] = useState({ botToken: '', chatId: '' });
+  const [initialWarrantyNotificationSettings, setInitialWarrantyNotificationSettings] = useState<WarrantyNotificationSettings>(DEFAULT_WARRANTY_NOTIFICATION_SETTINGS);
+  const [initialWarrantyDefaults, setInitialWarrantyDefaults] = useState<WarrantyDefaultsSettings>(DEFAULT_WARRANTY_DEFAULTS_SETTINGS);
   const [savingWarrantyNotificationSettings, setSavingWarrantyNotificationSettings] = useState(false);
   const [warrantyNotificationSaved, setWarrantyNotificationSaved] = useState(false);
   const storageMode = useMemo(() => getSettingsPersistenceMode(), []);
+  const showWarrantySettings = useMemo(
+    () => locationState?.from === 'warranties' || (locationState?.fromPath?.startsWith('/warranties') ?? false),
+    [locationState],
+  );
+
+  const telegramDirty = telegramBotToken !== initialTelegramConfig.botToken || telegramChatId !== initialTelegramConfig.chatId;
+  const warrantyDirty =
+    warrantyNotificationSettings.enabled !== initialWarrantyNotificationSettings.enabled ||
+    warrantyNotificationSettings.alertDays !== initialWarrantyNotificationSettings.alertDays ||
+    warrantyDefaults.defaultCategory !== initialWarrantyDefaults.defaultCategory ||
+    warrantyDefaults.defaultYears !== initialWarrantyDefaults.defaultYears;
 
   useEffect(() => {
     let cancelled = false;
@@ -51,12 +78,18 @@ export default function SettingsPage() {
 
         setTelegramBotToken(telegramConfig.botToken);
         setTelegramChatId(telegramConfig.chatId);
+        setInitialTelegramConfig({ botToken: telegramConfig.botToken, chatId: telegramConfig.chatId });
 
-        if (isFromWarranties) {
-          const warrantySettings = await loadWarrantyNotificationSettings();
-          if (cancelled) return;
-          setWarrantyNotificationSettings(warrantySettings);
-        }
+        const [warrantySettings, warrantyDefaultsSettings] = await Promise.all([
+          loadWarrantyNotificationSettings(),
+          loadWarrantyDefaultsSettings(),
+        ]);
+
+        if (cancelled) return;
+        setWarrantyNotificationSettings(warrantySettings);
+        setWarrantyDefaults(warrantyDefaultsSettings);
+        setInitialWarrantyNotificationSettings(warrantySettings);
+        setInitialWarrantyDefaults(warrantyDefaultsSettings);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -69,13 +102,17 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [isFromWarranties]);
+  }, []);
 
   const handleSave = async () => {
+    if (!telegramDirty) return;
+
     await persistTelegramConfig({
       botToken: telegramBotToken,
       chatId: telegramChatId,
     });
+
+    setInitialTelegramConfig({ botToken: telegramBotToken, chatId: telegramChatId });
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -107,9 +144,16 @@ export default function SettingsPage() {
   };
 
   const handleSaveWarrantyNotificationSettings = async () => {
+    if (!warrantyDirty) return;
+
     setSavingWarrantyNotificationSettings(true);
     try {
-      await persistWarrantyNotificationSettings(warrantyNotificationSettings);
+      await Promise.all([
+        persistWarrantyNotificationSettings(warrantyNotificationSettings),
+        persistWarrantyDefaultsSettings(warrantyDefaults),
+      ]);
+      setInitialWarrantyNotificationSettings(warrantyNotificationSettings);
+      setInitialWarrantyDefaults(warrantyDefaults);
       setWarrantyNotificationSaved(true);
       setTimeout(() => setWarrantyNotificationSaved(false), 2000);
     } finally {
@@ -233,7 +277,8 @@ export default function SettingsPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => void handleSave()}
-                className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95"
+                disabled={!telegramDirty}
+                className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
               >
                 {saved ? t('settingsPage.saved') : t('settingsPage.saveSettings')}
               </button>
@@ -253,60 +298,93 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {isFromWarranties && (
+        {showWarrantySettings && (
           <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '160ms' }}>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Bell className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.warrantyTitle')}</h2>
-                <p className="text-xs text-muted-foreground">{t('settingsPage.warrantyDescription')}</p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Bell className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.warrantyTitle')}</h2>
+              <p className="text-xs text-muted-foreground">{t('settingsPage.warrantyDescription')}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-foreground">Default category</p>
+              <div className="flex gap-2">
+                {WARRANTY_CATEGORY_OPTIONS.map((option) => (
+                  <Badge
+                    key={option.value}
+                    variant={warrantyDefaults.defaultCategory === option.value ? 'default' : 'outline'}
+                    className="cursor-pointer px-3 py-1.5 transition-all"
+                    onClick={() => setWarrantyDefaults((prev) => ({ ...prev, defaultCategory: option.value }))}
+                  >
+                    {option.label}
+                  </Badge>
+                ))}
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{t('settingsPage.warrantyEnabled')}</p>
-                  <p className="text-xs text-muted-foreground">{t('settingsPage.warrantyEnabledHint')}</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={warrantyNotificationSettings.enabled}
-                  onChange={(e) => setWarrantyNotificationSettings((prev) => ({ ...prev, enabled: e.target.checked }))}
-                  className="h-4 w-4 rounded"
-                />
+            <div>
+              <p className="mb-1.5 text-sm font-medium text-foreground">Default warranty length</p>
+              <div className="flex gap-2">
+                {([2, 3] as const).map((years) => (
+                  <Badge
+                    key={years}
+                    variant={warrantyDefaults.defaultYears === years ? 'default' : 'outline'}
+                    className="cursor-pointer px-3 py-1.5 transition-all"
+                    onClick={() => setWarrantyDefaults((prev) => ({ ...prev, defaultYears: years }))}
+                  >
+                    {years} years
+                  </Badge>
+                ))}
               </div>
-
-              <div>
-                <Label htmlFor="warranty-alert-days" className="mb-1.5 block">{t('settingsPage.warrantyLeadTime')}</Label>
-                <Input
-                  id="warranty-alert-days"
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={warrantyNotificationSettings.alertDays}
-                  onChange={(e) => setWarrantyNotificationSettings((prev) => ({ ...prev, alertDays: Math.max(1, Number(e.target.value) || 1) }))}
-                />
-                <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.warrantyLeadTimeHint')}</p>
-              </div>
-
-              <button
-                onClick={() => void handleSaveWarrantyNotificationSettings()}
-                disabled={savingWarrantyNotificationSettings}
-                className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-60"
-              >
-                {savingWarrantyNotificationSettings ? t('settingsPage.savingWarranty') : warrantyNotificationSaved ? t('settingsPage.saved') : t('settingsPage.saveWarranty')}
-              </button>
             </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">{t('settingsPage.warrantyEnabled')}</p>
+                <p className="text-xs text-muted-foreground">{t('settingsPage.warrantyEnabledHint')}</p>
+              </div>
+              <Switch
+                checked={warrantyNotificationSettings.enabled}
+                onCheckedChange={(checked) => setWarrantyNotificationSettings((prev) => ({ ...prev, enabled: checked }))}
+                aria-label={t('settingsPage.warrantyEnabled')}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="warranty-alert-days" className="mb-1.5 block">{t('settingsPage.warrantyLeadTime')}</Label>
+              <Input
+                id="warranty-alert-days"
+                type="number"
+                min={1}
+                max={365}
+                value={warrantyNotificationSettings.alertDays}
+                onChange={(e) => setWarrantyNotificationSettings((prev) => ({ ...prev, alertDays: Math.max(1, Number(e.target.value) || 1) }))}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.warrantyLeadTimeHint')}</p>
+            </div>
+
+            <button
+              onClick={() => void handleSaveWarrantyNotificationSettings()}
+              disabled={savingWarrantyNotificationSettings || !warrantyDirty}
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
+            >
+              {savingWarrantyNotificationSettings ? t('settingsPage.savingWarranty') : warrantyNotificationSaved ? t('settingsPage.saved') : t('settingsPage.saveWarranty')}
+            </button>
+          </div>
           </div>
         )}
 
-        <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: isFromWarranties ? '240ms' : '160ms' }}>
-          <p className="text-sm font-medium text-foreground">{t('settingsPage.featureNotificationsTitle')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{isFromWarranties ? t('settingsPage.featureNotificationsConfigured') : t('settingsPage.featureNotificationsDescription')}</p>
-        </div>
+        {showWarrantySettings && (
+          <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: '240ms' }}>
+            <p className="text-sm font-medium text-foreground">{t('settingsPage.featureNotificationsTitle')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.featureNotificationsConfigured')}</p>
+          </div>
+        )}
       </div>
     </div>
   );

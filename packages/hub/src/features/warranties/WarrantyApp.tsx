@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, Search, ShieldCheck } from "lucide-react";
 import AppSectionHeader from "@/components/AppSectionHeader";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 const FILTERS: { label: string; value: WarrantyStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -53,7 +53,6 @@ function parseCategoryFilter(value: string | null): WarrantyCategory | 'all' {
 
 export function WarrantyApp() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<WarrantyStatus | "all">(() => parseStatusFilter(searchParams.get('status')));

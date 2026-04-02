@@ -19,6 +19,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@shared-ui/*": [
+        "../libs/ui/src/*"
       ]
     },
     "skipLibCheck": true,

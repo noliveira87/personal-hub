@@ -13,6 +13,7 @@ import {
   markContractAlertsAsRead,
   markOccurredAppAlertsAsRead,
   getUnreadOccurredAppAlerts,
+  subscribeContractAlertReadState,
 } from '@/features/contracts/lib/alertReadState';
 
 type EditableAlertKind = 'days-before' | 'specific-date';
@@ -32,6 +33,9 @@ export default function AlertsPage() {
   const [message, setMessage] = useState('');
   const [appEnabled, setAppEnabled] = useState(true);
   const [telegramEnabled, setTelegramEnabled] = useState(false);
+  const [readStateVersion, setReadStateVersion] = useState(0);
+
+  useEffect(() => subscribeContractAlertReadState(() => setReadStateVersion((prev) => prev + 1)), []);
 
   useEffect(() => {
     const preselectedContractId = searchParams.get('contractId');
@@ -311,7 +315,7 @@ export default function AlertsPage() {
 
   // Ocorridos (histórico)
   // Derivar todos os ocorridos a partir dos lidos + não lidos
-  const unreadOccurredList = getUnreadOccurredAppAlerts(contracts);
+  const unreadOccurredList = useMemo(() => getUnreadOccurredAppAlerts(contracts), [contracts, readStateVersion]);
   const unreadOccurred = useMemo(() => new Set(unreadOccurredList.map(a => a.signature)), [unreadOccurredList]);
   // Para todos os ocorridos, unir os não lidos + lidos
   const occurredAlerts = useMemo(() => {

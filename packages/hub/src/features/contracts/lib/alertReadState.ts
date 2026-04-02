@@ -1,7 +1,11 @@
 import { Contract } from '@/features/contracts/types/contract';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { format, isValid, parseISO, subDays } from 'date-fns';
 
 const STORAGE_KEY = 'd12-contract-alerts-read-signatures';
+const SETTINGS_TABLE = 'app_settings';
+const GLOBAL_SETTINGS_ID = 'global';
+const CHANGE_EVENT = 'd12-contract-alert-read-state-changed';
 
 export interface OccurredAppAlert {
   signature: string;
@@ -15,20 +19,121 @@ export interface OccurredAppAlert {
 
 type ReadSignatureState = string[];
 
+type ContractAlertReadSettingsRow = {
+  id: string;
+  contract_alerts_read_signatures: unknown;
+};
+
+let cachedState: ReadSignatureState | null = null;
+let hydrationPromise: Promise<void> | null = null;
+
+function emitChange(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+function normalizeState(value: unknown): ReadSignatureState {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
 function readState(): ReadSignatureState {
+  if (cachedState) return cachedState;
+
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      cachedState = [];
+      return cachedState;
+    }
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === 'string');
+    cachedState = normalizeState(parsed);
+    return cachedState;
   } catch {
-    return [];
+    cachedState = [];
+    return cachedState;
   }
 }
 
 function writeState(state: ReadSignatureState): void {
+  cachedState = state;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+async function loadStateFromDatabase(): Promise<ReadSignatureState> {
+  const { data, error } = await supabase
+    .from(SETTINGS_TABLE)
+    .select('id, contract_alerts_read_signatures')
+    .eq('id', GLOBAL_SETTINGS_ID)
+    .maybeSingle();
+
+  if (error) throw error;
+  const row = (data as ContractAlertReadSettingsRow | null) ?? null;
+  return normalizeState(row?.contract_alerts_read_signatures);
+}
+
+async function persistStateToDatabase(state: ReadSignatureState): Promise<void> {
+  const { error } = await supabase
+    .from(SETTINGS_TABLE)
+    .upsert(
+      {
+        id: GLOBAL_SETTINGS_ID,
+        contract_alerts_read_signatures: state,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    );
+
+  if (error) throw error;
+}
+
+export async function hydrateContractAlertReadState(): Promise<void> {
+  readState();
+
+  if (!isSupabaseConfigured) return;
+  if (hydrationPromise) return hydrationPromise;
+
+  hydrationPromise = (async () => {
+    try {
+      const databaseState = await loadStateFromDatabase();
+      const mergedState = Array.from(new Set([...readState(), ...databaseState]));
+      const currentSerialized = JSON.stringify(readState());
+      const mergedSerialized = JSON.stringify(mergedState);
+
+      if (currentSerialized !== mergedSerialized) {
+        writeState(mergedState);
+        emitChange();
+      }
+
+      const databaseSerialized = JSON.stringify(databaseState);
+      if (databaseSerialized !== mergedSerialized) {
+        await persistStateToDatabase(mergedState);
+      }
+    } catch (error) {
+      console.error('Failed to hydrate contract alert read state from database, using local fallback:', error);
+    }
+  })();
+
+  return hydrationPromise;
+}
+
+export function subscribeContractAlertReadState(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => undefined;
+
+  const handler = () => onChange();
+  window.addEventListener(CHANGE_EVENT, handler);
+  return () => window.removeEventListener(CHANGE_EVENT, handler);
+}
+
+function persistAndNotify(state: ReadSignatureState): void {
+  writeState(state);
+  emitChange();
+
+  if (!isSupabaseConfigured) return;
+
+  void persistStateToDatabase(state).catch((error) => {
+    console.error('Failed to persist contract alert read state to database, kept local fallback:', error);
+  });
 }
 
 function normalizeDaysBefore(value: number): number {
@@ -90,6 +195,7 @@ function getOccurredAppAlertsForContract(contract: Contract, today: Date): Occur
 }
 
 export function getUnreadOccurredAppAlerts(contracts: Contract[]): OccurredAppAlert[] {
+  void hydrateContractAlertReadState();
   const readSignatures = new Set(readState());
   const today = new Date();
 
@@ -100,6 +206,7 @@ export function getUnreadOccurredAppAlerts(contracts: Contract[]): OccurredAppAl
 }
 
 export function hasUnreadContractAlerts(contract: Contract): boolean {
+  void hydrateContractAlertReadState();
   const readSignatures = new Set(readState());
   const today = new Date();
   return getOccurredAppAlertsForContract(contract, today).some(alert => !readSignatures.has(alert.signature));
@@ -114,7 +221,7 @@ export function markOccurredAppAlertsAsRead(contracts: Contract[]): void {
     .flatMap(contract => getOccurredAppAlertsForContract(contract, today))
     .forEach(alert => allSignatures.add(alert.signature));
 
-  writeState(Array.from(allSignatures));
+  persistAndNotify(Array.from(allSignatures));
 }
 
 export function markContractAlertsAsRead(contract: Contract): void {
@@ -124,5 +231,5 @@ export function markContractAlertsAsRead(contract: Contract): void {
 
   getOccurredAppAlertsForContract(contract, today).forEach(alert => signatures.add(alert.signature));
 
-  writeState(Array.from(signatures));
+  persistAndNotify(Array.from(signatures));
 }
