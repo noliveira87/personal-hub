@@ -1,5 +1,5 @@
-import { Suspense, lazy, useMemo, useState } from "react";
-import { Plus, ChartLine } from "lucide-react";
+import { Suspense, lazy, useMemo, useRef, useState } from "react";
+import { Plus, ChartLine, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { KpiCards } from "@/features/portfolio/components/KpiCards";
@@ -52,6 +52,11 @@ const Index = () => {
     [investments],
   );
   const { pricesEur: cryptoSpotEur, loading: cryptoQuoteLoading } = useCryptoQuotes(hasCryptoInvestments);
+  const earningsSectionRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToEarnings = () => {
+    earningsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const resolvedInvestments = useMemo(() => {
     return investments.map((investment) => ({
@@ -251,6 +256,18 @@ const Index = () => {
               <span className="hidden sm:inline">Add Investment</span>
             </Button>
 
+            <Button
+              onClick={scrollToEarnings}
+              variant="outline"
+              size="sm"
+              className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
+              aria-label="Go to Earnings"
+              title="Earnings"
+            >
+              <Coins className="h-4 w-4" />
+              <span className="hidden sm:inline">Earnings</span>
+            </Button>
+
             {/* Desktop actions */}
             <div className="hidden sm:flex items-center gap-2">
               <Button variant="outline" size="sm" asChild className="gap-1.5">
@@ -357,7 +374,7 @@ const Index = () => {
                   ))}
                 </div>
 
-                <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+                <div ref={earningsSectionRef} className="scroll-mt-24 rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
                   <div className="mb-5 border-b border-border/70 pb-5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -416,14 +433,16 @@ const Index = () => {
                   />
                 </div>
 
-                <EarningsSection
-                  earnings={portfolioEarnings}
-                  cryptoSpotEur={cryptoSpotEur}
-                  loading={earningsLoading}
-                  onAdd={handleAddEarning}
-                  onEdit={handleEditEarning}
-                  onDelete={handleDeleteEarning}
-                />
+                <div ref={earningsSectionRef} className="scroll-mt-24">
+                  <EarningsSection
+                    earnings={portfolioEarnings}
+                    cryptoSpotEur={cryptoSpotEur}
+                    loading={earningsLoading}
+                    onAdd={handleAddEarning}
+                    onEdit={handleEditEarning}
+                    onDelete={handleDeleteEarning}
+                  />
+                </div>
               </div>
             </>
           )}

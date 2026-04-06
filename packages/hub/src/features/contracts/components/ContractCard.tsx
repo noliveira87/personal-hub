@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Contract, CATEGORY_ICONS, BILLING_LABELS } from '@/features/contracts/types/contract';
+import { Contract, BILLING_LABELS, getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { StatusBadge } from './StatusBadge';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { hasUnreadContractAlerts, subscribeContractAlertReadState } from '@/features/contracts/lib/alertReadState';
@@ -23,7 +23,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   const urgency = getUrgencyLevel(daysLeft);
   const hasAlerts = contract.alerts.length > 0;
   const hasUnreadAlerts = hasUnreadContractAlerts(contract);
-  
+
   // Use latest price from history, fallback to contract price
   const displayPrice = latestPrice?.price ?? contract.price;
   const displayCurrency = latestPrice?.currency || contract.currency;
@@ -44,7 +44,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-xl flex-shrink-0">{CATEGORY_ICONS[contract.category]}</span>
+          <span className="text-xl flex-shrink-0">{getContractCategoryIcon(contract.category, contract.type)}</span>
           <div className="min-w-0">
             <h3 className="font-semibold text-sm text-foreground truncate">{contract.name}</h3>
             <p className="text-xs text-muted-foreground truncate">{contract.provider}</p>

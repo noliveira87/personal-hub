@@ -10,6 +10,14 @@ function extractYearMonth(value: string): { year: number; month: number } | null
   return { year, month };
 }
 
+export function sanitizeCarContractName(contractName: string): string {
+  return contractName.replace(/\s+renting\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+export function getCarChargingTransactionName(contractName: string): string {
+  return `Carregamento ${sanitizeCarContractName(contractName)}`;
+}
+
 /**
  * Maps contract categories to expense categories
  */
@@ -18,17 +26,23 @@ export function mapContractCategoryToExpenseCategory(
 ): ExpenseCategory | null {
   const mapping: Record<ContractCategory, ExpenseCategory | null> = {
     'mortgage': 'mortgage',
-    'home-insurance': 'mortgage', // Insurance goes with housing/mortgage
-    'apartment-insurance': 'mortgage', // Apartment insurance -> housing
+    'home-insurance': 'insurance',
+    'apartment-insurance': 'insurance',
     'gas': 'electricity', // Gas is a utility like electricity
     'electricity': 'electricity',
     'internet': 'internet',
     'mobile': 'internet', // Mobile as telecom/internet
     'water': 'water',
-    'tv-streaming': 'other', // Entertainment
+    'tv-streaming': 'leisure',
     'software': 'other', // Software subscriptions
     'maintenance': 'other', // General maintenance
     'security-alarm': 'other', // Security services
+    // Car contracts usually represent renting/leasing. Charging should be entered
+    // manually in Home Expenses and then linked back to the car contract.
+    'car': null,
+    'card-credit': 'other',
+    'card-debit': 'other',
+    'gym': 'gym',
     'other': 'other' as const,
   };
 

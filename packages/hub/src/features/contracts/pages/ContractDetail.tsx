@@ -5,7 +5,7 @@ import { CategoryBadge } from '@/features/contracts/components/CategoryBadge';
 import { PriceHistoryModal } from '@/features/contracts/components/PriceHistoryModal';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
-import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, CATEGORY_ICONS, HOUSING_USAGE_LABELS } from '@/features/contracts/types/contract';
+import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, HOUSING_USAGE_LABELS, getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { format, parseISO } from 'date-fns';
 import { Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import CarElectricityChart from '../components/CarElectricityChart';
@@ -85,12 +85,12 @@ export default function ContractDetail() {
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '60ms' }}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <span className="text-3xl">{CATEGORY_ICONS[contract.category]}</span>
+            <span className="text-3xl">{getContractCategoryIcon(contract.category, contract.type)}</span>
             <div>
               <h1 className="text-xl font-bold text-foreground">{contract.name}</h1>
               <p className="text-muted-foreground text-sm">{contract.provider}</p>
               <div className="flex items-center gap-2 mt-2">
-                <CategoryBadge category={contract.category} />
+                <CategoryBadge category={contract.category} contractType={contract.type} />
                 <StatusBadge status={contract.status} />
               </div>
             </div>
@@ -160,7 +160,7 @@ export default function ContractDetail() {
 
       {contract.type === 'car' && (
         <>
-          <CarElectricityChart contractId={contract.id} />
+          <CarElectricityChart contractId={contract.id} contractName={contract.name} />
         </>
       )}
 

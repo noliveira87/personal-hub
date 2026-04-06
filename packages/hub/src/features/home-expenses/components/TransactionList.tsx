@@ -79,14 +79,16 @@ export default function TransactionList() {
             <span className={`tabular-nums font-semibold text-sm ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
               {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
             </span>
-            <>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
-                <Pencil className="w-3.5 h-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            </>
+            {!tx.isReadOnly && (
+              <>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       ))}

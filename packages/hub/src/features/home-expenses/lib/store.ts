@@ -18,6 +18,17 @@ type TransactionRow = {
   created_at?: string;
 };
 
+export type LegacyCarChargingRow = {
+  id: string;
+  contract_id: string;
+  year: number;
+  month: number;
+  day: number | null;
+  value_eur: number;
+  charging_location: 'home' | 'outside' | null;
+  charging_note: string | null;
+};
+
 function rowToTransaction(row: TransactionRow): Transaction {
   return {
     id: row.id,
@@ -58,6 +69,40 @@ export async function fetchTransactions(): Promise<Transaction[]> {
 
 export async function insertTransaction(tx: Transaction): Promise<void> {
   const { error } = await supabase.from(TABLE).insert(transactionToRow(tx));
+  if (error) throw error;
+}
+
+export async function fetchLegacyCarChargingEntries(contractIds: string[]): Promise<LegacyCarChargingRow[]> {
+  if (contractIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('car_electricity_history')
+    .select('id, contract_id, year, month, day, value_eur, charging_location, charging_note')
+    .in('contract_id', contractIds)
+    .order('year', { ascending: false })
+    .order('month', { ascending: false })
+    .order('day', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as LegacyCarChargingRow[];
+}
+
+export async function updateLegacyCarChargingEntry(id: string, updates: Partial<LegacyCarChargingRow>): Promise<void> {
+  const row: Partial<LegacyCarChargingRow> = {};
+  if (updates.contract_id !== undefined) row.contract_id = updates.contract_id;
+  if (updates.year !== undefined) row.year = updates.year;
+  if (updates.month !== undefined) row.month = updates.month;
+  if ('day' in updates) row.day = updates.day ?? null;
+  if (updates.value_eur !== undefined) row.value_eur = updates.value_eur;
+  if ('charging_location' in updates) row.charging_location = updates.charging_location ?? null;
+  if ('charging_note' in updates) row.charging_note = updates.charging_note ?? null;
+
+  const { error } = await supabase.from('car_electricity_history').update(row).eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteLegacyCarChargingEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('car_electricity_history').delete().eq('id', id);
   if (error) throw error;
 }
 

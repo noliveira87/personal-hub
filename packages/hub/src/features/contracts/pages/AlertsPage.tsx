@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getDaysUntilExpiry, getUrgencyLevel } from '@/features/contracts/lib/contractUtils';
-import { CATEGORY_ICONS } from '@/features/contracts/types/contract';
+import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { differenceInCalendarDays, format, isValid, parseISO, subDays } from 'date-fns';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -148,7 +148,6 @@ export default function AlertsPage() {
       resetCreateForm();
       setShowCreateForm(false);
     } catch (error) {
-      console.error('Failed to create custom alert:', error);
       const errMessage = error instanceof Error ? error.message : 'Failed to create custom alert.';
       toast.error(errMessage);
     } finally {
@@ -459,7 +458,7 @@ export default function AlertsPage() {
                   .filter(contract => contract.status === 'active' || contract.status === 'pending-cancellation')
                   .map(contract => (
                     <option key={contract.id} value={contract.id}>
-                      {CATEGORY_ICONS[contract.category]} {contract.name} ({contract.provider})
+                      {getContractCategoryIcon(contract.category, contract.type)} {contract.name} ({contract.provider})
                     </option>
                   ))}
               </select>
@@ -578,7 +577,7 @@ export default function AlertsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
-                    {CATEGORY_ICONS[item.contract.category]} {item.contract.name}
+                    {getContractCategoryIcon(item.contract.category, item.contract.type)} {item.contract.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {item.contract.provider} · Expires {item.contract.endDate ? format(parseISO(item.contract.endDate), 'MMM d, yyyy') : 'No date'}

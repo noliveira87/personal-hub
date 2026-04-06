@@ -12,10 +12,12 @@ export type ContractCategory =
   | 'maintenance'
   | 'security-alarm'
   | 'car'
+  | 'card-credit'
+  | 'card-debit'
   | 'gym'
   | 'other';
 
-export type ContractType = 'mortgage' | 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'car' | 'other';
+export type ContractType = 'mortgage' | 'insurance' | 'utility' | 'telecom' | 'subscription' | 'maintenance' | 'car' | 'card' | 'other';
 export type HousingUsage = 'primary-residence' | 'secondary-home';
 export type RenewalType = 'manual' | 'auto-renew' | 'no-renewal';
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
@@ -120,6 +122,8 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   'maintenance': 'Maintenance',
   'security-alarm': 'Security / Alarm',
   'car': 'Carro',
+  'card-credit': 'Credit Card',
+  'card-debit': 'Debit Card',
   'gym': 'Gym',
   'other': 'Other',
 };
@@ -138,9 +142,19 @@ export const CATEGORY_ICONS: Record<ContractCategory, string> = {
   'maintenance': '🛠️',
   'security-alarm': '🚨',
   'car': '🚗',
+  'card-credit': '💳',
+  'card-debit': '🏧',
   'gym': '💪',
   'other': '❓',
 };
+
+export function getContractCategoryIcon(category: ContractCategory, type?: ContractType): string {
+  if (type === 'card' && category === 'other') {
+    return '💳';
+  }
+
+  return CATEGORY_ICONS[category];
+}
 
 export const TYPE_LABELS: Record<ContractType, string> = {
   mortgage: 'Mortgage',
@@ -150,6 +164,7 @@ export const TYPE_LABELS: Record<ContractType, string> = {
   subscription: 'Subscription',
   maintenance: 'Maintenance',
   car: 'Car',
+  card: 'Card',
   other: 'Other',
 };
 

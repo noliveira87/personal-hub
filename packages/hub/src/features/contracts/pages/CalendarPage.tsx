@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
-import { CATEGORY_ICONS } from '@/features/contracts/types/contract';
+import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, addMonths, differenceInCalendarDays, isValid, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -149,7 +149,7 @@ export default function CalendarPage() {
                               <Bell className="w-4 h-4" />
                             </span>
                           ) : (
-                            <span className="text-lg">{CATEGORY_ICONS[c.category]}</span>
+                            <span className="text-lg">{getContractCategoryIcon(c.category, c.type)}</span>
                           )}
                           <div>
                             <p className="text-sm font-medium text-foreground">{c.name}</p>

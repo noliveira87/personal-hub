@@ -190,8 +190,12 @@ export default function Monthly() {
                             />
                           ) : (
                             <span
-                              className={`tabular-nums cursor-pointer hover:underline ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}
-                              onClick={() => startEdit(tx.id, 'amount', tx.amount)}
+                              className={`tabular-nums ${tx.isReadOnly ? '' : 'cursor-pointer hover:underline'} ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}
+                              onClick={() => {
+                                if (!tx.isReadOnly) {
+                                  startEdit(tx.id, 'amount', tx.amount);
+                                }
+                              }}
                             >
                               {formatCurrency(tx.amount)}
                               {isContractTx && <span className="text-xs text-muted-foreground ml-1">{t('homeExpenses.list.contractTag')}</span>}

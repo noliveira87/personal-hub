@@ -2,10 +2,13 @@ export type TransactionType = 'income' | 'expense';
 
 export type ExpenseCategory =
   | 'mortgage'
+  | 'insurance'
   | 'electricity'
   | 'water'
   | 'internet'
   | 'car'
+  | 'carRenting'
+  | 'leisure'
   | 'gym'
   | 'socialSecurity'
   | 'other';
@@ -21,6 +24,8 @@ export interface Transaction {
   recurring: boolean;
   contractId?: string; // Link to contract manager when this expense is a contract payment
   isContractExpense?: boolean; // Flag to indicate this expense is linked to a contract
+  isReadOnly?: boolean; // Derived rows shown in the UI but not editable from home-expenses
+  source?: 'home-expenses' | 'legacy-car-charging';
 }
 
 export interface MonthData {
@@ -33,11 +38,14 @@ export interface MonthData {
 }
 
 export const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string; icon: string }[] = [
-  { value: 'mortgage', label: 'Mortgage', icon: '🏠' },
+  { value: 'mortgage', label: 'Mortgage', icon: '🏦' },
+  { value: 'insurance', label: 'Insurance', icon: '🛡️' },
   { value: 'electricity', label: 'Electricity', icon: '💡' },
   { value: 'water', label: 'Water', icon: '💧' },
   { value: 'internet', label: 'Internet', icon: '🌐' },
-  { value: 'car', label: 'Car', icon: '🚗' },
+  { value: 'car', label: 'Car Charging', icon: '🔋' },
+  { value: 'carRenting', label: 'Car Renting', icon: '🚗' },
+  { value: 'leisure', label: 'Leisure', icon: '🏖️' },
   { value: 'gym', label: 'Gym', icon: '💪' },
   { value: 'socialSecurity', label: 'Social Security', icon: '🧾' },
   { value: 'other', label: 'Other', icon: '🏆' },

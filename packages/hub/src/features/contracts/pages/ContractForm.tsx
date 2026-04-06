@@ -51,9 +51,10 @@ const TYPE_CATEGORY_OPTIONS: Record<ContractType, ContractCategory[]> = {
   insurance: ['home-insurance', 'apartment-insurance'],
   utility: ['gas', 'electricity', 'water'],
   telecom: ['internet', 'mobile'],
-  subscription: ['tv-streaming', 'software', 'gym'],
+  subscription: ['tv-streaming', 'software', 'gym', 'other'],
   maintenance: ['maintenance', 'security-alarm'],
   car: ['car'],
+  card: ['card-credit', 'card-debit', 'other'],
   other: ['other'],
 };
 

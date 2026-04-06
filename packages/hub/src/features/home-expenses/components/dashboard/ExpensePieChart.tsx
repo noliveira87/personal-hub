@@ -13,6 +13,9 @@ const COLORS = [
   'hsl(262, 83%, 58%)',
   'hsl(190, 90%, 50%)',
   'hsl(330, 80%, 60%)',
+  'hsl(24, 95%, 53%)',
+  'hsl(158, 64%, 40%)',
+  'hsl(207, 90%, 54%)',
 ];
 
 function CustomPieTooltip({ active, payload, fallbackTitle, formatCurrency }: { active?: boolean; payload?: Array<{ name?: string; value?: number }>; fallbackTitle: string; formatCurrency: (value: number) => string }) {

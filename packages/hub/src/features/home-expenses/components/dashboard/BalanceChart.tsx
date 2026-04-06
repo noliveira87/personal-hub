@@ -57,7 +57,7 @@ export default function BalanceChart() {
 
   return (
     <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
-      <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.monthlyBalance')} — {selectedYear}</h3>
+      <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.monthlyBalance')} - {selectedYear}</h3>
       <div className="flex-1 min-h-[12rem]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} barGap={6} barCategoryGap="16%" margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
