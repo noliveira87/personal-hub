@@ -1,14 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil, X } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Trip } from "@/features/trips/types/trip";
 import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
 import { getTripTotal, withFlightsInExpenses } from "@/features/trips/utils/totals";
-import { convertTripFoodToJourneyBite } from "@/lib/journeyBites";
+import { 
+  loadJourneyBites, 
+  deleteJourneyBite, 
+  updateJourneyBite,
+  JourneyBite,
+  JourneyBiteUpdate,
+  uploadJourneyBitePhoto 
+} from "@/lib/journeyBites";
 
 interface TripDetailProps {
   trip: Trip;
@@ -61,33 +71,93 @@ const formatExternalUrl = (value?: string) => {
 export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) {
   const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
-  const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
-  const [convertingFoodIndex, setConvertingFoodIndex] = useState<number | null>(null);
+  const [journeyBites, setJourneyBites] = useState<JourneyBite[]>([]);
+  const [editingBiteId, setEditingBiteId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<JourneyBiteUpdate>({});
+  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const tripTotal = getTripTotal(trip);
   const displayExpenses = withFlightsInExpenses(trip);
   const formatEuro = (value: number) => formatCurrency(value, "EUR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const localizedTitle = getLocalizedTripTitle(trip, language);
   const localizedDestination = getLocalizedTripDestination(trip.destination, language);
 
-  const handleConvertFoodToJourneyBites = async (foodIndex: number) => {
-    const food = trip.foods[foodIndex];
-    if (!food) return;
+  useEffect(() => {
+    const loadBites = async () => {
+      try {
+        const bites = await loadJourneyBites();
+        const tripBites = bites.filter(bite => bite.trip_id === trip.id);
+        setJourneyBites(tripBites);
+      } catch (error) {
+        console.error("Error loading journey bites:", error);
+      }
+    };
+    void loadBites();
+  }, [trip.id]);
 
-    setConvertingFoodIndex(foodIndex);
+  const handleEditBite = (bite: JourneyBite) => {
+    setEditingBiteId(bite.id);
+    setEditFormData({
+      dish_name: bite.dish_name,
+      description: bite.description,
+      restaurant_name: bite.restaurant_name,
+      review_url: bite.review_url,
+      eaten_on: bite.eaten_on,
+    });
+    setEditPhotoFile(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteBite = async (biteId: string) => {
+    if (!confirm(t("journeyBites.confirmDelete"))) return;
     try {
-      const result = await convertTripFoodToJourneyBite({
-        tripId: trip.id,
-        food,
-        foodIndex,
-        fallbackDate: trip.endDate,
-      });
-
-      alert(result.created ? t("trips.convertedToJourneyBites") : t("trips.alreadyInJourneyBites"));
+      await deleteJourneyBite(biteId);
+      setJourneyBites(journeyBites.filter(b => b.id !== biteId));
     } catch (error) {
-      console.error("Error converting food to Journey Bites:", error);
-      alert(t("trips.convertToJourneyBitesError"));
+      console.error("Error deleting bite:", error);
+      alert(t("journeyBites.deleteFailed"));
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.currentTarget.files?.[0];
+    if (!file) return;
+    setEditPhotoFile(file);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingBiteId) return;
+    
+    setIsLoading(true);
+    try {
+      let photoPath = editFormData.photo_path;
+      if (editPhotoFile) {
+        const result = await uploadJourneyBitePhoto(editPhotoFile);
+        photoPath = result.path;
+      }
+
+      const updateData: JourneyBiteUpdate = {
+        ...editFormData,
+        photo_path: photoPath,
+      };
+
+      await updateJourneyBite(editingBiteId, updateData);
+
+      const updated = await loadJourneyBites();
+      const tripBites = updated.filter(bite => bite.trip_id === trip.id);
+      setJourneyBites(tripBites);
+      
+      setIsEditModalOpen(false);
+      setEditingBiteId(null);
+      setEditFormData({});
+      setEditPhotoFile(null);
+    } catch (error) {
+      console.error("Error saving bite:", error);
+      alert(t("journeyBites.saveFailed"));
     } finally {
-      setConvertingFoodIndex(null);
+      setIsLoading(false);
     }
   };
 
@@ -162,33 +232,6 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
             animate={{ scale: 1, opacity: 1 }}
             src={optimizeTripPhotoUrl(trip.photos[selectedPhoto], { width: 1800, quality: 78 })}
             alt=""
-            className="max-w-full max-h-[85vh] object-contain rounded-lg"
-            decoding="async"
-          />
-        </div>
-      )}
-
-      {selectedFoodImage && (
-        <div
-          className="fixed inset-0 z-50 bg-foreground/90 flex items-center justify-center p-4"
-          onClick={() => setSelectedFoodImage(null)}
-        >
-          <button
-            type="button"
-            aria-label={t("trips.closePreview")}
-            onClick={(event) => {
-              event.stopPropagation();
-              setSelectedFoodImage(null);
-            }}
-            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background"
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <motion.img
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            src={selectedFoodImage.src}
-            alt={selectedFoodImage.alt}
             className="max-w-full max-h-[85vh] object-contain rounded-lg"
             decoding="async"
           />
@@ -287,30 +330,31 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
             </Section>
           )}
 
-          {trip.foods.length > 0 && (
-            <Section icon={UtensilsCrossed} title={t("trips.foodTitle")} delay={0.45}>
+          {journeyBites.length > 0 && (
+            <Section icon={UtensilsCrossed} title={t("journeyBites.title")} delay={0.45}>
               <div className="grid gap-3">
-                {trip.foods.map((food, index) => (
-                  <InfoCard key={`${food.name}-${index}`}>
+                {journeyBites.map((bite) => (
+                  <InfoCard key={bite.id}>
                     <div className="flex items-start gap-3">
-                      {food.image ? (
+                      {bite.photo_url ? (
                         <img
-                          src={food.image}
-                          alt={food.name}
-                          className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0 cursor-zoom-in"
+                          src={bite.photo_url}
+                          alt={bite.dish_name}
+                          className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0"
                           loading="lazy"
                           decoding="async"
-                          onClick={() => setSelectedFoodImage({ src: food.image as string, alt: food.name || t("trips.foodPhoto") })}
                         />
                       ) : (
                         <div className="h-14 w-14 rounded-lg border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
                       )}
-                      <div>
-                        <p className="font-body font-medium text-foreground">{food.name}</p>
-                        {food.description && <p className="mt-1 text-sm font-body text-foreground/75">{firstSentence(food.description)}</p>}
-                        {food.reviewUrl && (
+                      <div className="flex-1">
+                        <p className="font-body font-medium text-foreground">{bite.dish_name}</p>
+                        {bite.restaurant_name && <p className="mt-0.5 text-sm font-body text-foreground/75">{bite.restaurant_name}</p>}
+                        {bite.description && <p className="mt-1 text-sm font-body text-foreground/75">{bite.description}</p>}
+                        {bite.eaten_on && <p className="mt-1 text-xs font-body text-foreground/65">{formatDate(bite.eaten_on, { day: "numeric", month: "short", year: "numeric" })}</p>}
+                        {bite.review_url && (
                           <a
-                            href={formatExternalUrl(food.reviewUrl)}
+                            href={/^https?:\/\//i.test(bite.review_url) ? bite.review_url : `https://${bite.review_url}`}
                             target="_blank"
                             rel="noreferrer"
                             className="mt-1 inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
@@ -318,16 +362,28 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                             {t("trips.openRestaurantReview")}
                           </a>
                         )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 h-8 text-xs"
-                          onClick={() => { void handleConvertFoodToJourneyBites(index); }}
-                          disabled={convertingFoodIndex === index}
-                        >
-                          {convertingFoodIndex === index ? "..." : t("trips.convertToJourneyBites")}
-                        </Button>
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs gap-1.5"
+                            onClick={() => handleEditBite(bite)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            {t("common.edit")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs text-destructive hover:text-destructive gap-1.5"
+                            onClick={() => handleDeleteBite(bite.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {t("common.delete")}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </InfoCard>
@@ -356,6 +412,115 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
         </div>
       </div>
+
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("journeyBites.editBite")}</DialogTitle>
+            <DialogDescription>{t("journeyBites.editDescription")}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.dishName")}</label>
+              <Input
+                type="text"
+                value={editFormData.dish_name || ""}
+                onChange={(e) => setEditFormData({ ...editFormData, dish_name: e.currentTarget.value })}
+                placeholder={t("journeyBites.dishNamePlaceholder")}
+                className="font-body"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.restaurantName")}</label>
+              <Input
+                type="text"
+                value={editFormData.restaurant_name || ""}
+                onChange={(e) => setEditFormData({ ...editFormData, restaurant_name: e.currentTarget.value })}
+                placeholder={t("journeyBites.restaurantNamePlaceholder")}
+                className="font-body"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.description")}</label>
+              <Textarea
+                value={editFormData.description || ""}
+                onChange={(e) => setEditFormData({ ...editFormData, description: e.currentTarget.value })}
+                placeholder={t("journeyBites.descriptionPlaceholder")}
+                className="font-body min-h-20 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.eatenOn")}</label>
+              <Input
+                type="date"
+                value={editFormData.eaten_on || ""}
+                onChange={(e) => setEditFormData({ ...editFormData, eaten_on: e.currentTarget.value })}
+                className="font-body"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.reviewUrl")}</label>
+              <Input
+                type="text"
+                value={editFormData.review_url || ""}
+                onChange={(e) => setEditFormData({ ...editFormData, review_url: e.currentTarget.value })}
+                placeholder={t("journeyBites.reviewUrlPlaceholder")}
+                className="font-body"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.uploadPhoto")}</label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border/70 p-4 transition-colors hover:border-foreground/40 hover:bg-secondary/20"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-sm font-body text-foreground/75">
+                  {editPhotoFile ? editPhotoFile.name : t("journeyBites.selectPhoto")}
+                </span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingBiteId(null);
+                  setEditFormData({});
+                  setEditPhotoFile(null);
+                }}
+                className="flex-1"
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => { void handleSaveEdit(); }}
+                disabled={isLoading}
+                className="flex-1"
+              >
+                {isLoading ? "..." : t("common.save")}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
