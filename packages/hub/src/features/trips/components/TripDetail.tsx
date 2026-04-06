@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
