@@ -1191,15 +1191,31 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                   </div>
                 );
               })}
-              {remainingMonthlyRows > 0 && (
-                <button type="button" onClick={() => setVisibleMonthsCount((c) => c + 9)} className="text-xs font-medium text-primary hover:underline">
-                  {t("portfolioInsights.annual.loadMoreMonths", { count: Math.min(9, remainingMonthlyRows) })}
-                </button>
-              )}
-              {visibleMonthsCount > 3 && (
-                <button type="button" onClick={() => setVisibleMonthsCount(3)} className="text-xs font-medium text-primary hover:underline">
-                  {t("portfolioInsights.annual.showLast3Months")}
-                </button>
+              {(remainingMonthlyRows > 0 || visibleMonthsCount > 3) && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {remainingMonthlyRows > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVisibleMonthsCount((c) => c + 9)}
+                      className="h-8 rounded-full border-primary/35 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
+                    >
+                      {t("portfolioInsights.annual.loadMoreMonths", { count: Math.min(9, remainingMonthlyRows) })}
+                    </Button>
+                  )}
+                  {visibleMonthsCount > 3 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setVisibleMonthsCount(3)}
+                      className="h-8 rounded-full px-3 text-xs font-semibold text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    >
+                      {t("portfolioInsights.annual.showLast3Months")}
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           )}
