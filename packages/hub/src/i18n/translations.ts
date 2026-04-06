@@ -221,12 +221,22 @@ export const translations = {
       heroAlt: "Casal D12",
       title: "Projetos D12",
       openProject: "Abrir {{title}}",
+      sections: {
+        personal: {
+          title: "D12",
+          description: "Memórias, viagens e momentos do dia a dia.",
+        },
+        management: {
+          title: "",
+          description: "",
+        },
+      },
       projects: {
-        homeExpenses: { title: "Despesas da Casa", subtitle: "Despesas" },
-        portfolio: { title: "Portfolio Tracker", subtitle: "Investimentos" },
-        trips: { title: "Journey Book", subtitle: "Viagens" },
-        contracts: { title: "Contracts Manager", subtitle: "Renovações" },
-        warranties: { title: "Warranties Vault", subtitle: "Garantias" },
+        homeExpenses: { title: "Finanças da Casa", subtitle: "Salários e despesas" },
+        portfolio: { title: "Rumo Financeiro", subtitle: "Investimentos" },
+        trips: { title: "Livro de Memórias", subtitle: "Viagens" },
+        contracts: { title: "Contratos", subtitle: "Prazos e renovações" },
+        warranties: { title: "Garantias", subtitle: "Garantias de Equipamentos" },
       },
     },
     layout: {
@@ -297,7 +307,7 @@ export const translations = {
       deleteError: "Não foi possível apagar a viagem.",
       createError: "Não foi possível criar a viagem.",
       saveError: "Não foi possível guardar as alterações.",
-      headerTitle: "Journey Book",
+      headerTitle: "Livro de Memórias",
       upcoming: "Em Breve",
       upcomingSubtitle: "Reserva aberta para a próxima aventura.",
       back: "Voltar",
@@ -751,12 +761,22 @@ export const translations = {
       heroAlt: "D12 couple",
       title: "D12 Projects",
       openProject: "Open {{title}}",
+      sections: {
+        personal: {
+          title: "D12",
+          description: "",
+        },
+        management: {
+          title: "",
+          description: "",
+        },
+      },
       projects: {
-        homeExpenses: { title: "Home Expenses", subtitle: "Expenses" },
-        portfolio: { title: "Portfolio Tracker", subtitle: "Investments" },
-        trips: { title: "Journey Book", subtitle: "Trips" },
-        contracts: { title: "Contracts Manager", subtitle: "Renewals" },
-        warranties: { title: "Warranties Vault", subtitle: "Warranties" },
+        homeExpenses: { title: "Home Finances", subtitle: "Income and expenses" },
+        portfolio: { title: "Portfolio Journey", subtitle: "Investments" },
+        trips: { title: "Book of Memories", subtitle: "Lifetime trips and memories!" },
+        contracts: { title: "Contracts", subtitle: "Due dates and renewals" },
+        warranties: { title: "Warranties", subtitle: "Equipment Warranties" },
       },
     },
     layout: {
@@ -827,7 +847,7 @@ export const translations = {
       deleteError: "Could not delete the trip.",
       createError: "Could not create the trip.",
       saveError: "Could not save the changes.",
-      headerTitle: "Journey Book",
+      headerTitle: "Book of Memories",
       upcoming: "Coming Soon",
       upcomingSubtitle: "Booking open for the next adventure.",
       back: "Back",
