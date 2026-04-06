@@ -331,7 +331,37 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
 
           {journeyBites.length > 0 && (
-            <Section icon={UtensilsCrossed} title={t("journeyBites.title")} delay={0.45}>
+            <Section icon={UtensilsCrossed} title={t("trips.whereWeAte")} delay={0.45}>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {journeyBites.map((bite) => (
+                  <div
+                    key={bite.id}
+                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-secondary/40 hover:border-border/80 transition-all"
+                    onClick={() => handleEditBite(bite)}
+                    title={bite.dish_name}
+                  >
+                    {bite.photo_url ? (
+                      <img
+                        src={bite.photo_url}
+                        alt={bite.dish_name}
+                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-xs font-body text-foreground/50 text-center px-1">
+                        {bite.dish_name}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/20 transition-colors" />
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {journeyBites.length > 0 && (
+            <Section icon={UtensilsCrossed} title={t("journeyBites.title")} delay={0.5}>
               <div className="grid gap-3">
                 {journeyBites.map((bite) => (
                   <InfoCard key={bite.id}>
