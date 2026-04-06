@@ -242,52 +242,64 @@ export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAd
   const isCurrentMonth = selectedMonth === currentMonthKey();
 
   return (
-    <section className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
+    <section className="relative rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+      <Button
+        type="button"
+        size="icon"
+        onClick={onAdd}
+        aria-label="Add earning"
+        className="absolute right-5 top-5 z-10 h-9 w-9 rounded-lg sm:hidden"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+
+      <div className="mb-5 space-y-3 border-b border-border/70 pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 pr-14 sm:pr-0">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Gift className="h-4 w-4" />
             </div>
             <h2 className="text-lg font-bold text-foreground sm:text-xl">Rewards & surveys</h2>
           </div>
-          <p className="text-sm text-muted-foreground">Monthly ledger for cashback, surveys, social media, dividends and crypto cashback.</p>
-        </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
-          <div className="flex flex-wrap items-center justify-start gap-2 sm:flex-nowrap sm:justify-end sm:gap-2">
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/8 px-3 py-1.5 text-xs font-medium text-orange-600/85">
-              <span>Cashback</span>
-              <span className="font-bold">{formatCurrency(allTimeCashbackTotal)}</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-purple-500/25 bg-purple-500/8 px-3 py-1.5 text-xs font-medium text-purple-600/85">
-              <span>Surveys</span>
-              <span className="font-bold">{formatCurrency(allTimeSurveyTotal)}</span>
-              <span className="text-[11px] text-purple-600/70">· all-time</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-pink-500/25 bg-pink-500/8 px-3 py-1.5 text-xs font-medium text-pink-600/85">
-              <span>Social media</span>
-              <span className="font-bold">{formatCurrency(allTimeSocialMediaTotal)}</span>
-              <span className="text-[11px] text-pink-600/70">· all-time</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-sky-500/25 bg-sky-500/8 px-3 py-1.5 text-xs font-medium text-sky-600/85">
-              <span>Dividends</span>
-              <span className="font-bold">{formatCurrency(allTimeDividendTotal)}</span>
-              <span className="text-[11px] text-sky-600/70">· all-time</span>
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end sm:gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
+          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end sm:gap-3">
+            <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-success/30 bg-success/15 px-4 py-2 text-sm text-success">
               <span className="font-bold">{formatCurrency(monthTotal)}</span>
               <span className="text-success/80">·</span>
               <span className="font-medium text-success/90">
                 {isCurrentMonth ? "this month" : `in ${formatMonthLabel(selectedMonth)}`}
               </span>
             </span>
-            <Button type="button" size="sm" onClick={onAdd} className="h-9 gap-1.5 rounded-lg px-3">
+            <Button
+              type="button"
+              size="icon"
+              onClick={onAdd}
+              aria-label="Add earning"
+              className="hidden h-9 w-9 rounded-lg sm:inline-flex"
+            >
               <Plus className="h-4 w-4" />
-              <span>Add earning</span>
             </Button>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-start gap-2 sm:flex-nowrap sm:gap-2">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/8 px-3 py-1.5 text-xs font-medium text-orange-600/85">
+            <span>Cashback</span>
+            <span className="font-bold">{formatCurrency(allTimeCashbackTotal)}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-purple-500/25 bg-purple-500/8 px-3 py-1.5 text-xs font-medium text-purple-600/85">
+            <span>Surveys</span>
+            <span className="font-bold">{formatCurrency(allTimeSurveyTotal)}</span>
+            <span className="text-[11px] text-purple-600/70">· all-time</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-pink-500/25 bg-pink-500/8 px-3 py-1.5 text-xs font-medium text-pink-600/85">
+            <span>Social media</span>
+            <span className="font-bold">{formatCurrency(allTimeSocialMediaTotal)}</span>
+            <span className="text-[11px] text-pink-600/70">· all-time</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-sky-500/25 bg-sky-500/8 px-3 py-1.5 text-xs font-medium text-sky-600/85">
+            <span>Dividends</span>
+            <span className="font-bold">{formatCurrency(allTimeDividendTotal)}</span>
+            <span className="text-[11px] text-sky-600/70">· all-time</span>
+          </span>
         </div>
       </div>
 
