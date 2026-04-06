@@ -7,6 +7,7 @@ import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary, format
 import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 import { useI18n } from "@/i18n/I18nProvider";
 import { LOCALES_BY_LANGUAGE } from "@/i18n/translations";
+import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle, renderChartLegendLabel } from "@/lib/chartTheme";
 
 interface MonthlyInsightsProps {
   snapshots: MonthlySnapshot[];
@@ -23,6 +24,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAnnualYear, setSelectedAnnualYear] = useState<string | null>(null);
+
+  const formatChartCurrency = (value: number) => formatCurrency(Number(value));
 
   const isValidMonthKey = (monthKey: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey);
   const formatShortMonthLabel = (monthKey: string) => {
@@ -1222,17 +1225,22 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={monthlyChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <XAxis dataKey="monthLabel" tick={chartAxisTickStyle} />
+                        <YAxis tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
                         <Tooltip
-                          formatter={(value: number, name: string) => {
-                            if (name === "performance") return [formatCurrency(value), t("portfolioInsights.labels.performance")];
-                            if (name === "inflow") return [formatCurrency(value), t("portfolioInsights.labels.invested")];
-                            return [value, name];
+                          contentStyle={chartTooltipContentStyle}
+                          labelStyle={chartTooltipLabelStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          formatter={(value: number, name: string, item) => {
+                            const dataKey = String(item?.dataKey ?? "");
+
+                            if (dataKey === "performance") return [formatCurrency(value), t("portfolioInsights.labels.performance")];
+                            if (dataKey === "inflow") return [formatCurrency(value), t("portfolioInsights.labels.invested")];
+                            return [formatCurrency(value), name];
                           }}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                         />
-                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} formatter={renderChartLegendLabel} />
                         <Line
                           type="monotone"
                           dataKey="performance"
@@ -1268,18 +1276,23 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={annualChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                        <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <XAxis dataKey="year" tick={chartAxisTickStyle} />
+                        <YAxis tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
                         <Tooltip
+                          contentStyle={chartTooltipContentStyle}
+                          labelStyle={chartTooltipLabelStyle}
+                          itemStyle={chartTooltipItemStyle}
                           formatter={(value: number, name: string, item) => {
-                            if (name === "performance") {
+                            const dataKey = String(item?.dataKey ?? "");
+
+                            if (dataKey === "performance") {
                               const returnPct = item.payload.returnPct;
                               return [`${formatCurrency(value)} (${formatPercentage(returnPct)})`, t("portfolioInsights.labels.performance")];
                             }
-                            return [value, name];
+                            return [formatCurrency(value), name];
                           }}
                         />
-                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} formatter={renderChartLegendLabel} />
                         <Bar dataKey="performance" name={t("portfolioInsights.labels.performance")} radius={[6, 6, 0, 0]}>
                           {annualChartData.map((entry) => (
                             <Cell key={entry.year} fill={entry.performance >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"} />
@@ -1301,9 +1314,12 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={earningsEvolutionChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                        <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                        <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                        <XAxis dataKey="monthLabel" tick={chartAxisTickStyle} />
+                        <YAxis tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
                         <Tooltip
+                          contentStyle={chartTooltipContentStyle}
+                          labelStyle={chartTooltipLabelStyle}
+                          itemStyle={chartTooltipItemStyle}
                           formatter={(value: number, name: string, item) => {
                             const dataKey = String(item?.dataKey ?? "");
                             const formattedValue = Number(value).toLocaleString("pt-PT", {
@@ -1319,7 +1335,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                           }}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                         />
-                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                        <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} formatter={renderChartLegendLabel} />
                         <Line type="monotone" dataKey="surveys" name={t("portfolioInsights.labels.surveys")} stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                         <Line type="monotone" dataKey="cashback" name={t("portfolioInsights.labels.cashback")} stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                         <Line type="monotone" dataKey="social_media" name={t("portfolioInsights.labels.socialMedia")} stroke="hsl(var(--warning))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
@@ -1344,17 +1360,22 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={categoryGrowthChartData} margin={{ left: 6, right: 6, top: 10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
-                      <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
-                      <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
+                      <XAxis dataKey="monthLabel" tick={chartAxisTickStyle} />
+                        <YAxis tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
                       <Tooltip
-                        formatter={(value: number, name: string) => {
-                          if (name === "longPerformance") return [formatCurrency(value), t("portfolioInsights.labels.longTerm")];
-                          if (name === "shortPerformance") return [formatCurrency(value), t("portfolioInsights.labels.shortTerm")];
-                          return [value, name];
+                        contentStyle={chartTooltipContentStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                        formatter={(value: number, name: string, item) => {
+                          const dataKey = String(item?.dataKey ?? "");
+
+                          if (dataKey === "longPerformance") return [formatCurrency(value), t("portfolioInsights.labels.longTerm")];
+                          if (dataKey === "shortPerformance") return [formatCurrency(value), t("portfolioInsights.labels.shortTerm")];
+                          return [formatCurrency(value), name];
                         }}
                         labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                       />
-                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} />
+                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} formatter={renderChartLegendLabel} />
                       <Line type="monotone" dataKey="longPerformance" name={t("portfolioInsights.labels.longTerm")} stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                       <Line type="monotone" dataKey="shortPerformance" name={t("portfolioInsights.labels.shortTerm")} stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                     </LineChart>

@@ -7,6 +7,7 @@ import { FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle } from '@/lib/chartTheme';
 
 const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
 
@@ -190,15 +191,18 @@ export default function InsightsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthlyEvolutionData} margin={{ top: 10, right: 10, left: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="month" tick={chartAxisTickStyle} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fontSize: 12 }}
+                  tick={chartAxisTickStyle}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(value) => formatCurrency(Number(value), chartCurrency)}
                   width={84}
                 />
                 <Tooltip
+                  contentStyle={chartTooltipContentStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
                   formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
                   labelFormatter={(label) => `${label} ${effectiveYear}`}
                 />

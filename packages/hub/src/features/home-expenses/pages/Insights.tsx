@@ -10,6 +10,7 @@ import TransactionForm from '@/features/home-expenses/components/TransactionForm
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { Button } from '@/components/ui/button';
+import { chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle, renderChartLegendLabel } from '@/lib/chartTheme';
 
 const MONTH_KEYS = [
   'homeExpenses.months.january',
@@ -244,16 +245,13 @@ export default function Insights() {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data.trendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-              <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <XAxis dataKey="name" tick={chartAxisTickStyleCompact} />
+              <YAxis tick={chartAxisTickStyleCompact} tickFormatter={(value: number) => formatCurrency(value)} width={80} />
+              <Legend wrapperStyle={{ fontSize: 12 }} formatter={renderChartLegendLabel} />
               <Tooltip
-                contentStyle={{
-                  background: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '12px',
-                  fontSize: 12,
-                }}
+                contentStyle={{ ...chartTooltipContentStyle, fontSize: 12 }}
+                labelStyle={chartTooltipLabelStyle}
+                itemStyle={chartTooltipItemStyle}
                 formatter={(value: number, name: string) => [`€${value.toFixed(2)}`, name]}
               />
               <Line type="monotone" dataKey="income" name={t('homeExpenses.charts.income')} stroke="hsl(var(--income))" strokeWidth={2} dot={{ fill: 'hsl(var(--income))', r: 3 }} />

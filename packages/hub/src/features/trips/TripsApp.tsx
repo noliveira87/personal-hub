@@ -309,19 +309,19 @@ export function TripsApp() {
 
                   {nationalTrips > 0 && (
                     <div className="space-y-2 rounded-2xl border border-border/50 bg-[linear-gradient(160deg,hsl(var(--secondary)/0.42),hsl(var(--background)/0.9))] p-2.5 sm:max-w-2xl sm:p-3">
-                      <p className="px-1 text-xs font-body font-semibold tracking-[0.08em] text-foreground/70">{t("trips.stats.nationalSummary")}</p>
+                      <p className="px-1 text-[10px] font-body uppercase tracking-[0.2em] text-foreground/55">{t("trips.stats.nationalSummary")}</p>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         <div className="rounded-xl border border-border/50 bg-background/78 px-3 py-2.5 shadow-[0_6px_14px_hsl(var(--foreground)/0.05)]">
-                          <p className="font-display text-xl font-semibold tracking-tight text-foreground">{nationalTrips}</p>
-                          <p className="mt-0.5 text-xs font-body text-foreground/72">{t("trips.stats.nationalTrips")}</p>
+                          <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{nationalTrips}</p>
+                          <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.nationalTrips")}</p>
                         </div>
                         <div className="rounded-xl border border-border/50 bg-background/78 px-3 py-2.5 shadow-[0_6px_14px_hsl(var(--foreground)/0.05)]">
-                          <p className="font-display text-xl font-semibold tracking-tight text-foreground">{nationalDestinations}</p>
-                          <p className="mt-0.5 text-xs font-body text-foreground/72">{t("trips.stats.nationalDestinations")}</p>
+                          <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{nationalDestinations}</p>
+                          <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.nationalDestinations")}</p>
                         </div>
                         <div className="rounded-xl border border-border/50 bg-background/78 px-3 py-2.5 shadow-[0_6px_14px_hsl(var(--foreground)/0.05)]">
-                          <p className="font-display text-xl font-semibold tracking-tight text-foreground">{formatCurrency(nationalSpent, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                          <p className="mt-0.5 text-xs font-body text-foreground/72">{t("trips.stats.nationalSpent")}</p>
+                          <p className="font-display text-3xl font-semibold tracking-tight text-foreground">{formatCurrency(nationalSpent, "EUR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                          <p className="mt-0.5 text-xs font-body uppercase tracking-[0.16em] text-foreground/65">{t("trips.stats.nationalSpent")}</p>
                         </div>
                       </div>
                     </div>

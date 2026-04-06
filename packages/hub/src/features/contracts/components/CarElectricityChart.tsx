@@ -322,7 +322,7 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
                 <LineChart data={chartData} margin={{ left: 8, right: 8, top: 12, bottom: 8 }}>
                   <CartesianGrid vertical={false} strokeDasharray="4 4" />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
-                  <YAxis tickLine={false} axisLine={false} tickMargin={8} width={56} />
+                  <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Line
                     type="linear"

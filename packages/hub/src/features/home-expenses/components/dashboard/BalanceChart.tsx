@@ -4,6 +4,7 @@ import { MONTHS } from '@/features/home-expenses/lib/types';
 import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useI18n } from '@/i18n/I18nProvider';
+import { chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle } from '@/lib/chartTheme';
 
 const MONTH_KEYS = [
   'homeExpenses.months.january',
@@ -22,7 +23,7 @@ const MONTH_KEYS = [
 
 export default function BalanceChart() {
   const { allTransactions, selectedYear } = useData();
-  const { t } = useI18n();
+  const { t, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
 
   const chartData = useMemo(() => {
@@ -62,15 +63,12 @@ export default function BalanceChart() {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} barGap={6} barCategoryGap="16%" margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-            <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+            <XAxis dataKey="name" tick={chartAxisTickStyleCompact} />
+            <YAxis tick={chartAxisTickStyleCompact} tickFormatter={(value: number) => formatCurrency(value)} width={80} />
             <Tooltip
-              contentStyle={{
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '12px',
-                fontSize: 12,
-              }}
+              contentStyle={{ ...chartTooltipContentStyle, fontSize: 12 }}
+              labelStyle={chartTooltipLabelStyle}
+              itemStyle={chartTooltipItemStyle}
               formatter={(value: number) => [`€${value.toFixed(2)}`, undefined]}
             />
             <Bar dataKey="income" name={t('homeExpenses.charts.income')} fill="hsl(var(--income))" radius={[6, 6, 0, 0]} maxBarSize={28} />
