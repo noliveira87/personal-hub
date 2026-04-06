@@ -172,9 +172,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const transactionToDelete = transactions.find((transaction) => transaction.id === id);
+
+    if (transactionToDelete?.type === 'expense' && transactionToDelete.category === 'car' && transactionToDelete.contractId) {
+      const parsedDate = parseLocalDate(transactionToDelete.date);
+      const matchingLegacyRows = legacyCarChargingRows.filter((row) => (
+        row.contract_id === transactionToDelete.contractId
+        && row.year === parsedDate.getFullYear()
+        && row.month === parsedDate.getMonth() + 1
+        && (row.day ?? parsedDate.getDate()) === parsedDate.getDate()
+        && Math.abs(Number(row.value_eur) - transactionToDelete.amount) < 0.005
+      ));
+
+      if (matchingLegacyRows.length > 0) {
+        await Promise.all(matchingLegacyRows.map((row) => deleteLegacyCarChargingEntry(row.id)));
+        setLegacyCarChargingRows((prev) => prev.filter((row) => !matchingLegacyRows.some((candidate) => candidate.id === row.id)));
+      }
+    }
+
     await deleteTransactionFromDb(id);
     setTransactions((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+  }, [legacyCarChargingRows, transactions]);
 
   const allTransactions = useMemo(() => {
     const normalizedTransactions = transactions

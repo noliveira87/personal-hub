@@ -126,11 +126,17 @@ $$;
 revoke all on function public.send_warranty_expiry_alerts() from public;
 grant execute on function public.send_warranty_expiry_alerts() to service_role;
 
--- Step 4: Remove old cron job if it exists and schedule new one
+-- Step 4: Remove legacy/current cron jobs and schedule a single one
 -- This will run daily at 09:15 UTC
-select cron.unschedule('warranty-expiry-alerts-job') 
+select cron.unschedule('warranty-expiry-alerts')
 where exists (
-  select 1 from cron.job 
+  select 1 from cron.job
+  where jobname = 'warranty-expiry-alerts'
+);
+
+select cron.unschedule('warranty-expiry-alerts-job')
+where exists (
+  select 1 from cron.job
   where jobname = 'warranty-expiry-alerts-job'
 );
 

@@ -1304,12 +1304,18 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                         <XAxis dataKey="monthLabel" tick={{ fontSize: 12 }} />
                         <YAxis tickFormatter={(value: number) => `${Math.round(value)}€`} width={56} tick={{ fontSize: 12 }} />
                         <Tooltip
-                          formatter={(value: number, name: string) => {
-                            if (name === "surveys") return [formatCurrency(value), t("portfolioInsights.labels.surveys")];
-                            if (name === "cashback") return [formatCurrency(value), t("portfolioInsights.labels.cashback")];
-                            if (name === "social_media") return [formatCurrency(value), t("portfolioInsights.labels.socialMedia")];
-                            if (name === "dividend") return [formatCurrency(value), t("portfolioInsights.labels.dividends")];
-                            return [value, name];
+                          formatter={(value: number, name: string, item) => {
+                            const dataKey = String(item?.dataKey ?? "");
+                            const formattedValue = Number(value).toLocaleString("pt-PT", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            });
+
+                            if (dataKey === "surveys") return [formattedValue, t("portfolioInsights.labels.surveys")];
+                            if (dataKey === "cashback") return [formattedValue, t("portfolioInsights.labels.cashback")];
+                            if (dataKey === "social_media") return [formattedValue, t("portfolioInsights.labels.socialMedia")];
+                            if (dataKey === "dividend") return [formattedValue, t("portfolioInsights.labels.dividends")];
+                            return [formattedValue, name];
                           }}
                           labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
                         />

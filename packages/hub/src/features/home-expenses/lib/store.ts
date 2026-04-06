@@ -97,13 +97,27 @@ export async function updateLegacyCarChargingEntry(id: string, updates: Partial<
   if ('charging_location' in updates) row.charging_location = updates.charging_location ?? null;
   if ('charging_note' in updates) row.charging_note = updates.charging_note ?? null;
 
-  const { error } = await supabase.from('car_electricity_history').update(row).eq('id', id);
+  const { data, error } = await supabase
+    .from('car_electricity_history')
+    .update(row)
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Legacy car charging entry was not updated. Check car_electricity_history policies.');
+  }
 }
 
 export async function deleteLegacyCarChargingEntry(id: string): Promise<void> {
-  const { error } = await supabase.from('car_electricity_history').delete().eq('id', id);
+  const { data, error } = await supabase
+    .from('car_electricity_history')
+    .delete()
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Legacy car charging entry was not deleted. Check car_electricity_history policies.');
+  }
 }
 
 export async function updateTransactionInDb(id: string, updates: Partial<Transaction>): Promise<void> {

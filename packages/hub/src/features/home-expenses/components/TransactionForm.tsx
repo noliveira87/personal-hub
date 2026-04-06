@@ -93,6 +93,27 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     ? contracts.find(contract => contract.id === contractId)
     : undefined;
 
+  const filteredContracts = contracts.filter((contract) => {
+    if (contract.status !== 'active') {
+      return false;
+    }
+
+    if (category === 'car' || category === 'carRenting') {
+      return contract.category === 'car' || contract.type === 'car';
+    }
+
+    return true;
+  });
+
+  const isSelectedContractAvailable = contractId === 'none'
+    || filteredContracts.some((contract) => contract.id === contractId);
+
+  useEffect(() => {
+    if (!isSelectedContractAvailable) {
+      setContractId('none');
+    }
+  }, [isSelectedContractAvailable]);
+
   const reset = () => {
     setType(initialType ?? 'expense');
     setName(initialName ?? '');
@@ -218,6 +239,9 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
                     if (next === 'other') {
                       setContractId('none');
                     }
+                    if ((next === 'car' || next === 'carRenting') && selectedContract && selectedContract.category !== 'car' && selectedContract.type !== 'car') {
+                      setContractId('none');
+                    }
                     if (next !== 'car') {
                       setChargingLocation('home');
                       setChargingDescription('');
@@ -274,9 +298,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No linked contract</SelectItem>
-                      {contracts
-                        .filter(contract => contract.status === 'active')
-                        .map(contract => (
+                      {filteredContracts.map(contract => (
                           <SelectItem key={contract.id} value={contract.id}>
                             {contract.name} ({contract.provider})
                           </SelectItem>
