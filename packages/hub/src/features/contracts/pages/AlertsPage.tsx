@@ -554,80 +554,85 @@ export default function AlertsPage() {
               <div
                 key={`${item.contract.id}-${item.alertDay}-${i}`}
                 className={cn(
-                  'bg-card rounded-xl p-4 border flex items-center gap-4 animate-fade-up',
+                  'bg-card rounded-xl p-4 border flex flex-col gap-3 animate-fade-up sm:flex-row sm:items-center sm:gap-4',
                   urgency === 'critical' && 'border-urgent/30',
                   urgency === 'warning' && 'border-warning/30',
                 )}
                 style={{ animationDelay: `${i * 60}ms` }}
               >
-                <div className={cn(
-                  'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-                  urgency === 'critical' && 'bg-urgent/10',
-                  urgency === 'warning' && 'bg-warning/10',
-                  urgency === 'soon' && 'bg-warning/10',
-                  urgency === 'normal' && 'bg-muted',
-                )}>
-                  <BellRing className={cn(
-                    'w-4 h-4',
-                    urgency === 'critical' && 'text-urgent',
-                    urgency === 'warning' && 'text-warning',
-                    urgency === 'soon' && 'text-warning',
-                    urgency === 'normal' && 'text-muted-foreground',
-                  )} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {getContractCategoryIcon(item.contract.category, item.contract.type)} {item.contract.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.contract.provider} · Expires {item.contract.endDate ? format(parseISO(item.contract.endDate), 'MMM d, yyyy') : 'No date'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Trigger: {item.triggerLabel}
-                    {item.reason ? ` · ${item.reason}` : ''}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className={cn(
-                    'text-sm font-bold tabular-nums',
-                    item.daysUntilTrigger < 0 && 'text-muted-foreground',
-                    item.daysUntilTrigger >= 0 && urgency === 'critical' && 'text-urgent',
-                    item.daysUntilTrigger >= 0 && urgency === 'warning' && 'text-warning',
-                    item.daysUntilTrigger >= 0 && urgency === 'normal' && 'text-foreground',
+                <div className="w-full flex items-start gap-3 sm:contents">
+                  <div className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                    urgency === 'critical' && 'bg-urgent/10',
+                    urgency === 'warning' && 'bg-warning/10',
+                    urgency === 'soon' && 'bg-warning/10',
+                    urgency === 'normal' && 'bg-muted',
                   )}>
-                    {item.daysUntilTrigger < 0 ? `${Math.abs(item.daysUntilTrigger)}d` : `${item.daysUntilTrigger}d`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{item.daysUntilTrigger < 0 ? 'ago' : 'until alert'}</p>
-                  <div className="mt-2 flex justify-end gap-2">
-                    {item.alertIndex >= 0 && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => startEditingAlert(item.contract.id, item.alertIndex)}
-                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
-                        >
-                          <Pencil className="w-3 h-3" />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget({ contractId: item.contract.id, alertIndex: item.alertIndex })}
-                          disabled={saving}
-                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/contracts/${item.contract.id}`)}
-                      className="rounded border px-2 py-1 text-xs hover:bg-muted"
-                    >
-                      Contract
-                    </button>
+                    <BellRing className={cn(
+                      'w-4 h-4',
+                      urgency === 'critical' && 'text-urgent',
+                      urgency === 'warning' && 'text-warning',
+                      urgency === 'soon' && 'text-warning',
+                      urgency === 'normal' && 'text-muted-foreground',
+                    )} />
                   </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground break-words">
+                      {getContractCategoryIcon(item.contract.category, item.contract.type)} {item.contract.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground break-words">
+                      {item.contract.provider} · Expires {item.contract.endDate ? format(parseISO(item.contract.endDate), 'MMM d, yyyy') : 'No date'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                      Trigger: {item.triggerLabel}
+                      {item.reason ? ` · ${item.reason}` : ''}
+                    </p>
+                  </div>
+
+                  <div className="text-right flex-shrink-0 pl-1 sm:pl-0 sm:min-w-[68px]">
+                    <p className={cn(
+                      'text-2xl sm:text-sm font-bold tabular-nums leading-none',
+                      item.daysUntilTrigger < 0 && 'text-muted-foreground',
+                      item.daysUntilTrigger >= 0 && urgency === 'critical' && 'text-urgent',
+                      item.daysUntilTrigger >= 0 && urgency === 'warning' && 'text-warning',
+                      item.daysUntilTrigger >= 0 && urgency === 'normal' && 'text-foreground',
+                    )}>
+                      {item.daysUntilTrigger < 0 ? `${Math.abs(item.daysUntilTrigger)}d` : `${item.daysUntilTrigger}d`}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 sm:mt-0">{item.daysUntilTrigger < 0 ? 'ago' : 'until alert'}</p>
+                  </div>
+                </div>
+
+                <div className="w-full flex flex-wrap gap-2 sm:w-auto sm:justify-end">
+                  {item.alertIndex >= 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => startEditingAlert(item.contract.id, item.alertIndex)}
+                        className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-xs hover:bg-muted"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget({ contractId: item.contract.id, alertIndex: item.alertIndex })}
+                        disabled={saving}
+                        className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Delete
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/contracts/${item.contract.id}`)}
+                    className="rounded border px-3 py-1.5 text-xs hover:bg-muted"
+                  >
+                    Contract
+                  </button>
                 </div>
               </div>
             );
@@ -657,7 +662,7 @@ export default function AlertsPage() {
               <div
                 key={alert.signature}
                 className={cn(
-                  'bg-card rounded-lg border p-3 flex items-center gap-4',
+                  'bg-card rounded-lg border p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4',
                   unreadOccurred.has(alert.signature) ? 'border-warning/40' : 'border-muted',
                 )}
               >
@@ -671,7 +676,7 @@ export default function AlertsPage() {
                     {alert.reason ? ` · ${alert.reason}` : ''}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="w-full flex items-center justify-between sm:w-auto sm:flex-col sm:items-end sm:gap-1">
                   <span className={cn(
                     'text-xs',
                     unreadOccurred.has(alert.signature) ? 'text-warning font-semibold' : 'text-muted-foreground',
