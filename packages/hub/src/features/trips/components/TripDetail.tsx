@@ -1,11 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Trash2, Plane, Ticket, Receipt, Pencil, X, Plus } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Plane, Ticket, Receipt, X, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Trip } from "@/features/trips/types/trip";
 import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
@@ -13,11 +10,7 @@ import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/t
 import { getTripTotal, withFlightsInExpenses } from "@/features/trips/utils/totals";
 import { 
   loadJourneyBites, 
-  deleteJourneyBite, 
-  updateJourneyBite,
-  JourneyBite,
-  JourneyBiteUpdate,
-  uploadJourneyBitePhoto 
+  JourneyBite
 } from "@/lib/journeyBites";
 
 interface TripDetailProps {
@@ -72,12 +65,6 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
   const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [journeyBites, setJourneyBites] = useState<JourneyBite[]>([]);
-  const [editingBiteId, setEditingBiteId] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<JourneyBiteUpdate>({});
-  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const tripTotal = getTripTotal(trip);
   const displayExpenses = withFlightsInExpenses(trip);
   const formatEuro = (value: number) => formatCurrency(value, "EUR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -96,70 +83,6 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
     };
     void loadBites();
   }, [trip.id]);
-
-  const handleEditBite = (bite: JourneyBite) => {
-    setEditingBiteId(bite.id);
-    setEditFormData({
-      dish_name: bite.dish_name,
-      description: bite.description,
-      restaurant_name: bite.restaurant_name,
-      review_url: bite.review_url,
-      eaten_on: bite.eaten_on,
-    });
-    setEditPhotoFile(null);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteBite = async (biteId: string) => {
-    if (!confirm(t("journeyBites.confirmDelete"))) return;
-    try {
-      await deleteJourneyBite(biteId);
-      setJourneyBites(journeyBites.filter(b => b.id !== biteId));
-    } catch (error) {
-      console.error("Error deleting bite:", error);
-      alert(t("journeyBites.deleteFailed"));
-    }
-  };
-
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.currentTarget.files?.[0];
-    if (!file) return;
-    setEditPhotoFile(file);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingBiteId) return;
-    
-    setIsLoading(true);
-    try {
-      let photoPath = editFormData.photo_path;
-      if (editPhotoFile) {
-        const result = await uploadJourneyBitePhoto(editPhotoFile);
-        photoPath = result.path;
-      }
-
-      const updateData: JourneyBiteUpdate = {
-        ...editFormData,
-        photo_path: photoPath,
-      };
-
-      await updateJourneyBite(editingBiteId, updateData);
-
-      const updated = await loadJourneyBites();
-      const tripBites = updated.items.filter(bite => bite.tripId === trip.id);
-      setJourneyBites(tripBites);
-      
-      setIsEditModalOpen(false);
-      setEditingBiteId(null);
-      setEditFormData({});
-      setEditPhotoFile(null);
-    } catch (error) {
-      console.error("Error saving bite:", error);
-      alert(t("journeyBites.saveFailed"));
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
@@ -331,45 +254,15 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
 
           {journeyBites.length > 0 && (
-            <Section icon={UtensilsCrossed} title={t("trips.whereWeAte")} delay={0.45}>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {journeyBites.map((bite) => (
-                  <div
-                    key={bite.id}
-                    className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-secondary/40 hover:border-border/80 transition-all"
-                    onClick={() => handleEditBite(bite)}
-                    title={bite.dish_name}
-                  >
-                    {bite.photo_url ? (
-                      <img
-                        src={bite.photo_url}
-                        alt={bite.dish_name}
-                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-xs font-body text-foreground/50 text-center px-1">
-                        {bite.dish_name}
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/20 transition-colors" />
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {journeyBites.length > 0 && (
-            <Section icon={UtensilsCrossed} title={t("journeyBites.title")} delay={0.5}>
+            <Section icon={UtensilsCrossed} title={t("journeyBites.title")} delay={0.45}>
               <div className="grid gap-3">
                 {journeyBites.map((bite) => (
                   <InfoCard key={bite.id}>
                     <div className="flex items-start gap-3">
-                      {bite.photo_url ? (
+                      {bite.photoUrl ? (
                         <img
-                          src={bite.photo_url}
-                          alt={bite.dish_name}
+                          src={bite.photoUrl}
+                          alt={bite.dishName}
                           className="h-14 w-14 rounded-lg border border-border/60 object-cover shrink-0"
                           loading="lazy"
                           decoding="async"
@@ -378,13 +271,13 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                         <div className="h-14 w-14 rounded-lg border border-border/60 bg-secondary/60 shrink-0" aria-hidden="true" />
                       )}
                       <div className="flex-1">
-                        <p className="font-body font-medium text-foreground">{bite.dish_name}</p>
-                        {bite.restaurant_name && <p className="mt-0.5 text-sm font-body text-foreground/75">{bite.restaurant_name}</p>}
+                        <p className="font-body font-medium text-foreground">{bite.dishName}</p>
+                        {bite.restaurantName && <p className="mt-0.5 text-sm font-body text-foreground/75">{bite.restaurantName}</p>}
                         {bite.description && <p className="mt-1 text-sm font-body text-foreground/75">{bite.description}</p>}
-                        {bite.eaten_on && <p className="mt-1 text-xs font-body text-foreground/65">{formatDate(bite.eaten_on, { day: "numeric", month: "short", year: "numeric" })}</p>}
-                        {bite.review_url && (
+                        {bite.eatenOn && <p className="mt-1 text-xs font-body text-foreground/65">{formatDate(bite.eatenOn, { day: "numeric", month: "short", year: "numeric" })}</p>}
+                        {bite.reviewUrl && (
                           <a
-                            href={/^https?:\/\//i.test(bite.review_url) ? bite.review_url : `https://${bite.review_url}`}
+                            href={/^https?:\/\//i.test(bite.reviewUrl) ? bite.reviewUrl : `https://${bite.reviewUrl}`}
                             target="_blank"
                             rel="noreferrer"
                             className="mt-1 inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground"
@@ -392,27 +285,13 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                             {t("trips.openRestaurantReview")}
                           </a>
                         )}
-                        <div className="flex gap-2 mt-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs gap-1.5"
-                            onClick={() => handleEditBite(bite)}
+                        <div className="mt-2">
+                          <a
+                            href="/journey-bites"
+                            className="inline-flex text-sm font-body font-medium text-foreground/80 underline decoration-border underline-offset-4 transition-colors hover:text-foreground gap-1.5"
                           >
-                            <Pencil className="h-3 w-3" />
-                            {t("common.edit")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs text-destructive hover:text-destructive gap-1.5"
-                            onClick={() => handleDeleteBite(bite.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            {t("common.delete")}
-                          </Button>
+                            {t("journeyBites.edit")}
+                          </a>
                         </div>
                       </div>
                     </div>
@@ -442,115 +321,6 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
           )}
         </div>
       </div>
-
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("journeyBites.editBite")}</DialogTitle>
-            <DialogDescription>{t("journeyBites.editDescription")}</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.dishName")}</label>
-              <Input
-                type="text"
-                value={editFormData.dish_name || ""}
-                onChange={(e) => setEditFormData({ ...editFormData, dish_name: e.currentTarget.value })}
-                placeholder={t("journeyBites.dishNamePlaceholder")}
-                className="font-body"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.restaurantName")}</label>
-              <Input
-                type="text"
-                value={editFormData.restaurant_name || ""}
-                onChange={(e) => setEditFormData({ ...editFormData, restaurant_name: e.currentTarget.value })}
-                placeholder={t("journeyBites.restaurantNamePlaceholder")}
-                className="font-body"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.description")}</label>
-              <Textarea
-                value={editFormData.description || ""}
-                onChange={(e) => setEditFormData({ ...editFormData, description: e.currentTarget.value })}
-                placeholder={t("journeyBites.descriptionPlaceholder")}
-                className="font-body min-h-20 resize-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.eatenOn")}</label>
-              <Input
-                type="date"
-                value={editFormData.eaten_on || ""}
-                onChange={(e) => setEditFormData({ ...editFormData, eaten_on: e.currentTarget.value })}
-                className="font-body"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.reviewUrl")}</label>
-              <Input
-                type="text"
-                value={editFormData.review_url || ""}
-                onChange={(e) => setEditFormData({ ...editFormData, review_url: e.currentTarget.value })}
-                placeholder={t("journeyBites.reviewUrlPlaceholder")}
-                className="font-body"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-body font-medium text-foreground mb-1.5">{t("journeyBites.uploadPhoto")}</label>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border/70 p-4 transition-colors hover:border-foreground/40 hover:bg-secondary/20"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="text-sm font-body text-foreground/75">
-                  {editPhotoFile ? editPhotoFile.name : t("journeyBites.selectPhoto")}
-                </span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                className="hidden"
-              />
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingBiteId(null);
-                  setEditFormData({});
-                  setEditPhotoFile(null);
-                }}
-                className="flex-1"
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => { void handleSaveEdit(); }}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                {isLoading ? "..." : t("common.save")}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 }

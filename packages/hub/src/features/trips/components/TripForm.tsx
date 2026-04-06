@@ -555,7 +555,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       cost: totalCost || 0,
       photos,
       hotels: enrichedHotels,
-      foods: enrichedFoods,
+      foods: [],
       notes,
       tags: finalTags,
       travel: outbound.length > 0 || returnFlights.length > 0
@@ -854,47 +854,6 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
                   <p className="text-xs font-body text-muted-foreground">
                     {t("trips.hotelExpenseHint")}
                   </p>
-                </div>
-              ))}
-            </section>
-
-            <section className="space-y-3">
-              <SectionHeader icon={UtensilsCrossed} title={t("trips.foods")} onAdd={() => setFoods((prev) => [emptyFood(), ...prev])} addLabel={t("trips.addFood")} />
-              {foods.map((food, index) => (
-                <div key={`food-${index}`} className="relative bg-secondary/30 rounded-xl p-4 border border-border/40 space-y-3">
-                  <RemoveBtn onClick={() => removeFromArray(setFoods, index)} />
-                  <div className="grid grid-cols-1 sm:grid-cols-[92px_1fr] gap-3 items-start">
-                    <div className="space-y-2">
-                      <div className="h-20 w-20 rounded-lg border border-border/60 overflow-hidden bg-secondary/60 flex items-center justify-center">
-                        {food.image ? (
-                          <img
-                            src={food.image}
-                            alt={food.name || t("trips.foods")}
-                            className="h-full w-full cursor-zoom-in object-cover"
-                            onClick={() => setSelectedFoodPreview({ src: food.image as string, alt: food.name || t("trips.foods") })}
-                          />
-                        ) : (
-                          <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-border/60 px-2 py-1 text-[11px] font-body text-foreground/75 hover:bg-secondary/50">
-                        {t("trips.thumbnail")}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(event) => void handleFoodThumbnailUpload(index, event)}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                      <Input placeholder={t("trips.dishName")} value={food.name} onChange={(event) => updateArray(setFoods, index, "name", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder={t("trips.description")} value={food.description || ""} onChange={(event) => updateArray(setFoods, index, "description", event.target.value)} className="rounded-lg text-sm" />
-                      <Input placeholder={t("trips.restaurantReviewUrl")} value={food.reviewUrl || ""} onChange={(event) => updateArray(setFoods, index, "reviewUrl", event.target.value)} className="rounded-lg text-sm" />
-                    </div>
-                  </div>
-                  <p className="text-xs font-body text-muted-foreground">{t("trips.foodEnrichHint")}</p>
                 </div>
               ))}
             </section>
