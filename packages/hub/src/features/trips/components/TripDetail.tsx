@@ -87,8 +87,8 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
   useEffect(() => {
     const loadBites = async () => {
       try {
-        const bites = await loadJourneyBites();
-        const tripBites = bites.filter(bite => bite.trip_id === trip.id);
+        const result = await loadJourneyBites();
+        const tripBites = result.items.filter(bite => bite.tripId === trip.id);
         setJourneyBites(tripBites);
       } catch (error) {
         console.error("Error loading journey bites:", error);
@@ -146,7 +146,7 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
       await updateJourneyBite(editingBiteId, updateData);
 
       const updated = await loadJourneyBites();
-      const tripBites = updated.filter(bite => bite.trip_id === trip.id);
+      const tripBites = updated.items.filter(bite => bite.tripId === trip.id);
       setJourneyBites(tripBites);
       
       setIsEditModalOpen(false);
