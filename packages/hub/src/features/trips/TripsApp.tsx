@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, Plus, Compass } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,8 @@ import { Header } from "@/features/trips/components/Header";
 import { TripCard } from "@/features/trips/components/TripCard";
 import { TripDetail } from "@/features/trips/components/TripDetail";
 import { TripForm } from "@/features/trips/components/TripForm";
-import { TripsWorldMap } from "@/features/trips/components/TripsWorldMap";
 import { createTrip, deleteTrip, loadTrips, updateTrip } from "@/lib/trips";
 import { Trip } from "@/features/trips/types/trip";
-import { useEffect } from "react";
 import {
   getLocalizedTripDestination,
   getLocalizedTripTitle,
@@ -20,6 +18,10 @@ import {
 } from "@/features/trips/utils/locations";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getTripTotal } from "@/features/trips/utils/totals";
+
+const TripsWorldMap = lazy(() =>
+  import("@/features/trips/components/TripsWorldMap").then((module) => ({ default: module.TripsWorldMap })),
+);
 
 type View = "dashboard" | "detail" | "add" | "edit";
 type EditableTripFields = Omit<Trip, "id" | "createdAt" | "updatedAt">;
@@ -338,13 +340,15 @@ export function TripsApp() {
               transition={{ delay: 0.22, duration: 0.55 }}
               className="mb-4 sm:mb-5"
             >
-              <TripsWorldMap
-                trips={filteredTrips}
-                onSelectTrip={(trip) => {
-                  setSelectedTrip(trip);
-                  setView("detail");
-                }}
-              />
+              <Suspense fallback={<div className="h-[320px] rounded-2xl border border-border/70 bg-muted/20" />}>
+                <TripsWorldMap
+                  trips={filteredTrips}
+                  onSelectTrip={(trip) => {
+                    setSelectedTrip(trip);
+                    setView("detail");
+                  }}
+                />
+              </Suspense>
             </motion.div>
           )}
 

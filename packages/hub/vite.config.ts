@@ -22,12 +22,21 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    reportCompressedSize: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
           if (id.includes("recharts")) return "vendor-charts";
+          if (
+            id.includes("d3-geo") ||
+            id.includes("topojson-client") ||
+            id.includes("world-atlas") ||
+            id.includes("us-atlas")
+          ) {
+            return "vendor-geo";
+          }
           if (id.includes("@supabase/supabase-js")) return "vendor-supabase";
           if (id.includes("@tanstack/react-query")) return "vendor-query";
           if (id.includes("react-router") || id.includes("@remix-run")) return "vendor-router";
