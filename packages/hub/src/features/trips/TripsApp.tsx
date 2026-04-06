@@ -18,6 +18,7 @@ import {
 } from "@/features/trips/utils/locations";
 import { useI18n } from "@/i18n/I18nProvider";
 import { getTripTotal } from "@/features/trips/utils/totals";
+import { loadJourneyBitePhotoThumbnailsByTrip } from "@/lib/journeyBites";
 
 const TripsWorldMap = lazy(() =>
   import("@/features/trips/components/TripsWorldMap").then((module) => ({ default: module.TripsWorldMap })),
@@ -76,6 +77,7 @@ const buildTripChanges = (current: Trip, next: EditableTripFields): Partial<Edit
 export function TripsApp() {
   const { t, formatCurrency, language } = useI18n();
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [biteThumbnailsByTrip, setBiteThumbnailsByTrip] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [view, setView] = useState<View>("dashboard");
@@ -86,8 +88,10 @@ export function TripsApp() {
 
     const fetchTrips = async () => {
       const data = await loadTrips();
+      const thumbnails = await loadJourneyBitePhotoThumbnailsByTrip(data.map((trip) => trip.id));
       if (!mounted) return;
       setTrips(data);
+      setBiteThumbnailsByTrip(thumbnails);
       setLoading(false);
     };
 
@@ -143,7 +147,11 @@ export function TripsApp() {
 
     try {
       await deleteTrip(id);
-      setTrips((prev) => prev.filter((trip) => trip.id !== id));
+      setTrips((prev) => {
+        const nextTrips = prev.filter((trip) => trip.id !== id);
+        void loadJourneyBitePhotoThumbnailsByTrip(nextTrips.map((trip) => trip.id)).then(setBiteThumbnailsByTrip);
+        return nextTrips;
+      });
       setView("dashboard");
       setSelectedTrip(null);
     } catch (error) {
@@ -160,7 +168,11 @@ export function TripsApp() {
   const handleSaveNew = async (trip: Omit<Trip, "id" | "createdAt" | "updatedAt">) => {
     try {
       const created = await createTrip(trip);
-      setTrips((prev) => [created, ...prev]);
+      setTrips((prev) => {
+        const nextTrips = [created, ...prev];
+        void loadJourneyBitePhotoThumbnailsByTrip(nextTrips.map((item) => item.id)).then(setBiteThumbnailsByTrip);
+        return nextTrips;
+      });
       setView("dashboard");
     } catch (error) {
       console.error("Error creating trip:", error);
@@ -185,7 +197,11 @@ export function TripsApp() {
         updatedAt,
       };
 
-      setTrips((prev) => prev.map((trip) => (trip.id === updated.id ? updated : trip)));
+      setTrips((prev) => {
+        const nextTrips = prev.map((trip) => (trip.id === updated.id ? updated : trip));
+        void loadJourneyBitePhotoThumbnailsByTrip(nextTrips.map((item) => item.id)).then(setBiteThumbnailsByTrip);
+        return nextTrips;
+      });
       setSelectedTrip(updated);
       setView("detail");
     } catch (error) {
@@ -218,6 +234,7 @@ export function TripsApp() {
           onBack={() => {
             setView("dashboard");
             setSelectedTrip(null);
+            void loadJourneyBitePhotoThumbnailsByTrip(trips.map((trip) => trip.id)).then(setBiteThumbnailsByTrip);
           }}
           onDelete={(id) => {
             void handleDelete(id);
@@ -376,6 +393,7 @@ export function TripsApp() {
                   <TripCard
                     key={trip.id}
                     trip={trip}
+                    biteThumbnails={biteThumbnailsByTrip[trip.id] ?? []}
                     index={index}
                     prioritizeImage={index < 2}
                     onClick={() => {

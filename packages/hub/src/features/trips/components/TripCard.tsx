@@ -9,12 +9,13 @@ import { getTripTotal } from "@/features/trips/utils/totals";
 
 interface TripCardProps {
   trip: Trip;
+  biteThumbnails?: string[];
   onClick: () => void;
   index: number;
   prioritizeImage?: boolean;
 }
 
-export function TripCard({ trip, onClick, index, prioritizeImage = false }: TripCardProps) {
+export function TripCard({ trip, biteThumbnails = [], onClick, index, prioritizeImage = false }: TripCardProps) {
   const { t, formatMonthYear, formatCurrency, language } = useI18n();
   const photos = trip.photos.slice(0, 4);
   const days = differenceInDays(new Date(trip.endDate), new Date(trip.startDate));
@@ -128,6 +129,30 @@ export function TripCard({ trip, onClick, index, prioritizeImage = false }: Trip
                 {tag}
               </span>
             ))}
+          </div>
+        )}
+
+        {biteThumbnails.length > 0 && (
+          <div className="mt-3 flex items-center gap-1.5">
+            {biteThumbnails.slice(0, 4).map((thumbnail, imageIndex) => (
+              <span
+                key={`${trip.id}-bite-${imageIndex}`}
+                className="h-8 w-8 overflow-hidden rounded-md border border-border/70 bg-secondary/40"
+              >
+                <img
+                  src={thumbnail}
+                  alt={`Journey bite ${imageIndex + 1}`}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </span>
+            ))}
+            {biteThumbnails.length > 4 ? (
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                +{biteThumbnails.length - 4}
+              </span>
+            ) : null}
           </div>
         )}
       </div>

@@ -22,6 +22,7 @@ const InsightsPage = lazy(() => import("@/features/contracts/pages/InsightsPage"
 const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
 const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
+const JourneyBitesPage = lazy(() => import("@/pages/trips/JourneyBitesPage"));
 const WarrantiesPage = lazy(() => import("@/pages/warranties/WarrantiesPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const HomeExpensesIndexPage = lazy(() => import("@/features/home-expenses/pages/Index"));
@@ -90,6 +91,7 @@ const AppRoutes = () => {
 
             {/* Trips */}
             <Route path="/trips" element={<TripsPage />} />
+            <Route path="/journey-bites" element={<JourneyBitesPage />} />
 
             {/* Warranties */}
             <Route path="/warranties" element={<WarrantiesPage />} />

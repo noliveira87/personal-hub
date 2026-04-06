@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ArrowUpRight, ChartLine, Eye, EyeOff, FileCheck2, House, Map, Moon, Settings, ShieldCheck, Sun } from "lucide-react";
+import { ArrowUpRight, ChartLine, Eye, EyeOff, FileCheck2, House, Map, Moon, Settings, ShieldCheck, Sun, UtensilsCrossed } from "lucide-react";
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ const projectDefinitions = [
   { key: "homeExpenses", to: "/home-expenses", icon: House },
   { key: "portfolio", to: "/portfolio", icon: ChartLine },
   { key: "trips", to: "/trips", icon: Map },
+	{ key: "journeyBites", to: "/journey-bites", icon: UtensilsCrossed },
   { key: "contracts", to: "/dashboard", icon: FileCheck2 },
   { key: "warranties", to: "/warranties", icon: ShieldCheck },
 ] as const;
@@ -43,8 +44,8 @@ const Index = () => {
 	const hasManagementSectionHeader = Boolean(managementSectionTitle || managementSectionDescription);
 	const personalSectionDescription = t("index.sections.personal.description").trim();
 
-	const personalProjects = projects.filter((project) => project.key === "trips");
-	const managementProjects = projects.filter((project) => project.key !== "trips");
+	const personalProjects = projects.filter((project) => project.key === "trips" || project.key === "journeyBites");
+	const managementProjects = projects.filter((project) => project.key !== "trips" && project.key !== "journeyBites");
 
 	return (
 	<main className="relative min-h-screen overflow-hidden bg-background">
@@ -182,36 +183,38 @@ const Index = () => {
 							) : null}
 						</div>
 
-						{personalProjects.map((project) => {
-							const Icon = project.icon;
+						<div className="space-y-3 sm:space-y-4">
+							{personalProjects.map((project) => {
+								const Icon = project.icon;
 
-							return (
-								<Button
-									key={project.to}
-									asChild
-									variant="ghost"
-									className="group h-auto w-full justify-start rounded-[1.9rem_0.9rem_1.9rem_0.9rem] border border-violet-500/35 bg-[radial-gradient(circle_at_15%_15%,hsl(262_83%_58%/0.18),transparent_45%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))] px-4 py-4 text-left text-foreground shadow-lg transition-all hover:-translate-y-1 hover:border-violet-500/60 hover:shadow-md sm:px-5"
-								>
-									<Link to={project.to} aria-label={t("index.openProject", { title: project.title })}>
-										<div className="flex w-full items-center justify-between gap-4">
-											<div className="space-y-1.5">
-												<p className="text-lg font-semibold text-foreground sm:text-xl">{project.title}</p>
-												<p className="text-xs font-medium text-muted-foreground">{project.subtitle}</p>
-											{personalSectionDescription ? (
-												<p className="text-xs text-foreground/70">{personalSectionDescription}</p>
-											) : null}
-											</div>
-											<div className="flex items-center gap-2">
-												<div className="flex h-12 w-12 items-center justify-center rounded-[1rem_0.6rem_1rem_0.6rem] bg-primary text-primary-foreground shadow-md transition-transform duration-200 group-hover:scale-105 sm:h-14 sm:w-14">
-													<Icon className="h-6 w-6 sm:h-7 sm:w-7" />
+								return (
+									<Button
+										key={project.to}
+										asChild
+										variant="ghost"
+										className="group h-auto w-full justify-start rounded-[1.9rem_0.9rem_1.9rem_0.9rem] border border-violet-500/35 bg-[radial-gradient(circle_at_15%_15%,hsl(262_83%_58%/0.18),transparent_45%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))] px-4 py-4 text-left text-foreground shadow-lg transition-all hover:-translate-y-1 hover:border-violet-500/60 hover:shadow-md sm:px-5"
+									>
+										<Link to={project.to} aria-label={t("index.openProject", { title: project.title })}>
+											<div className="flex w-full items-center justify-between gap-4">
+												<div className="space-y-1.5">
+													<p className="text-lg font-semibold text-foreground sm:text-xl">{project.title}</p>
+													<p className="text-xs font-medium text-muted-foreground">{project.subtitle}</p>
+													{personalSectionDescription ? (
+														<p className="text-xs text-foreground/70">{personalSectionDescription}</p>
+													) : null}
 												</div>
-												<ArrowUpRight className="h-4 w-4 text-primary/90 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+												<div className="flex items-center gap-2">
+													<div className="flex h-12 w-12 items-center justify-center rounded-[1rem_0.6rem_1rem_0.6rem] bg-primary text-primary-foreground shadow-md transition-transform duration-200 group-hover:scale-105 sm:h-14 sm:w-14">
+														<Icon className="h-6 w-6 sm:h-7 sm:w-7" />
+													</div>
+													<ArrowUpRight className="h-4 w-4 text-primary/90 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+												</div>
 											</div>
-										</div>
-									</Link>
-								</Button>
-							);
-						})}
+										</Link>
+									</Button>
+								);
+							})}
+						</div>
 					</div>
 				</div>
 			</div>

@@ -8,6 +8,7 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { optimizeTripPhotoUrl } from "@/features/trips/utils/photo-url";
 import { getLocalizedTripDestination, getLocalizedTripTitle } from "@/features/trips/utils/locations";
 import { getTripTotal, withFlightsInExpenses } from "@/features/trips/utils/totals";
+import { convertTripFoodToJourneyBite } from "@/lib/journeyBites";
 
 interface TripDetailProps {
   trip: Trip;
@@ -61,11 +62,34 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
   const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [selectedFoodImage, setSelectedFoodImage] = useState<{ src: string; alt: string } | null>(null);
+  const [convertingFoodIndex, setConvertingFoodIndex] = useState<number | null>(null);
   const tripTotal = getTripTotal(trip);
   const displayExpenses = withFlightsInExpenses(trip);
   const formatEuro = (value: number) => formatCurrency(value, "EUR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const localizedTitle = getLocalizedTripTitle(trip, language);
   const localizedDestination = getLocalizedTripDestination(trip.destination, language);
+
+  const handleConvertFoodToJourneyBites = async (foodIndex: number) => {
+    const food = trip.foods[foodIndex];
+    if (!food) return;
+
+    setConvertingFoodIndex(foodIndex);
+    try {
+      const result = await convertTripFoodToJourneyBite({
+        tripId: trip.id,
+        food,
+        foodIndex,
+        fallbackDate: trip.endDate,
+      });
+
+      alert(result.created ? t("trips.convertedToJourneyBites") : t("trips.alreadyInJourneyBites"));
+    } catch (error) {
+      console.error("Error converting food to Journey Bites:", error);
+      alert(t("trips.convertToJourneyBitesError"));
+    } finally {
+      setConvertingFoodIndex(null);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
@@ -294,6 +318,16 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
                             {t("trips.openRestaurantReview")}
                           </a>
                         )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-8 text-xs"
+                          onClick={() => { void handleConvertFoodToJourneyBites(index); }}
+                          disabled={convertingFoodIndex === index}
+                        >
+                          {convertingFoodIndex === index ? "..." : t("trips.convertToJourneyBites")}
+                        </Button>
                       </div>
                     </div>
                   </InfoCard>
