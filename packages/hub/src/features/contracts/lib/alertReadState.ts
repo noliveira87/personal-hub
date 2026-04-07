@@ -3,6 +3,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { format, isValid, parseISO, subDays } from 'date-fns';
 
 const STORAGE_KEY = 'd12-contract-alerts-read-signatures';
+const TEST_ALERTS_STORAGE_KEY = 'd12-contract-test-app-alerts';
 const SETTINGS_TABLE = 'app_settings';
 const GLOBAL_SETTINGS_ID = 'global';
 const CHANGE_EVENT = 'd12-contract-alert-read-state-changed';
@@ -19,12 +20,23 @@ export interface OccurredAppAlert {
 
 type ReadSignatureState = string[];
 
+type StoredTestAppAlert = {
+  signature: string;
+  contractId: string;
+  contractName: string;
+  provider: string;
+  triggerDate: string;
+  triggerLabel: string;
+  reason: string | null;
+};
+
 type ContractAlertReadSettingsRow = {
   id: string;
   contract_alerts_read_signatures: unknown;
 };
 
 let cachedState: ReadSignatureState | null = null;
+let cachedTestAlerts: StoredTestAppAlert[] | null = null;
 let hydrationPromise: Promise<void> | null = null;
 
 function emitChange(): void {
@@ -58,6 +70,50 @@ function readState(): ReadSignatureState {
 function writeState(state: ReadSignatureState): void {
   cachedState = state;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function normalizeTestAlerts(value: unknown): StoredTestAppAlert[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((item): item is StoredTestAppAlert => {
+    if (!item || typeof item !== 'object') return false;
+
+    const candidate = item as Record<string, unknown>;
+    return typeof candidate.signature === 'string'
+      && typeof candidate.contractId === 'string'
+      && typeof candidate.contractName === 'string'
+      && typeof candidate.provider === 'string'
+      && typeof candidate.triggerDate === 'string'
+      && typeof candidate.triggerLabel === 'string'
+      && (typeof candidate.reason === 'string' || candidate.reason === null || candidate.reason === undefined);
+  }).map(item => ({
+    ...item,
+    reason: item.reason ?? null,
+  }));
+}
+
+function readTestAlerts(): StoredTestAppAlert[] {
+  if (cachedTestAlerts) return cachedTestAlerts;
+
+  try {
+    const raw = localStorage.getItem(TEST_ALERTS_STORAGE_KEY);
+    if (!raw) {
+      cachedTestAlerts = [];
+      return cachedTestAlerts;
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    cachedTestAlerts = normalizeTestAlerts(parsed);
+    return cachedTestAlerts;
+  } catch {
+    cachedTestAlerts = [];
+    return cachedTestAlerts;
+  }
+}
+
+function writeTestAlerts(alerts: StoredTestAppAlert[]): void {
+  cachedTestAlerts = alerts;
+  localStorage.setItem(TEST_ALERTS_STORAGE_KEY, JSON.stringify(alerts));
 }
 
 async function loadStateFromDatabase(): Promise<ReadSignatureState> {
@@ -194,13 +250,42 @@ function getOccurredAppAlertsForContract(contract: Contract, today: Date): Occur
   return occurred;
 }
 
+function getStoredTestAppAlerts(): OccurredAppAlert[] {
+  return readTestAlerts()
+    .map((alert) => {
+      const triggerDate = new Date(alert.triggerDate);
+      if (Number.isNaN(triggerDate.getTime())) return null;
+
+      return {
+        signature: alert.signature,
+        contractId: alert.contractId,
+        contractName: alert.contractName,
+        provider: alert.provider,
+        triggerDate,
+        triggerLabel: alert.triggerLabel,
+        reason: alert.reason,
+      } satisfies OccurredAppAlert;
+    })
+    .filter((alert): alert is OccurredAppAlert => alert !== null);
+}
+
+function getAllOccurredAppAlerts(contracts: Contract[], today: Date): OccurredAppAlert[] {
+  const alerts = [
+    ...contracts.flatMap(contract => getOccurredAppAlertsForContract(contract, today)),
+    ...getStoredTestAppAlerts(),
+  ];
+
+  const deduped = new Map<string, OccurredAppAlert>();
+  alerts.forEach((alert) => deduped.set(alert.signature, alert));
+  return Array.from(deduped.values());
+}
+
 export function getUnreadOccurredAppAlerts(contracts: Contract[]): OccurredAppAlert[] {
   void hydrateContractAlertReadState();
   const readSignatures = new Set(readState());
   const today = new Date();
 
-  return contracts
-    .flatMap(contract => getOccurredAppAlertsForContract(contract, today))
+  return getAllOccurredAppAlerts(contracts, today)
     .filter(alert => !readSignatures.has(alert.signature))
     .sort((a, b) => b.triggerDate.getTime() - a.triggerDate.getTime());
 }
@@ -217,11 +302,20 @@ export function markOccurredAppAlertsAsRead(contracts: Contract[]): void {
   const allSignatures = new Set(existing);
   const today = new Date();
 
-  contracts
-    .flatMap(contract => getOccurredAppAlertsForContract(contract, today))
+  getAllOccurredAppAlerts(contracts, today)
     .forEach(alert => allSignatures.add(alert.signature));
 
   persistAndNotify(Array.from(allSignatures));
+}
+
+export function markAppAlertAsRead(signature: string): void {
+  const signatures = new Set(readState());
+  signatures.add(signature);
+  persistAndNotify(Array.from(signatures));
+}
+
+export function isTestAppAlertSignature(signature: string): boolean {
+  return signature.startsWith('test:');
 }
 
 export function markContractAlertsAsRead(contract: Contract): void {
@@ -232,4 +326,25 @@ export function markContractAlertsAsRead(contract: Contract): void {
   getOccurredAppAlertsForContract(contract, today).forEach(alert => signatures.add(alert.signature));
 
   persistAndNotify(Array.from(signatures));
+}
+
+export function addTestAppAlert(alert: Omit<OccurredAppAlert, 'signature'>): string {
+  const signature = `test:${alert.contractId}:${Date.now()}`;
+  const alerts = readTestAlerts();
+  const nextAlerts = [
+    {
+      signature,
+      contractId: alert.contractId,
+      contractName: alert.contractName,
+      provider: alert.provider,
+      triggerDate: alert.triggerDate.toISOString(),
+      triggerLabel: alert.triggerLabel,
+      reason: alert.reason,
+    },
+    ...alerts,
+  ].slice(0, 30);
+
+  writeTestAlerts(nextAlerts);
+  emitChange();
+  return signature;
 }

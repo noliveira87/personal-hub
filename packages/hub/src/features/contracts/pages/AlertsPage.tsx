@@ -20,9 +20,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  addTestAppAlert,
+  markAppAlertAsRead,
   markContractAlertsAsRead,
   markOccurredAppAlertsAsRead,
   getUnreadOccurredAppAlerts,
+  isTestAppAlertSignature,
   subscribeContractAlertReadState,
 } from '@/features/contracts/lib/alertReadState';
 
@@ -238,6 +241,14 @@ export default function AlertsPage() {
       setTesting(true);
 
       if (appEnabled) {
+        addTestAppAlert({
+          contractId: contract.id,
+          contractName: contract.name,
+          provider: contract.provider,
+          triggerDate: new Date(),
+          triggerLabel: 'Test alert',
+          reason: message.trim() || preview,
+        });
         toast('App test preview', {
           description: preview,
         });
@@ -361,7 +372,10 @@ export default function AlertsPage() {
 
   // Ocorridos (histórico)
   // Derivar todos os ocorridos a partir dos lidos + não lidos
-  const unreadOccurredList = useMemo(() => getUnreadOccurredAppAlerts(contracts), [contracts, readStateVersion]);
+  const unreadOccurredList = useMemo(
+    () => getUnreadOccurredAppAlerts(contracts).filter(alert => !isTestAppAlertSignature(alert.signature)),
+    [contracts, readStateVersion],
+  );
   const unreadOccurred = useMemo(() => new Set(unreadOccurredList.map(a => a.signature)), [unreadOccurredList]);
   // Para todos os ocorridos, unir os não lidos + lidos
   const occurredAlerts = useMemo(() => {
@@ -403,7 +417,8 @@ export default function AlertsPage() {
       return occurred;
     }
     const allOccurred = contracts
-      .flatMap(contract => getOccurredAppAlertsForContract(contract, today));
+      .flatMap(contract => getOccurredAppAlertsForContract(contract, today))
+      .filter(alert => !isTestAppAlertSignature(alert.signature));
     // Remover duplicados por signature
     const allMap = new Map();
     allOccurred.forEach(a => allMap.set(a.signature, a));
@@ -688,11 +703,15 @@ export default function AlertsPage() {
                       type="button"
                       className="text-xs underline text-warning"
                       onClick={() => {
-                        const contract = contracts.find(c => c.id === alert.contractId);
-                        if (contract) {
-                          markContractAlertsAsRead(contract);
-                          toast.success('Alerta marcado como lido.');
+                        if (alert.signature.startsWith('test:')) {
+                          markAppAlertAsRead(alert.signature);
+                        } else {
+                          const contract = contracts.find(c => c.id === alert.contractId);
+                          if (contract) {
+                            markContractAlertsAsRead(contract);
+                          }
                         }
+                        toast.success('Alerta marcado como lido.');
                       }}
                     >
                       Marcar como lido

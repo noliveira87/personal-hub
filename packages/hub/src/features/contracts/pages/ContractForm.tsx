@@ -9,6 +9,8 @@ import { Plus, X, Loader, FileText, Send } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { sendTelegramMessage } from '@/lib/telegram';
+import { toast } from '@/components/ui/sonner';
+import { addTestAppAlert } from '@/features/contracts/lib/alertReadState';
 
 const defaultAlert = (kind: AlertSetting['kind'] = 'days-before'): AlertSetting => ({
   kind,
@@ -193,7 +195,7 @@ export default function ContractForm() {
 
   const testAlert = async (alertConfig: AlertSetting, index: number) => {
     if (!alertConfig.enabled && !alertConfig.telegramEnabled) {
-      window.alert('Enable at least one channel (App or Telegram) before testing.');
+      toast.error('Enable at least one channel (App or Telegram) before testing.');
       return;
     }
 
@@ -207,7 +209,17 @@ export default function ContractForm() {
       setTestingAlertIndex(index);
 
       if (alertConfig.enabled) {
-        window.alert(preview);
+        addTestAppAlert({
+          contractId: id ?? `draft:${form.name.trim() || 'contract'}`,
+          contractName: form.name.trim() || 'Unnamed contract',
+          provider: form.provider.trim() || 'Unknown provider',
+          triggerDate: new Date(),
+          triggerLabel: 'Test alert',
+          reason: alertConfig.reason?.trim() || preview,
+        });
+        toast('App test preview', {
+          description: preview,
+        });
       }
 
       if (alertConfig.telegramEnabled) {
@@ -217,11 +229,11 @@ export default function ContractForm() {
         await sendTelegramMessage(buildAlertTestMessage(alertConfig));
       }
 
-      window.alert('Test alert sent successfully.');
+      toast.success('Test alert sent successfully.');
     } catch (error) {
       console.error('Failed to test alert:', error);
       const message = error instanceof Error ? error.message : 'Failed to send test alert.';
-      window.alert(message);
+      toast.error(message);
     } finally {
       setTestingAlertIndex(null);
     }
