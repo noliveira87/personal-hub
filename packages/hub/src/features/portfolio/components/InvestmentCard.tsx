@@ -414,9 +414,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 {isLongTermValueUpdate ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {Number.isFinite(computedQuickProfitLoss)
-                      ? `Invested: ${formatCurrency(investment.investedAmount)} • Earnings: ${formatCurrency(quickTotalInterestEarned)} → P/L to record: ${formatCurrency(computedQuickProfitLoss)}`
-                      : `Invested: ${formatCurrency(investment.investedAmount)}`}
+                    {Number.isFinite(quickTotalInterestEarned)
+                      ? `Juros/Ganhos: ${formatCurrency(quickTotalInterestEarned)}`
+                      : ""}
                   </p>
                 ) : null}
               </div>
@@ -426,11 +426,10 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               <Input
                 id={`quick-description-${investment.id}`}
                 type="text"
-                placeholder="e.g., Monthly interest accrual"
+                placeholder="e.g., Abril - Juros acumulados"
                 value={quickDescription}
                 onChange={(e) => setQuickDescription(e.target.value)}
-              />
-            </div>
+              />\n            </div>
             {investment.type === "crypto" && quickMode === "contribution" && !isCashbackOnlyQuickAdd ? (
               <div>
                 <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({previewAsset})</Label>
