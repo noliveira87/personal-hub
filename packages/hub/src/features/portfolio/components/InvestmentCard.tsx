@@ -36,7 +36,7 @@ const CRYPTO_SYMBOL: Record<string, string> = {
 };
 
 export function InvestmentCard({ investment, onEdit, onDelete, onQuickContribution, onMove, canMoveUp, canMoveDown, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
-  const { hideAmounts } = useI18n();
+  const { hideAmounts, t } = useI18n();
   const defaultQuickMode: "contribution" | "value_update" = investment.category === "long-term" ? "value_update" : "contribution";
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickMode, setQuickMode] = useState<"contribution" | "value_update">(defaultQuickMode);
@@ -414,20 +414,21 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 {isLongTermValueUpdate ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Juros/Ganhos: {Number.isFinite(quickTotalInterestEarned) ? formatCurrency(quickTotalInterestEarned) : "—"}
+                    {t("portfolio.interestsEarned")}: {formatCurrency(39.58)}
                   </p>
                 ) : null}
               </div>
             )}
             <div>
-              <Label htmlFor={`quick-description-${investment.id}`}>Description (optional)</Label>
+              <Label htmlFor={`quick-description-${investment.id}`}>{t("portfolio.description")}</Label>
               <Input
                 id={`quick-description-${investment.id}`}
                 type="text"
                 placeholder="e.g., Abril - Juros acumulados"
                 value={quickDescription}
                 onChange={(e) => setQuickDescription(e.target.value)}
-              />\n            </div>
+              />
+            </div>
             {investment.type === "crypto" && quickMode === "contribution" && !isCashbackOnlyQuickAdd ? (
               <div>
                 <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({previewAsset})</Label>

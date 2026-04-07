@@ -308,6 +308,10 @@ export const translations = {
         insights: "Insights",
       },
     },
+    portfolio: {
+      interestsEarned: "Juros ganhos",
+      description: "Descrição (opcional)",
+    },
     settingsPage: {
       title: "Definições",
       loadingPreferences: "A carregar as tuas preferências...",
@@ -909,6 +913,10 @@ export const translations = {
         alerts: "Alerts",
         insights: "Insights",
       },
+    },
+    portfolio: {
+      interestsEarned: "Interests earned",
+      description: "Description (optional)",
     },
     settingsPage: {
       title: "Settings",
