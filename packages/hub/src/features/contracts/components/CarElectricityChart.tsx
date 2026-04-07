@@ -25,6 +25,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { parseCarChargingNotes } from '@/features/home-expenses/lib/carCharging';
 import { getCarChargingTransactionName } from '@/features/home-expenses/lib/contractMapping';
+import { formatCurrency } from '@/features/contracts/lib/contractUtils';
 
 interface CarElectricityChartProps {
   contractId: string;

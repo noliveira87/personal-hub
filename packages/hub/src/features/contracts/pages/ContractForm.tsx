@@ -44,6 +44,7 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   price: 0, currency: 'EUR', notes: null, status: 'active',
   alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: null,
   priceHistoryEnabled: true,
+  defaultMonthlyValue: null,
 });
 
 const TYPE_CATEGORY_OPTIONS: Record<ContractType, ContractCategory[]> = {
@@ -142,12 +143,11 @@ export default function ContractForm() {
         price: 0,
       };
 
-      if (isEdit) {
-        await updateContract({ ...submitData, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: new Date().toISOString() });
-      } else {
-        await addContract(submitData);
-      }
-      navigate('/dashboard');
+      const savedContract = isEdit
+        ? await updateContract({ ...submitData, id: id!, createdAt: getContract(id!)!.createdAt, updatedAt: new Date().toISOString() })
+        : await addContract(submitData);
+
+      navigate(`/contracts/${savedContract.id}`);
     } catch (err) {
       console.error('Error saving contract:', err);
       alert('Failed to save contract. Please try again.');
@@ -426,6 +426,20 @@ export default function ContractForm() {
               <select className={inputClass} value={form.billingFrequency} onChange={e => set('billingFrequency', e.target.value as BillingFrequency)} disabled={submitting}>
                 {Object.entries(BILLING_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
+            </div>
+            <div>
+              <label className={labelClass}>{t('contracts.defaultMonthlyValue')}</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                value={form.defaultMonthlyValue ?? ''}
+                onChange={e => set('defaultMonthlyValue', e.target.value ? parseFloat(e.target.value) : null)}
+                placeholder={t('contracts.defaultMonthlyValuePlaceholder')}
+                disabled={submitting}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">{t('contracts.defaultMonthlyValueHint')}</p>
             </div>
             <div>
               <label className={labelClass}>Currency</label>

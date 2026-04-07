@@ -22,6 +22,7 @@ type ContractRow = {
   telegram_alert_enabled: boolean;
   document_links: string[] | null;
   price_history_enabled: boolean;
+  default_monthly_value: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -52,6 +53,7 @@ function mapRowToContract(row: ContractRow): Contract {
     telegramAlertEnabled: row.telegram_alert_enabled,
     documentLinks: row.document_links,
     priceHistoryEnabled: row.price_history_enabled ?? true, // Default to true if null
+    defaultMonthlyValue: row.default_monthly_value ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -81,6 +83,7 @@ function mapContractToRow(contract: Contract) {
     telegram_alert_enabled: contract.telegramAlertEnabled,
     document_links: contract.documentLinks,
     price_history_enabled: contract.priceHistoryEnabled,
+    default_monthly_value: contract.defaultMonthlyValue ?? null,
     updated_at: new Date().toISOString(),
   };
 }

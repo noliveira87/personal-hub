@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useContracts } from '@/features/contracts/context/ContractContext';
-import { getCarChargingTransactionName, mapContractCategoryToExpenseCategory } from '@/features/home-expenses/lib/contractMapping';
+import { mapContractCategoryToExpenseCategory, sanitizeCarContractName } from '@/features/home-expenses/lib/contractMapping';
 import { encodeCarChargingNotes, parseCarChargingNotes, type CarChargingLocation } from '@/features/home-expenses/lib/carCharging';
 
 interface Props {
@@ -108,6 +108,14 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
   const isSelectedContractAvailable = contractId === 'none'
     || filteredContracts.some((contract) => contract.id === contractId);
 
+  const getDefaultCategoryForContract = (contractCategory: NonNullable<typeof selectedContract>['category']): ExpenseCategory => {
+    if (contractCategory === 'car') {
+      return 'carRenting';
+    }
+
+    return mapContractCategoryToExpenseCategory(contractCategory) ?? 'other';
+  };
+
   useEffect(() => {
     if (!isSelectedContractAvailable) {
       setContractId('none');
@@ -148,8 +156,12 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
           : undefined
       : undefined;
     const nextContractId = type === 'expense' && selectedContract ? selectedContract.id : undefined;
-    const nextName = type === 'expense' && nextCategory === 'car' && selectedContract?.category === 'car'
-      ? getCarChargingTransactionName(selectedContract.name)
+    const nextName = type === 'expense' && selectedContract
+      ? nextCategory === 'car' && selectedContract.category === 'car'
+        ? t('homeExpenses.form.carChargingTransactionName', {
+            name: sanitizeCarContractName(selectedContract.name),
+          })
+        : name.trim()
       : name.trim();
 
     try {
@@ -229,6 +241,58 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
 
           {type === 'expense' && (
             <>
+              {showLinkedContract && (
+                <div>
+                  <Label>{t('homeExpenses.form.linkedContract')}</Label>
+                  <Select
+                    value={contractId}
+                    onValueChange={(value) => {
+                      setContractId(value);
+                      if (value === 'none') {
+                        return;
+                      }
+
+                      const contract = contracts.find(item => item.id === value);
+                      if (!contract) {
+                        return;
+                      }
+
+                      const nextCategory = getDefaultCategoryForContract(contract.category);
+
+                      setCategory(nextCategory);
+                      setName(
+                        nextCategory === 'car'
+                          ? t('homeExpenses.form.carChargingTransactionName', {
+                              name: sanitizeCarContractName(contract.name),
+                            })
+                          : `${contract.name} (${contract.provider})`,
+                      );
+                      setAmount(contract.defaultMonthlyValue != null ? contract.defaultMonthlyValue.toString() : '');
+                    }}
+                    disabled={isLegacyCarChargingEdit}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder={t('homeExpenses.form.optional')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{t('homeExpenses.form.noLinkedContract')}</SelectItem>
+                      {filteredContracts.map(contract => (
+                          <SelectItem key={contract.id} value={contract.id}>
+                            {contract.name} ({contract.provider})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedContract && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {selectedContract.category === 'car' && category === 'car'
+                        ? t('homeExpenses.form.carContractHint')
+                        : t('homeExpenses.form.linkedContractHint')}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <Label>{t('homeExpenses.form.category')}</Label>
                 <Select
@@ -261,59 +325,6 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
                   </SelectContent>
                 </Select>
               </div>
-
-              {showLinkedContract && (
-                <div>
-                  <Label>Linked contract</Label>
-                  <Select
-                    value={contractId}
-                    onValueChange={(value) => {
-                      setContractId(value);
-                      if (value === 'none') {
-                        return;
-                      }
-
-                      const contract = contracts.find(item => item.id === value);
-                      if (!contract) {
-                        return;
-                      }
-
-                      const mappedCategory = mapContractCategoryToExpenseCategory(contract.category);
-                      if (mappedCategory && mappedCategory !== 'other') {
-                        setCategory(mappedCategory);
-                      }
-
-                      if (!name.trim()) {
-                        setName(
-                          contract.category === 'car'
-                            ? getCarChargingTransactionName(contract.name)
-                            : `${contract.name} (${contract.provider})`,
-                        );
-                      }
-                    }}
-                    disabled={isLegacyCarChargingEdit}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Optional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No linked contract</SelectItem>
-                      {filteredContracts.map(contract => (
-                          <SelectItem key={contract.id} value={contract.id}>
-                            {contract.name} ({contract.provider})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedContract && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {selectedContract.category === 'car'
-                        ? t('homeExpenses.form.carContractHint')
-                        : t('homeExpenses.form.linkedContractHint')}
-                    </p>
-                  )}
-                </div>
-              )}
 
               <div>
                 <Label htmlFor="name">{t('homeExpenses.form.name')}</Label>

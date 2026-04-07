@@ -94,6 +94,7 @@ export interface Contract {
   telegramAlertEnabled: boolean;
   documentLinks: string[] | null;
   priceHistoryEnabled: boolean;
+  defaultMonthlyValue: number | null;
   createdAt: string;
   updatedAt: string;
 }

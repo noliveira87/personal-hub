@@ -29,7 +29,7 @@ export default function ContractDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getContract, deleteContract } = useContracts();
-  const { formatCurrency, hideAmounts } = useI18n();
+  const { formatCurrency, hideAmounts, t } = useI18n();
   const contract = getContract(id!);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
 
@@ -72,6 +72,7 @@ export default function ContractDetail() {
     { label: 'Start Date', value: format(parseISO(contract.startDate), 'MMM d, yyyy') },
     { label: 'End Date', value: contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No end date' },
     { label: 'Currency', value: contract.currency },
+    { label: t('contracts.defaultMonthlyValue'), value: contract.defaultMonthlyValue != null ? formatCurrency(contract.defaultMonthlyValue, contract.currency) : '—' },
     { label: 'Status', value: null },
   ];
 
