@@ -14,6 +14,7 @@ create table if not exists public.app_settings (
   contract_alerts_read_signatures jsonb not null default '[]'::jsonb,
   warranty_default_category text not null default 'others',
   warranty_default_years integer not null default 3,
+  health_category_order jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
   constraint app_settings_singleton check (id = 'global')
 );
@@ -32,6 +33,9 @@ alter table public.app_settings
 
 alter table public.app_settings
   add column if not exists warranty_default_years integer not null default 3;
+
+alter table public.app_settings
+  add column if not exists health_category_order jsonb not null default '{}'::jsonb;
 
 alter table public.app_settings enable row level security;
 

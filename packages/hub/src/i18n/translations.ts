@@ -279,8 +279,18 @@ export const translations = {
         portfolio: { title: "Rumo Financeiro", subtitle: "Investimentos" },
         trips: { title: "Livro de Memórias", subtitle: "Viagens" },
         journeyBites: { title: "Dentadas pelo Mundo", subtitle: "Comidas e memórias" },
+        health: { title: "Saúde", subtitle: "Histórico de exames" },
         contracts: { title: "Contratos", subtitle: "Prazos e renovações" },
         warranties: { title: "Garantias", subtitle: "Garantias de Equipamentos" },
+      },
+    },
+    health: {
+      title: "Saúde",
+      subtitle: "Tabela de exames e histórico clínico.",
+      back: "Voltar",
+      person: {
+        me: "Nuno",
+        minina: "Minina",
       },
     },
     journeyBites: {
@@ -936,8 +946,18 @@ export const translations = {
         portfolio: { title: "Portfolio Journey", subtitle: "Investments" },
         trips: { title: "Book of Memories", subtitle: "Lifetime trips and memories!" },
         journeyBites: { title: "Journey Bites", subtitle: "Food moments from your trips" },
+        health: { title: "Health", subtitle: "Medical timeline" },
         contracts: { title: "Contracts", subtitle: "Due dates and renewals" },
         warranties: { title: "Warranties", subtitle: "Equipment Warranties" },
+      },
+    },
+    health: {
+      title: "Health",
+      subtitle: "Medical exams and checkup timeline.",
+      back: "Back",
+      person: {
+        me: "Nuno",
+        minina: "Minina",
       },
     },
     journeyBites: {
