@@ -100,9 +100,9 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const quickAmountValue = parseDecimalInput(quickAmount);
   const quickUnitsValue = parseDecimalInput(quickUnits);
   const isLongTermValueUpdate = !isCashbackOnlyQuickAdd && investment.category === "long-term" && quickMode === "value_update";
-  const quickCurrentTotalValue = parseDecimalInput(quickAmount);
-  const computedQuickProfitLoss = Number.isFinite(quickCurrentTotalValue)
-    ? quickCurrentTotalValue - displayCurrentValue
+  const quickTotalInterestEarned = parseDecimalInput(quickAmount);
+  const computedQuickProfitLoss = Number.isFinite(quickTotalInterestEarned)
+    ? (investment.investedAmount + quickTotalInterestEarned) - displayCurrentValue
     : NaN;
   const hasQuickUnitsPreview = investment.type === "crypto"
     && quickMode === "contribution"
@@ -360,7 +360,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                       : hasLiveCryptoQuote
                         ? "Profit / Return not available — current value is derived from live price."
                         : isLongTermValueUpdate
-                          ? "For long-term positions, enter the latest total current value. P/L is calculated automatically as (new total - current total)."
+                          ? "For long-term positions, enter the total interest/gains earned. P/L to record is calculated automatically."
                           : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
                 </p>
               </div>
@@ -399,7 +399,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                   {quickMode === "contribution"
                     ? "Amount to invest (€)"
                     : isLongTermValueUpdate
-                      ? "Current total value (€)"
+                      ? "Total interest/gains earned (€)"
                       : "Amount gained / lost (€)"}
                 </Label>
                 <Input
@@ -412,8 +412,8 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 {isLongTermValueUpdate ? (
                   <p className="mt-1 text-xs text-muted-foreground">
                     {Number.isFinite(computedQuickProfitLoss)
-                      ? `Current saved: ${formatCurrency(displayCurrentValue)} → P/L to record: ${formatCurrency(computedQuickProfitLoss)}`
-                      : `Current saved: ${formatCurrency(displayCurrentValue)}`}
+                      ? `Invested: ${formatCurrency(investment.investedAmount)} • Earnings: ${formatCurrency(quickTotalInterestEarned)} → P/L to record: ${formatCurrency(computedQuickProfitLoss)}`
+                      : `Invested: ${formatCurrency(investment.investedAmount)}`}
                   </p>
                 ) : null}
               </div>
