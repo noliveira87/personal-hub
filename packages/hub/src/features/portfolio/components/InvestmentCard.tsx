@@ -43,6 +43,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const [quickAmount, setQuickAmount] = useState("");
   const [quickDate, setQuickDate] = useState(new Date().toISOString().slice(0, 10));
   const [quickUnits, setQuickUnits] = useState("");
+  const [quickDescription, setQuickDescription] = useState("");
   const { asset, units, cashbackAsset, cashbackUnits, cashbackDate, userNotes } = parseCryptoNotes(investment.notes);
   const displayCurrentValue = resolveInvestmentCurrentValue(investment, cryptoSpotEur);
   const cashbackCurrentValue = resolveCashbackCurrentValue(investment, cryptoSpotEur);
@@ -156,11 +157,13 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
         investment.type === "crypto" && (effectiveMode === "contribution" || isCashbackOnlyQuickAdd)
           ? unitsBought
           : null,
+      description: quickDescription || undefined,
     });
 
     setQuickAmount("");
     setQuickUnits("");
     setQuickDate(new Date().toISOString().slice(0, 10));
+    setQuickDescription("");
     setQuickMode(defaultQuickMode);
     setQuickAddOpen(false);
   };
@@ -418,6 +421,16 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 ) : null}
               </div>
             )}
+            <div>
+              <Label htmlFor={`quick-description-${investment.id}`}>Description (optional)</Label>
+              <Input
+                id={`quick-description-${investment.id}`}
+                type="text"
+                placeholder="e.g., Monthly interest accrual"
+                value={quickDescription}
+                onChange={(e) => setQuickDescription(e.target.value)}
+              />
+            </div>
             {investment.type === "crypto" && quickMode === "contribution" && !isCashbackOnlyQuickAdd ? (
               <div>
                 <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({previewAsset})</Label>

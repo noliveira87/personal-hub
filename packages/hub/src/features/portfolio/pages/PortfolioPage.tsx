@@ -157,7 +157,7 @@ const Index = () => {
 
   const handleQuickContribution = (
     investment: Investment,
-    payload: { amount: number; date: string; mode: "contribution" | "value_update"; unitsBought?: number | null },
+    payload: { amount: number; date: string; mode: "contribution" | "value_update"; unitsBought?: number | null; description?: string },
   ) => {
     const { asset, units, cashbackAsset, cashbackUnits, cashbackDate, userNotes: rawUserNotes } = parseCryptoNotes(investment.notes);
     const existingMovements = parseInvestmentMovements(investment.notes);
@@ -176,7 +176,7 @@ const Index = () => {
           kind: "adjustment" as InvestmentMovementKind,
           amount: payload.amount,
           ...(investment.type === "crypto" && payload.unitsBought != null ? { units: roundUnits(payload.unitsBought) } : {}),
-          note: "Profit / Return",
+          note: payload.description || "Profit / Return",
         },
       ].sort((a, b) => a.date.localeCompare(b.date));
 
@@ -211,6 +211,7 @@ const Index = () => {
         kind: "contribution" as InvestmentMovementKind,
         amount: payload.amount,
         ...(investment.type === "crypto" && payload.unitsBought ? { units: roundUnits(payload.unitsBought) } : {}),
+        ...(payload.description ? { note: payload.description } : {}),
       },
     ].sort((a, b) => a.date.localeCompare(b.date));
 
