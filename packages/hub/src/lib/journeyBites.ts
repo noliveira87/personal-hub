@@ -9,6 +9,7 @@ export interface JourneyBite {
   dishName: string;
   description: string;
   restaurantName: string;
+  restaurantAddress: string;
   reviewUrl: string;
   photoUrl: string;
   eatenOn: string;
@@ -27,6 +28,7 @@ export interface JourneyBiteInput {
   dishName: string;
   description?: string;
   restaurantName?: string;
+  restaurantAddress?: string;
   reviewUrl?: string;
   photoPath?: string;
   eatenOn?: string;
@@ -39,6 +41,7 @@ export interface JourneyBiteUpdate {
   dishName?: string;
   description?: string;
   restaurantName?: string;
+  restaurantAddress?: string;
   reviewUrl?: string;
   photoPath?: string;
   eatenOn?: string;
@@ -51,6 +54,7 @@ type JourneyBiteRow = {
   dish_name: string;
   description: string | null;
   restaurant_name: string | null;
+  restaurant_address: string | null;
   review_url: string | null;
   photo_path: string | null;
   eaten_on: string | null;
@@ -83,6 +87,7 @@ const mapRowToJourneyBite = (row: JourneyBiteRow): JourneyBite => ({
   dishName: row.dish_name,
   description: row.description ?? "",
   restaurantName: row.restaurant_name ?? "",
+  restaurantAddress: row.restaurant_address ?? "",
   reviewUrl: row.review_url ?? "",
   photoUrl: resolvePhotoUrl(row.photo_path),
   eatenOn: row.eaten_on ?? "",
@@ -110,6 +115,7 @@ const toInsertRow = (input: JourneyBiteInput) => ({
   dish_name: input.dishName.trim(),
   description: toNullableTrimmed(input.description),
   restaurant_name: toNullableTrimmed(input.restaurantName),
+  restaurant_address: toNullableTrimmed(input.restaurantAddress),
   review_url: toNullableTrimmed(input.reviewUrl),
   photo_path: ensurePublicPath(input.photoPath),
   eaten_on: toNullableTrimmed(input.eatenOn),
@@ -123,6 +129,7 @@ const toUpdateRow = (input: JourneyBiteUpdate) => {
   if (input.dishName !== undefined) row.dish_name = input.dishName.trim();
   if (input.description !== undefined) row.description = toNullableTrimmed(input.description);
   if (input.restaurantName !== undefined) row.restaurant_name = toNullableTrimmed(input.restaurantName);
+  if (input.restaurantAddress !== undefined) row.restaurant_address = toNullableTrimmed(input.restaurantAddress);
   if (input.reviewUrl !== undefined) row.review_url = toNullableTrimmed(input.reviewUrl);
   if (input.photoPath !== undefined) row.photo_path = ensurePublicPath(input.photoPath);
   if (input.eatenOn !== undefined) row.eaten_on = toNullableTrimmed(input.eatenOn);
@@ -134,7 +141,7 @@ const toUpdateRow = (input: JourneyBiteUpdate) => {
 export async function loadJourneyBites(): Promise<{ items: JourneyBite[]; setupRequired: boolean }> {
   const { data, error } = await supabase
     .from("journey_bites")
-    .select("id, trip_id, dish_name, description, restaurant_name, review_url, photo_path, eaten_on, created_at")
+    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
     .order("eaten_on", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -177,6 +184,7 @@ export async function loadJourneyBites(): Promise<{ items: JourneyBite[]; setupR
       dishName: row.dish_name,
       description: row.description ?? "",
       restaurantName: row.restaurant_name ?? "",
+      restaurantAddress: row.restaurant_address ?? "",
       reviewUrl: row.review_url ?? "",
       photoUrl: resolvePhotoUrl(row.photo_path),
       eatenOn: row.eaten_on ?? "",
@@ -196,11 +204,53 @@ export async function loadJourneyBites(): Promise<{ items: JourneyBite[]; setupR
   return { items, setupRequired: false };
 }
 
+export async function loadJourneyBiteById(id: string): Promise<JourneyBite | null> {
+  const { data, error } = await supabase
+    .from("journey_bites")
+    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = data as JourneyBiteRow | null;
+  if (!row) return null;
+
+  let trip: JourneyBite["trip"] = null;
+  if (row.trip_id) {
+    const { data: tripRow, error: tripError } = await supabase
+      .from("trips")
+      .select("id, title, destination, start_date, end_date")
+      .eq("id", row.trip_id)
+      .maybeSingle();
+
+    if (tripError) {
+      throw new Error(tripError.message);
+    }
+
+    if (tripRow) {
+      const t = tripRow as TripLookupRow;
+      trip = {
+        id: t.id,
+        title: t.title,
+        destination: t.destination,
+        startDate: t.start_date,
+        endDate: t.end_date,
+      };
+    }
+  }
+
+  const item = mapRowToJourneyBite(row);
+  return { ...item, trip };
+}
+
 export async function createJourneyBite(input: JourneyBiteInput): Promise<JourneyBite> {
   const { data, error } = await supabase
     .from("journey_bites")
     .insert(toInsertRow(input))
-    .select("id, trip_id, dish_name, description, restaurant_name, review_url, photo_path, eaten_on, created_at")
+    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
     .single();
 
   if (error) {
@@ -216,7 +266,7 @@ export async function updateJourneyBite(id: string, changes: JourneyBiteUpdate):
     .from("journey_bites")
     .update(payload)
     .eq("id", id)
-    .select("id, trip_id, dish_name, description, restaurant_name, review_url, photo_path, eaten_on, created_at")
+    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
     .single();
 
   if (error) {
@@ -273,7 +323,7 @@ export async function convertTripFoodToJourneyBite(params: {
 
   const { data: existing, error: existingError } = await supabase
     .from("journey_bites")
-    .select("id, trip_id, dish_name, description, restaurant_name, review_url, photo_path, eaten_on, created_at")
+    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
     .eq("trip_id", tripId)
     .eq("source_food_index", foodIndex)
     .maybeSingle();
@@ -293,19 +343,20 @@ export async function convertTripFoodToJourneyBite(params: {
       source_food_index: foodIndex,
       dish_name: foodName,
       description: toNullableTrimmed(food.description),
+      restaurant_address: null,
       review_url: toNullableTrimmed(food.reviewUrl),
       photo_path: ensurePublicPath(food.image),
       eaten_on: toNullableTrimmed(fallbackDate),
       sort_order: foodIndex,
     })
-    .select("id, trip_id, dish_name, description, restaurant_name, review_url, photo_path, eaten_on, created_at")
+    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
     .single();
 
   if (error) {
     if (isConflictError(error)) {
       const { data: conflictRow } = await supabase
         .from("journey_bites")
-        .select("id, trip_id, dish_name, description, restaurant_name, review_url, photo_path, eaten_on, created_at")
+        .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
         .eq("trip_id", tripId)
         .eq("source_food_index", foodIndex)
         .maybeSingle();

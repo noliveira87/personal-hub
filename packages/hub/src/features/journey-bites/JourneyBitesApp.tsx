@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Edit3, ExternalLink, Image, Loader2, Plus, Save, Trash2, Upload, UtensilsCrossed, X } from "lucide-react";
+import { Image, Loader2, Plus, Save, Upload, UtensilsCrossed, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,7 @@ type FormState = {
   dishName: string;
   description: string;
   restaurantName: string;
+  restaurantAddress: string;
   reviewUrl: string;
   eatenOn: string;
   photoPath: string;
@@ -34,6 +36,7 @@ const buildInitialForm = (): FormState => ({
   dishName: "",
   description: "",
   restaurantName: "",
+  restaurantAddress: "",
   reviewUrl: "",
   eatenOn: "",
   photoPath: "",
@@ -44,6 +47,7 @@ const toInput = (state: FormState): JourneyBiteInput => ({
   dishName: state.dishName,
   description: state.description,
   restaurantName: state.restaurantName,
+  restaurantAddress: state.restaurantAddress,
   reviewUrl: state.reviewUrl,
   eatenOn: state.eatenOn,
   photoPath: state.photoPath,
@@ -51,6 +55,7 @@ const toInput = (state: FormState): JourneyBiteInput => ({
 
 export function JourneyBitesApp() {
   const { t, formatDate } = useI18n();
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [items, setItems] = useState<JourneyBite[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -84,6 +89,7 @@ export function JourneyBitesApp() {
       dishName: item.dishName,
       description: item.description,
       restaurantName: item.restaurantName,
+      restaurantAddress: item.restaurantAddress,
       reviewUrl: item.reviewUrl,
       eatenOn: item.eatenOn,
       photoPath: item.photoUrl,
@@ -244,12 +250,29 @@ export function JourneyBitesApp() {
             ) : null}
 
             {!loading && !setupRequired && items.length ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
                 {items.map((item) => (
-                  <article key={item.id} className="overflow-hidden rounded-2xl border border-border/80 bg-card/60">
-                    <div className="aspect-[16/9] w-full bg-muted/40">
+                  <article
+                    key={item.id}
+                    className="group flex flex-col cursor-pointer overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-foreground/20 hover:shadow-md"
+                    onClick={() => navigate(`/journey-bites/${item.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        navigate(`/journey-bites/${item.id}`);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="aspect-[16/9] w-full overflow-hidden bg-muted/30">
                       {item.photoUrl ? (
-                        <img src={item.photoUrl} alt={item.dishName} className="h-full w-full object-cover" loading="lazy" />
+                        <img
+                          src={item.photoUrl}
+                          alt={item.dishName}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
                           {t("journeyBites.noPhoto")}
@@ -257,44 +280,25 @@ export function JourneyBitesApp() {
                       )}
                     </div>
 
-                    <div className="space-y-2 p-4">
-                      <p className="text-lg font-semibold text-foreground">{item.dishName}</p>
-                      {item.restaurantName ? <p className="text-sm text-muted-foreground">{item.restaurantName}</p> : null}
+                    <div className="flex flex-col gap-3 p-5 flex-1">
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold leading-snug text-foreground line-clamp-2">{item.dishName}</h3>
+                        {item.restaurantName && (
+                          <p className="mt-1 text-sm font-medium text-foreground/75">{item.restaurantName}</p>
+                        )}
+                      </div>
 
-                      <p className="text-sm text-foreground/85">
+                      <p className="text-sm text-foreground/65 line-clamp-2 leading-relaxed">
                         {item.description || t("journeyBites.noDescription")}
                       </p>
 
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <p>
-                          {t("journeyBites.tripLabel")}: {item.trip?.title ?? "-"}
+                      <div className="border-t border-border/40 pt-3 space-y-1.5 text-xs text-muted-foreground">
+                        <p className="truncate font-medium">
+                          {t("journeyBites.tripLabel")}: <span className="font-normal">{item.trip?.title ?? "-"}</span>
                         </p>
                         <p>
-                          {t("journeyBites.dateLabel")}: {item.eatenOn ? formatDate(item.eatenOn) : "-"}
+                          {t("journeyBites.dateLabel")}: <span className="font-normal">{item.eatenOn ? formatDate(item.eatenOn) : "-"}</span>
                         </p>
-                      </div>
-
-                      {item.reviewUrl ? (
-                        <a
-                          href={item.reviewUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                        >
-                          {t("journeyBites.review")}
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      ) : null}
-
-                      <div className="flex items-center gap-2 pt-2">
-                        <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => hydrateFormFromItem(item)}>
-                          <Edit3 className="mr-1 h-3.5 w-3.5" />
-                          {t("journeyBites.edit")}
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { void handleDelete(item.id); }}>
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          {t("journeyBites.delete")}
-                        </Button>
                       </div>
                     </div>
                   </article>
@@ -362,7 +366,16 @@ export function JourneyBitesApp() {
                 <Input
                   value={form.restaurantName}
                   onChange={(event) => setForm((prev) => ({ ...prev, restaurantName: event.target.value }))}
-                  placeholder={t("journeyBites.restaurantPlaceholder")}
+                  placeholder={t("journeyBites.restaurantNamePlaceholder")}
+                />
+              </label>
+
+              <label className="space-y-1 text-sm">
+                <span className="text-muted-foreground">{t("journeyBites.restaurantAddressField")}</span>
+                <Input
+                  value={form.restaurantAddress}
+                  onChange={(event) => setForm((prev) => ({ ...prev, restaurantAddress: event.target.value }))}
+                  placeholder={t("journeyBites.restaurantAddressPlaceholder")}
                 />
               </label>
 

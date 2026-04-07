@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "migrate:journey-bites-photos": "node scripts/migrate-journey-bites-photos-to-bucket.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

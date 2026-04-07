@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, Plus, Compass } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/features/trips/components/Header";
@@ -76,6 +77,7 @@ const buildTripChanges = (current: Trip, next: EditableTripFields): Partial<Edit
 
 export function TripsApp() {
   const { t, formatCurrency, language } = useI18n();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [biteThumbnailsByTrip, setBiteThumbnailsByTrip] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
@@ -101,6 +103,23 @@ export function TripsApp() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!trips.length || view !== "dashboard") return;
+
+    const tripId = searchParams.get("tripId");
+    if (!tripId) return;
+
+    const trip = trips.find((item) => item.id === tripId);
+    if (!trip) return;
+
+    setSelectedTrip(trip);
+    setView("detail");
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("tripId");
+    setSearchParams(nextParams, { replace: true });
+  }, [trips, view, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (view === "detail" || view === "add" || view === "edit") {
