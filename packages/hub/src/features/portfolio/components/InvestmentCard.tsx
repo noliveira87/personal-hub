@@ -414,9 +414,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 {isLongTermValueUpdate ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {Number.isFinite(quickTotalInterestEarned)
-                      ? `Juros/Ganhos: ${formatCurrency(quickTotalInterestEarned)}`
-                      : ""}
+                    Juros/Ganhos: {Number.isFinite(quickTotalInterestEarned) ? formatCurrency(quickTotalInterestEarned) : "—"}
                   </p>
                 ) : null}
               </div>
