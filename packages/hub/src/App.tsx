@@ -19,6 +19,7 @@ const ContractForm = lazy(() => import("@/features/contracts/pages/ContractForm"
 const CalendarPage = lazy(() => import("@/features/contracts/pages/CalendarPage"));
 const AlertsPage = lazy(() => import("@/features/contracts/pages/AlertsPage"));
 const InsightsPage = lazy(() => import("@/features/contracts/pages/InsightsPage"));
+const QuotesPage = lazy(() => import("@/features/contracts/pages/QuotesPage"));
 const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
 const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
@@ -76,6 +77,7 @@ const AppRoutes = () => {
               <Route path="/contracts/calendar" element={<CalendarPage />} />
               <Route path="/contracts/alerts" element={<AlertsPage />} />
               <Route path="/contracts/insights" element={<InsightsPage />} />
+              <Route path="/contracts/quotes" element={<QuotesPage />} />
 
               {/* Home Expenses (needs ContractProvider for income from contracts) */}
               <Route element={<HomeExpensesScope />}>

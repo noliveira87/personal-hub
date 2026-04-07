@@ -99,6 +99,23 @@ export interface Contract {
   updatedAt: string;
 }
 
+export interface ContractQuote {
+  id: string;
+  contractId: string | null;
+  title: string;
+  description: string | null;
+  price: number | null;
+  currency: string;
+  date: string | null;
+  pdfUrl: string | null;
+  alertDate: string | null;
+  alertEnabled: boolean;
+  telegramAlertEnabled: boolean;
+  alertSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PriceHistory {
   id: string;
   contractId: string;

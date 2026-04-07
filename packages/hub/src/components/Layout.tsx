@@ -2,10 +2,11 @@ import { createContext, useContext, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useI18n } from '@/i18n/I18nProvider';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, CalendarDays, Bell, X, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bell, X, TrendingUp, Receipt } from 'lucide-react';
 
 const navItems = [
   { to: '/dashboard', labelKey: 'contracts.menu', icon: LayoutDashboard },
+  { to: '/contracts/quotes', labelKey: 'layout.nav.quotes', icon: Receipt },
   { to: '/contracts/calendar', labelKey: 'layout.nav.calendar', icon: CalendarDays },
   { to: '/contracts/alerts', labelKey: 'layout.nav.alerts', icon: Bell },
   { to: '/contracts/insights', labelKey: 'layout.nav.insights', icon: TrendingUp },

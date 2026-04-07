@@ -9,6 +9,7 @@ import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, HOUSING_USAGE_LABELS, getC
 import { format, parseISO } from 'date-fns';
 import { Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import CarElectricityChart from '../components/CarElectricityChart';
+import { QuotesSection } from '../components/QuotesSection';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -266,6 +267,13 @@ export default function ContractDetail() {
           </div>
         </div>
       )}
+
+      {/* Quotes / Budgets */}
+      <QuotesSection
+        contractId={contract.id}
+        contractCurrency={contract.currency}
+        animationDelay="350ms"
+      />
 
       {/* Price History Modal */}
       {showPriceHistory && (

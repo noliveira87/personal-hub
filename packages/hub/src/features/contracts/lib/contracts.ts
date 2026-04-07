@@ -273,3 +273,4 @@ export async function getLatestPriceForContract(contractId: string): Promise<Pri
 
   return mapRowToPriceHistory(data);
 }
+
