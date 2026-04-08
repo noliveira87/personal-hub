@@ -40,8 +40,9 @@ export default function TransactionList() {
         <div className="text-center py-12 text-muted-foreground text-sm">{t('homeExpenses.list.noTransactionsThisMonth')}</div>
       )}
       {filtered.map((tx) => (
-        <div key={tx.id} className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm flex items-center justify-between gap-4 animate-fade-in sm:p-5">
-          <div className="flex flex-1 items-center gap-3 min-w-0">
+        <div key={tx.id} className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm animate-fade-in sm:p-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
+            <div className="flex items-center gap-3 min-w-0">
             <div className={`w-2 h-8 rounded-full ${tx.type === 'income' ? 'bg-income' : 'bg-expense'}`} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
@@ -75,20 +76,22 @@ export default function TransactionList() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <span className={`tabular-nums font-semibold text-sm whitespace-nowrap ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
-              {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
-            </span>
-            {!tx.isReadOnly && (
-              <>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </>
-            )}
+
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              <span className={`tabular-nums font-semibold text-sm whitespace-nowrap ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
+                {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+              </span>
+              {!tx.isReadOnly && (
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ))}
