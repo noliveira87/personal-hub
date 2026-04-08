@@ -1,12 +1,5 @@
--- Server-side contract Telegram alerts (runs even when app is closed)
--- Run this in Supabase SQL Editor after running:
---   1) packages/hub/supabase/settings.sql
-
-create extension if not exists pg_net;
-create extension if not exists pg_cron;
-
 create or replace function public.send_contract_scheduled_alerts()
-returns void
+returns text
 language plpgsql
 security definer
 set search_path = public
@@ -22,6 +15,10 @@ declare
   v_reason_text text;
   v_expiry_hint text;
   v_item record;
+
+  -- 👇 NOVOS
+  v_response jsonb;
+  v_count integer := 0;
 begin
   select
     coalesce(telegram_bot_token, ''),
@@ -38,15 +35,15 @@ begin
   limit 1;
 
   if not found then
-    return;
+    return 'No settings found';
   end if;
 
   if not v_enabled then
-    return;
+    return 'Contracts disabled';
   end if;
 
   if btrim(v_bot_token) = '' or btrim(v_chat_id) = '' then
-    return;
+    return 'Missing Telegram config';
   end if;
 
   v_today_key := current_date::text;
@@ -54,6 +51,8 @@ begin
   select coalesce(array_agg(value), '{}')
   into v_sent_today
   from jsonb_array_elements_text(coalesce(v_history -> v_today_key, '[]'::jsonb));
+
+  raise log 'Starting contracts alert job for %', v_today_key;
 
   for v_item in
     with expanded as (
@@ -81,17 +80,26 @@ begin
         e.alert_index,
         coalesce(e.alert->>'kind', 'days-before') as kind,
         case
-          when coalesce(e.alert->>'daysBefore', '') ~ '^[0-9]+$' then greatest(1, (e.alert->>'daysBefore')::integer)
+          when coalesce(e.alert->>'daysBefore', '') ~ '^[0-9]+$'
+          then greatest(1, (e.alert->>'daysBefore')::integer)
           else 30
         end as days_before,
         case
-          when coalesce(e.alert->>'specificDate', '') ~ '^\\d{4}-\\d{2}-\\d{2}$' then (e.alert->>'specificDate')::date
+          when coalesce(e.alert->>'specificDate', '') ~ '^\d{4}-\d{2}-\d{2}$'
+          then (e.alert->>'specificDate')::date
           else null
         end as specific_date,
         coalesce(nullif(e.alert->>'reason', ''), '') as reason,
-        coalesce((e.alert->>'enabled')::boolean, true) as app_enabled,
-        -- Corrigido: transforma string "true"/"false" em boolean
-        (coalesce(nullif(lower(e.alert->>'telegramEnabled'), ''), 'false') = 'true') as telegram_enabled,
+        case
+          when e.alert ? 'enabled'
+          then (coalesce(nullif(lower(e.alert->>'enabled'), ''), 'true') = 'true')
+          else true
+        end as app_enabled,
+        case
+          when e.alert ? 'telegramEnabled'
+          then (coalesce(nullif(lower(e.alert->>'telegramEnabled'), ''), 'false') = 'true')
+          else true
+        end as telegram_enabled,
         e.telegram_alert_enabled
       from expanded e
     ),
@@ -118,22 +126,16 @@ begin
       where n.telegram_enabled = true
         and n.telegram_alert_enabled = true
     )
-    select
-      d.id,
-      d.name,
-      d.provider,
-      d.end_date,
-      d.alert_index,
-      d.reason,
-      d.trigger_date,
-      d.trigger_label
+    select *
     from due_today d
     where d.trigger_date = current_date
     order by d.end_date asc nulls last, d.alert_index asc
   loop
+
     v_signature := v_item.id::text || ':' || v_item.alert_index::text || ':' || v_item.trigger_date::text;
 
     if v_signature = any(v_sent_today) then
+      raise log 'Skipping already sent: %', v_signature;
       continue;
     end if;
 
@@ -147,7 +149,9 @@ begin
       else E'\n📅 Expires on: ' || to_char(v_item.end_date, 'DD/MM/YYYY')
     end;
 
-    perform net.http_post(
+    raise log 'Sending alert for: %', v_item.name;
+
+    select net.http_post(
       url := format('https://api.telegram.org/bot%s/sendMessage', v_bot_token),
       headers := '{"Content-Type":"application/json"}'::jsonb,
       body := jsonb_build_object(
@@ -162,9 +166,13 @@ begin
           '👉 Open alerts: https://hub.cafofo12.ddns.net/contracts/alerts',
         'disable_web_page_preview', true
       )
-    );
+    )
+    into v_response;
+
+    raise log 'Telegram response: %', v_response;
 
     v_sent_today := array_append(v_sent_today, v_signature);
+    v_count := v_count + 1;
   end loop;
 
   v_history := jsonb_set(v_history, array[v_today_key], to_jsonb(v_sent_today), true);
@@ -174,25 +182,9 @@ begin
     contracts_alerts_sent = v_history,
     updated_at = now()
   where id = 'global';
+
+  raise log 'Finished job. Sent % alerts', v_count;
+
+  return 'Sent ' || v_count || ' alerts';
 end;
 $$;
-
-revoke all on function public.send_contract_scheduled_alerts() from public;
-grant execute on function public.send_contract_scheduled_alerts() to service_role;
-
--- Schedule daily run at 09:20 UTC
-select cron.unschedule('contracts-scheduled-alerts')
-where exists (
-  select 1
-  from cron.job
-  where jobname = 'contracts-scheduled-alerts'
-);
-
-select cron.schedule(
-  'contracts-scheduled-alerts',
-  '20 9 * * *',
-  $$select public.send_contract_scheduled_alerts();$$
-);
-
--- Manual test:
--- select public.send_contract_scheduled_alerts();

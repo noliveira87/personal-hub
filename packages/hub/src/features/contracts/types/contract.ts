@@ -48,6 +48,16 @@ export interface AlertSetting {
 
 export function normalizeAlertSetting(value: unknown): AlertSetting {
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const parseBooleanLike = (input: unknown, defaultValue: boolean): boolean => {
+    if (typeof input === 'boolean') return input;
+    if (typeof input === 'string') {
+      const normalized = input.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    return defaultValue;
+  };
+
   const kind = raw.kind === 'specific-date' || typeof raw.specificDate === 'string'
     ? 'specific-date'
     : 'days-before';
@@ -68,8 +78,9 @@ export function normalizeAlertSetting(value: unknown): AlertSetting {
     daysBefore,
     specificDate: kind === 'specific-date' ? specificDate : null,
     reason,
-    enabled: raw.enabled !== false,
-    telegramEnabled: raw.telegramEnabled === true,
+    enabled: parseBooleanLike(raw.enabled, true),
+    // Legacy alerts may not have telegramEnabled; default to true to avoid silently dropping them.
+    telegramEnabled: parseBooleanLike(raw.telegramEnabled, true),
   };
 }
 

@@ -2,6 +2,66 @@
 -- Run this in Supabase SQL Editor.
 
 -- =====================================================
+-- QUICK 5-STEP MANUAL SEND TEST (copy-ready)
+-- =====================================================
+
+-- STEP 1) Confirm global settings
+select
+  id,
+  contracts_enabled,
+  (telegram_bot_token is not null and btrim(telegram_bot_token) <> '') as has_bot_token,
+  (telegram_chat_id is not null and btrim(telegram_chat_id) <> '') as has_chat_id
+from public.app_settings
+where id = 'global';
+
+-- STEP 2) Direct Telegram API test (returns request_id)
+with cfg as (
+  select
+    telegram_bot_token as bot_token,
+    telegram_chat_id as chat_id
+  from public.app_settings
+  where id = 'global'
+)
+select net.http_post(
+  url := 'https://api.telegram.org/bot' || cfg.bot_token || '/sendMessage',
+  headers := '{"Content-Type":"application/json"}'::jsonb,
+  body := jsonb_build_object(
+    'chat_id', cfg.chat_id,
+    'text', 'Direct Telegram SQL test ' || now()::text
+  )
+) as request_id
+from cfg;
+
+-- STEP 3) Check latest Telegram HTTP responses
+select
+  id,
+  status_code,
+  content,
+  created
+from net._http_response
+order by created desc
+limit 10;
+
+-- STEP 4) Clear dedup for today and run the contract alert function now
+update public.app_settings
+set
+  contracts_alerts_sent = contracts_alerts_sent - to_char(current_date, 'YYYY-MM-DD'),
+  updated_at = now()
+where id = 'global';
+
+select public.send_contract_scheduled_alerts();
+
+-- STEP 5) Re-check HTTP responses after function call
+select
+  id,
+  status_code,
+  content,
+  created
+from net._http_response
+order by created desc
+limit 10;
+
+-- =====================================================
 -- A) PRE-CHECKS
 -- =====================================================
 
@@ -40,7 +100,10 @@ normalized as (
       then (e.alert->>'specificDate')::date
       else null
     end as trigger_date,
-    coalesce((e.alert->>'telegramEnabled')::boolean, false) as telegram_enabled,
+    case
+      when e.alert ? 'telegramEnabled' then (coalesce(nullif(lower(e.alert->>'telegramEnabled'), ''), 'false') = 'true')
+      else true
+    end as telegram_enabled,
     coalesce(nullif(e.alert->>'reason', ''), '') as reason
   from expanded e
 )

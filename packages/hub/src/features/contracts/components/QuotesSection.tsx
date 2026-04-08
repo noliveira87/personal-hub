@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Receipt, Plus, Pencil, Trash2, ExternalLink, Loader2, Bell, Building2 } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ContractQuote } from '@/features/contracts/types/contract';
@@ -40,24 +40,42 @@ export function QuotesSection({
 }: QuotesSectionProps) {
   const { t, formatCurrency } = useI18n();
   const [quotes, setQuotes] = useState<ContractQuote[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<ContractQuote | null>(null);
+  const loadingTimerRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
+    setHasLoadedOnce(false);
+    if (loadingTimerRef.current) {
+      window.clearTimeout(loadingTimerRef.current);
+    }
+    // Avoid flashing a spinner when the query resolves quickly.
+    loadingTimerRef.current = window.setTimeout(() => setLoading(true), 250);
+
     try {
-      setLoading(true);
       const data = await loadQuotesByContract(contractId);
       setQuotes(data);
     } catch {
       // silently fail on load — non-critical section
     } finally {
+      if (loadingTimerRef.current) {
+        window.clearTimeout(loadingTimerRef.current);
+        loadingTimerRef.current = null;
+      }
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [contractId]);
 
   useEffect(() => {
     load();
+    return () => {
+      if (loadingTimerRef.current) {
+        window.clearTimeout(loadingTimerRef.current);
+      }
+    };
   }, [load]);
 
   const handleAdd = () => {
@@ -129,6 +147,8 @@ export function QuotesSection({
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
             <span className="text-sm">{t('contracts.quotes.loading')}</span>
           </div>
+        ) : !hasLoadedOnce ? (
+          <div className="py-6" />
         ) : quotes.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">{t('contracts.quotes.empty')}</p>
         ) : (

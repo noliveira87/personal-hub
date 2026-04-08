@@ -286,7 +286,7 @@ export default function AlertsPage() {
     active.forEach(c => {
       const daysLeft = getDaysUntilExpiry(c);
       c.alerts.forEach((alert, alertIndex) => {
-        if (!alert.enabled) {
+        if (!alert.enabled && !alert.telegramEnabled) {
           return;
         }
 
@@ -388,7 +388,7 @@ export default function AlertsPage() {
       if (!contract || !(contract.status === 'active' || contract.status === 'pending-cancellation')) return [];
       const occurred = [];
       contract.alerts.forEach((alert, index) => {
-        if (!alert.enabled) return;
+        if (!alert.enabled && !alert.telegramEnabled) return;
         let triggerDate = null;
         if (alert.kind === 'specific-date') {
           if (!alert.specificDate) return;
