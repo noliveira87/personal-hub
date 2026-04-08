@@ -4,7 +4,7 @@ import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost } from '@/features/contracts/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, LayoutDashboard, Loader } from 'lucide-react';
+import { Plus, ArrowRight, LayoutDashboard, Loader, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { parseISO } from 'date-fns';
@@ -103,13 +103,36 @@ export default function Dashboard() {
         title={t('contracts.menu')}
         icon={LayoutDashboard}
         actions={(
-          <Link
-            to="/contracts/new"
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('contracts.addContract')}</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/contracts/new"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors active:scale-95 shadow-sm"
+              aria-label={t('contracts.addContract')}
+              title={t('contracts.addContract')}
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('contracts.addContract')}</span>
+            </Link>
+
+            <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex gap-1.5">
+              <Link to="/contracts/insights" aria-label="Open insights" title="Insights" className="flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4" />
+                <span>Insights</span>
+              </Link>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl sm:hidden"
+              asChild
+              aria-label="Insights"
+            >
+              <Link to="/contracts/insights" title="Insights">
+                <TrendingUp className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         )}
       />
 

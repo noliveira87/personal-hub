@@ -7,9 +7,10 @@ import AnnualSummarySection from '@/features/home-expenses/components/dashboard/
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
-import { House, Plus } from 'lucide-react';
+import { House, Plus, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nProvider';
+import { Link } from 'react-router-dom';
 
 export default function Index() {
   const { t } = useI18n();
@@ -35,19 +36,42 @@ export default function Index() {
         icon={House}
         backTo="/"
         actions={(
-          <TransactionForm
-            trigger={(
-              <Button
-                size="sm"
-                className="h-10 w-10 rounded-xl px-0 gap-2 sm:h-9 sm:w-auto sm:px-3"
-                aria-label={t('homeExpenses.form.addTransaction')}
-                title={t('homeExpenses.form.addTransaction')}
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">{t('homeExpenses.form.addTransaction')}</span>
+          <div className="flex items-center gap-2">
+            <TransactionForm
+              trigger={(
+                <Button
+                  size="sm"
+                  className="h-10 w-10 rounded-xl px-0 gap-2 sm:h-9 sm:w-auto sm:px-3"
+                  aria-label={t('homeExpenses.form.addTransaction')}
+                  title={t('homeExpenses.form.addTransaction')}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('homeExpenses.form.addTransaction')}</span>
+                </Button>
+              )}
+            />
+
+            <div className="hidden sm:flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild className="gap-1.5">
+                <Link to="/home-expenses/insights" aria-label="Open insights" title="Insights" className="flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4" />
+                  <span>Insights</span>
+                </Link>
               </Button>
-            )}
-          />
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl sm:hidden"
+              asChild
+              aria-label="Insights"
+            >
+              <Link to="/home-expenses/insights" title="Insights">
+                <TrendingUp className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         )}
       />
 

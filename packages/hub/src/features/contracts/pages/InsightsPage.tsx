@@ -1,7 +1,7 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
-import { CATEGORY_LABELS, CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
+import { CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -13,7 +13,7 @@ const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/Insi
 
 export default function InsightsPage() {
   const { contracts, allPriceHistory } = useContracts();
-  const { formatCurrency, hideAmounts } = useI18n();
+  const { formatCurrency, t, locale } = useI18n();
 
   const active = contracts.filter(c => c.status === 'active');
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
@@ -33,6 +33,26 @@ export default function InsightsPage() {
     });
   }, [active, priceMap]);
 
+  const categoryNames: Record<ContractCategory, string> = {
+    'mortgage': t('contracts.categoryNames.mortgage'),
+    'home-insurance': t('contracts.categoryNames.homeInsurance'),
+    'apartment-insurance': t('contracts.categoryNames.apartmentInsurance'),
+    'gas': t('contracts.categoryNames.gas'),
+    'electricity': t('contracts.categoryNames.electricity'),
+    'internet': t('contracts.categoryNames.internet'),
+    'mobile': t('contracts.categoryNames.mobile'),
+    'water': t('contracts.categoryNames.water'),
+    'tv-streaming': t('contracts.categoryNames.tvStreaming'),
+    'software': t('contracts.categoryNames.software'),
+    'maintenance': t('contracts.categoryNames.maintenance'),
+    'security-alarm': t('contracts.categoryNames.securityAlarm'),
+    'car': t('contracts.categoryNames.car'),
+    'card-credit': t('contracts.categoryNames.cardCredit'),
+    'card-debit': t('contracts.categoryNames.cardDebit'),
+    'gym': t('contracts.categoryNames.gym'),
+    'other': t('contracts.categoryNames.other'),
+  };
+
   const monthlyTotal = activeWithResolvedPrices.reduce((s, c) => s + getMonthlyEquivalent(c), 0);
   const annualTotal = activeWithResolvedPrices.reduce((s, c) => s + getAnnualEquivalent(c), 0);
 
@@ -45,12 +65,12 @@ export default function InsightsPage() {
     return Array.from(map.entries())
       .map(([cat, amount]) => ({
         category: cat,
-        label: CATEGORY_LABELS[cat],
+        label: categoryNames[cat],
         icon: CATEGORY_ICONS[cat],
         amount: Math.round(amount * 100) / 100,
       }))
       .sort((a, b) => b.amount - a.amount);
-  }, [activeWithResolvedPrices]);
+  }, [activeWithResolvedPrices, categoryNames]);
 
   const topExpensive = useMemo(() => {
     return [...activeWithResolvedPrices]
@@ -120,10 +140,10 @@ export default function InsightsPage() {
     }
 
     return Array.from({ length: 12 }, (_, monthIndex) => ({
-      month: new Date(effectiveYear, monthIndex, 1).toLocaleDateString('pt-PT', { month: 'short' }),
+      month: new Date(effectiveYear, monthIndex, 1).toLocaleDateString(locale, { month: 'short' }),
       value: byMonth.get(monthIndex) ?? null,
     }));
-  }, [allPriceHistory, effectiveYear, selectedScope, electricityContractIds]);
+  }, [allPriceHistory, effectiveYear, selectedScope, electricityContractIds, locale]);
 
   const selectedContract = contracts.find((contract) => contract.id === selectedScope);
   const chartCurrency = selectedContract?.currency ?? 'EUR';
@@ -133,27 +153,27 @@ export default function InsightsPage() {
       <AppSectionHeader title="D12 Contracts" icon={FileText} />
 
       <div className="animate-fade-up">
-        <h1 className="text-2xl font-bold text-foreground">Insights</h1>
-        <p className="text-muted-foreground text-sm mt-1">Spending overview and analysis</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('contracts.insights.title')}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t('contracts.insights.subtitle')}</p>
       </div>
 
       {/* Totals */}
       <div className="grid sm:grid-cols-2 gap-4 animate-fade-up" style={{ animationDelay: '80ms' }}>
         <div className="bg-card rounded-xl p-6 border">
-          <p className="text-sm text-muted-foreground">Monthly Spending</p>
+          <p className="text-sm text-muted-foreground">{t('contracts.insights.monthlySpending')}</p>
           <p className="text-3xl font-bold tabular-nums text-foreground mt-1">{formatCurrency(monthlyTotal)}</p>
-          <p className="text-xs text-muted-foreground mt-1">across {active.length} active contracts</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('contracts.insights.acrossActiveContracts', { count: active.length })}</p>
         </div>
         <div className="bg-card rounded-xl p-6 border">
-          <p className="text-sm text-muted-foreground">Annual Spending</p>
+          <p className="text-sm text-muted-foreground">{t('contracts.insights.annualSpending')}</p>
           <p className="text-3xl font-bold tabular-nums text-foreground mt-1">{formatCurrency(annualTotal)}</p>
-          <p className="text-xs text-muted-foreground mt-1">estimated total</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('contracts.insights.estimatedTotal')}</p>
         </div>
       </div>
 
       {/* By category chart */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '160ms' }}>
-        <h2 className="text-sm font-semibold text-foreground mb-4">Monthly Spending by Category</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t('contracts.insights.monthlyByCategory')}</h2>
         <Suspense fallback={<div className="h-64 rounded-lg bg-muted/30 animate-pulse" />}>
           <InsightsCategoryChart data={byCategory} />
         </Suspense>
@@ -161,15 +181,15 @@ export default function InsightsPage() {
 
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '200ms' }}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-          <h2 className="text-sm font-semibold text-foreground">Price Evolution</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('contracts.insights.priceEvolution')}</h2>
           <div className="flex gap-2">
             <select
               value={selectedScope}
               onChange={(e) => setSelectedScope(e.target.value)}
               className="h-9 rounded-md border bg-background px-3 text-sm"
             >
-              <option value="all">All contracts</option>
-              <option value="category:electricity">Luz (todos os contratos)</option>
+              <option value="all">{t('contracts.insights.scopeAllContracts')}</option>
+              <option value="category:electricity">{t('contracts.insights.scopeElectricity')}</option>
               {chartContractOptions.map((option) => (
                 <option key={option.id} value={option.id}>{option.label}</option>
               ))}
@@ -220,14 +240,14 @@ export default function InsightsPage() {
           </div>
         ) : (
           <div className="text-center py-4 text-sm text-muted-foreground rounded-lg border bg-muted/20">
-            No data for {effectiveYear}
+            {t('contracts.insights.noDataForYear', { year: effectiveYear })}
           </div>
         )}
       </div>
 
       {/* Category breakdown list */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '240ms' }}>
-        <h2 className="text-sm font-semibold text-foreground mb-4">Category Breakdown</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t('contracts.insights.categoryBreakdown')}</h2>
         <div className="space-y-3">
           {byCategory.map((cat, i) => (
             <div key={cat.category} className="flex items-center justify-between">
@@ -237,7 +257,7 @@ export default function InsightsPage() {
               </div>
               <div className="text-right">
                 <span className="text-sm font-semibold tabular-nums">{formatCurrency(cat.amount)}</span>
-                <span className="text-xs text-muted-foreground ml-1">/ mo</span>
+                <span className="text-xs text-muted-foreground ml-1">{t('contracts.insights.perMonth')}</span>
               </div>
             </div>
           ))}
@@ -246,7 +266,7 @@ export default function InsightsPage() {
 
       {/* Most expensive */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '320ms' }}>
-        <h2 className="text-sm font-semibold text-foreground mb-4">Most Expensive (Annual)</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t('contracts.insights.mostExpensiveAnnual')}</h2>
         <div className="space-y-3">
           {topExpensive.map((c, i) => (
             <div key={c.id} className="flex items-center justify-between">

@@ -9,6 +9,7 @@ import { Bell, BellRing, FileText, Loader, Pencil, Plus, Send, Trash2 } from 'lu
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { toast } from '@/components/ui/sonner';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ type EditableAlertKind = 'days-before' | 'specific-date';
 
 export default function AlertsPage() {
   const { contracts, updateContract } = useContracts();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -93,38 +95,38 @@ export default function AlertsPage() {
 
   const handleCreateCustomAlert = async () => {
     if (!selectedContractId) {
-      toast.error('Select a contract first.');
+      toast.error(t('contracts.alerts.validation.selectContractFirst'));
       return;
     }
 
     if (alertKind === 'specific-date' && !specificDate) {
-      toast.error('Choose a date for the alert.');
+      toast.error(t('contracts.alerts.validation.chooseDate'));
       return;
     }
 
     if (alertKind === 'specific-date' && !message.trim()) {
-      toast.error('Write a specific message for this alert.');
+      toast.error(t('contracts.alerts.validation.writeSpecificMessage'));
       return;
     }
 
     if (alertKind === 'days-before' && (!Number.isFinite(daysBefore) || daysBefore < 1)) {
-      toast.error('Choose a valid number of days before.');
+      toast.error(t('contracts.alerts.validation.validDaysBefore'));
       return;
     }
 
     if (!appEnabled && !telegramEnabled) {
-      toast.error('Enable at least one channel: App or Telegram.');
+      toast.error(t('contracts.alerts.validation.enableOneChannel'));
       return;
     }
 
     const contract = contracts.find(c => c.id === selectedContractId);
     if (!contract) {
-      toast.error('Selected contract was not found.');
+      toast.error(t('contracts.alerts.validation.selectedContractNotFound'));
       return;
     }
 
     if (telegramEnabled && !contract.telegramAlertEnabled) {
-      toast.error('Enable Telegram notifications on the contract before using Telegram for this alert.');
+      toast.error(t('contracts.alerts.validation.enableContractTelegramFirst'));
       return;
     }
 
@@ -147,11 +149,11 @@ export default function AlertsPage() {
         ...contract,
         alerts: nextAlerts,
       });
-      toast.success(editingTarget ? 'Alert updated successfully.' : 'Custom alert created successfully.');
+      toast.success(editingTarget ? t('contracts.alerts.toast.updated') : t('contracts.alerts.toast.created'));
       resetCreateForm();
       setShowCreateForm(false);
     } catch (error) {
-      const errMessage = error instanceof Error ? error.message : 'Failed to create custom alert.';
+      const errMessage = error instanceof Error ? error.message : t('contracts.alerts.toast.createFailed');
       toast.error(errMessage);
     } finally {
       setSaving(false);
@@ -161,13 +163,13 @@ export default function AlertsPage() {
   const handleDeleteCustomAlert = async (contractId: string, alertIndex: number) => {
     const contract = contracts.find(c => c.id === contractId);
     if (!contract) {
-      toast.error('Contract not found.');
+      toast.error(t('contracts.alerts.toast.contractNotFound'));
       return;
     }
 
     const targetAlert = contract.alerts[alertIndex];
     if (!targetAlert) {
-      toast.error('Alert not found.');
+      toast.error(t('contracts.alerts.toast.alertNotFound'));
       return;
     }
 
@@ -184,10 +186,10 @@ export default function AlertsPage() {
         setShowCreateForm(false);
       }
 
-      toast.success('Custom alert deleted successfully.');
+      toast.success(t('contracts.alerts.toast.deleted'));
     } catch (error) {
       console.error('Failed to delete custom alert:', error);
-      const errMessage = error instanceof Error ? error.message : 'Failed to delete custom alert.';
+      const errMessage = error instanceof Error ? error.message : t('contracts.alerts.toast.deleteFailed');
       toast.error(errMessage);
     } finally {
       setSaving(false);
@@ -196,46 +198,46 @@ export default function AlertsPage() {
 
   const handleTestCustomAlert = async () => {
     if (!selectedContractId) {
-      toast.error('Select a contract first.');
+      toast.error(t('contracts.alerts.validation.selectContractFirst'));
       return;
     }
 
     if (alertKind === 'specific-date' && !specificDate) {
-      toast.error('Choose a date for the alert.');
+      toast.error(t('contracts.alerts.validation.chooseDate'));
       return;
     }
 
     if (alertKind === 'specific-date' && !message.trim()) {
-      toast.error('Write a specific message for this alert.');
+      toast.error(t('contracts.alerts.validation.writeSpecificMessage'));
       return;
     }
 
     if (alertKind === 'days-before' && (!Number.isFinite(daysBefore) || daysBefore < 1)) {
-      toast.error('Choose a valid number of days before.');
+      toast.error(t('contracts.alerts.validation.validDaysBefore'));
       return;
     }
 
     if (!appEnabled && !telegramEnabled) {
-      toast.error('Enable at least one channel: App or Telegram.');
+      toast.error(t('contracts.alerts.validation.enableOneChannel'));
       return;
     }
 
     const contract = contracts.find(c => c.id === selectedContractId);
     if (!contract) {
-      toast.error('Selected contract was not found.');
+      toast.error(t('contracts.alerts.validation.selectedContractNotFound'));
       return;
     }
 
     if (telegramEnabled && !contract.telegramAlertEnabled) {
-      toast.error('Enable Telegram notifications on the contract before using Telegram for this alert.');
+      toast.error(t('contracts.alerts.validation.enableContractTelegramFirst'));
       return;
     }
 
     const triggerText = alertKind === 'specific-date'
-      ? `Date: ${specificDate}`
-      : `${Math.floor(daysBefore)} days before expiry`;
+      ? t('contracts.alerts.triggerTextDate', { date: specificDate })
+      : t('contracts.alerts.triggerTextDaysBefore', { days: Math.floor(daysBefore) });
 
-    const preview = `Alert test for ${contract.name}\n${triggerText}${message.trim() ? `\nMessage: ${message.trim()}` : ''}`;
+    const preview = `${t('contracts.alerts.previewTitle', { contract: contract.name })}\n${triggerText}${message.trim() ? `\n${t('contracts.alerts.previewMessagePrefix', { message: message.trim() })}` : ''}`;
 
     try {
       setTesting(true);
@@ -246,23 +248,23 @@ export default function AlertsPage() {
           contractName: contract.name,
           provider: contract.provider,
           triggerDate: new Date(),
-          triggerLabel: 'Test alert',
+          triggerLabel: t('contracts.alerts.testAlertLabel'),
           reason: message.trim() || preview,
         });
-        toast('App test preview', {
+        toast(t('contracts.alerts.appTestPreviewTitle'), {
           description: preview,
         });
       }
 
       if (telegramEnabled) {
-        const text = `🧪 <b>D12 Contracts — Custom Alert Test</b>\n\nContract: <b>${contract.name}</b>\nProvider: ${contract.provider}\nTrigger: ${triggerText}${message.trim() ? `\nMessage: ${message.trim()}` : ''}`;
+        const text = `🧪 <b>${t('contracts.alerts.telegramTitle')}</b>\n\n${t('contracts.alerts.telegramContractLabel')}: <b>${contract.name}</b>\n${t('contracts.alerts.telegramProviderLabel')}: ${contract.provider}\n${t('contracts.alerts.telegramTriggerLabel')}: ${triggerText}${message.trim() ? `\n${t('contracts.alerts.telegramMessageLabel')}: ${message.trim()}` : ''}`;
         await sendTelegramMessage(text);
       }
 
-      toast.success('Test alert sent successfully.');
+      toast.success(t('contracts.alerts.toast.testSent'));
     } catch (error) {
       console.error('Failed to test custom alert:', error);
-      const errMessage = error instanceof Error ? error.message : 'Failed to test custom alert.';
+      const errMessage = error instanceof Error ? error.message : t('contracts.alerts.toast.testFailed');
       toast.error(errMessage);
     } finally {
       setTesting(false);
@@ -303,7 +305,7 @@ export default function AlertsPage() {
           const dateDiff = differenceInCalendarDays(targetDate, today);
 
           const triggerLabel = dateDiff === 0
-            ? `Today (${format(targetDate, 'MMM d, yyyy')})`
+            ? t('contracts.alerts.todayWithDate', { date: format(targetDate, 'MMM d, yyyy') })
             : format(targetDate, 'MMM d, yyyy');
 
           items.push({
@@ -332,7 +334,10 @@ export default function AlertsPage() {
             contract: c,
             daysLeft,
             alertDay: alert.daysBefore,
-            triggerLabel: `${alert.daysBefore} days before (${format(targetDate, 'MMM d, yyyy')})`,
+            triggerLabel: t('contracts.alerts.daysBeforeWithDate', {
+              days: alert.daysBefore,
+              date: format(targetDate, 'MMM d, yyyy'),
+            }),
             reason: alert.reason,
             alertIndex,
             triggerDate: targetDate,
@@ -350,7 +355,7 @@ export default function AlertsPage() {
           contract: c,
           daysLeft,
           alertDay: 0,
-          triggerLabel: 'Upcoming expiry',
+          triggerLabel: t('contracts.alerts.upcomingExpiry'),
           reason: null,
           alertIndex: -1,
           triggerDate: targetDate,
@@ -365,7 +370,7 @@ export default function AlertsPage() {
       if (aAbs !== bAbs) return aAbs - bAbs;
       return a.daysUntilTrigger - b.daysUntilTrigger;
     });
-  }, [contracts]);
+  }, [contracts, t]);
 
   const dueNowCount = alerts.filter(item => item.daysUntilTrigger === 0).length;
 
@@ -410,7 +415,7 @@ export default function AlertsPage() {
           triggerDate,
           triggerLabel: alert.kind === 'specific-date'
             ? format(triggerDate, 'MMM d, yyyy')
-            : `${alert.daysBefore} days before expiry`,
+            : t('contracts.alerts.triggerLabelDaysBeforeExpiry', { days: alert.daysBefore }),
           reason: alert.reason?.trim() || null,
         });
       });
@@ -424,12 +429,12 @@ export default function AlertsPage() {
     allOccurred.forEach(a => allMap.set(a.signature, a));
     // Garantir que os não lidos aparecem primeiro
     return Array.from(allMap.values()).sort((a, b) => b.triggerDate.getTime() - a.triggerDate.getTime());
-  }, [contracts, unreadOccurredList]);
+  }, [contracts, unreadOccurredList, t]);
 
   // Handler para marcar todos como lidos
   const handleMarkAllOccurredAsRead = () => {
     markOccurredAppAlertsAsRead(contracts);
-    toast.success('Todos os alertas ocorridos marcados como lidos.');
+    toast.success(t('contracts.alerts.toast.markAllReadSuccess'));
   };
 
   return (
@@ -438,7 +443,7 @@ export default function AlertsPage() {
 
       <div className="animate-fade-up">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t('contracts.alerts.title')}</h1>
           <button
             type="button"
             onClick={() => {
@@ -450,25 +455,27 @@ export default function AlertsPage() {
             className="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border bg-card hover:bg-muted transition-colors"
           >
             <Plus className="w-4 h-4" />
-            {editingTarget ? 'Cancel edit' : 'New Custom Alert'}
+            {editingTarget ? t('contracts.alerts.cancelEdit') : t('contracts.alerts.newCustomAlert')}
           </button>
         </div>
-        <p className="text-muted-foreground text-sm mt-1">{alerts.length} scheduled · {dueNowCount} due today</p>
+        <p className="text-muted-foreground text-sm mt-1">
+          {t('contracts.alerts.summaryScheduled', { count: alerts.length })} · {t('contracts.alerts.summaryDueToday', { count: dueNowCount })}
+        </p>
       </div>
 
       {showCreateForm && (
         <div className="bg-card rounded-xl p-4 border space-y-3 animate-fade-up" style={{ animationDelay: '50ms' }}>
-          <h2 className="text-sm font-semibold text-foreground">{editingTarget ? 'Edit Alert' : 'Create Custom Alert'}</h2>
+          <h2 className="text-sm font-semibold text-foreground">{editingTarget ? t('contracts.alerts.editAlert') : t('contracts.alerts.createCustomAlert')}</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Contract</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('contracts.alerts.form.contract')}</label>
               <select
                 value={selectedContractId}
                 onChange={e => setSelectedContractId(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border bg-card text-sm"
                 disabled={saving || Boolean(editingTarget)}
               >
-                <option value="">Select contract</option>
+                <option value="">{t('contracts.alerts.form.selectContract')}</option>
                 {contracts
                   .filter(contract => contract.status === 'active' || contract.status === 'pending-cancellation')
                   .map(contract => (
@@ -479,21 +486,21 @@ export default function AlertsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Trigger type</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('contracts.alerts.form.triggerType')}</label>
               <select
                 value={alertKind}
                 onChange={e => setAlertKind(e.target.value as EditableAlertKind)}
                 className="w-full px-3 py-2 rounded-lg border bg-card text-sm"
                 disabled={saving}
               >
-                <option value="specific-date">Specific date</option>
-                <option value="days-before">Days before expiry</option>
+                <option value="specific-date">{t('contracts.alerts.form.specificDate')}</option>
+                <option value="days-before">{t('contracts.alerts.form.daysBeforeExpiry')}</option>
               </select>
             </div>
           </div>
           {alertKind === 'specific-date' ? (
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Date</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('contracts.alerts.form.date')}</label>
               <input
                 type="date"
                 value={specificDate}
@@ -504,7 +511,7 @@ export default function AlertsPage() {
             </div>
           ) : (
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Days before expiry</label>
+              <label className="text-xs text-muted-foreground block mb-1">{t('contracts.alerts.form.daysBeforeExpiry')}</label>
               <input
                 type="number"
                 min="1"
@@ -516,23 +523,23 @@ export default function AlertsPage() {
             </div>
           )}
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Specific message</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('contracts.alerts.form.specificMessage')}</label>
             <textarea
               value={message}
               onChange={e => setMessage(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border bg-card text-sm min-h-[88px]"
-              placeholder="Write the custom alert message"
+              placeholder={t('contracts.alerts.form.messagePlaceholder')}
               disabled={saving}
             />
           </div>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={appEnabled} onChange={e => setAppEnabled(e.target.checked)} disabled={saving} />
-              App
+              {t('contracts.alerts.form.channelApp')}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={telegramEnabled} onChange={e => setTelegramEnabled(e.target.checked)} disabled={saving} />
-              Telegram
+              {t('contracts.alerts.form.channelTelegram')}
             </label>
             <button
               type="button"
@@ -541,7 +548,7 @@ export default function AlertsPage() {
               className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-muted disabled:opacity-50"
             >
               {testing ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Test
+              {t('contracts.alerts.form.test')}
             </button>
             <button
               type="button"
@@ -550,7 +557,7 @@ export default function AlertsPage() {
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 disabled:opacity-50"
             >
               {saving && <Loader className="w-4 h-4 animate-spin" />}
-              {editingTarget ? 'Update Alert' : 'Save Alert'}
+              {editingTarget ? t('contracts.alerts.form.updateAlert') : t('contracts.alerts.form.saveAlert')}
             </button>
           </div>
         </div>
@@ -559,7 +566,7 @@ export default function AlertsPage() {
       {alerts.length === 0 ? (
         <div className="text-center py-16 animate-fade-up" style={{ animationDelay: '80ms' }}>
           <Bell className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">No alerts at the moment. All good! 🎉</p>
+          <p className="text-muted-foreground">{t('contracts.alerts.empty')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -597,10 +604,10 @@ export default function AlertsPage() {
                       {getContractCategoryIcon(item.contract.category, item.contract.type)} {item.contract.name}
                     </p>
                     <p className="text-xs text-muted-foreground break-words">
-                      {item.contract.provider} · Expires {item.contract.endDate ? format(parseISO(item.contract.endDate), 'MMM d, yyyy') : 'No date'}
+                      {item.contract.provider} · {t('contracts.alerts.expires')} {item.contract.endDate ? format(parseISO(item.contract.endDate), 'MMM d, yyyy') : t('contracts.alerts.noDate')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5 break-words">
-                      Trigger: {item.triggerLabel}
+                      {t('contracts.alerts.triggerPrefix')}: {item.triggerLabel}
                       {item.reason ? ` · ${item.reason}` : ''}
                     </p>
                   </div>
@@ -615,7 +622,7 @@ export default function AlertsPage() {
                     )}>
                       {item.daysUntilTrigger < 0 ? `${Math.abs(item.daysUntilTrigger)}d` : `${item.daysUntilTrigger}d`}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1 sm:mt-0">{item.daysUntilTrigger < 0 ? 'ago' : 'until alert'}</p>
+                    <p className="text-xs text-muted-foreground mt-1 sm:mt-0">{item.daysUntilTrigger < 0 ? t('contracts.alerts.ago') : t('contracts.alerts.untilAlert')}</p>
                   </div>
                 </div>
 
@@ -628,7 +635,7 @@ export default function AlertsPage() {
                         className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-xs hover:bg-muted"
                       >
                         <Pencil className="w-3 h-3" />
-                        Edit
+                        {t('contracts.alerts.editAction')}
                       </button>
                       <button
                         type="button"
@@ -637,7 +644,7 @@ export default function AlertsPage() {
                         className="inline-flex items-center gap-1 rounded border px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       >
                         <Trash2 className="w-3 h-3" />
-                        Delete
+                        {t('contracts.alerts.deleteAction')}
                       </button>
                     </>
                   )}
@@ -646,7 +653,7 @@ export default function AlertsPage() {
                     onClick={() => navigate(`/contracts/${item.contract.id}`)}
                     className="rounded border px-3 py-1.5 text-xs hover:bg-muted"
                   >
-                    Contract
+                    {t('contracts.alerts.contractAction')}
                   </button>
                 </div>
               </div>
@@ -658,19 +665,19 @@ export default function AlertsPage() {
       {/* Seção de Alertas Ocorridos */}
       <div className="mt-10">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-foreground">Alertas Ocorridos</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('contracts.alerts.occurredTitle')}</h2>
           {occurredAlerts.length > 0 && (
             <button
               type="button"
               onClick={handleMarkAllOccurredAsRead}
               className="text-xs px-3 py-1 rounded border bg-card hover:bg-muted"
             >
-              Marcar todos como lidos
+              {t('contracts.alerts.markAllAsRead')}
             </button>
           )}
         </div>
         {occurredAlerts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhum alerta disparado ainda.</p>
+          <p className="text-muted-foreground text-sm">{t('contracts.alerts.occurredEmpty')}</p>
         ) : (
           <div className="space-y-2">
             {occurredAlerts.map(alert => (
@@ -696,7 +703,7 @@ export default function AlertsPage() {
                     'text-xs',
                     unreadOccurred.has(alert.signature) ? 'text-warning font-semibold' : 'text-muted-foreground',
                   )}>
-                    {unreadOccurred.has(alert.signature) ? 'Não lido' : 'Lido'}
+                    {unreadOccurred.has(alert.signature) ? t('contracts.alerts.unread') : t('contracts.alerts.read')}
                   </span>
                   {unreadOccurred.has(alert.signature) && (
                     <button
@@ -711,10 +718,10 @@ export default function AlertsPage() {
                             markContractAlertsAsRead(contract);
                           }
                         }
-                        toast.success('Alerta marcado como lido.');
+                        toast.success(t('contracts.alerts.toast.markAsReadSuccess'));
                       }}
                     >
-                      Marcar como lido
+                      {t('contracts.alerts.markAsRead')}
                     </button>
                   )}
                 </div>
@@ -727,13 +734,13 @@ export default function AlertsPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete custom alert?</AlertDialogTitle>
+            <AlertDialogTitle>{t('contracts.alerts.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action removes the custom alert from the contract. You can create it again later if needed.
+              {t('contracts.alerts.deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={saving}>{t('contracts.alerts.deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               disabled={saving || !deleteTarget}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -744,7 +751,7 @@ export default function AlertsPage() {
                 setDeleteTarget(null);
               }}
             >
-              {saving ? 'Deleting...' : 'Delete'}
+              {saving ? t('contracts.alerts.deleteDialog.deleting') : t('contracts.alerts.deleteDialog.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

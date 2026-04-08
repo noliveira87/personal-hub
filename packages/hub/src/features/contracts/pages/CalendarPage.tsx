@@ -11,7 +11,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 
 export default function CalendarPage() {
   const { contracts } = useContracts();
-  const { formatCurrency, hideAmounts } = useI18n();
+  const { formatCurrency, t, locale } = useI18n();
   const navigate = useNavigate();
 
   const months = useMemo(() => {
@@ -53,7 +53,7 @@ export default function CalendarPage() {
               contract,
               date: endDate,
               daysLeft: differenceInCalendarDays(endDate, today),
-              label: 'Renewal',
+              label: t('contracts.calendar.renewalLabel'),
             });
           }
         }
@@ -83,7 +83,9 @@ export default function CalendarPage() {
             contract,
             date: alertDate,
             daysLeft: differenceInCalendarDays(alertDate, today),
-            label: alert.reason?.trim() || (alert.kind === 'specific-date' ? 'Custom alert' : `${alert.daysBefore} days before`),
+            label: alert.reason?.trim() || (alert.kind === 'specific-date'
+              ? t('contracts.calendar.customAlertLabel')
+              : t('contracts.calendar.daysBeforeLabel', { days: alert.daysBefore })),
           });
         });
       });
@@ -95,15 +97,15 @@ export default function CalendarPage() {
     });
 
     return map;
-  }, [contracts, months]);
+  }, [contracts, months, t]);
 
   return (
     <div className="space-y-6">
       <AppSectionHeader title="D12 Contracts" icon={FileText} />
 
       <div className="animate-fade-up">
-        <h1 className="text-2xl font-bold text-foreground">Renewal Calendar</h1>
-        <p className="text-muted-foreground text-sm mt-1">Upcoming renewals over the next 12 months</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('contracts.calendar.title')}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t('contracts.calendar.subtitle')}</p>
       </div>
 
       <div className="space-y-4">
@@ -123,7 +125,7 @@ export default function CalendarPage() {
                 isCurrentMonth ? 'text-primary' : 'text-foreground'
               )}>
                 {isCurrentMonth && <span className="w-2 h-2 rounded-full bg-primary" />}
-                {format(month, 'MMMM yyyy')}
+                {month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
                 {items && <span className="text-xs text-muted-foreground font-normal">({items.length})</span>}
               </h2>
               {items ? (
@@ -154,19 +156,19 @@ export default function CalendarPage() {
                           <div>
                             <p className="text-sm font-medium text-foreground">{c.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {c.provider} · {format(entry.date, 'MMM d')} · {entry.kind === 'alert' ? `Alert: ${entry.label}` : 'Renewal'}
+                              {c.provider} · {entry.date.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} · {entry.kind === 'alert' ? `${t('contracts.calendar.alertPrefix')}: ${entry.label}` : t('contracts.calendar.renewalLabel')}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold tabular-nums">
-                            {entry.kind === 'renewal' ? formatCurrency(c.price, c.currency) : 'Alert'}
+                            {entry.kind === 'renewal' ? formatCurrency(c.price, c.currency) : t('contracts.calendar.alertValue')}
                           </p>
                           <p className={cn(
                             'text-xs',
                             daysLeft <= 7 ? 'text-urgent' : daysLeft <= 30 ? 'text-warning' : 'text-muted-foreground'
                           )}>
-                            {daysLeft < 0 ? 'Passed' : `${daysLeft}d left`}
+                            {daysLeft < 0 ? t('contracts.calendar.passed') : t('contracts.calendar.daysLeft', { days: daysLeft })}
                           </p>
                         </div>
                       </div>
@@ -174,7 +176,7 @@ export default function CalendarPage() {
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground pl-4 py-2">No renewals or alerts this month</p>
+                <p className="text-xs text-muted-foreground pl-4 py-2">{t('contracts.calendar.emptyMonth')}</p>
               )}
             </div>
           );

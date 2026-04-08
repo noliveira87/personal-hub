@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { Contract, CATEGORY_LABELS, ContractCategory, ContractStatus, STATUS_LABELS } from '@/features/contracts/types/contract';
 import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
-import { Plus, Search, SlidersHorizontal, Loader, FileText } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, Loader, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
@@ -70,10 +70,39 @@ export default function ContractsList() {
         title={t('contracts.menu')}
         icon={FileText}
         actions={
-          <Button size="sm" className="gap-1.5" onClick={() => navigate('/contracts/new')}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">{t('contracts.addContract')}</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
+              onClick={() => navigate('/contracts/new')}
+              aria-label={t('contracts.addContract')}
+              title={t('contracts.addContract')}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('contracts.addContract')}</span>
+            </Button>
+
+            <div className="hidden sm:flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild className="gap-1.5">
+                <Link to="/contracts/insights" aria-label="Open insights" title="Insights" className="flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4" />
+                  <span>Insights</span>
+                </Link>
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl sm:hidden"
+              asChild
+              aria-label="Insights"
+            >
+              <Link to="/contracts/insights" title="Insights">
+                <TrendingUp className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         }
       />
 
