@@ -866,45 +866,98 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                           const visibleCount = categoryItemCounts[category] ?? 4;
                           const visibleItems = items.slice(0, visibleCount);
                           const remainingItems = Math.max(0, items.length - visibleCount);
+                          const itemsByYear = visibleItems.reduce<Record<string, typeof visibleItems>>((acc, item) => {
+                            if (!acc[item.year]) acc[item.year] = [];
+                            acc[item.year].push(item);
+                            return acc;
+                          }, {});
+                          const yearGroups = Object.entries(itemsByYear).sort((a, b) => Number(b[0]) - Number(a[0]));
 
                           return (
                             <>
-                              {visibleItems.map((item) => {
-                                return (
-                                  <article key={item.id} className="group flex items-center gap-2 rounded-md border bg-background/60 px-2.5 py-1.5">
-                                    <span className={`shrink-0 text-[11px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
-                                      {item.date}
-                                    </span>
+                              {yearGroups.map(([year, yearItems]) => (
+                                <section key={`${category}-${year}`} className="rounded-md border bg-background/60 px-2.5 py-2">
+                                  {(() => {
+                                    const hasDetails = yearItems.some((item) => item.note || item.clinic || item.doctor);
 
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <p className="text-[11px] font-medium text-muted-foreground">{item.year}</p>
-                                        {categoryRow && (
-                                          <button
-                                            onClick={() => openEdit(categoryRow)}
-                                            className="opacity-60 group-hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                            title="Editar categoria"
-                                          >
-                                            <Pencil className="w-3 h-3" />
-                                          </button>
-                                        )}
+                                    if (!hasDetails) {
+                                      return (
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="flex min-w-0 flex-1 items-start gap-3">
+                                            <span className="shrink-0 text-base font-bold leading-none text-foreground pt-1">
+                                              {year}
+                                            </span>
+
+                                            <div className="min-w-0 flex flex-wrap gap-2">
+                                              {yearItems.map((item) => (
+                                                <article key={item.id} className="flex items-start gap-2 py-0.5">
+                                                  <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
+                                                    {item.date}
+                                                  </span>
+                                                </article>
+                                              ))}
+                                            </div>
+                                          </div>
+
+                                          {categoryRow && (
+                                            <button
+                                              onClick={() => openEdit(categoryRow)}
+                                              className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                              title="Editar categoria"
+                                            >
+                                              <Pencil className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div className="space-y-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <span className="shrink-0 text-base font-bold leading-none text-foreground pt-0.5">
+                                            {year}
+                                          </span>
+
+                                          {categoryRow && (
+                                            <button
+                                              onClick={() => openEdit(categoryRow)}
+                                              className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                              title="Editar categoria"
+                                            >
+                                              <Pencil className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                          {yearItems.map((item) => (
+                                            <article key={item.id} className="flex items-start gap-2">
+                                              <span className={`mt-0.5 shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
+                                                {item.date}
+                                              </span>
+
+                                              <div className="min-w-0 flex-1">
+                                                {(item.clinic || item.doctor) && (
+                                                  <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                                    {item.clinic || 'Sem local'}
+                                                    {item.clinic && item.doctor ? ' · ' : ''}
+                                                    {item.doctor ? `Dr(a). ${item.doctor}` : ''}
+                                                  </p>
+                                                )}
+
+                                                {item.note && (
+                                                  <p className="text-[11px] text-muted-foreground italic line-clamp-1">{item.note}</p>
+                                                )}
+                                              </div>
+                                            </article>
+                                          ))}
+                                        </div>
                                       </div>
-
-                                      {(item.clinic || item.doctor) && (
-                                        <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">
-                                          {item.clinic || 'Sem local'}
-                                          {item.clinic && item.doctor ? ' · ' : ''}
-                                          {item.doctor ? `Dr(a). ${item.doctor}` : ''}
-                                        </p>
-                                      )}
-
-                                      {item.note && (
-                                        <p className="mt-0.5 text-[11px] text-muted-foreground italic line-clamp-1">{item.note}</p>
-                                      )}
-                                    </div>
-                                  </article>
-                                );
-                              })}
+                                    );
+                                  })()}
+                                </section>
+                              ))}
                               {visibleItems.length === 0 && (
                                 <p className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
                                   Sem registos
