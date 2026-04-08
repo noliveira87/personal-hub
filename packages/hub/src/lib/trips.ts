@@ -9,6 +9,9 @@ import {
   TripTravel,
 } from "@/features/trips/types/trip";
 
+const TRIP_PHOTOS_BUCKET = "trip-photos";
+const JOURNEY_BITES_BUCKET = "journey-bites";
+
 type TripRow = {
   id: string;
   title: string;
@@ -34,6 +37,41 @@ type TripUpdateInput = Partial<Omit<Trip, "id" | "createdAt" | "updatedAt">>;
 const isMissingDestinationsColumnError = (error: { message?: string } | null) => {
   const message = error?.message ?? "";
   return /destinations/i.test(message) && /does not exist/i.test(message);
+};
+
+const isMissingJourneyBitesTableError = (error: { message?: string } | null) => {
+  const message = error?.message ?? "";
+  return /journey_bites/i.test(message) && /does not exist/i.test(message);
+};
+
+const getStoragePathFromUrl = (source: string, bucket: string) => {
+  const markers = [
+    `/storage/v1/object/public/${bucket}/`,
+    `/storage/v1/object/sign/${bucket}/`,
+    `/object/public/${bucket}/`,
+    `/object/sign/${bucket}/`,
+  ];
+
+  for (const marker of markers) {
+    const markerIndex = source.indexOf(marker);
+    if (markerIndex === -1) continue;
+
+    const rawPath = source.slice(markerIndex + marker.length).split("?")[0];
+    if (rawPath) return decodeURIComponent(rawPath);
+  }
+
+  return null;
+};
+
+const resolveTripBucketPath = (value: string, bucket: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return getStoragePathFromUrl(trimmed, bucket);
 };
 
 const stripDestinationsField = <T extends Record<string, unknown>>(payload: T): T => {
@@ -311,6 +349,73 @@ export async function updateTrip(id: string, changes: TripUpdateInput): Promise<
 }
 
 export async function deleteTrip(id: string): Promise<void> {
+  const { data: tripRow, error: tripRowError } = await supabase
+    .from("trips")
+    .select("photos, foods")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (tripRowError) {
+    console.error("Error loading trip for storage cleanup:", tripRowError);
+    throw new Error(`Failed to load trip for deletion: ${tripRowError.message}`);
+  }
+
+  const tripPhotos = parseStringArray((tripRow as { photos?: unknown } | null)?.photos);
+  const tripFoods = parseFoods((tripRow as { foods?: unknown } | null)?.foods);
+  const tripPaths = [
+    ...tripPhotos,
+    ...tripFoods.map((food) => food.image ?? ""),
+  ]
+    .map((value) => resolveTripBucketPath(value, TRIP_PHOTOS_BUCKET))
+    .filter((value): value is string => Boolean(value));
+
+  const uniqueTripPaths = [...new Set(tripPaths)];
+  if (uniqueTripPaths.length) {
+    const { data: removeData, error: removeError } = await supabase.storage
+      .from(TRIP_PHOTOS_BUCKET)
+      .remove(uniqueTripPaths);
+
+    if (removeError) {
+      console.error("Error deleting trip photos from storage:", removeError);
+      throw new Error(`Failed to delete trip photos from storage: ${removeError.message}`);
+    }
+
+    const objectError = removeData?.find((item) => item.error)?.error;
+    if (objectError) {
+      throw new Error(objectError);
+    }
+  }
+
+  const { data: journeyBiteRows, error: journeyBiteError } = await supabase
+    .from("journey_bites")
+    .select("photo_path")
+    .eq("trip_id", id);
+
+  if (journeyBiteError && !isMissingJourneyBitesTableError(journeyBiteError)) {
+    throw new Error(`Failed to load journey bite photos: ${journeyBiteError.message}`);
+  }
+
+  const journeyBitePaths = (journeyBiteRows ?? [])
+    .map((row) => (row as { photo_path?: string | null }).photo_path ?? "")
+    .map((value) => resolveTripBucketPath(value, JOURNEY_BITES_BUCKET))
+    .filter((value): value is string => Boolean(value));
+
+  const uniqueJourneyBitePaths = [...new Set(journeyBitePaths)];
+  if (uniqueJourneyBitePaths.length) {
+    const { data: removeData, error: removeError } = await supabase.storage
+      .from(JOURNEY_BITES_BUCKET)
+      .remove(uniqueJourneyBitePaths);
+
+    if (removeError) {
+      throw new Error(`Failed to delete journey bite photos from storage: ${removeError.message}`);
+    }
+
+    const objectError = removeData?.find((item) => item.error)?.error;
+    if (objectError) {
+      throw new Error(objectError);
+    }
+  }
+
   const { error } = await supabase
     .from("trips")
     .delete()

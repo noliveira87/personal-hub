@@ -109,6 +109,32 @@ const ensurePublicPath = (pathOrUrl?: string) => {
   return value;
 };
 
+const getJourneyBitePhotoPath = (pathOrUrl?: string | null) => {
+  const value = pathOrUrl?.trim();
+  if (!value) return null;
+
+  if (!/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  const markers = [
+    `/storage/v1/object/public/${JOURNEY_BITES_BUCKET}/`,
+    `/storage/v1/object/sign/${JOURNEY_BITES_BUCKET}/`,
+    `/object/public/${JOURNEY_BITES_BUCKET}/`,
+    `/object/sign/${JOURNEY_BITES_BUCKET}/`,
+  ];
+
+  for (const marker of markers) {
+    const markerIndex = value.indexOf(marker);
+    if (markerIndex === -1) continue;
+
+    const rawPath = value.slice(markerIndex + marker.length).split("?")[0];
+    if (rawPath) return decodeURIComponent(rawPath);
+  }
+
+  return null;
+};
+
 const toInsertRow = (input: JourneyBiteInput) => ({
   trip_id: input.tripId,
   source_food_index: input.sourceFoodIndex ?? null,
@@ -277,6 +303,32 @@ export async function updateJourneyBite(id: string, changes: JourneyBiteUpdate):
 }
 
 export async function deleteJourneyBite(id: string): Promise<void> {
+  const { data: row, error: rowError } = await supabase
+    .from("journey_bites")
+    .select("photo_path")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (rowError) {
+    throw new Error(rowError.message);
+  }
+
+  const photoPath = getJourneyBitePhotoPath((row as { photo_path?: string | null } | null)?.photo_path ?? null);
+  if (photoPath) {
+    const { data: removedData, error: removeError } = await supabase.storage
+      .from(JOURNEY_BITES_BUCKET)
+      .remove([photoPath]);
+
+    if (removeError) {
+      throw new Error(removeError.message);
+    }
+
+    const objectError = removedData?.find((item) => item.error)?.error;
+    if (objectError) {
+      throw new Error(objectError);
+    }
+  }
+
   const { error } = await supabase
     .from("journey_bites")
     .delete()

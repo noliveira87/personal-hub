@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { ContractQuote } from '@/features/contracts/types/contract';
+import { compressPdfFile } from '@/lib/pdfCompression';
 
 const QUOTES_BUCKET = 'contract-quotes';
 
@@ -164,17 +165,22 @@ export async function uploadQuotePdf(
   file: File,
   quoteId: string
 ): Promise<string> {
+  const fileToUpload = await compressPdfFile(file);
+
   const maxSize = 10 * 1024 * 1024; // 10MB
-  if (file.size > maxSize) {
+  if (fileToUpload.size > maxSize) {
     throw new Error('PDF file must be smaller than 10MB.');
   }
 
-  const ext = file.name.split('.').pop() ?? 'pdf';
+  const ext = fileToUpload.name.split('.').pop() ?? 'pdf';
   const path = `quotes/${quoteId}.${ext}`;
 
   const { error } = await supabase.storage
     .from(QUOTES_BUCKET)
-    .upload(path, file, { upsert: true });
+    .upload(path, fileToUpload, {
+      contentType: fileToUpload.type || 'application/pdf',
+      upsert: true,
+    });
 
   if (error) {
     console.error('Error uploading quote PDF:', error);
@@ -186,16 +192,45 @@ export async function uploadQuotePdf(
 }
 
 export async function deleteQuotePdf(pdfUrl: string): Promise<void> {
-  try {
-    const url = new URL(pdfUrl);
-    const segments = url.pathname.split('/');
-    const bucketIdx = segments.findIndex(s => s === QUOTES_BUCKET);
-    if (bucketIdx === -1) return;
-    const filePath = segments.slice(bucketIdx + 1).join('/');
-    if (!filePath) return;
+  const markers = [
+    `/storage/v1/object/public/${QUOTES_BUCKET}/`,
+    `/storage/v1/object/sign/${QUOTES_BUCKET}/`,
+    `/object/public/${QUOTES_BUCKET}/`,
+    `/object/sign/${QUOTES_BUCKET}/`,
+  ];
 
-    await supabase.storage.from(QUOTES_BUCKET).remove([filePath]);
-  } catch {
-    // best-effort – don't block deletion of the DB row
+  const resolvePath = (source: string) => {
+    for (const marker of markers) {
+      const markerIndex = source.indexOf(marker);
+      if (markerIndex === -1) continue;
+      const rawPath = source.slice(markerIndex + marker.length).split('?')[0];
+      if (rawPath) return decodeURIComponent(rawPath);
+    }
+
+    return null;
+  };
+
+  let filePath = resolvePath(pdfUrl);
+  if (!filePath) {
+    try {
+      const parsed = new URL(pdfUrl);
+      filePath = resolvePath(parsed.pathname);
+    } catch {
+      filePath = null;
+    }
+  }
+
+  if (!filePath) {
+    throw new Error('Could not resolve quote PDF path from storage URL');
+  }
+
+  const { data, error } = await supabase.storage.from(QUOTES_BUCKET).remove([filePath]);
+  if (error) {
+    throw new Error(`Failed to delete quote PDF from storage: ${error.message}`);
+  }
+
+  const objectError = data?.find((item) => item.error)?.error;
+  if (objectError) {
+    throw new Error(objectError);
   }
 }

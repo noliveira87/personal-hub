@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { compressPdfFile } from "@/lib/pdfCompression";
 
 export type WarrantyCategory = "tech" | "appliances" | "others";
 
@@ -118,16 +119,16 @@ async function compressImageFile(file: File): Promise<File> {
 }
 
 async function prepareReceiptFile(file: File): Promise<File> {
-  if (!file.type.startsWith("image/")) {
-    return file;
+  if (file.type.startsWith("image/")) {
+    try {
+      const compressed = await compressImageFile(file);
+      return compressed.size < file.size ? compressed : file;
+    } catch {
+      return file;
+    }
   }
 
-  try {
-    const compressed = await compressImageFile(file);
-    return compressed.size < file.size ? compressed : file;
-  } catch {
-    return file;
-  }
+  return compressPdfFile(file);
 }
 
 export async function uploadReceipt(
@@ -137,12 +138,12 @@ export async function uploadReceipt(
 ): Promise<string | null> {
   if (!file) return null;
 
+  const fileToUpload = await prepareReceiptFile(file);
+
   const maxSize = 5 * 1024 * 1024; // 5MB
-  if (file.size > maxSize) {
+  if (fileToUpload.size > maxSize) {
     throw new Error("Receipt file must be smaller than 5MB");
   }
-
-  const fileToUpload = await prepareReceiptFile(file);
 
   // Generate clean filename: product-name-id.ext
   const sanitizedName = productName
