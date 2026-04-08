@@ -177,6 +177,23 @@ function sortDraftCholesterolRows(rows: DraftCholesterolRow[]): DraftCholesterol
   });
 }
 
+function buildNextDraftCholesterolEntry(rows: DraftCholesterolRow[]): DraftCholesterolRow {
+  const newYear = rows.length > 0
+    ? Math.max(...rows.map((row) => row.year))
+    : new Date().getFullYear();
+  const nextEntryOrder = rows.filter((row) => row.year === newYear).length + 1;
+
+  return {
+    key: nextKey(),
+    year: newYear,
+    entryOrder: nextEntryOrder,
+    total: null,
+    hdl: null,
+    ldl: null,
+    triglycerides: null,
+  };
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function HealthTimelineTable({ person: propPerson, openNewCategory: propOpenNewCategory, onCloseNewCategory }: { person: HealthPerson; openNewCategory: boolean; onCloseNewCategory: () => void }) {
   const [displayRows, setDisplayRows] = useState<DisplayRow[]>([]);
@@ -184,6 +201,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   const [showAllCholesterolYears, setShowAllCholesterolYears] = useState(false);
   const [isEditingCholesterol, setIsEditingCholesterol] = useState(false);
   const [cholesterolDraftRows, setCholesterolDraftRows] = useState<DraftCholesterolRow[]>([]);
+  const [cholesterolNewEntry, setCholesterolNewEntry] = useState<DraftCholesterolRow | null>(null);
   const [deletedCholesterolIds, setDeletedCholesterolIds] = useState<string[]>([]);
   const [savingCholesterol, setSavingCholesterol] = useState(false);
   const [visibleYearCount, setVisibleYearCount] = useState(4);
@@ -214,6 +232,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
   const totalCholesterolYears = new Set(cholesterolSourceRows.map((row) => row.year)).size;
   const hasHiddenCholesterolYears = totalCholesterolYears > 3;
+  const hiddenCholesterolYearsCount = Math.max(totalCholesterolYears - 3, 0);
   const visibleCholesterolRows = showAllCholesterolYears
     ? cholesterolSourceRows
     : (() => {
@@ -703,6 +722,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     );
 
     setCholesterolDraftRows(draft);
+    setCholesterolNewEntry(null);
     setDeletedCholesterolIds([]);
     setShowAllCholesterolYears(true);
     setIsEditingCholesterol(true);
@@ -711,6 +731,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   function cancelCholesterolEdit() {
     setIsEditingCholesterol(false);
     setCholesterolDraftRows([]);
+    setCholesterolNewEntry(null);
     setDeletedCholesterolIds([]);
   }
 
@@ -749,26 +770,55 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     });
   }
 
-  function addDraftCholesterolEntry() {
-    const newYear = cholesterolDraftRows.length > 0
-      ? Math.max(...cholesterolDraftRows.map((row) => row.year))
-      : new Date().getFullYear();
-    const nextEntryOrder = cholesterolDraftRows.filter((row) => row.year === newYear).length + 1;
+  function openCholesterolNewEntryForm() {
+    setCholesterolNewEntry(buildNextDraftCholesterolEntry(cholesterolDraftRows));
+  }
 
-    setCholesterolDraftRows((prev) =>
-      sortDraftCholesterolRows([
-        ...prev,
-        {
-          key: nextKey(),
-          year: newYear,
-          entryOrder: nextEntryOrder,
-          total: null,
-          hdl: null,
-          ldl: null,
-          triglycerides: null,
-        },
-      ]),
+  function startCholesterolEditWithNewEntry() {
+    const draft = sortDraftCholesterolRows(
+      cholesterolRows.map((row) => ({
+        key: row.id,
+        id: row.id,
+        year: row.year,
+        entryOrder: row.entryOrder,
+        total: row.total,
+        hdl: row.hdl,
+        ldl: row.ldl,
+        triglycerides: row.triglycerides,
+      })),
     );
+
+    setCholesterolDraftRows(draft);
+    setCholesterolNewEntry(buildNextDraftCholesterolEntry(draft));
+    setDeletedCholesterolIds([]);
+    setShowAllCholesterolYears(true);
+    setIsEditingCholesterol(true);
+  }
+
+  function updateNewCholesterolField(
+    field: 'year' | 'entryOrder' | 'total' | 'hdl' | 'ldl' | 'triglycerides',
+    value: string,
+  ) {
+    setCholesterolNewEntry((prev) => {
+      if (!prev) return prev;
+
+      if (field === 'year') {
+        return { ...prev, year: Math.max(2000, Number(value) || prev.year) };
+      }
+
+      if (field === 'entryOrder') {
+        return { ...prev, entryOrder: Math.max(1, Number(value) || prev.entryOrder) };
+      }
+
+      return { ...prev, [field]: parseNullableInt(value) };
+    });
+  }
+
+  function addNewCholesterolEntryFromForm() {
+    if (!cholesterolNewEntry) return;
+
+    setCholesterolDraftRows((prev) => sortDraftCholesterolRows([...prev, cholesterolNewEntry]));
+    setCholesterolNewEntry(null);
   }
 
   async function saveCholesterolEdits() {
@@ -795,6 +845,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
       await loadData(propPerson);
       setIsEditingCholesterol(false);
       setCholesterolDraftRows([]);
+      setCholesterolNewEntry(null);
       setDeletedCholesterolIds([]);
     } finally {
       setSavingCholesterol(false);
@@ -1025,56 +1076,137 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 <p className="text-xs text-muted-foreground mt-1">
                   Exemplo: se Total = 240 e HDL = 60, então rácio = 4. Em geral, quanto menor este valor, melhor.
                 </p>
-              </div>
-
-              <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
-                {isEditingCholesterol ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={addDraftCholesterolEntry}
-                      className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
-                    >
-                      Adicionar análise
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelCholesterolEdit}
-                      className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveCholesterolEdits}
-                      disabled={savingCholesterol}
-                      className="rounded-md bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
-                    >
-                      {savingCholesterol && <Loader2 className="w-3 h-3 animate-spin" />}
-                      Guardar colesterol
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={startCholesterolEdit}
-                    className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
-                  >
-                    Editar tabela
-                  </button>
-                )}
 
                 {hasHiddenCholesterolYears && (
                   <button
                     type="button"
                     onClick={() => setShowAllCholesterolYears((prev) => !prev)}
-                    className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                    className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     {showAllCholesterolYears ? 'Esconder anos antigos' : 'Mostrar anos antigos'}
+                    {!showAllCholesterolYears && (
+                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                        +{hiddenCholesterolYearsCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={isEditingCholesterol ? openCholesterolNewEntryForm : startCholesterolEditWithNewEntry}
+                  title="Adicionar análise"
+                  aria-label="Adicionar análise"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={isEditingCholesterol ? cancelCholesterolEdit : startCholesterolEdit}
+                  title={isEditingCholesterol ? 'Cancelar edição' : 'Editar tabela'}
+                  aria-label={isEditingCholesterol ? 'Cancelar edição' : 'Editar tabela'}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  {isEditingCholesterol ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                </button>
+
+                {isEditingCholesterol && (
+                  <button
+                    type="button"
+                    onClick={saveCholesterolEdits}
+                    disabled={savingCholesterol}
+                    className="rounded-md bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                  >
+                    {savingCholesterol && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Guardar colesterol
                   </button>
                 )}
               </div>
             </div>
+
+            {isEditingCholesterol && cholesterolNewEntry && (
+              <div className="mt-3 rounded-lg border bg-background p-3">
+                <p className="text-xs font-semibold text-foreground mb-2">Nova análise</p>
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">Ano</label>
+                    <input
+                      type="number"
+                      min={2000}
+                      value={cholesterolNewEntry.year}
+                      onChange={(e) => updateNewCholesterolField('year', e.target.value)}
+                      className="w-full rounded border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">Ordem da análise</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={cholesterolNewEntry.entryOrder}
+                      onChange={(e) => updateNewCholesterolField('entryOrder', e.target.value)}
+                      className="w-full rounded border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">Total</label>
+                    <input
+                      type="number"
+                      value={cholesterolNewEntry.total ?? ''}
+                      onChange={(e) => updateNewCholesterolField('total', e.target.value)}
+                      className="w-full rounded border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">HDL</label>
+                    <input
+                      type="number"
+                      value={cholesterolNewEntry.hdl ?? ''}
+                      onChange={(e) => updateNewCholesterolField('hdl', e.target.value)}
+                      className="w-full rounded border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">LDL</label>
+                    <input
+                      type="number"
+                      value={cholesterolNewEntry.ldl ?? ''}
+                      onChange={(e) => updateNewCholesterolField('ldl', e.target.value)}
+                      className="w-full rounded border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-muted-foreground">Triglicerídeos</label>
+                    <input
+                      type="number"
+                      value={cholesterolNewEntry.triglycerides ?? ''}
+                      onChange={(e) => updateNewCholesterolField('triglycerides', e.target.value)}
+                      className="w-full rounded border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCholesterolNewEntry(null)}
+                    className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    Cancelar nova
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addNewCholesterolEntryFromForm}
+                    className="rounded-md bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    Adicionar à tabela
+                  </button>
+                </div>
+              </div>
+            )}
 
             {(() => {
               if (!latestCholesterolRow) return null;
