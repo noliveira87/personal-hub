@@ -1064,8 +1064,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
       )}
 
       {/* Cholesterol control table */}
-      {cholesterolRows.length > 0 && (
-        <div className="rounded-xl border bg-card overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden">
           <div className="px-4 pt-4 pb-3 border-b bg-gradient-to-r from-muted/40 to-muted/10">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1209,7 +1208,14 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
             )}
 
             {(() => {
-              if (!latestCholesterolRow) return null;
+              if (!latestCholesterolRow) {
+                return (
+                  <div className="mt-3 rounded-lg border border-dashed bg-background px-3 py-2 text-xs text-muted-foreground">
+                    Sem análises ainda. Usa o botão + para adicionar a primeira análise de colesterol.
+                  </div>
+                );
+              }
+
               const latest = latestCholesterolRow;
               const total = totalLegend(latest.total);
               const hdl = hdlLegend(latest.hdl);
@@ -1381,6 +1387,11 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 </article>
               );
             })}
+            {visibleCholesterolRows.length === 0 && (
+              <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                Ainda não existem análises registadas.
+              </p>
+            )}
           </div>
 
           <div className="hidden md:block overflow-x-auto">
@@ -1519,11 +1530,20 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                   </tr>
                 );
               })}
+              {visibleCholesterolRows.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={isEditingCholesterol ? 7 : 6}
+                    className="border border-border p-4 text-center text-xs text-muted-foreground"
+                  >
+                    Ainda não existem análises registadas.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
           </div>
         </div>
-      )}
 
       {/* Edit modal */}
       {editing && (
