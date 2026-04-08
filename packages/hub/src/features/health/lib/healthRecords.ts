@@ -22,6 +22,11 @@ export type CholesterolRow = {
   triglycerides: number | null;
 };
 
+export type HealthCategoryGroups = {
+  consultas: string[];
+  exames: string[];
+};
+
 export async function loadAppointments(person: HealthPerson): Promise<AppointmentRow[]> {
   const { data, error } = await supabase
     .from('health_appointments')
@@ -90,6 +95,53 @@ export async function loadCholesterolEntries(person: HealthPerson): Promise<Chol
   }));
 }
 
+export async function saveCholesterolEntry(input: {
+  id?: string;
+  person: HealthPerson;
+  year: number;
+  entryOrder: number;
+  total: number | null;
+  hdl: number | null;
+  ldl: number | null;
+  triglycerides: number | null;
+}): Promise<void> {
+  const payload = {
+    person: input.person,
+    year: input.year,
+    entry_order: input.entryOrder,
+    total: input.total,
+    hdl: input.hdl,
+    ldl: input.ldl,
+    triglycerides: input.triglycerides,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.id) {
+    const { error } = await supabase
+      .from('health_cholesterol_entries')
+      .update(payload)
+      .eq('id', input.id);
+
+    if (error) throw new Error(`Failed to update cholesterol entry: ${error.message}`);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('health_cholesterol_entries')
+    .insert(payload);
+
+  if (error) throw new Error(`Failed to insert cholesterol entry: ${error.message}`);
+}
+
+export async function deleteCholesterolEntry(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('health_cholesterol_entries')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(`Failed to delete cholesterol entry: ${error.message}`);
+}
+
 export async function loadCategoryOrder(person: HealthPerson): Promise<string[]> {
   const { data, error } = await supabase
     .from('app_settings')
@@ -125,4 +177,45 @@ export async function saveCategoryOrder(person: HealthPerson, order: string[]): 
     .eq('id', 'global');
 
   if (error) throw new Error(`Failed to save category order: ${error.message}`);
+}
+
+export async function loadCategoryGroups(person: HealthPerson): Promise<HealthCategoryGroups> {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('health_category_groups')
+    .eq('id', 'global')
+    .single();
+
+  if (error) {
+    console.warn(`Failed to load category groups: ${error.message}`);
+    return { consultas: [], exames: [] };
+  }
+
+  const groupsByPerson = (data?.health_category_groups ?? {}) as Record<string, Partial<HealthCategoryGroups>>;
+  const personGroups = groupsByPerson[person] ?? {};
+
+  return {
+    consultas: Array.isArray(personGroups.consultas) ? personGroups.consultas : [],
+    exames: Array.isArray(personGroups.exames) ? personGroups.exames : [],
+  };
+}
+
+export async function saveCategoryGroups(person: HealthPerson, groups: HealthCategoryGroups): Promise<void> {
+  const { data: current, error: loadError } = await supabase
+    .from('app_settings')
+    .select('health_category_groups')
+    .eq('id', 'global')
+    .single();
+
+  if (loadError) throw new Error(`Failed to load current category groups: ${loadError.message}`);
+
+  const groupsByPerson = (current?.health_category_groups ?? {}) as Record<string, HealthCategoryGroups>;
+  groupsByPerson[person] = groups;
+
+  const { error } = await supabase
+    .from('app_settings')
+    .update({ health_category_groups: groupsByPerson, updated_at: new Date().toISOString() })
+    .eq('id', 'global');
+
+  if (error) throw new Error(`Failed to save category groups: ${error.message}`);
 }

@@ -38,7 +38,10 @@ insert into public.health_appointments (person, category, date, note) values
 ('nuno', 'Otorrino', '2021-08-28', null),
 
 ('nuno', 'Ecocardiograma', '2021-06-29', null),
+('nuno', 'ECG em repouso', '2021-06-29', null),
+('nuno', 'Eco Abdominal', '2021-07-15', null),
 ('nuno', 'Eco Renal', '2021-07-15', null),
+('nuno', 'Eco Pélvica Suprapúbica', '2021-07-15', null),
 
 -- Minina (pink)
 ('minina', 'Análises Clínicas', '2026-02-05', null),

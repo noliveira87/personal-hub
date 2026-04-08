@@ -5,9 +5,14 @@ import { HealthPerson } from '@/features/health/lib/healthData';
 import {
   AppointmentRow,
   CholesterolRow,
+  HealthCategoryGroups,
   loadAppointments,
+  loadCategoryGroups,
   loadCholesterolEntries,
   loadCategoryOrder,
+  saveCategoryGroups,
+  deleteCholesterolEntry,
+  saveCholesterolEntry,
   saveCategoryOrder,
   upsertAppointment,
   deleteAppointment,
@@ -48,6 +53,7 @@ type EditState = {
 type NewCategoryState = {
   mode: 'create' | 'add-to-existing';
   name: string;
+  group: 'consultas' | 'exames';
   selectedCategory?: string; // for 'add-to-existing' mode
   entries: { key: string; date: string; clinic: string; doctor: string; note: string }[]; // YYYY-MM-DD format
 };
@@ -60,6 +66,17 @@ type TimelineItem = {
   clinic: string;
   doctor: string;
   note: string;
+};
+
+type DraftCholesterolRow = {
+  key: string;
+  id?: string;
+  year: number;
+  entryOrder: number;
+  total: number | null;
+  hdl: number | null;
+  ldl: number | null;
+  triglycerides: number | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -146,15 +163,34 @@ function ratioLegend(total: number | null, hdl: number | null): { value: string;
   return { value: rounded, label: 'Elevado', color: 'text-red-600' };
 }
 
+function parseNullableInt(value: string): number | null {
+  if (value.trim() === '') return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return Math.trunc(num);
+}
+
+function sortDraftCholesterolRows(rows: DraftCholesterolRow[]): DraftCholesterolRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.year !== b.year) return b.year - a.year;
+    return a.entryOrder - b.entryOrder;
+  });
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function HealthTimelineTable({ person: propPerson, openNewCategory: propOpenNewCategory, onCloseNewCategory }: { person: HealthPerson; openNewCategory: boolean; onCloseNewCategory: () => void }) {
   const [displayRows, setDisplayRows] = useState<DisplayRow[]>([]);
   const [cholesterolRows, setCholesterolRows] = useState<CholesterolRow[]>([]);
   const [showAllCholesterolYears, setShowAllCholesterolYears] = useState(false);
+  const [isEditingCholesterol, setIsEditingCholesterol] = useState(false);
+  const [cholesterolDraftRows, setCholesterolDraftRows] = useState<DraftCholesterolRow[]>([]);
+  const [deletedCholesterolIds, setDeletedCholesterolIds] = useState<string[]>([]);
+  const [savingCholesterol, setSavingCholesterol] = useState(false);
   const [visibleYearCount, setVisibleYearCount] = useState(4);
   const [visibleCategoryCount, setVisibleCategoryCount] = useState(4);
   const [categoryItemCounts, setCategoryItemCounts] = useState<Record<string, number>>({});
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<HealthCategoryGroups>({ consultas: [], exames: [] });
   const [loading, setLoading] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
@@ -163,15 +199,37 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   const [savingCategory, setSavingCategory] = useState(false);
 
   const accent = accentClass(propPerson);
-  const totalCholesterolYears = new Set(cholesterolRows.map((row) => row.year)).size;
+  const cholesterolSourceRows = isEditingCholesterol
+    ? cholesterolDraftRows.map((row) => ({
+        id: row.id ?? row.key,
+        person: propPerson,
+        year: row.year,
+        entryOrder: row.entryOrder,
+        total: row.total,
+        hdl: row.hdl,
+        ldl: row.ldl,
+        triglycerides: row.triglycerides,
+      }))
+    : cholesterolRows;
+
+  const totalCholesterolYears = new Set(cholesterolSourceRows.map((row) => row.year)).size;
   const hasHiddenCholesterolYears = totalCholesterolYears > 3;
   const visibleCholesterolRows = showAllCholesterolYears
-    ? cholesterolRows
+    ? cholesterolSourceRows
     : (() => {
-        const latestYears = Array.from(new Set(cholesterolRows.map((row) => row.year))).slice(0, 3);
+        const latestYears = Array.from(new Set(cholesterolSourceRows.map((row) => row.year))).slice(0, 3);
         const allowed = new Set(latestYears);
-        return cholesterolRows.filter((row) => allowed.has(row.year));
+        return cholesterolSourceRows.filter((row) => allowed.has(row.year));
       })();
+
+  const latestCholesterolRow = useMemo(() => {
+    if (cholesterolSourceRows.length === 0) return null;
+
+    return [...cholesterolSourceRows].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.entryOrder - a.entryOrder;
+    })[0];
+  }, [cholesterolSourceRows]);
 
   const rowsByLabel = useMemo(
     () => new Map(displayRows.map((row) => [row.label, row])),
@@ -244,10 +302,12 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     if (visibleCategoryCards.length === 0) return [];
 
     const cardsMap = new Map(visibleCategoryCards.map((card) => [card.category, card]));
-    const orderedFromState = categoryOrder
-      .map((category) => cardsMap.get(category))
-      .filter((card): card is { category: string; items: Array<TimelineItem & { year: string }> } => Boolean(card));
-    const missing = visibleCategoryCards.filter((card) => !categoryOrder.includes(card.category));
+    const uniqueOrder = categoryOrder.filter((category, index, arr) => arr.indexOf(category) === index);
+    const orderedFromState = uniqueOrder.map((category) => ({
+      category,
+      items: cardsMap.get(category)?.items ?? [],
+    }));
+    const missing = visibleCategoryCards.filter((card) => !uniqueOrder.includes(card.category));
 
     return [...orderedFromState, ...missing];
   }, [visibleCategoryCards, categoryOrder]);
@@ -255,6 +315,35 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   const limitedCategoryCards = useMemo(() => {
     return orderedVisibleCategoryCards.slice(0, visibleCategoryCount);
   }, [orderedVisibleCategoryCards, visibleCategoryCount]);
+
+  const groupedLimitedCategoryCards = useMemo(() => {
+    const normalize = (value: string) => value.trim().toLocaleLowerCase('pt-PT');
+    const consultasSet = new Set(categoryGroups.consultas.map(normalize));
+    const examesSet = new Set(categoryGroups.exames.map(normalize));
+
+    const grouped: {
+      consultas: Array<{ category: string; items: Array<TimelineItem & { year: string }> }>;
+      exames: Array<{ category: string; items: Array<TimelineItem & { year: string }> }>;
+      semGrupo: Array<{ category: string; items: Array<TimelineItem & { year: string }> }>;
+    } = {
+      consultas: [],
+      exames: [],
+      semGrupo: [],
+    };
+
+    limitedCategoryCards.forEach((card) => {
+      const key = normalize(card.category);
+      if (consultasSet.has(key)) {
+        grouped.consultas.push(card);
+      } else if (examesSet.has(key)) {
+        grouped.exames.push(card);
+      } else {
+        grouped.semGrupo.push(card);
+      }
+    });
+
+    return grouped;
+  }, [limitedCategoryCards, categoryGroups]);
 
   const remainingCategoryCount = Math.max(0, orderedVisibleCategoryCards.length - limitedCategoryCards.length);
   const nextCategoriesToLoad = Math.min(4, remainingCategoryCount);
@@ -280,18 +369,25 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
   useEffect(() => {
     // Load saved category order when person changes
-    const loadOrder = async () => {
+    const loadSettings = async () => {
       try {
-        const savedOrder = await loadCategoryOrder(propPerson);
-        setCategoryOrder(savedOrder);
+        const [savedOrder, savedGroups] = await Promise.all([
+          loadCategoryOrder(propPerson),
+          loadCategoryGroups(propPerson),
+        ]);
+        setCategoryOrder(savedOrder.filter((category, index, arr) => arr.indexOf(category) === index));
+        setCategoryGroups(savedGroups);
       } catch (err) {
-        console.warn('Failed to load category order:', err);
+        console.warn('Failed to load health category settings:', err);
       }
     };
-    loadOrder();
+    loadSettings();
     setVisibleYearCount(4);
     setVisibleCategoryCount(4);
     setCategoryItemCounts({});
+    setIsEditingCholesterol(false);
+    setCholesterolDraftRows([]);
+    setDeletedCholesterolIds([]);
   }, [propPerson]);
 
   useEffect(() => {
@@ -308,12 +404,12 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
   useEffect(() => {
     setCategoryOrder((prev) => {
+      const uniquePrev = prev.filter((category, index, arr) => arr.indexOf(category) === index);
       const currentCategories = visibleCategoryCards.map((card) => card.category);
-      const kept = prev.filter((category) => currentCategories.includes(category));
-      const added = currentCategories.filter((category) => !kept.includes(category));
-      const next = [...kept, ...added];
+      const added = currentCategories.filter((category) => !uniquePrev.includes(category));
+      const next = [...uniquePrev, ...added];
 
-      if (next.length === prev.length && next.every((item, idx) => item === prev[idx])) {
+      if (next.length === uniquePrev.length && next.every((item, idx) => item === uniquePrev[idx])) {
         return prev;
       }
       return next;
@@ -350,6 +446,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
       setNewCategory({
         mode: hasExistingCategories ? 'add-to-existing' : 'create',
         name: '',
+        group: 'consultas',
         selectedCategory: undefined,
         entries: [{ key: nextKey(), date: '', clinic: '', doctor: '', note: '' }] 
       });
@@ -513,6 +610,10 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     setNewCategory((prev) => (prev ? { ...prev, mode, selectedCategory: undefined } : prev));
   }
 
+  function updateNewCategoryGroup(group: 'consultas' | 'exames') {
+    setNewCategory((prev) => (prev ? { ...prev, group } : prev));
+  }
+
   function updateSelectedCategory(categoryLabel: string) {
     setNewCategory((prev) => (prev ? { ...prev, selectedCategory: categoryLabel } : prev));
   }
@@ -562,10 +663,141 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
         ),
       );
 
+      if (newCategory.mode === 'create') {
+        const normalized = (value: string) => value.trim().toLocaleLowerCase('pt-PT');
+        const label = categoryLabel.trim();
+        const nextGroups: HealthCategoryGroups = {
+          consultas: categoryGroups.consultas.filter((item) => normalized(item) !== normalized(label)),
+          exames: categoryGroups.exames.filter((item) => normalized(item) !== normalized(label)),
+        };
+
+        if (newCategory.group === 'consultas') {
+          nextGroups.consultas = [...nextGroups.consultas, label];
+        } else {
+          nextGroups.exames = [...nextGroups.exames, label];
+        }
+
+        setCategoryGroups(nextGroups);
+        await saveCategoryGroups(propPerson, nextGroups);
+      }
+
       await loadData(propPerson);
       closeNewCategory();
     } finally {
       setSavingCategory(false);
+    }
+  }
+
+  function startCholesterolEdit() {
+    const draft = sortDraftCholesterolRows(
+      cholesterolRows.map((row) => ({
+        key: row.id,
+        id: row.id,
+        year: row.year,
+        entryOrder: row.entryOrder,
+        total: row.total,
+        hdl: row.hdl,
+        ldl: row.ldl,
+        triglycerides: row.triglycerides,
+      })),
+    );
+
+    setCholesterolDraftRows(draft);
+    setDeletedCholesterolIds([]);
+    setShowAllCholesterolYears(true);
+    setIsEditingCholesterol(true);
+  }
+
+  function cancelCholesterolEdit() {
+    setIsEditingCholesterol(false);
+    setCholesterolDraftRows([]);
+    setDeletedCholesterolIds([]);
+  }
+
+  function removeDraftCholesterolEntry(key: string) {
+    setCholesterolDraftRows((prev) => {
+      const found = prev.find((row) => row.key === key);
+      if (found?.id) {
+        setDeletedCholesterolIds((ids) => (ids.includes(found.id!) ? ids : [...ids, found.id!]));
+      }
+
+      return prev.filter((row) => row.key !== key);
+    });
+  }
+
+  function updateDraftCholesterolField(
+    key: string,
+    field: 'year' | 'entryOrder' | 'total' | 'hdl' | 'ldl' | 'triglycerides',
+    value: string,
+  ) {
+    setCholesterolDraftRows((prev) => {
+      const next = prev.map((row) => {
+        if (row.key !== key) return row;
+
+        if (field === 'year') {
+          return { ...row, year: Math.max(2000, Number(value) || row.year) };
+        }
+
+        if (field === 'entryOrder') {
+          return { ...row, entryOrder: Math.max(1, Number(value) || row.entryOrder) };
+        }
+
+        return { ...row, [field]: parseNullableInt(value) };
+      });
+
+      return sortDraftCholesterolRows(next);
+    });
+  }
+
+  function addDraftCholesterolEntry() {
+    const newYear = cholesterolDraftRows.length > 0
+      ? Math.max(...cholesterolDraftRows.map((row) => row.year))
+      : new Date().getFullYear();
+    const nextEntryOrder = cholesterolDraftRows.filter((row) => row.year === newYear).length + 1;
+
+    setCholesterolDraftRows((prev) =>
+      sortDraftCholesterolRows([
+        ...prev,
+        {
+          key: nextKey(),
+          year: newYear,
+          entryOrder: nextEntryOrder,
+          total: null,
+          hdl: null,
+          ldl: null,
+          triglycerides: null,
+        },
+      ]),
+    );
+  }
+
+  async function saveCholesterolEdits() {
+    setSavingCholesterol(true);
+    try {
+      await Promise.all(
+        [
+          ...deletedCholesterolIds.map((id) => deleteCholesterolEntry(id)),
+          ...cholesterolDraftRows.map((row) =>
+            saveCholesterolEntry({
+              id: row.id,
+              person: propPerson,
+              year: row.year,
+              entryOrder: row.entryOrder,
+              total: row.total,
+              hdl: row.hdl,
+              ldl: row.ldl,
+              triglycerides: row.triglycerides,
+            }),
+          ),
+        ],
+      );
+
+      await loadData(propPerson);
+      setIsEditingCholesterol(false);
+      setCholesterolDraftRows([]);
+      setDeletedCholesterolIds([]);
+    } finally {
+      setSavingCholesterol(false);
     }
   }
 
@@ -584,8 +816,19 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
             <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">Sem registos</div>
           ) : (
             <>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {limitedCategoryCards.map(({ category, items }, index) => {
+              {[
+                { key: 'consultas', title: 'Consultas', cards: groupedLimitedCategoryCards.consultas },
+                { key: 'exames', title: 'Exames', cards: groupedLimitedCategoryCards.exames },
+                { key: 'sem-grupo', title: 'Sem grupo geral', cards: groupedLimitedCategoryCards.semGrupo },
+              ]
+                .filter((section) => section.cards.length > 0)
+                .map((section) => (
+                  <div key={section.key} className="space-y-3">
+                    <div className="px-1">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {section.cards.map(({ category, items }) => {
                   const categoryRow = rowsByLabel.get(category);
                   const allCategoriesIndex = orderedVisibleCategoryCards.findIndex(c => c.category === category);
                   const canMoveUp = allCategoriesIndex > 0;
@@ -662,6 +905,11 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                                   </article>
                                 );
                               })}
+                              {visibleItems.length === 0 && (
+                                <p className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
+                                  Sem registos
+                                </p>
+                              )}
                               {remainingItems > 0 && (
                                 <button
                                   type="button"
@@ -680,8 +928,10 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                       </div>
                     </section>
                   );
-                })}
-              </div>
+                      })}
+                    </div>
+                  </div>
+                ))}
 
               {remainingCategoryCount > 0 && (
                 <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
@@ -724,19 +974,58 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 </p>
               </div>
 
-              {hasHiddenCholesterolYears && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllCholesterolYears((prev) => !prev)}
-                  className="shrink-0 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
-                >
-                  {showAllCholesterolYears ? 'Esconder anos antigos' : 'Mostrar anos antigos'}
-                </button>
-              )}
+              <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
+                {isEditingCholesterol ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={addDraftCholesterolEntry}
+                      className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                    >
+                      Adicionar análise
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelCholesterolEdit}
+                      className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveCholesterolEdits}
+                      disabled={savingCholesterol}
+                      className="rounded-md bg-primary text-primary-foreground px-2.5 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+                    >
+                      {savingCholesterol && <Loader2 className="w-3 h-3 animate-spin" />}
+                      Guardar colesterol
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startCholesterolEdit}
+                    className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    Editar tabela
+                  </button>
+                )}
+
+                {hasHiddenCholesterolYears && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllCholesterolYears((prev) => !prev)}
+                    className="rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+                  >
+                    {showAllCholesterolYears ? 'Esconder anos antigos' : 'Mostrar anos antigos'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {(() => {
-              const latest = cholesterolRows[0];
+              if (!latestCholesterolRow) return null;
+              const latest = latestCholesterolRow;
               const total = totalLegend(latest.total);
               const hdl = hdlLegend(latest.hdl);
               const ldl = ldlLegend(latest.ldl);
@@ -790,7 +1079,126 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
               </div>
             </details>
           </div>
-          <div className="overflow-x-auto">
+          <div className="md:hidden p-3 space-y-2">
+            {visibleCholesterolRows.map((row, idx) => {
+              const ratio = ratioLegend(row.total, row.hdl);
+              const total = totalLegend(row.total);
+              const hdl = hdlLegend(row.hdl);
+              const ldl = ldlLegend(row.ldl);
+              const tri = triglyceridesLegend(row.triglycerides);
+              const previous = visibleCholesterolRows[idx - 1];
+              const showYear = !previous || previous.year !== row.year;
+              const showOrder = (previous && previous.year === row.year) || row.entryOrder > 1;
+
+              return (
+                <article key={`mobile-${row.id}`} className="rounded-lg border bg-background p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold">
+                      {isEditingCholesterol ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={2000}
+                            value={row.year}
+                            onChange={(e) => updateDraftCholesterolField(row.id, 'year', e.target.value)}
+                            className="w-20 rounded border bg-background px-2 py-1 text-xs text-center"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={row.entryOrder}
+                            onChange={(e) => updateDraftCholesterolField(row.id, 'entryOrder', e.target.value)}
+                            className="w-14 rounded border bg-background px-2 py-1 text-xs text-center"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          {showYear ? row.year : 'Mesmo ano'}
+                          {showOrder && <span className="ml-1 text-xs text-muted-foreground">#{row.entryOrder}</span>}
+                        </>
+                      )}
+                    </div>
+
+                    {isEditingCholesterol && (
+                      <button
+                        type="button"
+                        onClick={() => removeDraftCholesterolEntry(row.id)}
+                        className="inline-flex items-center justify-center rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
+                        title="Apagar entrada"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded border p-2">
+                      <p className="text-muted-foreground">Total</p>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.total ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'total', e.target.value)}
+                          className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+                        />
+                      ) : (
+                        <p className={`mt-1 text-base font-bold ${total.color}`}>{row.total ?? '-'}</p>
+                      )}
+                    </div>
+
+                    <div className="rounded border p-2">
+                      <p className="text-muted-foreground">HDL</p>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.hdl ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'hdl', e.target.value)}
+                          className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+                        />
+                      ) : (
+                        <p className={`mt-1 text-base font-bold ${hdl.color}`}>{row.hdl ?? '-'}</p>
+                      )}
+                    </div>
+
+                    <div className="rounded border p-2">
+                      <p className="text-muted-foreground">LDL</p>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.ldl ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'ldl', e.target.value)}
+                          className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+                        />
+                      ) : (
+                        <p className={`mt-1 text-base font-bold ${ldl.color}`}>{row.ldl ?? '-'}</p>
+                      )}
+                    </div>
+
+                    <div className="rounded border p-2">
+                      <p className="text-muted-foreground">Triglicerídeos</p>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.triglycerides ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'triglycerides', e.target.value)}
+                          className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+                        />
+                      ) : (
+                        <p className={`mt-1 text-base font-bold ${tri.color}`}>{row.triglycerides ?? '-'}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded border p-2">
+                    <p className="text-xs text-muted-foreground">Rácio Total/HDL</p>
+                    <p className={`mt-1 text-base font-bold ${ratio.color}`}>{ratio.value}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
           <table className="min-w-[700px] w-full border-collapse text-sm">
             <thead>
               <tr>
@@ -800,6 +1208,9 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 <th className="border border-border bg-muted/30 p-2 text-center font-semibold">LDL</th>
                 <th className="border border-border bg-muted/30 p-2 text-center font-semibold">Triglicerídeos</th>
                 <th className="border border-border bg-muted/30 p-2 text-center font-semibold">Rácio</th>
+                {isEditingCholesterol && (
+                  <th className="border border-border bg-muted/30 p-2 text-center font-semibold w-[74px]">Ações</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -816,34 +1227,91 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 return (
                   <tr key={row.id} className="hover:bg-muted/20 transition-colors">
                     <td className="border border-border bg-muted/10 p-2 text-center font-semibold">
-                      {showYear ? row.year : ''}
-                      {showOrder && (
-                        <div className="text-[10px] font-normal text-muted-foreground">#{row.entryOrder}</div>
+                      {isEditingCholesterol ? (
+                        <div className="flex flex-col gap-1">
+                          <input
+                            type="number"
+                            min={2000}
+                            value={row.year}
+                            onChange={(e) => updateDraftCholesterolField(row.id, 'year', e.target.value)}
+                            className="w-full rounded border bg-background px-1.5 py-1 text-xs text-center"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={row.entryOrder}
+                            onChange={(e) => updateDraftCholesterolField(row.id, 'entryOrder', e.target.value)}
+                            className="w-full rounded border bg-background px-1.5 py-1 text-xs text-center"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          {showYear ? row.year : ''}
+                          {showOrder && (
+                            <div className="text-[10px] font-normal text-muted-foreground">#{row.entryOrder}</div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="border border-border p-2 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className={`text-lg leading-none font-bold ${total.color}`}>{row.total ?? '-'}</span>
-                        <span className={`text-[11px] font-medium ${total.color}`}>{total.label}</span>
-                      </div>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.total ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'total', e.target.value)}
+                          className="w-full rounded border bg-background px-2 py-1 text-sm text-center"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-lg leading-none font-bold ${total.color}`}>{row.total ?? '-'}</span>
+                          <span className={`text-[11px] font-medium ${total.color}`}>{total.label}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="border border-border p-2 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className={`text-lg leading-none font-bold ${hdl.color}`}>{row.hdl ?? '-'}</span>
-                        <span className={`text-[11px] font-medium ${hdl.color}`}>{hdl.label}</span>
-                      </div>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.hdl ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'hdl', e.target.value)}
+                          className="w-full rounded border bg-background px-2 py-1 text-sm text-center"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-lg leading-none font-bold ${hdl.color}`}>{row.hdl ?? '-'}</span>
+                          <span className={`text-[11px] font-medium ${hdl.color}`}>{hdl.label}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="border border-border p-2 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className={`text-lg leading-none font-bold ${ldl.color}`}>{row.ldl ?? '-'}</span>
-                        <span className={`text-[11px] font-medium ${ldl.color}`}>{ldl.label}</span>
-                      </div>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.ldl ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'ldl', e.target.value)}
+                          className="w-full rounded border bg-background px-2 py-1 text-sm text-center"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-lg leading-none font-bold ${ldl.color}`}>{row.ldl ?? '-'}</span>
+                          <span className={`text-[11px] font-medium ${ldl.color}`}>{ldl.label}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="border border-border p-2 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className={`text-lg leading-none font-bold ${tri.color}`}>{row.triglycerides ?? '-'}</span>
-                        <span className={`text-[11px] font-medium ${tri.color}`}>{tri.label}</span>
-                      </div>
+                      {isEditingCholesterol ? (
+                        <input
+                          type="number"
+                          value={row.triglycerides ?? ''}
+                          onChange={(e) => updateDraftCholesterolField(row.id, 'triglycerides', e.target.value)}
+                          className="w-full rounded border bg-background px-2 py-1 text-sm text-center"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-lg leading-none font-bold ${tri.color}`}>{row.triglycerides ?? '-'}</span>
+                          <span className={`text-[11px] font-medium ${tri.color}`}>{tri.label}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="border border-border p-2 text-center">
                       <div className="flex flex-col items-center">
@@ -851,6 +1319,18 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                         <span className={`text-[11px] font-medium ${ratio.color}`}>{ratio.label}</span>
                       </div>
                     </td>
+                    {isEditingCholesterol && (
+                      <td className="border border-border p-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeDraftCholesterolEntry(row.id)}
+                          className="inline-flex items-center justify-center rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
+                          title="Apagar entrada"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1028,6 +1508,15 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                     onChange={(e) => updateNewCategoryName(e.target.value)}
                     className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                   />
+                  <label className="text-xs font-bold text-muted-foreground mt-2 block">Grupo geral</label>
+                  <select
+                    value={newCategory.group}
+                    onChange={(e) => updateNewCategoryGroup(e.target.value as 'consultas' | 'exames')}
+                    className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="consultas">Consultas</option>
+                    <option value="exames">Exames</option>
+                  </select>
                 </div>
               )}
 
