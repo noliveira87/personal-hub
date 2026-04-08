@@ -7,11 +7,14 @@ type QuoteRow = {
   id: string;
   contract_id: string | null;
   title: string;
+  provider: string | null;
   description: string | null;
   price: number | null;
   currency: string;
   date: string | null;
   pdf_url: string | null;
+  approval_status: 'pending' | 'approved' | 'rejected';
+  payment_terms: string | null;
   alert_date: string | null;
   alert_enabled: boolean;
   telegram_alert_enabled: boolean;
@@ -25,11 +28,14 @@ function mapRowToQuote(row: QuoteRow): ContractQuote {
     id: row.id,
     contractId: row.contract_id,
     title: row.title,
+    provider: row.provider,
     description: row.description,
     price: row.price != null ? Number(row.price) : null,
     currency: row.currency,
     date: row.date,
     pdfUrl: row.pdf_url,
+    approvalStatus: row.approval_status ?? 'pending',
+    paymentTerms: row.payment_terms,
     alertDate: row.alert_date,
     alertEnabled: row.alert_enabled ?? false,
     telegramAlertEnabled: row.telegram_alert_enabled ?? false,
@@ -82,11 +88,14 @@ export async function createQuote(
       id,
       contract_id: quote.contractId ?? null,
       title: quote.title,
+      provider: quote.provider ?? null,
       description: quote.description ?? null,
       price: quote.price ?? null,
       currency: quote.currency,
       date: quote.date ?? null,
       pdf_url: quote.pdfUrl ?? null,
+      approval_status: quote.approvalStatus ?? 'pending',
+      payment_terms: quote.paymentTerms ?? null,
       alert_date: quote.alertDate ?? null,
       alert_enabled: quote.alertEnabled ?? false,
       telegram_alert_enabled: quote.telegramAlertEnabled ?? false,
@@ -110,11 +119,14 @@ export async function updateQuote(quote: ContractQuote): Promise<ContractQuote> 
     .update({
       contract_id: quote.contractId ?? null,
       title: quote.title,
+      provider: quote.provider ?? null,
       description: quote.description ?? null,
       price: quote.price ?? null,
       currency: quote.currency,
       date: quote.date ?? null,
       pdf_url: quote.pdfUrl ?? null,
+      approval_status: quote.approvalStatus ?? 'pending',
+      payment_terms: quote.paymentTerms ?? null,
       alert_date: quote.alertDate ?? null,
       alert_enabled: quote.alertEnabled ?? false,
       telegram_alert_enabled: quote.telegramAlertEnabled ?? false,

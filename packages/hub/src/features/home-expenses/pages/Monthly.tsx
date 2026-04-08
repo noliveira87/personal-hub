@@ -165,18 +165,22 @@ export default function Monthly() {
             <summary className="p-4 cursor-pointer font-medium text-foreground hover:bg-accent/50 transition-colors">
               {m.name} — {t('homeExpenses.monthlyTable.transactionsCount', { count: m.transactions.length })}
             </summary>
-            <div className="px-4 pb-4">
-              <table className="w-full text-sm">
+            <div className="px-4 pb-4 overflow-hidden">
+              <table className="w-full table-fixed sm:table-auto text-sm">
                 <tbody>
                   {m.transactions.map((tx) => {
                     const isContractTx = isContractTransaction(tx);
                     return (
                       <tr key={tx.id} className={`border-b border-border/30 ${isContractTx ? 'bg-muted/20' : ''}`}>
-                        <td className="py-2 text-foreground">{tx.name}</td>
-                        <td className="py-2 text-muted-foreground text-xs">
+                        <td className="py-2 pr-2 text-foreground min-w-0">
+                          <span className="block truncate sm:whitespace-normal" title={tx.name}>
+                            {tx.name}
+                          </span>
+                        </td>
+                        <td className="w-6 py-2 text-muted-foreground text-xs">
                           {tx.type === 'expense' && EXPENSE_CATEGORIES.find((c) => c.value === tx.category)?.icon}
                         </td>
-                        <td className="py-2 text-right">
+                        <td className="w-32 py-2 text-right">
                           {editingCell?.txId === tx.id ? (
                             <Input
                               type="number"

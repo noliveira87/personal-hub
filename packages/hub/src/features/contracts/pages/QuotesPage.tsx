@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Loader2, Receipt, Link2, Bell } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Loader2, Receipt, Link2, Bell, Building2 } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ContractQuote } from '@/features/contracts/types/contract';
 import { loadAllQuotes, deleteQuote } from '@/features/contracts/lib/quotes';
@@ -8,6 +8,27 @@ import { QuoteModal } from '@/features/contracts/components/QuoteModal';
 import { toast } from '@/components/ui/sonner';
 import { format, parseISO } from 'date-fns';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import { Button } from '@/components/ui/button';
+
+function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
+  if (status === 'approved') {
+    return 'bg-success/10 text-success border-success/20';
+  }
+
+  if (status === 'rejected') {
+    return 'bg-destructive/10 text-destructive border-destructive/20';
+  }
+
+  return 'bg-muted text-muted-foreground border-border';
+}
+
+function parsePaymentTermsLines(paymentTerms: string): string[] {
+  return paymentTerms
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => line.replace(/^[-•]\s*/, ''));
+}
 
 export default function QuotesPage() {
   const { t, formatCurrency } = useI18n();
@@ -56,22 +77,30 @@ export default function QuotesPage() {
     setEditingQuote(null);
   };
 
+  const getQuoteStatusLabel = (status: ContractQuote['approvalStatus']) => {
+    if (status === 'approved') return t('contracts.quotes.approvalStatusApproved');
+    if (status === 'rejected') return t('contracts.quotes.approvalStatusRejected');
+    return t('contracts.quotes.approvalStatusPending');
+  };
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <AppSectionHeader title="D12 Contracts" icon={Receipt} backTo="/contracts" backLabel={t('contracts.backToContracts')} />
+      <AppSectionHeader
+        title="D12 Contracts"
+        icon={Receipt}
+        backTo="/contracts"
+        backLabel={t('contracts.backToContracts')}
+        actions={(
+          <Button size="sm" className="gap-1.5" onClick={handleAdd}>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">{t('contracts.quotes.addButton')}</span>
+          </Button>
+        )}
+      />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{t('contracts.quotes.pageTitle')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t('contracts.quotes.pageSubtitle')}</p>
-        </div>
-        <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" />
-          {t('contracts.quotes.addButton')}
-        </button>
+      <div>
+        <h1 className="text-xl font-bold text-foreground">{t('contracts.quotes.pageTitle')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('contracts.quotes.pageSubtitle')}</p>
       </div>
 
       {loading ? (
@@ -100,6 +129,12 @@ export default function QuotesPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight">{q.title}</p>
+                    {q.provider && (
+                      <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                        <Building2 className="h-3 w-3" />
+                        {q.provider}
+                      </span>
+                    )}
                     {q.date && (
                       <p className="text-xs text-muted-foreground mt-0.5">{format(parseISO(q.date), 'd MMM yyyy')}</p>
                     )}
@@ -111,6 +146,9 @@ export default function QuotesPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${getQuoteStatusBadgeClasses(q.approvalStatus)}`}>
+                      {getQuoteStatusLabel(q.approvalStatus)}
+                    </span>
                     {q.pdfUrl && (
                       <a
                         href={q.pdfUrl}
@@ -145,6 +183,16 @@ export default function QuotesPage() {
                 )}
                 {q.description && (
                   <p className="text-xs text-muted-foreground leading-relaxed">{q.description}</p>
+                )}
+                {q.paymentTerms && (
+                  <div className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="font-medium text-foreground mb-1">{t('contracts.quotes.paymentTermsLabel')}</p>
+                    <ul className="space-y-0.5">
+                      {parsePaymentTermsLines(q.paymentTerms).map((line, idx) => (
+                        <li key={`${q.id}-payment-term-${idx}`}>• {line}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 {(q.alertEnabled || q.telegramAlertEnabled) && q.alertDate && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">

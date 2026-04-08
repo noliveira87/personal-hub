@@ -103,11 +103,14 @@ export interface ContractQuote {
   id: string;
   contractId: string | null;
   title: string;
+  provider: string | null;
   description: string | null;
   price: number | null;
   currency: string;
   date: string | null;
   pdfUrl: string | null;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  paymentTerms: string | null;
   alertDate: string | null;
   alertEnabled: boolean;
   telegramAlertEnabled: boolean;

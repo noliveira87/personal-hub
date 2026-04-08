@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Receipt, Plus, Pencil, Trash2, ExternalLink, Loader2, Bell } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, ExternalLink, Loader2, Bell, Building2 } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ContractQuote } from '@/features/contracts/types/contract';
 import { loadQuotesByContract, deleteQuote } from '@/features/contracts/lib/quotes';
@@ -11,6 +11,26 @@ interface QuotesSectionProps {
   contractId: string;
   contractCurrency: string;
   animationDelay?: string;
+}
+
+function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
+  if (status === 'approved') {
+    return 'bg-success/10 text-success border-success/20';
+  }
+
+  if (status === 'rejected') {
+    return 'bg-destructive/10 text-destructive border-destructive/20';
+  }
+
+  return 'bg-muted text-muted-foreground border-border';
+}
+
+function parsePaymentTermsLines(paymentTerms: string): string[] {
+  return paymentTerms
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => line.replace(/^[-•]\s*/, ''));
 }
 
 export function QuotesSection({
@@ -76,6 +96,12 @@ export function QuotesSection({
     setEditingQuote(null);
   };
 
+  const getQuoteStatusLabel = (status: ContractQuote['approvalStatus']) => {
+    if (status === 'approved') return t('contracts.quotes.approvalStatusApproved');
+    if (status === 'rejected') return t('contracts.quotes.approvalStatusRejected');
+    return t('contracts.quotes.approvalStatusPending');
+  };
+
   return (
     <>
       <div
@@ -116,6 +142,12 @@ export function QuotesSection({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground leading-tight">{quote.title}</p>
+                    {quote.provider && (
+                      <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                        <Building2 className="h-3 w-3" />
+                        {quote.provider}
+                      </span>
+                    )}
                     {quote.date && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {format(parseISO(quote.date), 'd MMM yyyy')}
@@ -123,6 +155,9 @@ export function QuotesSection({
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${getQuoteStatusBadgeClasses(quote.approvalStatus)}`}>
+                      {getQuoteStatusLabel(quote.approvalStatus)}
+                    </span>
                     {quote.pdfUrl && (
                       <a
                         href={quote.pdfUrl}
@@ -163,6 +198,17 @@ export function QuotesSection({
                   <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
                     {quote.description}
                   </p>
+                )}
+
+                {quote.paymentTerms && (
+                  <div className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="font-medium text-foreground mb-1">{t('contracts.quotes.paymentTermsLabel')}</p>
+                    <ul className="space-y-0.5">
+                      {parsePaymentTermsLines(quote.paymentTerms).map((line, idx) => (
+                        <li key={`${quote.id}-payment-term-${idx}`}>• {line}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
 
                 {/* Alert badge */}
