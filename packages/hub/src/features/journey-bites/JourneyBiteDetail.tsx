@@ -192,7 +192,8 @@ export function JourneyBiteDetail() {
       setForm((prev) => ({ ...prev, photoPath: upload.path }));
     } catch (error) {
       console.error("Error uploading journey bite photo:", error);
-      alert(t("journeyBites.uploadError"));
+      const message = error instanceof Error ? error.message : t("journeyBites.uploadError");
+      alert(message);
     } finally {
       setUploading(false);
       event.target.value = "";

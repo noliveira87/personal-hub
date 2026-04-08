@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Loader2, Plus, Save, Upload, UtensilsCrossed, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Image, Loader2, Map, Plus, Save, Upload, UtensilsCrossed, X } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,9 +77,16 @@ export function JourneyBitesApp() {
     setForm(buildInitialForm());
   };
 
+  const ensureTripsLoaded = async () => {
+    if (trips.length) return;
+    const tripRows = await loadTrips();
+    setTrips(tripRows);
+  };
+
   const openCreateForm = () => {
     resetForm();
     setFormOpen(true);
+    void ensureTripsLoaded();
   };
 
   const hydrateFormFromItem = (item: JourneyBite) => {
@@ -112,21 +119,19 @@ export function JourneyBitesApp() {
   }, [form.photoPath]);
 
   const refreshData = async () => {
-    const [journeyBitesResult, tripRows] = await Promise.all([loadJourneyBites(), loadTrips()]);
+    const journeyBitesResult = await loadJourneyBites();
     setItems(journeyBitesResult.items);
     setSetupRequired(journeyBitesResult.setupRequired);
-    setTrips(tripRows);
   };
 
   useEffect(() => {
     let mounted = true;
 
     const fetchData = async () => {
-      const [journeyBitesResult, tripRows] = await Promise.all([loadJourneyBites(), loadTrips()]);
+      const journeyBitesResult = await loadJourneyBites();
       if (!mounted) return;
       setItems(journeyBitesResult.items);
       setSetupRequired(journeyBitesResult.setupRequired);
-      setTrips(tripRows);
       setLoading(false);
     };
 
@@ -136,6 +141,11 @@ export function JourneyBitesApp() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!formOpen) return;
+    void ensureTripsLoaded();
+  }, [formOpen]);
 
   const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -150,7 +160,8 @@ export function JourneyBitesApp() {
       }));
     } catch (error) {
       console.error("Error uploading journey bite photo:", error);
-      alert(t("journeyBites.uploadError"));
+      const message = error instanceof Error ? error.message : t("journeyBites.uploadError");
+      alert(message);
     } finally {
       setUploading(false);
       event.target.value = "";
@@ -161,6 +172,11 @@ export function JourneyBitesApp() {
     event.preventDefault();
 
     if (!form.tripId || !form.dishName.trim()) {
+      alert(t("journeyBites.requiredFields"));
+      return;
+    }
+
+    if (!editingId && (!form.restaurantName.trim() || !form.restaurantAddress.trim())) {
       alert(t("journeyBites.requiredFields"));
       return;
     }
@@ -205,16 +221,25 @@ export function JourneyBitesApp() {
   };
 
   const headerActions = (
-    <Button
-      onClick={openCreateForm}
-      size="sm"
-      className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
-      aria-label={t("journeyBites.addAction")}
-      title={t("journeyBites.addAction")}
-    >
-      <Plus className="h-4 w-4" />
-      <span className="hidden sm:inline">{t("journeyBites.addAction")}</span>
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button asChild size="sm" variant="outline" className="h-10 w-10 rounded-xl px-0 sm:h-9 sm:w-auto sm:px-3" aria-label={t("journeyBites.map.open")} title={t("journeyBites.map.open")}>
+        <Link to="/journey-bites/map">
+          <Map className="h-4 w-4" />
+          <span className="hidden sm:inline sm:ml-1.5">{t("journeyBites.map.open")}</span>
+        </Link>
+      </Button>
+
+      <Button
+        onClick={openCreateForm}
+        size="sm"
+        className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
+        aria-label={t("journeyBites.addAction")}
+        title={t("journeyBites.addAction")}
+      >
+        <Plus className="h-4 w-4" />
+        <span className="hidden sm:inline">{t("journeyBites.addAction")}</span>
+      </Button>
+    </div>
   );
 
   return (

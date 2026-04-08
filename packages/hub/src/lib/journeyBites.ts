@@ -59,6 +59,7 @@ type JourneyBiteRow = {
   photo_path: string | null;
   eaten_on: string | null;
   created_at: string;
+  trip?: TripLookupRow | TripLookupRow[] | null;
 };
 
 type TripLookupRow = {
@@ -167,7 +168,9 @@ const toUpdateRow = (input: JourneyBiteUpdate) => {
 export async function loadJourneyBites(): Promise<{ items: JourneyBite[]; setupRequired: boolean }> {
   const { data, error } = await supabase
     .from("journey_bites")
-    .select("id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at")
+    .select(
+      "id, trip_id, dish_name, description, restaurant_name, restaurant_address, review_url, photo_path, eaten_on, created_at, trip:trips!journey_bites_trip_id_fkey(id, title, destination, start_date, end_date)"
+    )
     .order("eaten_on", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -185,24 +188,9 @@ export async function loadJourneyBites(): Promise<{ items: JourneyBite[]; setupR
     return { items: [], setupRequired: false };
   }
 
-  const uniqueTripIds = [...new Set(rows.map((row) => row.trip_id).filter(Boolean))];
-  let tripsById = new Map<string, TripLookupRow>();
-
-  if (uniqueTripIds.length) {
-    const { data: tripData, error: tripError } = await supabase
-      .from("trips")
-      .select("id, title, destination, start_date, end_date")
-      .in("id", uniqueTripIds);
-
-    if (tripError) {
-      console.error("Error loading trips for journey bites:", tripError);
-    } else {
-      tripsById = new Map(((tripData ?? []) as TripLookupRow[]).map((trip) => [trip.id, trip]));
-    }
-  }
-
   const items: JourneyBite[] = rows.map((row) => {
-    const relatedTrip = tripsById.get(row.trip_id) ?? null;
+    const relatedTripRaw = Array.isArray(row.trip) ? row.trip[0] : row.trip;
+    const relatedTrip = relatedTripRaw ?? null;
 
     return {
       id: row.id,
@@ -340,6 +328,11 @@ export async function deleteJourneyBite(id: string): Promise<void> {
 }
 
 export async function uploadJourneyBitePhoto(file: File): Promise<{ path: string; publicUrl: string }> {
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    throw new Error("Photo must be smaller than 10MB.");
+  }
+
   const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
   const filePath = `foods/${crypto.randomUUID()}.${extension}`;
 
@@ -352,7 +345,26 @@ export async function uploadJourneyBitePhoto(file: File): Promise<{ path: string
     });
 
   if (error) {
-    throw new Error(error.message);
+    const message = error.message || "Unknown storage error";
+    const normalized = message.toLowerCase();
+
+    if (
+      normalized.includes("bucket") && normalized.includes("not") && normalized.includes("found")
+      || normalized.includes("row-level security")
+      || normalized.includes("permission denied")
+      || normalized.includes("not allowed")
+      || normalized.includes("unauthorized")
+    ) {
+      throw new Error(
+        "Journey Bites storage is not configured. Run `packages/hub/supabase/journey_bites_bucket.sql` in Supabase SQL Editor, then try again."
+      );
+    }
+
+    if (normalized.includes("mime") || normalized.includes("invalid file type")) {
+      throw new Error("Only JPG, PNG and WEBP images are allowed.");
+    }
+
+    throw new Error(message);
   }
 
   const { data } = supabase.storage.from(JOURNEY_BITES_BUCKET).getPublicUrl(filePath);

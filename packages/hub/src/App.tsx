@@ -24,6 +24,7 @@ const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
 const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
 const JourneyBitesPage = lazy(() => import("@/pages/trips/JourneyBitesPage"));
+const JourneyBitesMapPage = lazy(() => import("@/pages/trips/JourneyBitesMapPage"));
 const JourneyBiteDetailPage = lazy(() => import("@/pages/trips/JourneyBiteDetailPage"));
 const HealthPage = lazy(() => import("@/features/health/pages/HealthPage"));
 const WarrantiesPage = lazy(() => import("@/pages/warranties/WarrantiesPage"));
@@ -96,6 +97,7 @@ const AppRoutes = () => {
             {/* Trips */}
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/journey-bites" element={<JourneyBitesPage />} />
+            <Route path="/journey-bites/map" element={<JourneyBitesMapPage />} />
             <Route path="/journey-bites/:id" element={<JourneyBiteDetailPage />} />
 
             {/* Health */}
