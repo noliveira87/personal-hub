@@ -41,16 +41,16 @@ export default function TransactionList() {
       )}
       {filtered.map((tx) => (
         <div key={tx.id} className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm flex items-center justify-between gap-4 animate-fade-in sm:p-5">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex flex-1 items-center gap-3 min-w-0">
             <div className={`w-2 h-8 rounded-full ${tx.type === 'income' ? 'bg-income' : 'bg-expense'}`} />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm text-foreground truncate">{tx.name}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="block min-w-0 flex-1 font-medium text-sm text-foreground truncate" title={tx.name}>{tx.name}</span>
                 {isContractTx(tx) && (
                   <span
                     title={t('homeExpenses.list.linkedContract')}
                     aria-label={t('homeExpenses.list.linkedContract')}
-                    className="text-muted-foreground"
+                    className="text-muted-foreground shrink-0"
                   >
                     <Link2 className="w-3 h-3" />
                   </span>
@@ -59,7 +59,7 @@ export default function TransactionList() {
                   <span
                     title={t('homeExpenses.list.recurring')}
                     aria-label={t('homeExpenses.list.recurring')}
-                    className="text-muted-foreground"
+                    className="text-muted-foreground shrink-0"
                   >
                     <RotateCcw className="w-3 h-3" />
                   </span>
@@ -75,8 +75,8 @@ export default function TransactionList() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`tabular-nums font-semibold text-sm ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <span className={`tabular-nums font-semibold text-sm whitespace-nowrap ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
               {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
             </span>
             {!tx.isReadOnly && (
