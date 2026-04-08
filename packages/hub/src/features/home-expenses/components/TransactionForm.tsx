@@ -139,7 +139,18 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = parseFloat(amount);
-    if (!name.trim() || isNaN(parsed) || parsed <= 0) return;
+    if (!name.trim() || isNaN(parsed)) return;
+
+    if (parsed === 0) {
+      setSubmitError(t('homeExpenses.form.amountCannotBeZero'));
+      return;
+    }
+
+    if (type === 'income' && parsed < 0) {
+      setSubmitError(t('homeExpenses.form.incomeMustBePositive'));
+      return;
+    }
+
     setSubmitError(null);
 
     const nextCategory = type === 'expense' ? category : undefined;
@@ -234,7 +245,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
 
               <div>
                 <Label htmlFor="amount">{t('homeExpenses.form.amount')}</Label>
-                <Input id="amount" type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t('homeExpenses.form.amountPlaceholder')} className="mt-1 tabular-nums" required />
+                <Input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t('homeExpenses.form.amountPlaceholder')} className="mt-1 tabular-nums" required />
               </div>
             </>
           )}
@@ -333,7 +344,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
 
               <div>
                 <Label htmlFor="amount">{t('homeExpenses.form.amount')}</Label>
-                <Input id="amount" type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t('homeExpenses.form.amountPlaceholder')} className="mt-1 tabular-nums" required />
+                <Input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t('homeExpenses.form.amountPlaceholder')} className="mt-1 tabular-nums" required />
               </div>
 
               {category === 'car' && (

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { PriceHistory } from '@/features/contracts/types/contract';
 import { supabase } from '@/lib/supabase';
 
 export interface LatestPrice {
@@ -12,6 +11,7 @@ interface PriceHistoryMapRow {
   contract_id: string | null;
   amount: number;
   date: string;
+  category: string | null;
 }
 
 export function usePriceHistoryMap(contractIds: string[]) {
@@ -43,7 +43,7 @@ export function usePriceHistoryMap(contractIds: string[]) {
       try {
         const { data, error: err } = await supabase
           .from('home_expenses_transactions')
-          .select('id, contract_id, amount, date, created_at')
+          .select('id, contract_id, category, amount, date, created_at')
           .eq('type', 'expense')
           .in('contract_id', contractIds);
 
@@ -64,21 +64,48 @@ export function usePriceHistoryMap(contractIds: string[]) {
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
 
-        // Build map with latest price for each contract
-        const latestMap = new Map<string, LatestPrice>();
-        const seenContracts = new Set<string>();
+        // For car contracts, only carRenting should drive the contract card price.
+        // Car charging entries (category "car") must not replace renting base price.
+        const latestAnyByContract = new Map<string, LatestPrice>();
+        const latestCarRentingByContract = new Map<string, LatestPrice>();
+        const carCategoryContracts = new Set<string>();
 
         sortedData.forEach((entry) => {
-          if (!entry.contract_id || seenContracts.has(entry.contract_id)) {
+          if (!entry.contract_id) {
             return;
           }
 
-          const latestEntry: LatestPrice = {
-            price: Number(entry.amount),
-            date: entry.date,
-          };
-          latestMap.set(entry.contract_id, latestEntry);
-          seenContracts.add(entry.contract_id);
+          if (!latestAnyByContract.has(entry.contract_id)) {
+            latestAnyByContract.set(entry.contract_id, {
+              price: Number(entry.amount),
+              date: entry.date,
+            });
+          }
+
+          if (entry.category === 'car' || entry.category === 'carRenting') {
+            carCategoryContracts.add(entry.contract_id);
+          }
+
+          if (entry.category === 'carRenting' && !latestCarRentingByContract.has(entry.contract_id)) {
+            latestCarRentingByContract.set(entry.contract_id, {
+              price: Number(entry.amount),
+              date: entry.date,
+            });
+          }
+        });
+
+        const latestMap = new Map<string, LatestPrice>();
+
+        latestAnyByContract.forEach((latestAny, contractId) => {
+          if (carCategoryContracts.has(contractId)) {
+            const rentingOnly = latestCarRentingByContract.get(contractId);
+            if (rentingOnly) {
+              latestMap.set(contractId, rentingOnly);
+            }
+            return;
+          }
+
+          latestMap.set(contractId, latestAny);
         });
 
         setPriceMap(latestMap);

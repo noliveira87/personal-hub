@@ -72,8 +72,13 @@ export default function Monthly() {
   const commitEdit = () => {
     if (!editingCell) return;
     const parsed = parseFloat(editValue);
-    if (!isNaN(parsed) && parsed >= 0) {
-      void updateTx(editingCell.txId, { amount: parsed });
+    const tx = allTransactions.find((item) => item.id === editingCell.txId);
+
+    if (!isNaN(parsed) && parsed !== 0 && tx) {
+      const isValidForType = tx.type === 'income' ? parsed > 0 : true;
+      if (isValidForType) {
+        void updateTx(editingCell.txId, { amount: parsed });
+      }
     }
     setEditingCell(null);
   };
