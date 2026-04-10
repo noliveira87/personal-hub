@@ -19,6 +19,7 @@ type CashbackEntryRow = {
   purchase_id: string;
   source: string;
   amount: number | null;
+  points: number | null;
   date_received: string;
   created_at: string;
   updated_at: string;
@@ -153,6 +154,7 @@ function mapEntryRow(row: CashbackEntryRow): CashbackEntry {
     id: row.id,
     source: row.source,
     amount: Number(row.amount ?? 0),
+    points: row.points != null ? Number(row.points) : undefined,
     dateReceived: row.date_received,
   };
 }
@@ -230,6 +232,7 @@ export async function createCashbackEntry(
       purchase_id: purchaseId,
       source: entry.source,
       amount: entry.amount,
+      points: entry.points ?? null,
       date_received: entry.dateReceived,
       created_at: now,
       updated_at: now,
@@ -274,6 +277,7 @@ export async function updateCashbackEntry(
 
   if (fields.source !== undefined) dbFields.source = fields.source;
   if (fields.amount !== undefined) dbFields.amount = fields.amount;
+  if (fields.points !== undefined) dbFields.points = fields.points;
   if (fields.dateReceived !== undefined) dbFields.date_received = fields.dateReceived;
 
   const { error } = await supabase

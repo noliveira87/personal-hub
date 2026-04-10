@@ -69,7 +69,34 @@ function monthKeyFromDate(value: Date): string {
   return format(value, 'yyyy-MM');
 }
 
+function getEffectiveEntryAmounts(purchase: CashbackPurchase): Array<{ id: string; amount: number }> {
+  if (purchase.isReferral) {
+    return purchase.cashbackEntries.map((entry) => ({ id: entry.id, amount: entry.amount }));
+  }
+
+  let remaining = Math.max(0, purchase.amount);
+  return purchase.cashbackEntries.map((entry) => {
+    const effectiveAmount = Math.max(0, Math.min(entry.amount, remaining));
+    remaining -= effectiveAmount;
+    return { id: entry.id, amount: effectiveAmount };
+  });
+}
+
+function getEffectiveTotalCashback(purchase: CashbackPurchase): number {
+  return getEffectiveEntryAmounts(purchase).reduce((sum, item) => sum + item.amount, 0);
+}
+
+function getDisplayPercentFromPurchase(purchase: CashbackPurchase): number {
+  if (!Number.isFinite(purchase.amount) || purchase.amount <= 0) return 0;
+
+  // For display, never show more than 100% cashback for a purchase.
+  const effectiveCashback = getEffectiveTotalCashback(purchase);
+  const rawPercent = (effectiveCashback / purchase.amount) * 100;
+  return Math.max(0, Math.min(100, rawPercent));
+}
+
 function CashbackPercentBadge({ percent }: { percent: number }) {
+  const displayPercent = Math.max(0, Math.min(100, Math.round(percent)));
   const tone = percent >= 5
     ? 'border-emerald-600 bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/30 dark:text-emerald-200'
     : percent >= 2
@@ -78,7 +105,7 @@ function CashbackPercentBadge({ percent }: { percent: number }) {
 
   return (
     <span className={cn('inline-flex rounded-lg border px-3 py-1.5 text-sm font-bold tabular-nums', tone)}>
-      {percent.toFixed(1)}%
+      {displayPercent.toFixed(0)}%
     </span>
   );
 }
@@ -91,7 +118,7 @@ function CashbackBadge({ purchase }: { purchase: CashbackPurchase }) {
       </span>
     );
   }
-  return <CashbackPercentBadge percent={getCashbackPercent(purchase)} />;
+  return <CashbackPercentBadge percent={getDisplayPercentFromPurchase(purchase)} />;
 }
 
 export default function CashbackHeroPage() {
@@ -556,8 +583,8 @@ export default function CashbackHeroPage() {
           ) : !loading ? (
             filteredPurchases.map((purchase) => {
               const isExpanded = Boolean(expandedIds[purchase.id]);
-              const totalCashback = getTotalCashback(purchase);
-              const percent = getCashbackPercent(purchase);
+              const totalCashback = getEffectiveTotalCashback(purchase);
+              const effectiveEntries = new Map(getEffectiveEntryAmounts(purchase).map((item) => [item.id, item.amount]));
 
               return (
                 <div key={purchase.id} className="overflow-hidden rounded-xl border bg-card">
@@ -616,12 +643,12 @@ export default function CashbackHeroPage() {
                                 <p className="text-sm font-medium text-foreground">{entry.source}</p>
                                 <p className="text-xs text-muted-foreground">{formatDateLabel(entry.dateReceived)}</p>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-primary">+{formatCurrency(entry.amount, 'EUR')}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-semibold text-primary">+{formatCurrency(effectiveEntries.get(entry.id) ?? entry.amount, 'EUR')}</p>
                                 <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
                                   onClick={() => {
                                     setEditingCashback({ purchaseId: purchase.id, entry });
                                     setCashbackPurchaseId(purchase.id);
@@ -630,16 +657,18 @@ export default function CashbackHeroPage() {
                                   aria-label={t('cashbackHero.cashback.editCashback')}
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
+                                  <span className="text-xs">Cashback</span>
                                 </Button>
                                 <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
                                   onClick={() => { void requestDeleteCashback(purchase.id, entry.id); }}
-                                  title="Eliminar cashback"
-                                  aria-label="Eliminar cashback"
+                                  title={`Eliminar cashback (${entry.source})`}
+                                  aria-label={`Eliminar cashback (${entry.source})`}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
+                                  <span className="text-xs">Cashback</span>
                                 </Button>
                               </div>
                             </div>
@@ -649,19 +678,25 @@ export default function CashbackHeroPage() {
                         <p className="text-xs text-muted-foreground">{t('cashbackHero.cashback.noCashback')}</p>
                       )}
 
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                      <div className="mt-3 space-y-2">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Acoes da compra</p>
+                        <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => {
                           setEditingCashback(null);
                           setCashbackPurchaseId(purchase.id);
-                        }} title="Adicionar cashback" aria-label="Adicionar cashback">
+                        }} title="Adicionar cashback a esta compra" aria-label="Adicionar cashback a esta compra">
                           <Plus className="h-3.5 w-3.5" />
+                          <span className="text-xs">Adicionar cashback</span>
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPurchase(purchase)} title="Editar" aria-label="Editar">
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setEditingPurchase(purchase)} title="Editar compra" aria-label="Editar compra">
                           <Pencil className="h-3.5 w-3.5" />
+                          <span className="text-xs">Editar compra</span>
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => { void requestDeletePurchase(purchase.id); }} title="Eliminar" aria-label="Eliminar">
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => { void requestDeletePurchase(purchase.id); }} title={`Eliminar compra (${purchase.merchant})`} aria-label={`Eliminar compra (${purchase.merchant})`}>
                           <Trash2 className="h-3.5 w-3.5" />
+                          <span className="text-xs">Eliminar compra</span>
                         </Button>
+                        </div>
                       </div>
                     </div>
                   ) : null}
@@ -710,6 +745,7 @@ export default function CashbackHeroPage() {
       <AddCashbackDialog
         open={cashbackPurchaseId !== null}
         sources={sources}
+        targetPurchase={cashbackPurchaseId ? (purchases.find((p) => p.id === cashbackPurchaseId) ?? null) : null}
         editingEntry={editingCashback?.entry ?? null}
         onOpenChange={(open) => {
           if (!open) {
@@ -882,28 +918,38 @@ function AddPurchaseDialog({
 function AddCashbackDialog({
   open,
   sources,
+  targetPurchase,
   editingEntry,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   sources: string[];
+  targetPurchase: CashbackPurchase | null;
   editingEntry: CashbackEntry | null;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (value: { source: string; amount: number; dateReceived: string }) => Promise<void>;
+  onSubmit: (value: { source: string; amount: number; points?: number; dateReceived: string }) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const [source, setSource] = useState(() => sources[0] ?? '');
+  const BYBIT_EUR_PER_POINT = 0.002;
+  const availableSources = useMemo(() => {
+    const hasBybit = sources.some((value) => /bybit/i.test(value));
+    return hasBybit ? sources : [...sources, 'Bybit'];
+  }, [sources]);
+
+  const [source, setSource] = useState(() => availableSources[0] ?? '');
   const [amount, setAmount] = useState('');
+  const [points, setPoints] = useState('');
   const [dateReceived, setDateReceived] = useState(format(new Date(), 'yyyy-MM-dd'));
   const isEditing = editingEntry !== null;
+  const isBybitSource = /bybit/i.test(source);
 
   // Reset source when sources list changes and current is gone
   useEffect(() => {
-    if (!sources.includes(source)) {
-      setSource(sources[0] ?? '');
+    if (!availableSources.includes(source)) {
+      setSource(availableSources[0] ?? '');
     }
-  }, [sources, source]);
+  }, [availableSources, source]);
 
   useEffect(() => {
     if (!open) return;
@@ -911,26 +957,66 @@ function AddCashbackDialog({
     if (editingEntry) {
       setSource(editingEntry.source);
       setAmount(String(editingEntry.amount));
+      if (/bybit/i.test(editingEntry.source)) {
+        if (editingEntry.points != null) {
+          setPoints(String(editingEntry.points));
+        } else {
+          const inferredPoints = Math.round((editingEntry.amount / BYBIT_EUR_PER_POINT) * 100) / 100;
+          setPoints(String(inferredPoints));
+        }
+      } else {
+        setPoints('');
+      }
       setDateReceived(editingEntry.dateReceived);
       return;
     }
 
-    setSource((prev) => (sources.includes(prev) ? prev : (sources[0] ?? '')));
+    setSource((prev) => (availableSources.includes(prev) ? prev : (availableSources[0] ?? '')));
     setAmount('');
+    setPoints('');
     setDateReceived(format(new Date(), 'yyyy-MM-dd'));
-  }, [open, editingEntry, sources]);
+  }, [open, editingEntry, availableSources, BYBIT_EUR_PER_POINT]);
+
+  useEffect(() => {
+    if (!isBybitSource) return;
+
+    const parsedPoints = Number(points.replace(',', '.'));
+    if (!Number.isFinite(parsedPoints) || parsedPoints <= 0) {
+      setAmount('');
+      return;
+    }
+
+    const converted = Math.round(parsedPoints * BYBIT_EUR_PER_POINT * 100) / 100;
+    const maxAmount = targetPurchase && !targetPurchase.isReferral ? targetPurchase.amount : Number.POSITIVE_INFINITY;
+    setAmount(Math.min(converted, maxAmount).toFixed(2));
+  }, [isBybitSource, points, targetPurchase]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const parsedAmount = Number(amount.replace(',', '.'));
+    let parsedAmount = Number(amount.replace(',', '.'));
+    let parsedPoints: number | undefined;
+
+    if (isBybitSource) {
+      const parsedBybitPoints = Number(points.replace(',', '.'));
+      if (!Number.isFinite(parsedBybitPoints) || parsedBybitPoints <= 0) {
+        toast.error(t('cashbackHero.cashback.bybitPointsLabel'));
+        return;
+      }
+      parsedPoints = parsedBybitPoints;
+      parsedAmount = Math.round(parsedBybitPoints * BYBIT_EUR_PER_POINT * 100) / 100;
+    }
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       toast.error(t('cashbackHero.form.amount'));
       return;
     }
 
+    if (targetPurchase && !targetPurchase.isReferral) {
+      parsedAmount = Math.min(parsedAmount, targetPurchase.amount);
+    }
+
     try {
-      await onSubmit({ source, amount: parsedAmount, dateReceived });
+      await onSubmit({ source, amount: parsedAmount, points: parsedPoints, dateReceived });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(message);
@@ -959,7 +1045,7 @@ function AddCashbackDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {sources.map((value) => (
+                {availableSources.map((value) => (
                   <SelectItem key={value} value={value}>{value}</SelectItem>
                 ))}
               </SelectContent>
@@ -974,8 +1060,26 @@ function AddCashbackDialog({
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0.00"
+              readOnly={isBybitSource}
             />
+            {isBybitSource ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitConvertedHint')}</p>
+            ) : null}
           </div>
+
+          {isBybitSource ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.bybitPointsLabel')}</label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={points}
+                onChange={(event) => setPoints(event.target.value)}
+                placeholder="10000"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitPointsHint')}</p>
+            </div>
+          ) : null}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.dateReceived')}</label>

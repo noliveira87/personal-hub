@@ -13,6 +13,7 @@ export interface CashbackEntry {
   id: string;
   source: string;
   amount: number;
+  points?: number;
   dateReceived: string;
 }
 
@@ -43,6 +44,7 @@ export const CASHBACK_CATEGORIES: Array<{ value: CashbackCategory; label: string
 
 export const CASHBACK_SOURCES = [
   'Unibanco',
+  'Bybit',
   'Revolut',
   'LetyShops',
   'Cartao de Credito',
