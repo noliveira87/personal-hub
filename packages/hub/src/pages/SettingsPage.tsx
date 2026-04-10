@@ -427,7 +427,7 @@ function CashbackSourcesCard({
           <Coins className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Cashback Hero — Fontes</h2>
+          <h2 className="text-sm font-semibold text-foreground">Reward Wallet — Fontes</h2>
           <p className="text-xs text-muted-foreground">Gere as fontes de cashback disponíveis ao registar entradas.</p>
         </div>
       </div>

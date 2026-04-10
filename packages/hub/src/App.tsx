@@ -95,7 +95,7 @@ const AppRoutes = () => {
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/portfolio/insights" element={<PortfolioMonthlyInsightsPage />} />
 
-            {/* Cashback Hero */}
+            {/* Reward Wallet */}
             <Route path="/cashback-hero" element={<CashbackHeroPage />} />
 
             {/* Trips */}

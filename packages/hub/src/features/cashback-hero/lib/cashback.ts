@@ -154,6 +154,26 @@ export async function removeCashbackEntry(entryId: string): Promise<void> {
   }
 }
 
+export async function updateCashbackEntry(
+  entryId: string,
+  fields: Partial<Omit<CashbackEntry, 'id'>>,
+): Promise<void> {
+  const dbFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  if (fields.source !== undefined) dbFields.source = fields.source;
+  if (fields.amount !== undefined) dbFields.amount = fields.amount;
+  if (fields.dateReceived !== undefined) dbFields.date_received = fields.dateReceived;
+
+  const { error } = await supabase
+    .from('cashback_entries')
+    .update(dbFields)
+    .eq('id', entryId);
+
+  if (error) {
+    throw new Error(`Failed to update cashback entry: ${error.message}`);
+  }
+}
+
 export async function updateCashbackPurchase(
   purchaseId: string,
   fields: Partial<Omit<CashbackPurchase, 'id' | 'cashbackEntries'>>,

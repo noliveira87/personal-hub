@@ -1,12 +1,22 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Gift, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Gift, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PortfolioEarning, formatCurrency, formatMonthLabel } from "@/features/portfolio/types/investment";
 import { CryptoQuoteMap } from "@/features/portfolio/lib/crypto";
+import { useI18n } from "@/i18n/I18nProvider";
 
 const PAGE_SIZE = 5;
+const CASHBACK_HERO_CUTOFF_DATE = "2026-04-01";
+
+const isOnOrAfterCashbackCutoff = (rawDate?: string) => {
+  if (!rawDate) return false;
+  const normalized = rawDate.length === 10 ? `${rawDate}T00:00:00Z` : rawDate;
+  const parsedTs = Date.parse(normalized);
+  const cutoffTs = Date.parse(`${CASHBACK_HERO_CUTOFF_DATE}T00:00:00Z`);
+  return Number.isFinite(parsedTs) && parsedTs >= cutoffTs;
+};
 
 interface EarningsSectionProps {
   earnings: PortfolioEarning[];
@@ -34,6 +44,7 @@ const offsetMonth = (monthKey: string, delta: number) => {
 };
 
 export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAdd, onEdit, onDelete }: EarningsSectionProps) {
+  const { t } = useI18n();
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [searchTerm, setSearchTerm] = useState("");
@@ -391,7 +402,12 @@ export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAd
       ) : visible.length ? (
         <div className="space-y-3">
           {visible.map((earning) => (
-            <div key={earning.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
+            (() => {
+              const isLinkedCashback = earning.externalSource === "cashback_hero"
+                || ((earning.kind === "cashback" || earning.kind === "crypto_cashback") && isOnOrAfterCashbackCutoff(earning.date));
+
+              return (
+                <div key={earning.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-foreground">{earning.title}</span>
@@ -399,6 +415,15 @@ export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAd
                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                     {kindLabel[earning.kind] ?? earning.kind}
                   </span>
+                  {isLinkedCashback ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                      title={t("portfolio.syncedFromCashbackHeroHint")}
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      {t("portfolio.syncedFromCashbackHero")}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {earning.date}
@@ -410,10 +435,16 @@ export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAd
               </div>
               <div className="flex items-center gap-2">
                 <p className="min-w-[84px] text-right font-semibold text-success">{formatCurrency(earning.amountEur)}</p>
-                <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(earning)}><Pencil className="h-4 w-4" /></Button>
-                <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(earning.id)}><Trash2 className="h-4 w-4" /></Button>
+                {isLinkedCashback ? null : (
+                  <>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => onEdit(earning)}><Pencil className="h-4 w-4" /></Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(earning.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </>
+                )}
               </div>
-            </div>
+                </div>
+              );
+            })()
           ))}
           {remaining > 0 && (
             <div className="pt-1">

@@ -46,7 +46,29 @@ type PortfolioCardOrderRow = {
   updated_at: string;
 };
 
+type CashbackHeroEntryRow = {
+  id: string;
+  source: string;
+  amount: number | null;
+  date_received: string;
+  created_at: string;
+  updated_at: string;
+  cashback_purchases: {
+    merchant: string;
+  } | null;
+};
+
 const SOCIAL_MEDIA_NOTE_PREFIX = "KIND:social_media";
+const CASHBACK_HERO_CUTOFF_DATE = "2026-04-01";
+const CASHBACK_HERO_ENTRY_PREFIX = "cashback-entry:";
+const CASHBACK_HERO_CUTOFF_TS = Date.parse(`${CASHBACK_HERO_CUTOFF_DATE}T00:00:00Z`);
+
+function isOnOrAfterCashbackCutoff(rawDate?: string | null): boolean {
+  if (!rawDate) return false;
+  const normalized = rawDate.length === 10 ? `${rawDate}T00:00:00Z` : rawDate;
+  const parsedTs = Date.parse(normalized);
+  return Number.isFinite(parsedTs) && parsedTs >= CASHBACK_HERO_CUTOFF_TS;
+}
 
 function normalizeCategory(value: string): InvestmentCategory {
   return value === "short-term" || value === "long-term" ? value : "long-term";
@@ -273,13 +295,53 @@ export async function loadPortfolioEarningsFromDb(): Promise<PortfolioEarning[] 
     from += pageSize;
   }
 
-  return rows.map((row) => mapPortfolioEarningRow(row));
+  const legacyRows = rows
+    .map((row) => mapPortfolioEarningRow(row))
+    .filter((earning) => {
+      const isCashbackKind = earning.kind === "cashback" || earning.kind === "crypto_cashback";
+      return !(isCashbackKind && isOnOrAfterCashbackCutoff(earning.date));
+    });
+
+  const { data: cashbackRows, error: cashbackError } = await supabase
+    .from("cashback_entries")
+    .select("id, source, amount, date_received, created_at, updated_at, cashback_purchases(merchant)")
+    .gte("date_received", CASHBACK_HERO_CUTOFF_DATE)
+    .order("date_received", { ascending: false });
+
+  if (cashbackError) {
+    console.error("Error loading Reward Wallet entries for earnings linkage:", cashbackError);
+    return legacyRows;
+  }
+
+  const linkedCashbackRows = ((cashbackRows ?? []) as CashbackHeroEntryRow[])
+    .map((row): PortfolioEarning => ({
+      id: `${CASHBACK_HERO_ENTRY_PREFIX}${row.id}`,
+      title: row.cashback_purchases?.merchant ?? "Cashback",
+      provider: row.source,
+      kind: "cashback",
+      externalSource: "cashback_hero",
+      date: row.date_received,
+      amountEur: Number(row.amount ?? 0),
+      notes: undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      cryptoAsset: undefined,
+      cryptoUnits: null,
+      spotEurAtEarned: null,
+    }))
+    .filter((entry) => entry.amountEur > 0);
+
+  return [...legacyRows, ...linkedCashbackRows].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function upsertPortfolioEarningsInDb(earnings: PortfolioEarning[]): Promise<void> {
   if (!supabase) return;
 
-  const payload = earnings.map((item) => {
+  const localEarnings = earnings.filter((item) => (
+    item.externalSource !== "cashback_hero" && !item.id.startsWith(CASHBACK_HERO_ENTRY_PREFIX)
+  ));
+
+  const payload = localEarnings.map((item) => {
     const { dbKind, dbNotes } = encodeEarningKind(item.kind, item.notes ?? null);
 
     return {

@@ -31,6 +31,7 @@ export interface PortfolioEarning {
   title: string;
   provider?: string;
   kind: PortfolioEarningKind;
+  externalSource?: "cashback_hero";
   date: string;
   amountEur: number;
   cryptoAsset?: "BTC" | "ETH";

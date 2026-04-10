@@ -43,6 +43,7 @@ import { toast } from '@/components/ui/sonner';
 import {
   CASHBACK_CATEGORIES,
   CASHBACK_SOURCES,
+  CashbackEntry,
   CashbackCategory,
   CashbackPurchase,
   getCashbackPercent,
@@ -90,12 +91,13 @@ function CashbackBadge({ purchase }: { purchase: CashbackPurchase }) {
 
 export default function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
-  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
+  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
 
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<CashbackPurchase | null>(null);
   const [cashbackPurchaseId, setCashbackPurchaseId] = useState<string | null>(null);
+  const [editingCashback, setEditingCashback] = useState<{ purchaseId: string; entry: CashbackEntry } | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
@@ -444,6 +446,19 @@ export default function CashbackHeroPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setEditingCashback({ purchaseId: purchase.id, entry });
+                                    setCashbackPurchaseId(purchase.id);
+                                  }}
+                                  title={t('cashbackHero.cashback.editCashback')}
+                                  aria-label={t('cashbackHero.cashback.editCashback')}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => { void requestDeleteCashback(purchase.id, entry.id); }}
                                   title="Eliminar cashback"
@@ -460,7 +475,10 @@ export default function CashbackHeroPage() {
                       )}
 
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCashbackPurchaseId(purchase.id)} title="Adicionar cashback" aria-label="Adicionar cashback">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                          setEditingCashback(null);
+                          setCashbackPurchaseId(purchase.id);
+                        }} title="Adicionar cashback" aria-label="Adicionar cashback">
                           <Plus className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingPurchase(purchase)} title="Editar" aria-label="Editar">
@@ -502,13 +520,23 @@ export default function CashbackHeroPage() {
       <AddCashbackDialog
         open={cashbackPurchaseId !== null}
         sources={sources}
+        editingEntry={editingCashback?.entry ?? null}
         onOpenChange={(open) => {
-          if (!open) setCashbackPurchaseId(null);
+          if (!open) {
+            setCashbackPurchaseId(null);
+            setEditingCashback(null);
+          }
         }}
         onSubmit={async (payload) => {
           if (!cashbackPurchaseId) return;
-          await addCashbackEntry(cashbackPurchaseId, payload);
-          toast.success(t('cashbackHero.cashback.addCashback'));
+          if (editingCashback && editingCashback.purchaseId === cashbackPurchaseId) {
+            await editCashbackEntry(cashbackPurchaseId, editingCashback.entry.id, payload);
+            toast.success(t('cashbackHero.cashback.editCashback'));
+            setEditingCashback(null);
+          } else {
+            await addCashbackEntry(cashbackPurchaseId, payload);
+            toast.success(t('cashbackHero.cashback.addCashback'));
+          }
         }}
       />
     </div>
@@ -643,11 +671,13 @@ function AddPurchaseDialog({
 function AddCashbackDialog({
   open,
   sources,
+  editingEntry,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   sources: string[];
+  editingEntry: CashbackEntry | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: { source: string; amount: number; dateReceived: string }) => Promise<void>;
 }) {
@@ -655,6 +685,7 @@ function AddCashbackDialog({
   const [source, setSource] = useState(() => sources[0] ?? '');
   const [amount, setAmount] = useState('');
   const [dateReceived, setDateReceived] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const isEditing = editingEntry !== null;
 
   // Reset source when sources list changes and current is gone
   useEffect(() => {
@@ -662,6 +693,21 @@ function AddCashbackDialog({
       setSource(sources[0] ?? '');
     }
   }, [sources, source]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (editingEntry) {
+      setSource(editingEntry.source);
+      setAmount(String(editingEntry.amount));
+      setDateReceived(editingEntry.dateReceived);
+      return;
+    }
+
+    setSource((prev) => (sources.includes(prev) ? prev : (sources[0] ?? '')));
+    setAmount('');
+    setDateReceived(format(new Date(), 'yyyy-MM-dd'));
+  }, [open, editingEntry, sources]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -680,7 +726,9 @@ function AddCashbackDialog({
       return;
     }
 
-    setAmount('');
+    if (!isEditing) {
+      setAmount('');
+    }
     onOpenChange(false);
   };
 
@@ -688,7 +736,7 @@ function AddCashbackDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{t('cashbackHero.cashback.addCashback')}</DialogTitle>
+          <DialogTitle>{isEditing ? t('cashbackHero.cashback.editCashback') : t('cashbackHero.cashback.addCashback')}</DialogTitle>
           <DialogDescription>{t('cashbackHero.subtitle')}</DialogDescription>
         </DialogHeader>
 
@@ -723,7 +771,7 @@ function AddCashbackDialog({
             <Input type="date" value={dateReceived} onChange={(event) => setDateReceived(event.target.value)} />
           </div>
 
-          <Button type="submit" className="w-full">{t('cashbackHero.cashback.saveCashback')}</Button>
+          <Button type="submit" className="w-full">{isEditing ? t('cashbackHero.cashback.editCashback') : t('cashbackHero.cashback.saveCashback')}</Button>
         </form>
       </DialogContent>
     </Dialog>

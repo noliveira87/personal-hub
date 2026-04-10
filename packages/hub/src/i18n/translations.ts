@@ -424,7 +424,7 @@ export const translations = {
       projects: {
         homeExpenses: { title: "Finanças da Casa", subtitle: "Salários e despesas" },
         portfolio: { title: "Rumo Financeiro", subtitle: "Investimentos" },
-		cashbackHero: { title: "Cashback Hero", subtitle: "Compras e retorno" },
+		cashbackHero: { title: "Reward Wallet", subtitle: "Compras e retorno" },
         trips: { title: "Livro de Memórias", subtitle: "Viagens" },
         journeyBites: { title: "Dentadas pelo Mundo", subtitle: "Comidas e memórias" },
         health: { title: "Saúde", subtitle: "Histórico de exames" },
@@ -528,6 +528,8 @@ export const translations = {
     portfolio: {
       interestsEarned: "Juros ganhos",
       description: "Descrição (opcional)",
+      syncedFromCashbackHero: "Reward Wallet",
+      syncedFromCashbackHeroHint: "Sincronizado automaticamente com Reward Wallet",
     },
     settingsPage: {
       title: "Definições",
@@ -565,7 +567,7 @@ export const translations = {
       featureNotificationsDescription: "Cada módulo gere os seus próprios interruptores, limites e histórico de envios.",
     },
     cashbackHero: {
-      title: "Cashback Hero",
+      title: "Reward Wallet",
       subtitle: "Acompanha e maximiza o cashback das tuas compras",
       addPurchase: "Adicionar compra",
       editPurchase: "Editar compra",
@@ -584,6 +586,7 @@ export const translations = {
       },
       cashback: {
         addCashback: "Adicionar cashback",
+        editCashback: "Editar cashback",
         source: "Fonte",
         dateReceived: "Data de Recepção",
         amount: "Valor",
@@ -1311,7 +1314,7 @@ export const translations = {
       projects: {
         homeExpenses: { title: "Home Finances", subtitle: "Income and expenses" },
         portfolio: { title: "Portfolio Journey", subtitle: "Investments" },
-		cashbackHero: { title: "Cashback Hero", subtitle: "Purchases and rewards" },
+		cashbackHero: { title: "Reward Wallet", subtitle: "Purchases and rewards" },
         trips: { title: "Book of Memories", subtitle: "Lifetime trips and memories!" },
         journeyBites: { title: "Journey Bites", subtitle: "Food moments from your trips" },
         health: { title: "Health", subtitle: "Medical timeline" },
@@ -1412,6 +1415,8 @@ export const translations = {
     portfolio: {
       interestsEarned: "Interests earned",
       description: "Description (optional)",
+      syncedFromCashbackHero: "Reward Wallet",
+      syncedFromCashbackHeroHint: "Automatically synced with Reward Wallet",
     },
     settingsPage: {
       title: "Settings",
@@ -1449,7 +1454,7 @@ export const translations = {
       featureNotificationsDescription: "Each module manages its own switches, thresholds, and send history.",
     },
     cashbackHero: {
-      title: "Cashback Hero",
+      title: "Reward Wallet",
       subtitle: "Track and maximize cashback from your purchases",
       addPurchase: "Add purchase",
       editPurchase: "Edit purchase",
@@ -1468,6 +1473,7 @@ export const translations = {
       },
       cashback: {
         addCashback: "Add cashback",
+        editCashback: "Edit cashback",
         source: "Source",
         dateReceived: "Date received",
         amount: "Amount",

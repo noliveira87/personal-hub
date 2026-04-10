@@ -6,6 +6,7 @@ import {
   loadCashbackPurchases,
   removeCashbackEntry,
   removeCashbackPurchase,
+  updateCashbackEntry,
   updateCashbackPurchase,
 } from '@/features/cashback-hero/lib/cashback';
 
@@ -24,7 +25,7 @@ export function useCashbackStore() {
       const message = err instanceof Error ? err.message : String(err);
       setPurchases([]);
       setError(message);
-      console.error('Cashback Hero load failed:', err);
+      console.error('Reward Wallet load failed:', err);
     } finally {
       setLoading(false);
     }
@@ -66,6 +67,23 @@ export function useCashbackStore() {
     }));
   }, []);
 
+  const editCashbackEntry = useCallback(async (
+    purchaseId: string,
+    entryId: string,
+    fields: Partial<Omit<CashbackEntry, 'id'>>,
+  ) => {
+    await updateCashbackEntry(entryId, fields);
+    setPurchases((prev) => prev.map((purchase) => {
+      if (purchase.id !== purchaseId) return purchase;
+      return {
+        ...purchase,
+        cashbackEntries: purchase.cashbackEntries.map((entry) => (
+          entry.id === entryId ? { ...entry, ...fields } : entry
+        )),
+      };
+    }));
+  }, []);
+
   const updatePurchase = useCallback(async (
     purchaseId: string,
     fields: Partial<Omit<CashbackPurchase, 'id' | 'cashbackEntries'>>,
@@ -84,6 +102,7 @@ export function useCashbackStore() {
     reload,
     addPurchase,
     addCashbackEntry,
+    editCashbackEntry,
     deletePurchase,
     deleteCashbackEntry,
     updatePurchase,
