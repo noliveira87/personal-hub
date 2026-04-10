@@ -61,16 +61,24 @@ function isMonthWithinCampaign(monthKey: string): boolean {
   return diff >= 0 && diff < UNIBANCO_CAMPAIGN_MONTHS;
 }
 
-type UnibancoTier = { minSpend: number; cashback: number };
+export type UnibancoTier = { minSpend: number; cashback: number };
 
-const UNIBANCO_TIERS: UnibancoTier[] = [
+export const UNIBANCO_TIERS: UnibancoTier[] = [
   { minSpend: 500, cashback: 20 },
   { minSpend: 300, cashback: 10 },
   { minSpend: 100, cashback: 5 },
 ];
 
-function getActiveTier(spent: number): UnibancoTier | null {
+export const UNIBANCO_CAMPAIGN_MAX = UNIBANCO_CAMPAIGN_CAP;
+export const UNIBANCO_CAMPAIGN_START_DATE = UNIBANCO_CAMPAIGN_START;
+export const UNIBANCO_CAMPAIGN_TOTAL_MONTHS = UNIBANCO_CAMPAIGN_MONTHS;
+
+export function getActiveTier(spent: number): UnibancoTier | null {
   return UNIBANCO_TIERS.find((t) => spent >= t.minSpend) ?? null;
+}
+
+export function getNextTier(spent: number): UnibancoTier | null {
+  return [...UNIBANCO_TIERS].reverse().find((t) => spent < t.minSpend) ?? null;
 }
 
 function computeUnibancoMonthlyCashback(spent: number): number {

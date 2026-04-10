@@ -51,6 +51,11 @@ import {
   getTotalCashback,
 } from '@/features/cashback-hero/types';
 import { useCashbackStore } from '@/features/cashback-hero/use-cashback-store';
+import {
+  getActiveTier,
+  getNextTier,
+  UNIBANCO_TIERS,
+} from '@/features/cashback-hero/lib/cashback';
 
 function formatDateLabel(raw: string): string {
   try {
@@ -187,6 +192,82 @@ export default function CashbackHeroPage() {
 
     const list: string[] = [];
 
+    // --- Unibanco tier insight ---
+    if (selectedMonth !== 'all') {
+      const unibancoEligible = monthPurchases.filter((p) => (p.isUnibanco ?? false) && !(p.isReferral ?? false));
+      const unibancoSpent = unibancoEligible.reduce((sum, p) => sum + p.amount, 0);
+      const activeTier = getActiveTier(unibancoSpent);
+      const nextTier = getNextTier(unibancoSpent);
+      const topTierThreshold = UNIBANCO_TIERS[0].minSpend; // 500
+
+      if (unibancoEligible.length === 0) {
+        list.push(t('cashbackHero.insights.unibancoNoSpend', { min: String(UNIBANCO_TIERS[UNIBANCO_TIERS.length - 1].minSpend) }));
+      } else if (activeTier) {
+        if (activeTier.minSpend === topTierThreshold) {
+          list.push(t('cashbackHero.insights.unibancoTopTier', { cashback: String(activeTier.cashback) }));
+          if (unibancoSpent > topTierThreshold) {
+            list.push(t('cashbackHero.insights.unibancoOverCap', {
+              over: (unibancoSpent - topTierThreshold).toFixed(2),
+              cap: String(topTierThreshold),
+            }));
+          }
+        } else {
+          list.push(t('cashbackHero.insights.unibancoTierActive', {
+            cashback: String(activeTier.cashback),
+            spent: unibancoSpent.toFixed(2),
+            minSpend: String(activeTier.minSpend),
+          }));
+          if (nextTier) {
+            list.push(t('cashbackHero.insights.unibancoTierNext', {
+              remaining: (nextTier.minSpend - unibancoSpent).toFixed(2),
+              cashback: String(nextTier.cashback),
+            }));
+          }
+        }
+      } else if (nextTier) {
+        list.push(t('cashbackHero.insights.unibancoTierNext', {
+          remaining: (nextTier.minSpend - unibancoSpent).toFixed(2),
+          cashback: String(nextTier.cashback),
+        }));
+      }
+
+      const unibancoNoCashbackCount = unibancoEligible.filter((p) => getTotalCashback(p) <= 0).length;
+      if (unibancoNoCashbackCount > 0) {
+        list.push(t('cashbackHero.insights.unibancoNoCashbackDueToCap', {
+          count: String(unibancoNoCashbackCount),
+        }));
+      }
+    }
+
+    const eligibleForCoverage = monthPurchases.filter((p) => !(p.isReferral ?? false));
+    if (eligibleForCoverage.length > 0) {
+      const withCashbackCount = eligibleForCoverage.filter((p) => getTotalCashback(p) > 0).length;
+      const coverageRate = (withCashbackCount / eligibleForCoverage.length) * 100;
+      list.push(t('cashbackHero.insights.coverage', {
+        covered: String(withCashbackCount),
+        total: String(eligibleForCoverage.length),
+        rate: coverageRate.toFixed(0),
+      }));
+    }
+
+    const sourceTotals = monthPurchases.reduce<Record<string, number>>((acc, purchase) => {
+      for (const entry of purchase.cashbackEntries) {
+        acc[entry.source] = (acc[entry.source] ?? 0) + entry.amount;
+      }
+      return acc;
+    }, {});
+
+    const topSource = Object.entries(sourceTotals)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    if (topSource && topSource[1] > 0) {
+      list.push(t('cashbackHero.insights.topSource', {
+        source: topSource[0],
+        amount: formatCurrency(topSource[1], 'EUR'),
+      }));
+    }
+
+    // --- General insights ---
     if (stats.bestPurchase) {
       list.push(t('cashbackHero.insights.bestDeal', {
         merchant: stats.bestPurchase.merchant,
@@ -206,7 +287,7 @@ export default function CashbackHeroPage() {
     }
 
     return list;
-  }, [monthPurchases, stats, formatCurrency, t]);
+  }, [monthPurchases, selectedMonth, stats, formatCurrency, t]);
 
   const monthLabel = selectedMonth === 'all'
     ? t('cashbackHero.months.all')
@@ -380,16 +461,41 @@ export default function CashbackHeroPage() {
         </div>
 
         {insights.length > 0 ? (
-          <div className="mt-4 rounded-xl border bg-card p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
-              <Lightbulb className="h-4 w-4 text-primary" />
-              {t('cashbackHero.insights.title')}
+          <div className="mt-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-amber-500/10">
+            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <Lightbulb className="h-4 w-4" />
+                </span>
+                {t('cashbackHero.insights.title')}
+              </div>
+              <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                {insights.length}
+              </span>
             </div>
-            <ul className="space-y-1.5 text-sm text-muted-foreground">
-              {insights.map((line) => (
-                <li key={line}>- {line}</li>
+
+            <div className="grid gap-2 p-3 sm:grid-cols-2">
+              {insights.map((line, index) => (
+                <div
+                  key={`${line}-${index}`}
+                  className="group rounded-xl border border-border/70 bg-background/80 p-3 backdrop-blur-sm transition-colors hover:border-primary/35"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1 text-[11px] font-bold text-primary">
+                      {index + 1}
+                    </span>
+                    <p className="text-sm leading-5 text-foreground/90">
+                      {line.includes(':') ? (
+                        <>
+                          <span className="font-semibold">{line.slice(0, line.indexOf(':'))}:</span>
+                          {line.slice(line.indexOf(':') + 1)}
+                        </>
+                      ) : line}
+                    </p>
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         ) : null}
 
