@@ -424,7 +424,7 @@ export const translations = {
       projects: {
         homeExpenses: { title: "Finanças da Casa", subtitle: "Salários e despesas" },
         portfolio: { title: "Rumo Financeiro", subtitle: "Investimentos" },
-		cashbackHero: { title: "Reward Wallet", subtitle: "Compras e retorno" },
+    cashbackHero: { title: "Carteira de Cashback", subtitle: "Compras e cashback" },
         trips: { title: "Livro de Memórias", subtitle: "Viagens" },
         journeyBites: { title: "Dentadas pelo Mundo", subtitle: "Comidas e memórias" },
         health: { title: "Saúde", subtitle: "Histórico de exames" },
@@ -528,8 +528,8 @@ export const translations = {
     portfolio: {
       interestsEarned: "Juros ganhos",
       description: "Descrição (opcional)",
-      syncedFromCashbackHero: "Reward Wallet",
-      syncedFromCashbackHeroHint: "Sincronizado automaticamente com Reward Wallet",
+      syncedFromCashbackHero: "Carteira de Cashback",
+      syncedFromCashbackHeroHint: "Sincronizado automaticamente com Carteira de Cashback",
     },
     settingsPage: {
       title: "Definições",
@@ -565,9 +565,14 @@ export const translations = {
       featureNotificationsTitle: "Notificações por módulo",
       featureNotificationsConfigured: "Os alertas de garantia estão configurados acima.",
       featureNotificationsDescription: "Cada módulo gere os seus próprios interruptores, limites e histórico de envios.",
+      rewardWalletSourcesTitle: "Carteira de Cashback — Fontes",
+      rewardWalletSourcesDescription: "Gere as fontes de cashback disponíveis ao registar entradas.",
+      rewardWalletSourcesPlaceholder: "Nova fonte...",
+      rewardWalletSourcesEmpty: "Sem fontes. Adiciona acima.",
+      rewardWalletSourcesRemoveAria: "Remover {{source}}",
     },
     cashbackHero: {
-      title: "Reward Wallet",
+      title: "Carteira de Cashback",
       subtitle: "Acompanha e maximiza o cashback das tuas compras",
       addPurchase: "Adicionar compra",
       editPurchase: "Editar compra",
@@ -1328,7 +1333,7 @@ export const translations = {
       projects: {
         homeExpenses: { title: "Home Finances", subtitle: "Income and expenses" },
         portfolio: { title: "Portfolio Journey", subtitle: "Investments" },
-		cashbackHero: { title: "Reward Wallet", subtitle: "Purchases and rewards" },
+    cashbackHero: { title: "Reward Wallet", subtitle: "Purchases and cashback" },
         trips: { title: "Book of Memories", subtitle: "Lifetime trips and memories!" },
         journeyBites: { title: "Journey Bites", subtitle: "Food moments from your trips" },
         health: { title: "Health", subtitle: "Medical timeline" },
@@ -1466,6 +1471,11 @@ export const translations = {
       featureNotificationsTitle: "Feature-level notifications",
       featureNotificationsConfigured: "Warranty alerts are configured above.",
       featureNotificationsDescription: "Each module manages its own switches, thresholds, and send history.",
+      rewardWalletSourcesTitle: "Reward Wallet - Sources",
+      rewardWalletSourcesDescription: "Manage available cashback sources when registering entries.",
+      rewardWalletSourcesPlaceholder: "New source...",
+      rewardWalletSourcesEmpty: "No sources yet. Add one above.",
+      rewardWalletSourcesRemoveAria: "Remove {{source}}",
     },
     cashbackHero: {
       title: "Reward Wallet",

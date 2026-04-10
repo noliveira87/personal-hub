@@ -411,6 +411,7 @@ function CashbackSourcesCard({
   onRemove: (name: string) => Promise<void>;
   onReset: () => Promise<void>;
 }) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleAdd = () => {
@@ -427,15 +428,15 @@ function CashbackSourcesCard({
           <Coins className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Reward Wallet — Fontes</h2>
-          <p className="text-xs text-muted-foreground">Gere as fontes de cashback disponíveis ao registar entradas.</p>
+          <h2 className="text-sm font-semibold text-foreground">{t('settings.rewardWalletSourcesTitle')}</h2>
+          <p className="text-xs text-muted-foreground">{t('settings.rewardWalletSourcesDescription')}</p>
         </div>
       </div>
 
       <div className="flex gap-2">
         <Input
           ref={inputRef}
-          placeholder="Nova fonte..."
+          placeholder={t('settings.rewardWalletSourcesPlaceholder')}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
           className="flex-1"
         />
@@ -452,7 +453,7 @@ function CashbackSourcesCard({
               type="button"
               onClick={() => { void onRemove(source); }}
               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              aria-label={`Remover ${source}`}
+              aria-label={t('settings.rewardWalletSourcesRemoveAria', { source })}
             >
               <X className="h-4 w-4" />
             </button>
@@ -460,7 +461,7 @@ function CashbackSourcesCard({
         ))}
         {sources.length === 0 ? (
           <li className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-            Sem fontes. Adiciona acima.
+            {t('settings.rewardWalletSourcesEmpty')}
           </li>
         ) : null}
       </ul>
