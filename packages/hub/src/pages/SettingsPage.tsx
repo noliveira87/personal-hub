@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Send, Settings, Bell, Moon, Sun, Eye, EyeOff } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Coins, Send, Settings, Bell, Moon, Sun, Eye, EyeOff, Plus, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import {
   type WarrantyDefaultsSettings,
 } from '@/features/warranties/lib/defaultSettings';
 import type { WarrantyCategory } from '@/lib/warranties';
+import { useCashbackSources } from '@/features/cashback-hero/use-cashback-sources';
 
 const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string }> = [
   { value: 'tech', label: 'Tech' },
@@ -38,6 +39,7 @@ const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string 
 export default function SettingsPage() {
   const { hideAmounts, language, setLanguage, t, toggleHideAmounts } = useI18n();
   const { isDark, toggleDark } = useDarkMode();
+  const { sources, addSource, removeSource, resetSources } = useCashbackSources();
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
   const backToPath: string | number = locationState?.fromPath ?? (window.history.length > 1 ? -1 : '/');
@@ -57,6 +59,10 @@ export default function SettingsPage() {
   const storageMode = useMemo(() => getSettingsPersistenceMode(), []);
   const showWarrantySettings = useMemo(
     () => locationState?.from === 'warranties' || (locationState?.fromPath?.startsWith('/warranties') ?? false),
+    [locationState],
+  );
+  const showCashbackSourcesSettings = useMemo(
+    () => locationState?.from === 'cashback-hero' || (locationState?.fromPath?.startsWith('/cashback-hero') ?? false),
     [locationState],
   );
 
@@ -385,7 +391,87 @@ export default function SettingsPage() {
             <p className="mt-1 text-xs text-muted-foreground">{t('settingsPage.featureNotificationsConfigured')}</p>
           </div>
         )}
+
+        {showCashbackSourcesSettings && (
+          <CashbackSourcesCard sources={sources} onAdd={addSource} onRemove={removeSource} onReset={resetSources} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function CashbackSourcesCard({
+  sources,
+  onAdd,
+  onRemove,
+  onReset,
+}: {
+  sources: string[];
+  onAdd: (name: string) => Promise<void>;
+  onRemove: (name: string) => Promise<void>;
+  onReset: () => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleAdd = () => {
+    const value = inputRef.current?.value.trim() ?? '';
+    if (!value) return;
+    void onAdd(value);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  return (
+    <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '200ms' }}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <Coins className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Cashback Hero — Fontes</h2>
+          <p className="text-xs text-muted-foreground">Gere as fontes de cashback disponíveis ao registar entradas.</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          ref={inputRef}
+          placeholder="Nova fonte..."
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
+          className="flex-1"
+        />
+        <Button onClick={handleAdd} size="sm" variant="outline">
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <ul className="space-y-1.5">
+        {sources.map((source) => (
+          <li key={source} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5">
+            <span className="text-sm">{source}</span>
+            <button
+              type="button"
+              onClick={() => { void onRemove(source); }}
+              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              aria-label={`Remover ${source}`}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </li>
+        ))}
+        {sources.length === 0 ? (
+          <li className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+            Sem fontes. Adiciona acima.
+          </li>
+        ) : null}
+      </ul>
+
+      <button
+        type="button"
+        onClick={() => { void onReset(); }}
+        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+      >
+        Repor predefinições
+      </button>
     </div>
   );
 }

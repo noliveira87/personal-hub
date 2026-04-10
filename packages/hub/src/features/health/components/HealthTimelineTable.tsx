@@ -978,84 +978,38 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                                     <>
                                       {yearGroups.map(([year, yearItems]) => (
                                         <section key={`${category}-${year}`} className="rounded-md border bg-background/60 px-2.5 py-2">
-                                          {(() => {
-                                            const hasDetails = yearItems.some((item) => item.note || item.clinic || item.doctor);
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                                              <span className="shrink-0 text-base font-bold leading-none text-foreground pt-1">
+                                                {year}
+                                              </span>
 
-                                            if (!hasDetails) {
-                                              return (
-                                                <div className="flex items-start justify-between gap-2">
-                                                  <div className="flex min-w-0 flex-1 items-start gap-3">
-                                                    <span className="shrink-0 text-base font-bold leading-none text-foreground pt-1">
-                                                      {year}
+                                              <div className="min-w-0 flex flex-wrap gap-2">
+                                                {yearItems.map((item) => (
+                                                  <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => openEntryDetails(item)}
+                                                    className="flex items-start gap-2 py-0.5 text-left transition-opacity hover:opacity-80"
+                                                  >
+                                                    <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
+                                                      {item.date}
                                                     </span>
-
-                                                    <div className="min-w-0 flex flex-wrap gap-2">
-                                                      {yearItems.map((item) => (
-                                                        <button
-                                                          key={item.id}
-                                                          type="button"
-                                                          onClick={() => openEntryDetails(item)}
-                                                          className="flex items-start gap-2 py-0.5 text-left transition-opacity hover:opacity-80"
-                                                        >
-                                                          <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
-                                                            {item.date}
-                                                          </span>
-                                                        </button>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-
-                                                  {categoryRow && (
-                                                    <button
-                                                      onClick={() => openEdit(categoryRow)}
-                                                      className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                                      title="Editar categoria"
-                                                    >
-                                                      <Pencil className="w-3 h-3" />
-                                                    </button>
-                                                  )}
-                                                </div>
-                                              );
-                                            }
-
-                                            return (
-                                              <div className="space-y-2">
-                                                <div className="flex items-start justify-between gap-2">
-                                                  <span className="shrink-0 text-base font-bold leading-none text-foreground pt-0.5">
-                                                    {year}
-                                                  </span>
-
-                                                  {categoryRow && (
-                                                    <button
-                                                      onClick={() => openEdit(categoryRow)}
-                                                      className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                                      title="Editar categoria"
-                                                    >
-                                                      <Pencil className="w-3 h-3" />
-                                                    </button>
-                                                  )}
-                                                </div>
-
-                                                <div className="space-y-1.5">
-                                                  {yearItems.map((item) => (
-                                                    <button
-                                                      key={item.id}
-                                                      type="button"
-                                                      onClick={() => openEntryDetails(item)}
-                                                      className="flex w-full items-start gap-2 text-left transition-opacity hover:opacity-85"
-                                                    >
-                                                      <span className={`mt-0.5 shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
-                                                        {item.date}
-                                                      </span>
-
-                                                      <div className="min-w-0 flex-1">
-                                                      </div>
-                                                    </button>
-                                                  ))}
-                                                </div>
+                                                  </button>
+                                                ))}
                                               </div>
-                                            );
-                                          })()}
+                                            </div>
+
+                                            {categoryRow && (
+                                              <button
+                                                onClick={() => openEdit(categoryRow)}
+                                                className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                                title="Editar categoria"
+                                              >
+                                                <Pencil className="w-3 h-3" />
+                                              </button>
+                                            )}
+                                          </div>
                                         </section>
                                       ))}
                                       {visibleItems.length === 0 && (

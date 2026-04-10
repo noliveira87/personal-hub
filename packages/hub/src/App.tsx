@@ -22,6 +22,7 @@ const InsightsPage = lazy(() => import("@/features/contracts/pages/InsightsPage"
 const QuotesPage = lazy(() => import("@/features/contracts/pages/QuotesPage"));
 const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
+const CashbackHeroPage = lazy(() => import("@/pages/CashbackHeroPage"));
 const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
 const JourneyBitesPage = lazy(() => import("@/pages/trips/JourneyBitesPage"));
 const JourneyBitesMapPage = lazy(() => import("@/pages/trips/JourneyBitesMapPage"));
@@ -93,6 +94,9 @@ const AppRoutes = () => {
             {/* Portfolio */}
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/portfolio/insights" element={<PortfolioMonthlyInsightsPage />} />
+
+            {/* Cashback Hero */}
+            <Route path="/cashback-hero" element={<CashbackHeroPage />} />
 
             {/* Trips */}
             <Route path="/trips" element={<TripsPage />} />
