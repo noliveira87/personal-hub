@@ -9,6 +9,7 @@ type CashbackPurchaseRow = {
   amount: number | null;
   notes: string | null;
   is_referral: boolean | null;
+  is_unibanco: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -22,6 +23,106 @@ type CashbackEntryRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type UnibancoSyncResult = {
+  status: 'synced' | 'no-cashback' | 'out-of-campaign';
+  month: string;
+  spent: number;
+  amount: number;
+};
+
+const UNIBANCO_SOURCE = 'Unibanco';
+const UNIBANCO_CAMPAIGN_START = '2026-04-01';
+const UNIBANCO_CAMPAIGN_MONTHS = 12;
+const UNIBANCO_CAMPAIGN_CAP = 200;
+
+function getMonthDateRange(monthKey: string): { start: string; endExclusive: string; monthEnd: string } {
+  const [yearRaw, monthRaw] = monthKey.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const startDate = new Date(Date.UTC(year, month - 1, 1));
+  const endDate = new Date(Date.UTC(year, month, 1));
+  const monthEndDate = new Date(Date.UTC(year, month, 0));
+  return {
+    start: startDate.toISOString().slice(0, 10),
+    endExclusive: endDate.toISOString().slice(0, 10),
+    monthEnd: monthEndDate.toISOString().slice(0, 10),
+  };
+}
+
+function monthKeyFromDate(raw: string): string {
+  return raw.slice(0, 7);
+}
+
+function isMonthWithinCampaign(monthKey: string): boolean {
+  const [y, m] = monthKey.split('-').map(Number);
+  const [startY, startM] = UNIBANCO_CAMPAIGN_START.slice(0, 7).split('-').map(Number);
+  const diff = (y - startY) * 12 + (m - startM);
+  return diff >= 0 && diff < UNIBANCO_CAMPAIGN_MONTHS;
+}
+
+type UnibancoTier = { minSpend: number; cashback: number };
+
+const UNIBANCO_TIERS: UnibancoTier[] = [
+  { minSpend: 500, cashback: 20 },
+  { minSpend: 300, cashback: 10 },
+  { minSpend: 100, cashback: 5 },
+];
+
+function getActiveTier(spent: number): UnibancoTier | null {
+  return UNIBANCO_TIERS.find((t) => spent >= t.minSpend) ?? null;
+}
+
+function computeUnibancoMonthlyCashback(spent: number): number {
+  return getActiveTier(spent)?.cashback ?? 0;
+}
+
+/**
+ * Distribute cashback chronologically up to the tier spend cap.
+ * Rate = tierCashback / tierMinSpend (e.g. €20/€500 = 4%).
+ * Earlier purchases are filled first at that rate; spend beyond the cap earns nothing.
+ * Any cent rounding remainder goes to the largest slices.
+ */
+function distributeWithTierCap(
+  purchases: Array<{ id: string; amount: number | null; date: string; created_at?: string }>,
+  tierMinSpend: number,
+  finalCashback: number,
+): Array<{ purchaseId: string; amount: number }> {
+  if (purchases.length === 0 || finalCashback <= 0 || tierMinSpend <= 0) return [];
+
+  const rate = finalCashback / tierMinSpend; // € cashback per € eligible spend
+  // Sort chronologically; tiebreak by created_at (insertion order) then id.
+  const sorted = [...purchases].sort((a, b) =>
+    a.date.localeCompare(b.date)
+    || (a.created_at ?? '').localeCompare(b.created_at ?? '')
+    || a.id.localeCompare(b.id),
+  );
+
+  let capRemaining = tierMinSpend;
+  const raw: Array<{ purchaseId: string; baseCents: number }> = [];
+
+  for (const p of sorted) {
+    if (capRemaining <= 0) break;
+    const amount = Math.max(0, Number(p.amount ?? 0));
+    const eligible = Math.min(amount, capRemaining);
+    const baseCents = Math.floor(eligible * rate * 100);
+    if (baseCents > 0) raw.push({ purchaseId: p.id, baseCents });
+    capRemaining -= amount;
+  }
+
+  // Distribute rounding remainder to largest slices.
+  const targetCents = Math.round(finalCashback * 100);
+  let unallocated = Math.max(0, targetCents - raw.reduce((s, r) => s + r.baseCents, 0));
+  [...raw].sort((a, b) => b.baseCents - a.baseCents).forEach((r) => {
+    if (unallocated <= 0) return;
+    r.baseCents += 1;
+    unallocated -= 1;
+  });
+
+  return raw
+    .filter((r) => r.baseCents > 0)
+    .map((r) => ({ purchaseId: r.purchaseId, amount: r.baseCents / 100 }));
+}
 
 function formatSupabaseError(prefix: string, error: unknown): string {
   if (!error || typeof error !== 'object') {
@@ -57,6 +158,8 @@ function mapPurchaseRow(row: CashbackPurchaseRow, entries: CashbackEntryRow[]): 
     amount: Number(row.amount ?? 0),
     notes: row.notes ?? undefined,
     isReferral: row.is_referral ?? false,
+    isUnibanco: row.is_unibanco ?? false,
+    createdAt: row.created_at,
     cashbackEntries: entries.map(mapEntryRow),
   };
 }
@@ -91,6 +194,7 @@ export async function createCashbackPurchase(
       amount: purchase.amount,
       notes: purchase.notes ?? null,
       is_referral: purchase.isReferral ?? false,
+      is_unibanco: purchase.isUnibanco ?? false,
       created_at: now,
       updated_at: now,
     }])
@@ -183,6 +287,8 @@ export async function updateCashbackPurchase(
   for (const [key, value] of Object.entries(fields)) {
     if (key === 'isReferral') {
       dbFields.is_referral = value;
+    } else if (key === 'isUnibanco') {
+      dbFields.is_unibanco = value;
     } else {
       dbFields[key] = value;
     }
@@ -196,6 +302,145 @@ export async function updateCashbackPurchase(
   if (error) {
     throw new Error(`Failed to update purchase: ${error.message}`);
   }
+}
+
+export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<UnibancoSyncResult> {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    throw new Error('Invalid month format. Expected YYYY-MM.');
+  }
+
+  if (!isMonthWithinCampaign(monthKey)) {
+    return {
+      status: 'out-of-campaign',
+      month: monthKey,
+      spent: 0,
+      amount: 0,
+    };
+  }
+
+  const { start, endExclusive, monthEnd } = getMonthDateRange(monthKey);
+  const autoEntryIdPrefix = `unibanco-cashback-${monthKey}-entry`;
+  const legacyAnchorPurchaseId = `unibanco-cashback-${monthKey}-purchase`;
+  const now = new Date().toISOString();
+
+  const { data: purchaseRows, error: purchaseError } = await supabase
+    .from('cashback_purchases')
+    .select('id, date, amount, is_referral, is_unibanco, created_at')
+    .gte('date', start)
+    .lt('date', endExclusive);
+
+  if (purchaseError) {
+    throw new Error(formatSupabaseError('Failed to load monthly purchases for Unibanco sync', purchaseError));
+  }
+
+  const eligiblePurchases = ((purchaseRows ?? []) as Array<{ id: string; date: string; amount: number | null; is_referral: boolean | null; is_unibanco: boolean | null; created_at: string }>)
+    .filter((row) => row.id !== legacyAnchorPurchaseId)
+    .filter((row) => row.is_unibanco ?? false)
+    .filter((row) => !(row.is_referral ?? false));
+
+  const spent = eligiblePurchases
+    .reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+
+  const activeTier = getActiveTier(spent);
+  const tierCashback = activeTier?.cashback ?? 0;
+
+  const { data: usedRows, error: usedError } = await supabase
+    .from('cashback_entries')
+    .select('amount, date_received')
+    .eq('source', UNIBANCO_SOURCE)
+    .gte('date_received', UNIBANCO_CAMPAIGN_START)
+    .lt('date_received', start);
+
+  if (usedError) {
+    throw new Error(formatSupabaseError('Failed to load Unibanco campaign usage', usedError));
+  }
+
+  const usedTotal = ((usedRows ?? []) as Array<{ amount: number | null; date_received: string }>)
+    .filter((row) => isMonthWithinCampaign(monthKeyFromDate(row.date_received)))
+    .reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+
+  const remainingCap = Math.max(0, UNIBANCO_CAMPAIGN_CAP - usedTotal);
+  const finalCashback = Math.min(tierCashback, remainingCap);
+
+  // Fetch all existing auto Unibanco entries for this month (any format/version).
+  const { data: existingEntryRows, error: fetchExistingError } = await supabase
+    .from('cashback_entries')
+    .select('id')
+    .eq('source', UNIBANCO_SOURCE)
+    .gte('date_received', start)
+    .lt('date_received', endExclusive);
+
+  if (fetchExistingError) {
+    throw new Error(formatSupabaseError('Failed to fetch existing Unibanco entries', fetchExistingError));
+  }
+
+  const existingEntryIds = ((existingEntryRows ?? []) as Array<{ id: string }>).map((r) => r.id);
+
+  const deleteExisting = async () => {
+    if (existingEntryIds.length === 0) return;
+    const { error } = await supabase
+      .from('cashback_entries')
+      .delete()
+      .in('id', existingEntryIds);
+    if (error) {
+      throw new Error(formatSupabaseError('Failed to clear existing Unibanco entries', error));
+    }
+  };
+
+  if (finalCashback <= 0 || eligiblePurchases.length === 0) {
+    await deleteExisting();
+
+    // Cleanup legacy anchor purchase if it still exists.
+    await supabase.from('cashback_purchases').delete().eq('id', legacyAnchorPurchaseId);
+
+    return {
+      status: 'no-cashback',
+      month: monthKey,
+      spent,
+      amount: 0,
+    };
+  }
+
+  await deleteExisting();
+
+  // For the top tier (≥€500): cap cashback-earning spend at €500 — purchases beyond earn 0%.
+  // For lower tiers: all spend qualifies, so cap = actual spent → effectively proportional.
+  const TOP_TIER_THRESHOLD = UNIBANCO_TIERS[0].minSpend; // 500
+  const distributionCap = activeTier!.minSpend === TOP_TIER_THRESHOLD && spent > TOP_TIER_THRESHOLD
+    ? TOP_TIER_THRESHOLD
+    : spent;
+
+  const distributed = distributeWithTierCap(eligiblePurchases, distributionCap, finalCashback);
+
+  if (distributed.length > 0) {
+    const rows = distributed.map((slice) => ({
+      id: `${autoEntryIdPrefix}-${slice.purchaseId}`,
+      purchase_id: slice.purchaseId,
+      source: UNIBANCO_SOURCE,
+      amount: slice.amount,
+      date_received: monthEnd,
+      created_at: now,
+      updated_at: now,
+    }));
+
+    const { error: upsertError } = await supabase
+      .from('cashback_entries')
+      .upsert(rows, { onConflict: 'id' });
+
+    if (upsertError) {
+      throw new Error(formatSupabaseError('Failed to upsert distributed Unibanco cashback entries', upsertError));
+    }
+  }
+
+  // Cleanup legacy anchor purchase if it still exists.
+  await supabase.from('cashback_purchases').delete().eq('id', legacyAnchorPurchaseId);
+
+  return {
+    status: 'synced',
+    month: monthKey,
+    spent,
+    amount: finalCashback,
+  };
 }
 
 // --- Sources ---

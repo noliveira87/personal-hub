@@ -24,6 +24,8 @@ export interface CashbackPurchase {
   amount: number;
   notes?: string;
   isReferral?: boolean;
+  isUnibanco?: boolean;
+  createdAt?: string;
   cashbackEntries: CashbackEntry[];
 }
 
@@ -40,6 +42,7 @@ export const CASHBACK_CATEGORIES: Array<{ value: CashbackCategory; label: string
 ];
 
 export const CASHBACK_SOURCES = [
+  'Unibanco',
   'Revolut',
   'LetyShops',
   'Cartao de Credito',

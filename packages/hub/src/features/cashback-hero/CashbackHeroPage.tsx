@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format, parse, addMonths, subMonths, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -91,7 +91,7 @@ function CashbackBadge({ purchase }: { purchase: CashbackPurchase }) {
 
 export default function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
-  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
+  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
 
   const [showAddPurchase, setShowAddPurchase] = useState(false);
@@ -105,6 +105,8 @@ export default function CashbackHeroPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => monthKeyFromDate(new Date()));
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
+  const lastSyncSigRef = useRef<Map<string, string>>(new Map());
+
   const monthPurchases = useMemo(() => {
     if (selectedMonth === 'all') return purchases;
     return purchases.filter((purchase) => purchase.date.startsWith(selectedMonth));
@@ -115,7 +117,27 @@ export default function CashbackHeroPage() {
 
     if (search.trim()) {
       const term = search.trim().toLowerCase();
-      result = result.filter((purchase) => purchase.merchant.toLowerCase().includes(term));
+      result = result.filter((purchase) => {
+        const categoryLabel = getCategoryLabel(purchase.category).toLowerCase();
+        const sourceLabels = purchase.cashbackEntries.map((entry) => entry.source.toLowerCase());
+        const stateLabels = [
+          purchase.isReferral ? 'referral' : '',
+          purchase.isUnibanco ? 'unibanco' : '',
+        ].filter(Boolean);
+
+        const searchable = [
+          purchase.merchant,
+          purchase.category,
+          categoryLabel,
+          purchase.notes ?? '',
+          ...sourceLabels,
+          ...stateLabels,
+        ]
+          .join(' ')
+          .toLowerCase();
+
+        return searchable.includes(term);
+      });
     }
 
     if (categoryFilter !== 'all') {
@@ -129,7 +151,7 @@ export default function CashbackHeroPage() {
     if (sortByPercent) {
       result.sort((a, b) => getCashbackPercent(b) - getCashbackPercent(a));
     } else {
-      result.sort((a, b) => b.date.localeCompare(a.date));
+      result.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
     }
 
     return result;
@@ -205,10 +227,52 @@ export default function CashbackHeroPage() {
     setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const syncUnibancoForMonths = useCallback(async (monthKeys: string[]) => {
+    const uniqueMonths = [...new Set(monthKeys.filter((value) => /^\d{4}-\d{2}$/.test(value)))];
+    for (const month of uniqueMonths) {
+      try {
+        await syncUnibancoMonth(month);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(message);
+      }
+    }
+  }, [syncUnibancoMonth]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    // Compute a signature per month: only sync when eligible purchases actually changed (add/delete/amount edit).
+    const monthMap = new Map<string, CashbackPurchase[]>();
+    purchases
+      .filter((p) => (p.isUnibanco ?? false) && !(p.isReferral ?? false))
+      .forEach((p) => {
+        const month = p.date.slice(0, 7);
+        if (!monthMap.has(month)) monthMap.set(month, []);
+        monthMap.get(month)!.push(p);
+      });
+
+    const monthsToSync: string[] = [];
+    for (const [month, ps] of monthMap) {
+      const sig = ps.map((p) => `${p.id}:${p.amount}`).sort().join('|');
+      if (lastSyncSigRef.current.get(month) !== sig) {
+        lastSyncSigRef.current.set(month, sig);
+        monthsToSync.push(month);
+      }
+    }
+
+    if (monthsToSync.length === 0) return;
+    void syncUnibancoForMonths(monthsToSync);
+  }, [loading, purchases, syncUnibancoForMonths]);
+
   const requestDeletePurchase = async (id: string) => {
     if (!window.confirm(t('cashbackHero.confirmDelete'))) return;
     try {
+      const purchase = purchases.find((item) => item.id === id);
       await deletePurchase(id);
+      if (purchase?.isUnibanco) {
+        await syncUnibancoForMonths([purchase.date.slice(0, 7)]);
+      }
       toast.success(t('cashbackHero.deletePurchase'));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -404,6 +468,11 @@ export default function CashbackHeroPage() {
                           <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                             {getCategoryLabel(purchase.category)}
                           </span>
+                          {purchase.isUnibanco ? (
+                            <span className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              {t('cashbackHero.badges.unibanco')}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -502,6 +571,9 @@ export default function CashbackHeroPage() {
         onOpenChange={setShowAddPurchase}
         onSubmit={async (payload) => {
           await addPurchase(payload);
+          if (payload.isUnibanco) {
+            await syncUnibancoForMonths([payload.date.slice(0, 7)]);
+          }
           toast.success(t('cashbackHero.addPurchase'));
         }}
       />
@@ -511,7 +583,19 @@ export default function CashbackHeroPage() {
         onOpenChange={(open) => { if (!open) setEditingPurchase(null); }}
         onSubmit={async (payload) => {
           if (!editingPurchase) return;
+
+          const monthsToSync: string[] = [];
+          if (editingPurchase.isUnibanco) {
+            monthsToSync.push(editingPurchase.date.slice(0, 7));
+          }
+          if (payload.isUnibanco) {
+            monthsToSync.push(payload.date.slice(0, 7));
+          }
+
           await updatePurchase(editingPurchase.id, payload);
+          if (monthsToSync.length > 0) {
+            await syncUnibancoForMonths(monthsToSync);
+          }
           toast.success(t('cashbackHero.editPurchase'));
           setEditingPurchase(null);
         }}
@@ -550,7 +634,7 @@ function AddPurchaseDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean }) => Promise<void>;
+  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [merchant, setMerchant] = useState('');
@@ -559,6 +643,7 @@ function AddPurchaseDialog({
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [isReferral, setIsReferral] = useState(false);
+  const [isUnibanco, setIsUnibanco] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -582,6 +667,7 @@ function AddPurchaseDialog({
         amount: Math.max(parsedAmount, 0),
         notes: notes.trim() || undefined,
         isReferral: isReferral || undefined,
+        isUnibanco: !isReferral && isUnibanco,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -593,6 +679,7 @@ function AddPurchaseDialog({
     setAmount('');
     setNotes('');
     setIsReferral(false);
+    setIsUnibanco(false);
     onOpenChange(false);
   };
 
@@ -653,11 +740,29 @@ function AddPurchaseDialog({
               type="checkbox"
               id="is-referral"
               checked={isReferral}
-              onChange={(e) => setIsReferral(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsReferral(checked);
+                if (checked) setIsUnibanco(false);
+              }}
               className="rounded border border-input"
             />
             <label htmlFor="is-referral" className="text-xs font-medium text-muted-foreground cursor-pointer">
               {t('cashbackHero.form.isReferral')}
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is-unibanco"
+              checked={isUnibanco}
+              onChange={(e) => setIsUnibanco(e.target.checked)}
+              disabled={isReferral}
+              className="rounded border border-input"
+            />
+            <label htmlFor="is-unibanco" className="text-xs font-medium text-muted-foreground cursor-pointer">
+              {t('cashbackHero.form.isUnibanco')}
             </label>
           </div>
 
@@ -785,7 +890,7 @@ function EditPurchaseDialog({
 }: {
   purchase: CashbackPurchase | null;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean }) => Promise<void>;
+  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [merchant, setMerchant] = useState('');
@@ -794,6 +899,7 @@ function EditPurchaseDialog({
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [isReferral, setIsReferral] = useState(false);
+  const [isUnibanco, setIsUnibanco] = useState(false);
 
   // Sync form when the purchase changes
   useEffect(() => {
@@ -804,6 +910,7 @@ function EditPurchaseDialog({
       setAmount(String(purchase.amount));
       setNotes(purchase.notes ?? '');
       setIsReferral(purchase.isReferral ?? false);
+      setIsUnibanco(purchase.isUnibanco ?? false);
     }
   }, [purchase]);
 
@@ -829,6 +936,7 @@ function EditPurchaseDialog({
         amount: Math.max(parsedAmount, 0),
         notes: notes.trim() || undefined,
         isReferral: isReferral || undefined,
+        isUnibanco: !isReferral && isUnibanco,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -893,11 +1001,29 @@ function EditPurchaseDialog({
               type="checkbox"
               id="is-referral-edit"
               checked={isReferral}
-              onChange={(e) => setIsReferral(e.target.checked)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsReferral(checked);
+                if (checked) setIsUnibanco(false);
+              }}
               className="rounded border border-input"
             />
             <label htmlFor="is-referral-edit" className="text-xs font-medium text-muted-foreground cursor-pointer">
               {t('cashbackHero.form.isReferral')}
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is-unibanco-edit"
+              checked={isUnibanco}
+              onChange={(e) => setIsUnibanco(e.target.checked)}
+              disabled={isReferral}
+              className="rounded border border-input"
+            />
+            <label htmlFor="is-unibanco-edit" className="text-xs font-medium text-muted-foreground cursor-pointer">
+              {t('cashbackHero.form.isUnibanco')}
             </label>
           </div>
 

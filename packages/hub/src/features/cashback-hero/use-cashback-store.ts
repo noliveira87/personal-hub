@@ -6,6 +6,8 @@ import {
   loadCashbackPurchases,
   removeCashbackEntry,
   removeCashbackPurchase,
+  syncUnibancoMonthlyCashback,
+  UnibancoSyncResult,
   updateCashbackEntry,
   updateCashbackPurchase,
 } from '@/features/cashback-hero/lib/cashback';
@@ -95,6 +97,12 @@ export function useCashbackStore() {
     }));
   }, []);
 
+  const syncUnibancoMonth = useCallback(async (monthKey: string): Promise<UnibancoSyncResult> => {
+    const result = await syncUnibancoMonthlyCashback(monthKey);
+    await reload();
+    return result;
+  }, [reload]);
+
   return {
     purchases,
     loading,
@@ -103,6 +111,7 @@ export function useCashbackStore() {
     addPurchase,
     addCashbackEntry,
     editCashbackEntry,
+    syncUnibancoMonth,
     deletePurchase,
     deleteCashbackEntry,
     updatePurchase,

@@ -174,7 +174,14 @@ export function EarningsSection({ earnings, cryptoSpotEur, loading = false, onAd
     });
   }, [deferredSearchTerm, monthEarnings, sortedEarnings]);
 
-  const filteredMonthEarnings = searchableEarnings;
+  // Cashback entries are managed in Reward Wallet — exclude them from the list but keep sums.
+  const filteredMonthEarnings = searchableEarnings.filter((earning) => {
+    const isCashbackKind = earning.kind === "cashback" || earning.kind === "crypto_cashback";
+    if (!isCashbackKind) return true;
+    if (earning.externalSource === "cashback_hero") return false;
+    if (isOnOrAfterCashbackCutoff(earning.date)) return false;
+    return true;
+  });
 
   const monthTotal = monthStats.total;
   const monthSurveyCount = monthStats.surveyCount;

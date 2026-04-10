@@ -581,12 +581,17 @@ export const translations = {
         amount: "Valor",
         notes: "Notas (opcional)",
         isReferral: "Isto é um referral (sem compra)",
+        isUnibanco: "Compra feita com Unibanco",
         savePurchase: "Guardar compra",
         addPurchaseButton: "Adicionar compra",
       },
       cashback: {
         addCashback: "Adicionar cashback",
         editCashback: "Editar cashback",
+        syncUnibanco: "Sync Unibanco",
+        unibancoSynced: "Unibanco sincronizado: {{amount}} (gasto: {{spent}})",
+        unibancoNoCashback: "Sem cashback Unibanco neste mês (gasto: {{spent}}).",
+        unibancoOutOfCampaign: "Mês fora da campanha Unibanco (12 meses / máximo €200).",
         source: "Fonte",
         dateReceived: "Data de Recepção",
         amount: "Valor",
@@ -611,6 +616,7 @@ export const translations = {
       },
       badges: {
         referral: "Referral",
+        unibanco: "Unibanco",
       },
       insights: {
         title: "Insights",
@@ -1468,12 +1474,17 @@ export const translations = {
         amount: "Amount",
         notes: "Notes (optional)",
         isReferral: "This is a referral (no purchase)",
+        isUnibanco: "Purchased with Unibanco",
         savePurchase: "Save purchase",
         addPurchaseButton: "Add purchase",
       },
       cashback: {
         addCashback: "Add cashback",
         editCashback: "Edit cashback",
+        syncUnibanco: "Sync Unibanco",
+        unibancoSynced: "Unibanco synced: {{amount}} (spent: {{spent}})",
+        unibancoNoCashback: "No Unibanco cashback this month (spent: {{spent}}).",
+        unibancoOutOfCampaign: "Month outside Unibanco campaign (12 months / max €200).",
         source: "Source",
         dateReceived: "Date received",
         amount: "Amount",
@@ -1498,6 +1509,7 @@ export const translations = {
       },
       badges: {
         referral: "Referral",
+        unibanco: "Unibanco",
       },
       insights: {
         title: "Insights",

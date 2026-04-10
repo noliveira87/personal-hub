@@ -9,6 +9,7 @@ create table if not exists public.cashback_purchases (
   amount numeric(12, 2) not null default 0,
   notes text,
   is_referral boolean not null default false,
+  is_unibanco boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -20,6 +21,7 @@ alter table public.cashback_purchases
   add column if not exists amount numeric(12, 2) default 0,
   add column if not exists notes text,
   add column if not exists is_referral boolean default false,
+  add column if not exists is_unibanco boolean default false,
   add column if not exists created_at timestamptz default now(),
   add column if not exists updated_at timestamptz default now();
 
