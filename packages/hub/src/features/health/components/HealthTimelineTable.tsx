@@ -35,9 +35,9 @@ type DisplayRow = {
 
 type DraftAppt = {
   key: string;
-  id?: string;       // undefined = not yet in DB
-  date: string;      // DD/MM
-  fullDate: string;  // YYYY-MM-DD
+  id?: string;
+  date: string;
+  fullDate: string;
   clinic: string;
   doctor: string;
   note: string;
@@ -54,8 +54,8 @@ type NewCategoryState = {
   mode: 'create' | 'add-to-existing';
   name: string;
   group: 'consultas' | 'exames';
-  selectedCategory?: string; // for 'add-to-existing' mode
-  entries: { key: string; date: string; clinic: string; doctor: string; note: string }[]; // YYYY-MM-DD format
+  selectedCategory?: string;
+  entries: { key: string; date: string; clinic: string; doctor: string; note: string }[];
 };
 
 type TimelineItem = {
@@ -68,6 +68,10 @@ type TimelineItem = {
   note: string;
 };
 
+type ViewingEntry = TimelineItem & {
+  year: string;
+};
+
 type DraftCholesterolRow = {
   key: string;
   id?: string;
@@ -78,6 +82,15 @@ type DraftCholesterolRow = {
   ldl: number | null;
   triglycerides: number | null;
 };
+
+type CategorySectionKey = 'consultas' | 'exames' | 'semGrupo';
+
+type CategoryCard = {
+  category: string;
+  items: Array<TimelineItem & { year: string }>;
+};
+
+const DEFAULT_VISIBLE_CATEGORY_COUNT = 4;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 let _draftKey = 0;
@@ -105,7 +118,6 @@ function groupAppointments(appts: AppointmentRow[]): DisplayRow[] {
     });
   });
 
-  // Sort ascending within each year
   Object.values(byLabel).forEach((byYear) =>
     Object.values(byYear).forEach((list) =>
       list.sort((a, b) => a.fullDate.localeCompare(b.fullDate)),
@@ -205,13 +217,18 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   const [deletedCholesterolIds, setDeletedCholesterolIds] = useState<string[]>([]);
   const [savingCholesterol, setSavingCholesterol] = useState(false);
   const [visibleYearCount, setVisibleYearCount] = useState(4);
-  const [visibleCategoryCount, setVisibleCategoryCount] = useState(4);
+  const [visibleCategoryCounts, setVisibleCategoryCounts] = useState<Record<CategorySectionKey, number>>({
+    consultas: DEFAULT_VISIBLE_CATEGORY_COUNT,
+    exames: DEFAULT_VISIBLE_CATEGORY_COUNT,
+    semGrupo: DEFAULT_VISIBLE_CATEGORY_COUNT,
+  });
   const [categoryItemCounts, setCategoryItemCounts] = useState<Record<string, number>>({});
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [categoryGroups, setCategoryGroups] = useState<HealthCategoryGroups>({ consultas: [], exames: [] });
   const [loading, setLoading] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [editing, setEditing] = useState<EditState | null>(null);
+  const [viewingEntry, setViewingEntry] = useState<ViewingEntry | null>(null);
   const [saving, setSaving] = useState(false);
   const [newCategory, setNewCategory] = useState<NewCategoryState | null>(null);
   const [savingCategory, setSavingCategory] = useState(false);
@@ -331,26 +348,22 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     return [...orderedFromState, ...missing];
   }, [visibleCategoryCards, categoryOrder]);
 
-  const limitedCategoryCards = useMemo(() => {
-    return orderedVisibleCategoryCards.slice(0, visibleCategoryCount);
-  }, [orderedVisibleCategoryCards, visibleCategoryCount]);
-
-  const groupedLimitedCategoryCards = useMemo(() => {
+  const groupedOrderedCategoryCards = useMemo(() => {
     const normalize = (value: string) => value.trim().toLocaleLowerCase('pt-PT');
     const consultasSet = new Set(categoryGroups.consultas.map(normalize));
     const examesSet = new Set(categoryGroups.exames.map(normalize));
 
     const grouped: {
-      consultas: Array<{ category: string; items: Array<TimelineItem & { year: string }> }>;
-      exames: Array<{ category: string; items: Array<TimelineItem & { year: string }> }>;
-      semGrupo: Array<{ category: string; items: Array<TimelineItem & { year: string }> }>;
+      consultas: CategoryCard[];
+      exames: CategoryCard[];
+      semGrupo: CategoryCard[];
     } = {
       consultas: [],
       exames: [],
       semGrupo: [],
     };
 
-    limitedCategoryCards.forEach((card) => {
+    orderedVisibleCategoryCards.forEach((card) => {
       const key = normalize(card.category);
       if (consultasSet.has(key)) {
         grouped.consultas.push(card);
@@ -362,10 +375,15 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     });
 
     return grouped;
-  }, [limitedCategoryCards, categoryGroups]);
+  }, [orderedVisibleCategoryCards, categoryGroups]);
 
-  const remainingCategoryCount = Math.max(0, orderedVisibleCategoryCards.length - limitedCategoryCards.length);
-  const nextCategoriesToLoad = Math.min(4, remainingCategoryCount);
+  const groupedVisibleCategoryCards = useMemo(() => {
+    return {
+      consultas: groupedOrderedCategoryCards.consultas.slice(0, visibleCategoryCounts.consultas),
+      exames: groupedOrderedCategoryCards.exames.slice(0, visibleCategoryCounts.exames),
+      semGrupo: groupedOrderedCategoryCards.semGrupo.slice(0, visibleCategoryCounts.semGrupo),
+    };
+  }, [groupedOrderedCategoryCards, visibleCategoryCounts]);
 
   const loadData = useCallback(async (p: HealthPerson) => {
     setLoading(true);
@@ -402,7 +420,11 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     };
     loadSettings();
     setVisibleYearCount(4);
-    setVisibleCategoryCount(4);
+    setVisibleCategoryCounts({
+      consultas: DEFAULT_VISIBLE_CATEGORY_COUNT,
+      exames: DEFAULT_VISIBLE_CATEGORY_COUNT,
+      semGrupo: DEFAULT_VISIBLE_CATEGORY_COUNT,
+    });
     setCategoryItemCounts({});
     setIsEditingCholesterol(false);
     setCholesterolDraftRows([]);
@@ -414,12 +436,6 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
       setVisibleYearCount(Math.max(4, timelineYears.length));
     }
   }, [timelineYears.length, visibleYearCount]);
-
-  useEffect(() => {
-    if (orderedVisibleCategoryCards.length < visibleCategoryCount) {
-      setVisibleCategoryCount(Math.max(4, orderedVisibleCategoryCards.length));
-    }
-  }, [orderedVisibleCategoryCards.length, visibleCategoryCount]);
 
   useEffect(() => {
     setCategoryOrder((prev) => {
@@ -491,6 +507,20 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
       }));
     });
     setEditing({ label: row.label, years: allYears, yearData });
+  }
+
+  function openEntryDetails(item: TimelineItem & { year: string }) {
+    setViewingEntry(item);
+  }
+
+  function editViewingEntry() {
+    if (!viewingEntry) return;
+
+    const row = rowsByLabel.get(viewingEntry.category);
+    if (!row) return;
+
+    setViewingEntry(null);
+    openEdit(row);
   }
 
   function addDate(year: string, isoDate: string) {
@@ -868,202 +898,228 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
           ) : (
             <>
               {[
-                { key: 'consultas', title: 'Consultas', cards: groupedLimitedCategoryCards.consultas },
-                { key: 'exames', title: 'Exames', cards: groupedLimitedCategoryCards.exames },
-                { key: 'sem-grupo', title: 'Sem grupo geral', cards: groupedLimitedCategoryCards.semGrupo },
+                {
+                  key: 'consultas' as const,
+                  title: 'Consultas',
+                  cards: groupedVisibleCategoryCards.consultas,
+                  totalCards: groupedOrderedCategoryCards.consultas.length,
+                },
+                {
+                  key: 'exames' as const,
+                  title: 'Exames',
+                  cards: groupedVisibleCategoryCards.exames,
+                  totalCards: groupedOrderedCategoryCards.exames.length,
+                },
+                {
+                  key: 'semGrupo' as const,
+                  title: 'Sem grupo geral',
+                  cards: groupedVisibleCategoryCards.semGrupo,
+                  totalCards: groupedOrderedCategoryCards.semGrupo.length,
+                },
               ]
-                .filter((section) => section.cards.length > 0)
-                .map((section) => (
-                  <div key={section.key} className="space-y-3">
-                    <div className="px-1">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h3>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {section.cards.map(({ category, items }) => {
-                  const categoryRow = rowsByLabel.get(category);
-                  const allCategoriesIndex = orderedVisibleCategoryCards.findIndex(c => c.category === category);
-                  const canMoveUp = allCategoriesIndex > 0;
-                  const canMoveDown = allCategoriesIndex < orderedVisibleCategoryCards.length - 1;
+                .filter((section) => section.totalCards > 0)
+                .map((section) => {
+                  const remainingSectionCount = Math.max(0, section.totalCards - section.cards.length);
+                  const canShowLess = section.totalCards > DEFAULT_VISIBLE_CATEGORY_COUNT
+                    && visibleCategoryCounts[section.key] > DEFAULT_VISIBLE_CATEGORY_COUNT;
 
                   return (
-                    <section key={category} className="rounded-xl border bg-card">
-                      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/20">
-                        <h3 className="text-sm font-semibold truncate">{category}</h3>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground">{items.length} registos</span>
-                          <button
-                            type="button"
-                            onClick={() => moveCategory(category, 'up')}
-                            disabled={!canMoveUp}
-                            className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Mover categoria para cima"
-                          >
-                            <ArrowUp className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveCategory(category, 'down')}
-                            disabled={!canMoveDown}
-                            className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Mover categoria para baixo"
-                          >
-                            <ArrowDown className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                    <div key={section.key} className="space-y-3">
+                      <div className="px-1">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h3>
                       </div>
-
-                      <div className="p-2 space-y-1.5">
-                        {(() => {
-                          const visibleCount = categoryItemCounts[category] ?? 4;
-                          const visibleItems = items.slice(0, visibleCount);
-                          const remainingItems = Math.max(0, items.length - visibleCount);
-                          const itemsByYear = visibleItems.reduce<Record<string, typeof visibleItems>>((acc, item) => {
-                            if (!acc[item.year]) acc[item.year] = [];
-                            acc[item.year].push(item);
-                            return acc;
-                          }, {});
-                          const yearGroups = Object.entries(itemsByYear).sort((a, b) => Number(b[0]) - Number(a[0]));
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {section.cards.map(({ category, items }) => {
+                          const categoryRow = rowsByLabel.get(category);
+                          const allCategoriesIndex = orderedVisibleCategoryCards.findIndex((card) => card.category === category);
+                          const canMoveUp = allCategoriesIndex > 0;
+                          const canMoveDown = allCategoriesIndex < orderedVisibleCategoryCards.length - 1;
 
                           return (
-                            <>
-                              {yearGroups.map(([year, yearItems]) => (
-                                <section key={`${category}-${year}`} className="rounded-md border bg-background/60 px-2.5 py-2">
-                                  {(() => {
-                                    const hasDetails = yearItems.some((item) => item.note || item.clinic || item.doctor);
+                            <section key={category} className="rounded-xl border bg-card">
+                              <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/20">
+                                <h3 className="text-sm font-semibold truncate">{category}</h3>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">{items.length} registos</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveCategory(category, 'up')}
+                                    disabled={!canMoveUp}
+                                    className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                                    title="Mover categoria para cima"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveCategory(category, 'down')}
+                                    disabled={!canMoveDown}
+                                    className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                                    title="Mover categoria para baixo"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
 
-                                    if (!hasDetails) {
-                                      return (
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="flex min-w-0 flex-1 items-start gap-3">
-                                            <span className="shrink-0 text-base font-bold leading-none text-foreground pt-1">
-                                              {year}
-                                            </span>
+                              <div className="p-2 space-y-1.5">
+                                {(() => {
+                                  const visibleCount = categoryItemCounts[category] ?? 4;
+                                  const visibleItems = items.slice(0, visibleCount);
+                                  const remainingItems = Math.max(0, items.length - visibleCount);
+                                  const itemsByYear = visibleItems.reduce<Record<string, typeof visibleItems>>((acc, item) => {
+                                    if (!acc[item.year]) acc[item.year] = [];
+                                    acc[item.year].push(item);
+                                    return acc;
+                                  }, {});
+                                  const yearGroups = Object.entries(itemsByYear).sort((a, b) => Number(b[0]) - Number(a[0]));
 
-                                            <div className="min-w-0 flex flex-wrap gap-2">
-                                              {yearItems.map((item) => (
-                                                <article key={item.id} className="flex items-start gap-2 py-0.5">
-                                                  <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
-                                                    {item.date}
+                                  return (
+                                    <>
+                                      {yearGroups.map(([year, yearItems]) => (
+                                        <section key={`${category}-${year}`} className="rounded-md border bg-background/60 px-2.5 py-2">
+                                          {(() => {
+                                            const hasDetails = yearItems.some((item) => item.note || item.clinic || item.doctor);
+
+                                            if (!hasDetails) {
+                                              return (
+                                                <div className="flex items-start justify-between gap-2">
+                                                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                                                    <span className="shrink-0 text-base font-bold leading-none text-foreground pt-1">
+                                                      {year}
+                                                    </span>
+
+                                                    <div className="min-w-0 flex flex-wrap gap-2">
+                                                      {yearItems.map((item) => (
+                                                        <button
+                                                          key={item.id}
+                                                          type="button"
+                                                          onClick={() => openEntryDetails(item)}
+                                                          className="flex items-start gap-2 py-0.5 text-left transition-opacity hover:opacity-80"
+                                                        >
+                                                          <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
+                                                            {item.date}
+                                                          </span>
+                                                        </button>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+
+                                                  {categoryRow && (
+                                                    <button
+                                                      onClick={() => openEdit(categoryRow)}
+                                                      className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                                      title="Editar categoria"
+                                                    >
+                                                      <Pencil className="w-3 h-3" />
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              );
+                                            }
+
+                                            return (
+                                              <div className="space-y-2">
+                                                <div className="flex items-start justify-between gap-2">
+                                                  <span className="shrink-0 text-base font-bold leading-none text-foreground pt-0.5">
+                                                    {year}
                                                   </span>
-                                                </article>
-                                              ))}
-                                            </div>
-                                          </div>
 
-                                          {categoryRow && (
-                                            <button
-                                              onClick={() => openEdit(categoryRow)}
-                                              className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                              title="Editar categoria"
-                                            >
-                                              <Pencil className="w-3 h-3" />
-                                            </button>
-                                          )}
-                                        </div>
-                                      );
-                                    }
+                                                  {categoryRow && (
+                                                    <button
+                                                      onClick={() => openEdit(categoryRow)}
+                                                      className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                                      title="Editar categoria"
+                                                    >
+                                                      <Pencil className="w-3 h-3" />
+                                                    </button>
+                                                  )}
+                                                </div>
 
-                                    return (
-                                      <div className="space-y-2">
-                                        <div className="flex items-start justify-between gap-2">
-                                          <span className="shrink-0 text-base font-bold leading-none text-foreground pt-0.5">
-                                            {year}
-                                          </span>
+                                                <div className="space-y-1.5">
+                                                  {yearItems.map((item) => (
+                                                    <button
+                                                      key={item.id}
+                                                      type="button"
+                                                      onClick={() => openEntryDetails(item)}
+                                                      className="flex w-full items-start gap-2 text-left transition-opacity hover:opacity-85"
+                                                    >
+                                                      <span className={`mt-0.5 shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
+                                                        {item.date}
+                                                      </span>
 
-                                          {categoryRow && (
-                                            <button
-                                              onClick={() => openEdit(categoryRow)}
-                                              className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                              title="Editar categoria"
-                                            >
-                                              <Pencil className="w-3 h-3" />
-                                            </button>
-                                          )}
-                                        </div>
-
-                                        <div className="space-y-1.5">
-                                          {yearItems.map((item) => (
-                                            <article key={item.id} className="flex items-start gap-2">
-                                              <span className={`mt-0.5 shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${accent.badge}`}>
-                                                {item.date}
-                                              </span>
-
-                                              <div className="min-w-0 flex-1">
-                                                {(item.clinic || item.doctor) && (
-                                                  <p className="text-[11px] text-muted-foreground line-clamp-1">
-                                                    {item.clinic || 'Sem local'}
-                                                    {item.clinic && item.doctor ? ' · ' : ''}
-                                                    {item.doctor ? `Dr(a). ${item.doctor}` : ''}
-                                                  </p>
-                                                )}
-
-                                                {item.note && (
-                                                  <p className="text-[11px] text-muted-foreground italic line-clamp-1">{item.note}</p>
-                                                )}
+                                                      <div className="min-w-0 flex-1">
+                                                      </div>
+                                                    </button>
+                                                  ))}
+                                                </div>
                                               </div>
-                                            </article>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    );
-                                  })()}
-                                </section>
-                              ))}
-                              {visibleItems.length === 0 && (
-                                <p className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
-                                  Sem registos
-                                </p>
-                              )}
-                              {remainingItems > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setCategoryItemCounts((prev) => ({
-                                    ...prev,
-                                    [category]: (prev[category] ?? 4) + 4,
-                                  }))}
-                                  className="w-full text-center py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded transition-colors"
-                                >
-                                  Carregar mais ({remainingItems} {remainingItems === 1 ? 'entrada' : 'entradas'})
-                                </button>
-                              )}
-                            </>
+                                            );
+                                          })()}
+                                        </section>
+                                      ))}
+                                      {visibleItems.length === 0 && (
+                                        <p className="rounded-md border border-dashed px-2.5 py-2 text-xs text-muted-foreground">
+                                          Sem registos
+                                        </p>
+                                      )}
+                                      {remainingItems > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setCategoryItemCounts((prev) => ({
+                                            ...prev,
+                                            [category]: (prev[category] ?? 4) + 4,
+                                          }))}
+                                          className="w-full text-center py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded transition-colors"
+                                        >
+                                          Carregar mais ({remainingItems} {remainingItems === 1 ? 'entrada' : 'entradas'})
+                                        </button>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </section>
                           );
-                        })()}
+                        })}
                       </div>
-                    </section>
-                  );
-                      })}
+                      {(remainingSectionCount > 0 || canShowLess) && (
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                          {remainingSectionCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setVisibleCategoryCounts((prev) => ({
+                                ...prev,
+                                [section.key]: Math.min(prev[section.key] + DEFAULT_VISIBLE_CATEGORY_COUNT, section.totalCards),
+                              }))}
+                              className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-muted"
+                            >
+                              Carregar mais
+                            </button>
+                          )}
+
+                          {canShowLess && (
+                            <button
+                              type="button"
+                              onClick={() => setVisibleCategoryCounts((prev) => ({
+                                ...prev,
+                                [section.key]: DEFAULT_VISIBLE_CATEGORY_COUNT,
+                              }))}
+                              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              Mostrar menos
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-
-              {remainingCategoryCount > 0 && (
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCategoryCount((prev) => Math.min(prev + 4, orderedVisibleCategoryCards.length))}
-                    className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-muted"
-                  >
-                    Carregar mais
-                  </button>
-
-                  {visibleCategoryCount > 4 && (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCategoryCount(4)}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      Mostrar menos
-                    </button>
-                  )}
-                </div>
-              )}
+                  );
+                })}
             </>
           )}
         </div>
       )}
 
-      {/* Cholesterol control table */}
       <div className="rounded-xl border bg-card overflow-hidden">
           <div className="px-4 pt-4 pb-3 border-b bg-gradient-to-r from-muted/40 to-muted/10">
             <div className="flex items-start justify-between gap-3">
@@ -1546,9 +1602,68 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
         </div>
 
       {/* Edit modal */}
+      {viewingEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setViewingEntry(null)}>
+          <div className="bg-background rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
+              <div>
+                <h2 className="text-base font-semibold">{viewingEntry.category}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">{viewingEntry.fullDate}</p>
+              </div>
+              <button onClick={() => setViewingEntry(null)} className="p-1 rounded hover:bg-muted transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-4 space-y-4 flex-1 text-sm">
+              <div className="rounded-lg border bg-background/60 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Data</p>
+                <p className="mt-1 font-medium text-foreground">{viewingEntry.fullDate}</p>
+              </div>
+
+              {viewingEntry.clinic && (
+                <div className="rounded-lg border bg-background/60 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hospital / Clínica</p>
+                  <p className="mt-1 font-medium text-foreground">{viewingEntry.clinic}</p>
+                </div>
+              )}
+
+              {viewingEntry.doctor && (
+                <div className="rounded-lg border bg-background/60 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Médico</p>
+                  <p className="mt-1 font-medium text-foreground">{viewingEntry.doctor}</p>
+                </div>
+              )}
+
+              {viewingEntry.note && (
+                <div className="rounded-lg border bg-background/60 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Descrição</p>
+                  <p className="mt-1 whitespace-pre-wrap text-foreground">{viewingEntry.note}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 px-5 py-4 border-t shrink-0">
+              <button
+                onClick={editViewingEntry}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => setViewingEntry(null)}
+                className="px-4 py-2 text-sm rounded-lg border hover:bg-muted transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-background rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
+          <div className="bg-background rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={(event) => event.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
               <h2 className="text-base font-semibold">{editing.label}</h2>
@@ -1648,8 +1763,8 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
       {/* New category/entry modal */}
       {newCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 pt-20">
-          <div className="bg-background rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 pt-20" onClick={() => setNewCategory(null)}>
+          <div className="bg-background rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[85vh]" onClick={(event) => event.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b shrink-0">
               <h2 className="text-base font-semibold">Adicionar entrada</h2>

@@ -200,9 +200,6 @@ const Index = () => {
 												<div className="space-y-1.5">
 													<p className="text-lg font-semibold text-foreground sm:text-xl">{project.title}</p>
 													<p className="text-xs font-medium text-muted-foreground">{project.subtitle}</p>
-													{personalSectionDescription ? (
-														<p className="text-xs text-foreground/70">{personalSectionDescription}</p>
-													) : null}
 												</div>
 												<div className="flex items-center gap-2">
 													<div className="flex h-12 w-12 items-center justify-center rounded-[1rem_0.6rem_1rem_0.6rem] bg-primary text-primary-foreground shadow-md transition-transform duration-200 group-hover:scale-105 sm:h-14 sm:w-14">
