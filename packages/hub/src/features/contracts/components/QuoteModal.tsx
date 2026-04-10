@@ -20,12 +20,56 @@ type PaymentPhase = {
   id: string;
   percentage: string;
   description: string;
+  amount: string;
+  paymentDate: string;
+  paid: boolean;
 };
+
+type StoredPaymentPhaseV2 = {
+  percentage: string;
+  description: string;
+  amount: string;
+  paymentDate: string;
+  paid: boolean;
+};
+
+const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
+
+function parsePaymentTermsV2(paymentTerms: string): PaymentPhase[] | null {
+  if (!paymentTerms.startsWith(PAYMENT_TERMS_V2_PREFIX)) {
+    return null;
+  }
+
+  try {
+    const rawJson = paymentTerms.slice(PAYMENT_TERMS_V2_PREFIX.length);
+    const parsed = JSON.parse(rawJson) as StoredPaymentPhaseV2[];
+
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed.map(phase => ({
+      id: crypto.randomUUID(),
+      percentage: typeof phase.percentage === 'string' ? phase.percentage : '',
+      description: typeof phase.description === 'string' ? phase.description : '',
+      amount: typeof phase.amount === 'string' ? phase.amount : '',
+      paymentDate: typeof phase.paymentDate === 'string' ? phase.paymentDate : '',
+      paid: Boolean(phase.paid),
+    }));
+  } catch {
+    return null;
+  }
+}
 
 function parsePaymentTermsToPhases(paymentTerms: string | null | undefined): PaymentPhase[] {
   const raw = paymentTerms?.trim();
   if (!raw) {
-    return [{ id: crypto.randomUUID(), percentage: '', description: '' }];
+    return [{ id: crypto.randomUUID(), percentage: '', description: '', amount: '', paymentDate: '', paid: false }];
+  }
+
+  const v2Phases = parsePaymentTermsV2(raw);
+  if (v2Phases && v2Phases.length > 0) {
+    return v2Phases;
   }
 
   const lines = raw
@@ -42,6 +86,9 @@ function parsePaymentTermsToPhases(paymentTerms: string | null | undefined): Pay
         id: crypto.randomUUID(),
         percentage: match[1],
         description: match[2] ?? '',
+        amount: '',
+        paymentDate: '',
+        paid: false,
       };
     }
 
@@ -49,29 +96,31 @@ function parsePaymentTermsToPhases(paymentTerms: string | null | undefined): Pay
       id: crypto.randomUUID(),
       percentage: '',
       description: cleanedLine,
+      amount: '',
+      paymentDate: '',
+      paid: false,
     };
   });
 
-  return phases.length > 0 ? phases : [{ id: crypto.randomUUID(), percentage: '', description: '' }];
+  return phases.length > 0 ? phases : [{ id: crypto.randomUUID(), percentage: '', description: '', amount: '', paymentDate: '', paid: false }];
 }
 
 function serializePaymentPhases(phases: PaymentPhase[]): string {
-  return phases
+  const normalizedPhases: StoredPaymentPhaseV2[] = phases
     .map(phase => ({
       percentage: phase.percentage.trim(),
       description: phase.description.trim(),
+      amount: phase.amount.trim(),
+      paymentDate: phase.paymentDate,
+      paid: phase.paid,
     }))
-    .filter(phase => phase.percentage || phase.description)
-    .map(phase => {
-      if (phase.percentage && phase.description) {
-        return `- ${phase.percentage}% ${phase.description}`;
-      }
-      if (phase.percentage) {
-        return `- ${phase.percentage}%`;
-      }
-      return `- ${phase.description}`;
-    })
-    .join('\n');
+    .filter(phase => phase.percentage || phase.description || phase.amount || phase.paymentDate || phase.paid);
+
+  if (normalizedPhases.length === 0) {
+    return '';
+  }
+
+  return `${PAYMENT_TERMS_V2_PREFIX}${JSON.stringify(normalizedPhases)}`;
 }
 
 export function QuoteModal({
@@ -126,10 +175,10 @@ export function QuoteModal({
   };
 
   const addPaymentPhase = () => {
-    setPaymentPhases(prev => [...prev, { id: crypto.randomUUID(), percentage: '', description: '' }]);
+    setPaymentPhases(prev => [...prev, { id: crypto.randomUUID(), percentage: '', description: '', amount: '', paymentDate: '', paid: false }]);
   };
 
-  const updatePaymentPhase = (id: string, field: 'percentage' | 'description', value: string) => {
+  const updatePaymentPhase = (id: string, field: 'percentage' | 'description' | 'amount' | 'paymentDate', value: string) => {
     setPaymentPhases(prev => prev.map(phase => (
       phase.id === id
         ? { ...phase, [field]: value }
@@ -137,10 +186,18 @@ export function QuoteModal({
     )));
   };
 
+  const updatePaymentPhasePaid = (id: string, paid: boolean) => {
+    setPaymentPhases(prev => prev.map(phase => (
+      phase.id === id
+        ? { ...phase, paid }
+        : phase
+    )));
+  };
+
   const removePaymentPhase = (id: string) => {
     setPaymentPhases(prev => {
       if (prev.length <= 1) {
-        return [{ id: crypto.randomUUID(), percentage: '', description: '' }];
+        return [{ id: crypto.randomUUID(), percentage: '', description: '', amount: '', paymentDate: '', paid: false }];
       }
 
       return prev.filter(phase => phase.id !== id);
@@ -345,33 +402,93 @@ export function QuoteModal({
             </label>
             <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
               {paymentPhases.map((phase, index) => (
-                <div key={phase.id} className="grid grid-cols-[90px_1fr_auto] gap-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={phase.percentage}
-                    onChange={e => updatePaymentPhase(phase.id, 'percentage', e.target.value)}
-                    placeholder={t('contracts.quotes.paymentTermsPercentagePlaceholder')}
-                    className="rounded-lg border bg-background px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1} %`}
-                  />
-                  <input
-                    type="text"
-                    value={phase.description}
-                    onChange={e => updatePaymentPhase(phase.id, 'description', e.target.value)}
-                    placeholder={t('contracts.quotes.paymentTermsDescriptionPlaceholder')}
-                    className="rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePaymentPhase(phase.id)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                    title={t('contracts.quotes.delete')}
-                    aria-label={t('contracts.quotes.delete')}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                <div key={phase.id} className="rounded-lg border bg-background/70 p-2.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t('contracts.quotes.paymentTermsLabel')} {index + 1}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => removePaymentPhase(phase.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      title={t('contracts.quotes.delete')}
+                      aria-label={t('contracts.quotes.delete')}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[96px_1fr]">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t('contracts.quotes.paymentTermsPercentageLabel')}
+                      </p>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={phase.percentage}
+                        onChange={e => updatePaymentPhase(phase.id, 'percentage', e.target.value)}
+                        placeholder={t('contracts.quotes.paymentTermsPercentagePlaceholder')}
+                        className="w-full rounded-lg border bg-background px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1} %`}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t('contracts.quotes.paymentTermsDescriptionLabel')}
+                      </p>
+                      <input
+                        type="text"
+                        value={phase.description}
+                        onChange={e => updatePaymentPhase(phase.id, 'description', e.target.value)}
+                        placeholder={t('contracts.quotes.paymentTermsDescriptionPlaceholder')}
+                        className="min-w-0 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_auto] sm:items-end">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t('contracts.quotes.paymentTermsAmountLabel')}
+                      </p>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={phase.amount}
+                        onChange={e => updatePaymentPhase(phase.id, 'amount', e.target.value)}
+                        placeholder={t('contracts.quotes.paymentTermsAmountPlaceholder')}
+                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1} ${t('contracts.quotes.paymentTermsAmountPlaceholder')}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t('contracts.quotes.paymentTermsPaymentDateLabel')}
+                      </p>
+                      <input
+                        type="date"
+                        value={phase.paymentDate}
+                        onChange={e => updatePaymentPhase(phase.id, 'paymentDate', e.target.value)}
+                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1} ${t('contracts.quotes.paymentTermsPaymentDateLabel')}`}
+                      />
+                    </div>
+
+                    <label className="inline-flex h-10 w-fit items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium text-foreground whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={phase.paid}
+                        onChange={e => updatePaymentPhasePaid(phase.id, e.target.checked)}
+                        className="h-4 w-4 rounded border-muted-foreground accent-primary"
+                        aria-label={`${t('contracts.quotes.paymentTermsLabel')} ${index + 1} ${t('contracts.quotes.paymentTermsPaidLabel')}`}
+                      />
+                      <span>{t('contracts.quotes.paymentTermsPaidLabel')}</span>
+                    </label>
+                  </div>
                 </div>
               ))}
 

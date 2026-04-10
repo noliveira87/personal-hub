@@ -22,12 +22,67 @@ function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
   return 'bg-muted text-muted-foreground border-border';
 }
 
-function parsePaymentTermsLines(paymentTerms: string): string[] {
-  return paymentTerms
+type DisplayPaymentTerm = {
+  text: string;
+  amount: string;
+  paymentDate: string;
+  paid: boolean;
+};
+
+const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
+
+function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
+  const raw = paymentTerms.trim();
+
+  if (raw.startsWith(PAYMENT_TERMS_V2_PREFIX)) {
+    try {
+      const parsed = JSON.parse(raw.slice(PAYMENT_TERMS_V2_PREFIX.length)) as Array<{
+        percentage?: string;
+        description?: string;
+        amount?: string;
+        paid?: boolean;
+      }>;
+
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(term => {
+            const percentage = (term.percentage ?? '').trim();
+            const description = (term.description ?? '').trim();
+            const amount = (term.amount ?? '').trim();
+            const paymentDate = (term.paymentDate ?? '').trim();
+            const paid = Boolean(term.paid);
+
+            const text = percentage && description
+              ? `${percentage}% ${description}`
+              : percentage
+                ? `${percentage}%`
+                : description;
+
+            return { text, amount, paymentDate, paid };
+          })
+          .filter(term => term.text || term.amount || term.paymentDate || term.paid);
+      }
+    } catch {
+      // Fallback to legacy plain-text format.
+    }
+  }
+
+  return raw
     .split('\n')
     .map(line => line.trim())
     .filter(Boolean)
-    .map(line => line.replace(/^[-•]\s*/, ''));
+    .map(line => line.replace(/^[-•]\s*/, ''))
+    .map(line => ({ text: line, amount: '', paymentDate: '', paid: false }));
+}
+
+function formatPaymentTermDate(value: string): string {
+  if (!value) return '';
+
+  try {
+    return format(parseISO(value), 'd MMM yyyy');
+  } catch {
+    return value;
+  }
 }
 
 export default function QuotesPage() {
@@ -188,8 +243,20 @@ export default function QuotesPage() {
                   <div className="text-xs text-muted-foreground leading-relaxed">
                     <p className="font-medium text-foreground mb-1">{t('contracts.quotes.paymentTermsLabel')}</p>
                     <ul className="space-y-0.5">
-                      {parsePaymentTermsLines(q.paymentTerms).map((line, idx) => (
-                        <li key={`${q.id}-payment-term-${idx}`}>• {line}</li>
+                      {parsePaymentTermsLines(q.paymentTerms).map((term, idx) => (
+                        <li key={`${q.id}-payment-term-${idx}`} className="flex flex-wrap items-center gap-1.5">
+                          <span>• {term.text}{term.amount ? ` - ${term.amount}` : ''}</span>
+                          {term.paymentDate && (
+                            <span className="text-[11px] text-muted-foreground/90">
+                              {t('contracts.quotes.paymentTermsPaymentDateLabel')}: {formatPaymentTermDate(term.paymentDate)}
+                            </span>
+                          )}
+                          {term.paid && (
+                            <span className="rounded-full border border-success/30 bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
+                              {t('contracts.quotes.paymentTermsPaidLabel')}
+                            </span>
+                          )}
+                        </li>
                       ))}
                     </ul>
                   </div>
