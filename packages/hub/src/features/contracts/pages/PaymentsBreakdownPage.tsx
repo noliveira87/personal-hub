@@ -164,7 +164,7 @@ export default function PaymentsBreakdownPage() {
           {/* Direct Debit Banks Breakdown */}
           {byDirectDebitBank.length > 0 && (
             <div className="animate-fade-up" style={{ animationDelay: '120ms' }}>
-              <h2 className="text-lg font-semibold text-foreground mb-4">Débitos Diretos por Banco</h2>
+              <h2 className="text-lg font-semibold text-foreground mb-4">{t('contracts.payments.byDirectDebitBank')}</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {byDirectDebitBank.map((bankData, i) => (
                   <div
@@ -179,7 +179,7 @@ export default function PaymentsBreakdownPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground">{bankData.bank}</p>
-                          <p className="text-xs text-muted-foreground">{bankData.totalCount} contrato(s)</p>
+                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(bankData.totalCount) })}</p>
                         </div>
                       </div>
 
@@ -208,7 +208,7 @@ export default function PaymentsBreakdownPage() {
                               ))}
                               {timing.contracts.length > 3 && (
                                 <p className="text-xs text-muted-foreground italic">
-                                  +{timing.contracts.length - 3} mais
+                                  {t('contracts.payments.moreCount', { count: String(timing.contracts.length - 3) })}
                                 </p>
                               )}
                             </div>
@@ -240,7 +240,7 @@ export default function PaymentsBreakdownPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground">{cardData.card}</p>
-                          <p className="text-xs text-muted-foreground">{cardData.count} contrato(s)</p>
+                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(cardData.count) })}</p>
                         </div>
                       </div>
 
@@ -258,7 +258,7 @@ export default function PaymentsBreakdownPage() {
                           ))}
                           {cardData.contracts.length > 3 && (
                             <p className="text-xs text-muted-foreground italic">
-                              +{cardData.contracts.length - 3} mais
+                              {t('contracts.payments.moreCount', { count: String(cardData.contracts.length - 3) })}
                             </p>
                           )}
                         </div>
@@ -288,7 +288,7 @@ export default function PaymentsBreakdownPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground">{entityData.entity}</p>
-                          <p className="text-xs text-muted-foreground">{entityData.count} contrato(s)</p>
+                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(entityData.count) })}</p>
                         </div>
                       </div>
 
@@ -306,7 +306,7 @@ export default function PaymentsBreakdownPage() {
                           ))}
                           {entityData.contracts.length > 3 && (
                             <p className="text-xs text-muted-foreground italic">
-                              +{entityData.contracts.length - 3} mais
+                              {t('contracts.payments.moreCount', { count: String(entityData.contracts.length - 3) })}
                             </p>
                           )}
                         </div>
