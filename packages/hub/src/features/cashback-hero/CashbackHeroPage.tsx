@@ -389,6 +389,9 @@ export default function CashbackHeroPage() {
     ? t('cashbackHero.months.all')
     : format(parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date()), 'MMMM yyyy', { locale: pt });
 
+  const currentMonthKey = monthKeyFromDate(new Date());
+  const canNavigateForward = selectedMonth !== 'all' && selectedMonth < currentMonthKey;
+
   const navigateMonth = (direction: -1 | 1) => {
     if (selectedMonth === 'all') {
       setSelectedMonth(monthKeyFromDate(new Date()));
@@ -397,6 +400,9 @@ export default function CashbackHeroPage() {
 
     const current = parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date());
     const next = direction < 0 ? subMonths(current, 1) : addMonths(current, 1);
+    if (direction > 0 && monthKeyFromDate(next) > currentMonthKey) {
+      return;
+    }
     setSelectedMonth(monthKeyFromDate(next));
   };
 
@@ -512,7 +518,13 @@ export default function CashbackHeroPage() {
             {monthLabel}
           </button>
 
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateMonth(1)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 disabled:opacity-40"
+            onClick={() => navigateMonth(1)}
+            disabled={!canNavigateForward}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
