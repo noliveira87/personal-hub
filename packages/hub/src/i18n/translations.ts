@@ -43,6 +43,7 @@ export const translations = {
       name: "Nome",
       close: "Fechar",
       status: "Estado",
+      contracts: "Contratos",
     },
     contracts: {
       menu: "Contratos",
@@ -1122,7 +1123,10 @@ export const translations = {
       showAmounts: "Show amounts",
       darkMode: "Enable dark mode",
       lightMode: "Enable light mode",
+      name: "Name",
+      close: "Close",
       status: "Status",
+      contracts: "Contracts",
     },
     contracts: {
       menu: "Contracts",

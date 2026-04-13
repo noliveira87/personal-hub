@@ -287,29 +287,28 @@ export default function Dashboard() {
               </div>
 
               {section.contracts.length > CARDS_PER_ROW && (
-                <div className="mt-6 flex justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                <div className="flex justify-center mt-4">
+                  <button
                     onClick={() => setVisibleByCategory((current) => ({
                       ...current,
                       [section.category]: current[section.category] >= section.contracts.length
                         ? CARDS_PER_ROW
                         : Math.min(current[section.category] + CARDS_PER_ROW, section.contracts.length),
                     }))}
-                    className="group relative overflow-hidden transition-all duration-200 hover:gap-2 flex items-center gap-1.5 px-4"
+                    className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-muted"
                   >
-                    <span className="transition-all duration-200">
-                      {visibleByCategory[section.category] >= section.contracts.length
-                        ? t('contracts.dashboard.hide')
-                        : t('contracts.dashboard.loadMore')}
-                    </span>
                     {visibleByCategory[section.category] >= section.contracts.length ? (
-                      <ChevronUp className="w-4 h-4 transition-transform duration-200 group-hover:-translate-y-1" />
+                      <>
+                        <ChevronUp className="w-4 h-4" />
+                        {t('contracts.dashboard.hide')}
+                      </>
                     ) : (
-                      <ChevronDown className="w-4 h-4 transition-transform duration-200 group-hover:translate-y-1" />
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        {t('contracts.dashboard.loadMore')}
+                      </>
                     )}
-                  </Button>
+                  </button>
                 </div>
               )}
             </div>
