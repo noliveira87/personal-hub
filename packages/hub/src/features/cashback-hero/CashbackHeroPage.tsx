@@ -259,7 +259,10 @@ export default function CashbackHeroPage() {
     const monthCashback = monthPurchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase), 0);
     const overallSpent = purchases.reduce((sum, purchase) => sum + purchase.amount, 0);
     const overallCashback = purchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase), 0);
-    const avgPercent = monthSpent > 0 ? (monthCashback / monthSpent) * 100 : 0;
+    const eligibleAveragePurchases = monthPurchases.filter((purchase) => !purchase.isReferral);
+    const avgPercent = eligibleAveragePurchases.length > 0
+      ? eligibleAveragePurchases.reduce((sum, purchase) => sum + getDisplayPercentFromPurchase(purchase), 0) / eligibleAveragePurchases.length
+      : 0;
 
     const bestPurchase = monthPurchases.reduce<CashbackPurchase | null>((currentBest, purchase) => {
       if (!currentBest) return purchase;
@@ -272,6 +275,7 @@ export default function CashbackHeroPage() {
       overallSpent,
       overallCashback,
       avgPercent,
+      eligibleAveragePurchasesCount: eligibleAveragePurchases.length,
       bestPurchase,
     };
   }, [monthPurchases, purchases]);
@@ -374,7 +378,7 @@ export default function CashbackHeroPage() {
       }));
     }
 
-    if (stats.avgPercent < 2 && monthPurchases.length >= 3) {
+    if (stats.avgPercent < 2 && stats.eligibleAveragePurchasesCount >= 3) {
       list.push(t('cashbackHero.insights.lowAverage'));
     }
 

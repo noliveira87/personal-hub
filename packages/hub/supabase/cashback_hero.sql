@@ -4,7 +4,7 @@
 create table if not exists public.cashback_purchases (
   id text primary key,
   merchant text not null,
-  category text not null default 'other' check (category in ('groceries', 'tech', 'travel', 'dining', 'shopping', 'entertainment', 'transport', 'health', 'other')),
+  category text not null default 'other' check (category in ('groceries', 'tech', 'travel', 'car', 'dining', 'shopping', 'entertainment', 'transport', 'health', 'other')),
   date date not null,
   amount numeric(12, 2) not null default 0,
   notes text,
@@ -24,6 +24,13 @@ alter table public.cashback_purchases
   add column if not exists is_unibanco boolean default false,
   add column if not exists created_at timestamptz default now(),
   add column if not exists updated_at timestamptz default now();
+
+alter table public.cashback_purchases
+  drop constraint if exists cashback_purchases_category_check;
+
+alter table public.cashback_purchases
+  add constraint cashback_purchases_category_check
+  check (category in ('groceries', 'tech', 'travel', 'car', 'dining', 'shopping', 'entertainment', 'transport', 'health', 'other'));
 
 create table if not exists public.cashback_entries (
   id text primary key,

@@ -2,6 +2,7 @@ export type CashbackCategory =
   | 'groceries'
   | 'tech'
   | 'travel'
+  | 'car'
   | 'dining'
   | 'shopping'
   | 'entertainment'
@@ -34,6 +35,7 @@ export const CASHBACK_CATEGORIES: Array<{ value: CashbackCategory; label: string
   { value: 'groceries', label: 'Supermercado' },
   { value: 'tech', label: 'Tecnologia' },
   { value: 'travel', label: 'Viagens' },
+  { value: 'car', label: 'Carro' },
   { value: 'dining', label: 'Restauracao' },
   { value: 'shopping', label: 'Compras' },
   { value: 'entertainment', label: 'Lazer' },
