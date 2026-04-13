@@ -152,8 +152,13 @@ export default function ContractsList() {
               className="px-3 py-2 rounded-lg border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="all">{t('contracts.allStatuses') ?? 'All Statuses'}</option>
-              {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+              {Object.entries({
+                active: 'active',
+                'pending-cancellation': 'pending-cancellation',
+                expired: 'expired',
+                archived: 'archived',
+              } as Record<string, ContractStatus>).map(([k, v]) => (
+                <option key={k} value={v}>{t(`contracts.statusLabels.${v}`)}</option>
               ))}
             </select>
             <select

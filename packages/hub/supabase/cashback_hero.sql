@@ -156,3 +156,39 @@ create policy "cashback_sources_delete"
   for delete
   to anon, authenticated
   using (true);
+
+-- Cashback cards (user-managed list for purchase card selector)
+create table if not exists public.cashback_cards (
+  id text primary key,
+  name text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.cashback_cards
+  add column if not exists name text,
+  add column if not exists sort_order integer default 0,
+  add column if not exists created_at timestamptz default now();
+
+alter table public.cashback_cards enable row level security;
+
+drop policy if exists "cashback_cards_select" on public.cashback_cards;
+create policy "cashback_cards_select"
+  on public.cashback_cards
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "cashback_cards_insert" on public.cashback_cards;
+create policy "cashback_cards_insert"
+  on public.cashback_cards
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "cashback_cards_delete" on public.cashback_cards;
+create policy "cashback_cards_delete"
+  on public.cashback_cards
+  for delete
+  to anon, authenticated
+  using (true);

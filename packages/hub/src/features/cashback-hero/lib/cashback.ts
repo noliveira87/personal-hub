@@ -518,3 +518,67 @@ export async function replaceAllCashbackSources(names: string[]): Promise<void> 
     throw new Error(formatSupabaseError('Failed to insert default sources', insertError));
   }
 }
+
+// --- Cards ---
+
+export async function loadCashbackCards(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('cashback_cards')
+    .select('name')
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    throw new Error(formatSupabaseError('Failed to load cashback cards', error));
+  }
+
+  const rows = (data ?? []) as Array<{ name: string }>;
+  return rows.map((row) => row.name);
+}
+
+export async function addCashbackCard(name: string, sortOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from('cashback_cards')
+    .insert([{ id: crypto.randomUUID(), name, sort_order: sortOrder, created_at: new Date().toISOString() }]);
+
+  if (error) {
+    throw new Error(formatSupabaseError('Failed to add cashback card', error));
+  }
+}
+
+export async function removeCashbackCard(name: string): Promise<void> {
+  const { error } = await supabase
+    .from('cashback_cards')
+    .delete()
+    .eq('name', name);
+
+  if (error) {
+    throw new Error(formatSupabaseError('Failed to remove cashback card', error));
+  }
+}
+
+export async function replaceAllCashbackCards(names: string[]): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from('cashback_cards')
+    .delete()
+    .neq('id', '');
+
+  if (deleteError) {
+    throw new Error(formatSupabaseError('Failed to reset cashback cards', deleteError));
+  }
+
+  if (names.length === 0) return;
+
+  const now = new Date().toISOString();
+  const rows = names.map((name, index) => ({
+    id: crypto.randomUUID(),
+    name,
+    sort_order: index,
+    created_at: now,
+  }));
+
+  const { error: insertError } = await supabase.from('cashback_cards').insert(rows);
+
+  if (insertError) {
+    throw new Error(formatSupabaseError('Failed to insert default cards', insertError));
+  }
+}

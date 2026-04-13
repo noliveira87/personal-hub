@@ -469,15 +469,20 @@ export default function ContractForm() {
 
         {/* Status & notes */}
         <div className="bg-card rounded-xl p-6 border space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Status & Notes</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('common.status')} & {t('common.notes')}</h2>
           <div>
-            <label className={labelClass}>Status</label>
+            <label className={labelClass}>{t('common.status')}</label>
             <select className={inputClass} value={form.status} onChange={e => set('status', e.target.value as ContractStatus)} disabled={submitting}>
-              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {Object.entries({
+                active: 'active',
+                'pending-cancellation': 'pending-cancellation',
+                expired: 'expired',
+                archived: 'archived',
+              } as Record<string, ContractStatus>).map(([k, v]) => <option key={k} value={v}>{t(`contracts.statusLabels.${v}`)}</option>)}
             </select>
           </div>
           <div>
-            <label className={labelClass}>Notes</label>
+            <label className={labelClass}>{t('common.notes')}</label>
             <textarea className={inputClass + ' min-h-[80px] resize-y'} value={form.notes ?? ''} onChange={e => set('notes', e.target.value || null)} placeholder="Optional notes..." disabled={submitting} />
           </div>
           

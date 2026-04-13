@@ -78,7 +78,7 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   if (loading) {
     return (
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -86,32 +86,32 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   if (data.length === 0) {
     return (
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
-        <h2 className="text-sm font-semibold text-foreground mb-2">⚡ kWh Consumption</h2>
-        <p className="text-sm text-muted-foreground">No kWh data recorded yet. Add kWh when logging expenses.</p>
+        <h2 className="text-sm font-semibold text-foreground mb-2">{t('contracts.kwh.title')}</h2>
+        <p className="text-sm text-muted-foreground">{t('contracts.kwh.noData')}</p>
       </div>
     );
   }
 
   return (
     <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
-      <h2 className="text-sm font-semibold text-foreground mb-4">⚡ kWh Consumption</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-4">{t('contracts.kwh.title')}</h2>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div>
-          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="text-xs text-muted-foreground">{t('contracts.kwh.total')}</p>
           <p className="text-lg font-bold text-foreground">{stats.total.toFixed(0)} kWh</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Average</p>
+          <p className="text-xs text-muted-foreground">{t('contracts.kwh.average')}</p>
           <p className="text-lg font-bold text-foreground">{stats.average.toFixed(1)} kWh</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Min</p>
+          <p className="text-xs text-muted-foreground">{t('contracts.kwh.min')}</p>
           <p className="text-lg font-bold text-foreground">{stats.min.toFixed(1)} kWh</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Max</p>
+          <p className="text-xs text-muted-foreground">{t('contracts.kwh.max')}</p>
           <p className="text-lg font-bold text-foreground">{stats.max.toFixed(1)} kWh</p>
         </div>
       </div>

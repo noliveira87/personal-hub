@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/select';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useCashbackSources } from '@/features/cashback-hero/use-cashback-sources';
+import { useCashbackCards } from '@/features/cashback-hero/use-cashback-cards';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/sonner';
 import {
@@ -66,6 +67,43 @@ function formatDateLabel(raw: string): string {
   } catch {
     return raw;
   }
+}
+
+const CARD_NOTE_PREFIX_REGEX = /^(cart[aã]o|card):\s*/i;
+
+function extractCardFromNotes(notes?: string | null): string {
+  if (!notes) return '';
+  const lines = notes.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i].trim();
+    if (CARD_NOTE_PREFIX_REGEX.test(line)) {
+      return line.replace(CARD_NOTE_PREFIX_REGEX, '').trim();
+    }
+  }
+  return '';
+}
+
+function stripCardFromNotes(notes?: string | null): string {
+  if (!notes) return '';
+  return notes
+    .split('\n')
+    .filter((line) => !CARD_NOTE_PREFIX_REGEX.test(line.trim()))
+    .join('\n')
+    .trim();
+}
+
+function buildNotesWithCard(notes: string, cardUsed: string): string | undefined {
+  const cleanNotes = notes.trim();
+  const cleanCard = cardUsed.trim();
+  const parts: string[] = [];
+  if (cleanNotes) parts.push(cleanNotes);
+  if (cleanCard) parts.push(`Cartão: ${cleanCard}`);
+  const combined = parts.join('\n');
+  return combined || undefined;
+}
+
+function isUnibancoCard(cardUsed: string): boolean {
+  return /unibanco/i.test(cardUsed.trim());
 }
 
 function monthKeyFromDate(value: Date): string {
@@ -150,6 +188,7 @@ export default function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
   const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
+  const { cards } = useCashbackCards();
 
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<CashbackPurchase | null>(null);
@@ -627,6 +666,8 @@ export default function CashbackHeroPage() {
               const isExpanded = Boolean(expandedIds[purchase.id]);
               const totalCashback = getEffectiveTotalCashback(purchase);
               const effectiveEntries = new Map(getEffectiveEntryAmounts(purchase).map((item) => [item.id, item.amount]));
+              const purchaseNotes = stripCardFromNotes(purchase.notes);
+              const purchaseCardUsed = extractCardFromNotes(purchase.notes);
 
               return (
                 <div key={purchase.id} className="overflow-hidden rounded-xl border bg-card">
@@ -673,8 +714,14 @@ export default function CashbackHeroPage() {
 
                   {isExpanded ? (
                     <div className="border-t bg-muted/20 p-4">
-                      {purchase.notes ? (
-                        <p className="mb-3 text-xs italic text-muted-foreground">{purchase.notes}</p>
+                      {purchaseNotes ? (
+                        <p className="mb-2 text-xs italic text-muted-foreground">{purchaseNotes}</p>
+                      ) : null}
+
+                      {purchaseCardUsed ? (
+                        <p className="mb-3 text-xs text-muted-foreground">
+                          <span className="font-medium">{t('cashbackHero.form.cardUsed')}:</span> {purchaseCardUsed}
+                        </p>
                       ) : null}
 
                       <div className="rounded-lg border bg-background/70 px-3 py-2">
@@ -762,6 +809,7 @@ export default function CashbackHeroPage() {
 
       <AddPurchaseDialog
         open={showAddPurchase}
+        cardOptions={cards}
         onOpenChange={setShowAddPurchase}
         onSubmit={async (payload) => {
           await addPurchase(payload);
@@ -774,6 +822,7 @@ export default function CashbackHeroPage() {
 
       <EditPurchaseDialog
         purchase={editingPurchase}
+        cardOptions={cards}
         onOpenChange={(open) => { if (!open) setEditingPurchase(null); }}
         onSubmit={async (payload) => {
           if (!editingPurchase) return;
@@ -824,10 +873,12 @@ export default function CashbackHeroPage() {
 
 function AddPurchaseDialog({
   open,
+  cardOptions,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
+  cardOptions: string[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
 }) {
@@ -837,8 +888,17 @@ function AddPurchaseDialog({
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [cardUsed, setCardUsed] = useState('');
   const [isReferral, setIsReferral] = useState(false);
-  const [isUnibanco, setIsUnibanco] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (cardOptions.length === 0) {
+      setCardUsed('');
+      return;
+    }
+    setCardUsed((prev) => (prev && cardOptions.includes(prev) ? prev : cardOptions[0]));
+  }, [open, cardOptions]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -854,15 +914,20 @@ function AddPurchaseDialog({
       return;
     }
 
+    if (!isReferral && !cardUsed.trim()) {
+      toast.error(t('cashbackHero.form.cardUsedRequired'));
+      return;
+    }
+
     try {
       await onSubmit({
         merchant: merchant.trim(),
         category,
         date,
         amount: Math.max(parsedAmount, 0),
-        notes: notes.trim() || undefined,
+        notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
-        isUnibanco: !isReferral && isUnibanco,
+        isUnibanco: !isReferral && isUnibancoCard(cardUsed),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -873,8 +938,8 @@ function AddPurchaseDialog({
     setMerchant('');
     setAmount('');
     setNotes('');
+    setCardUsed('');
     setIsReferral(false);
-    setIsUnibanco(false);
     onOpenChange(false);
   };
 
@@ -930,34 +995,30 @@ function AddPurchaseDialog({
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} placeholder={t('cashbackHero.form.notes')} />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is-referral"
-              checked={isReferral}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                setIsReferral(checked);
-                if (checked) setIsUnibanco(false);
-              }}
-              className="rounded border border-input"
-            />
-            <label htmlFor="is-referral" className="text-xs font-medium text-muted-foreground cursor-pointer">
-              {t('cashbackHero.form.isReferral')}
-            </label>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.cardUsed')}</label>
+            <Select value={cardUsed} onValueChange={setCardUsed} disabled={isReferral || cardOptions.length === 0}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('cashbackHero.form.cardUsed')} />
+              </SelectTrigger>
+              <SelectContent>
+                {cardOptions.map((card) => (
+                  <SelectItem key={card} value={card}>{card}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="is-unibanco"
-              checked={isUnibanco}
-              onChange={(e) => setIsUnibanco(e.target.checked)}
-              disabled={isReferral}
+              id="is-referral"
+              checked={isReferral}
+              onChange={(e) => setIsReferral(e.target.checked)}
               className="rounded border border-input"
             />
-            <label htmlFor="is-unibanco" className="text-xs font-medium text-muted-foreground cursor-pointer">
-              {t('cashbackHero.form.isUnibanco')}
+            <label htmlFor="is-referral" className="text-xs font-medium text-muted-foreground cursor-pointer">
+              {t('cashbackHero.form.isReferral')}
             </label>
           </div>
 
@@ -1212,10 +1273,12 @@ function AddCashbackDialog({
 
 function EditPurchaseDialog({
   purchase,
+  cardOptions,
   onOpenChange,
   onSubmit,
 }: {
   purchase: CashbackPurchase | null;
+  cardOptions: string[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
 }) {
@@ -1225,8 +1288,12 @@ function EditPurchaseDialog({
   const [date, setDate] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [cardUsed, setCardUsed] = useState('');
   const [isReferral, setIsReferral] = useState(false);
-  const [isUnibanco, setIsUnibanco] = useState(false);
+  const availableCardOptions = useMemo(() => {
+    if (!cardUsed.trim()) return cardOptions;
+    return cardOptions.includes(cardUsed) ? cardOptions : [...cardOptions, cardUsed];
+  }, [cardOptions, cardUsed]);
 
   // Sync form when the purchase changes
   useEffect(() => {
@@ -1235,9 +1302,9 @@ function EditPurchaseDialog({
       setCategory(purchase.category);
       setDate(purchase.date);
       setAmount(String(purchase.amount));
-      setNotes(purchase.notes ?? '');
+      setNotes(stripCardFromNotes(purchase.notes));
+      setCardUsed(extractCardFromNotes(purchase.notes));
       setIsReferral(purchase.isReferral ?? false);
-      setIsUnibanco(purchase.isUnibanco ?? false);
     }
   }, [purchase]);
 
@@ -1255,15 +1322,20 @@ function EditPurchaseDialog({
       return;
     }
 
+    if (!isReferral && !cardUsed.trim()) {
+      toast.error(t('cashbackHero.form.cardUsedRequired'));
+      return;
+    }
+
     try {
       await onSubmit({
         merchant: merchant.trim(),
         category,
         date,
         amount: Math.max(parsedAmount, 0),
-        notes: notes.trim() || undefined,
+        notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
-        isUnibanco: !isReferral && isUnibanco,
+        isUnibanco: !isReferral && isUnibancoCard(cardUsed),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1323,34 +1395,30 @@ function EditPurchaseDialog({
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} placeholder={t('cashbackHero.form.notes')} />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="is-referral-edit"
-              checked={isReferral}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                setIsReferral(checked);
-                if (checked) setIsUnibanco(false);
-              }}
-              className="rounded border border-input"
-            />
-            <label htmlFor="is-referral-edit" className="text-xs font-medium text-muted-foreground cursor-pointer">
-              {t('cashbackHero.form.isReferral')}
-            </label>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.cardUsed')}</label>
+            <Select value={cardUsed} onValueChange={setCardUsed} disabled={isReferral || availableCardOptions.length === 0}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('cashbackHero.form.cardUsed')} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCardOptions.map((card) => (
+                  <SelectItem key={card} value={card}>{card}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="is-unibanco-edit"
-              checked={isUnibanco}
-              onChange={(e) => setIsUnibanco(e.target.checked)}
-              disabled={isReferral}
+              id="is-referral-edit"
+              checked={isReferral}
+              onChange={(e) => setIsReferral(e.target.checked)}
               className="rounded border border-input"
             />
-            <label htmlFor="is-unibanco-edit" className="text-xs font-medium text-muted-foreground cursor-pointer">
-              {t('cashbackHero.form.isUnibanco')}
+            <label htmlFor="is-referral-edit" className="text-xs font-medium text-muted-foreground cursor-pointer">
+              {t('cashbackHero.form.isReferral')}
             </label>
           </div>
 

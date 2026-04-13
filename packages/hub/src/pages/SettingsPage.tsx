@@ -29,6 +29,7 @@ import {
 } from '@/features/warranties/lib/defaultSettings';
 import type { WarrantyCategory } from '@/lib/warranties';
 import { useCashbackSources } from '@/features/cashback-hero/use-cashback-sources';
+import { useCashbackCards } from '@/features/cashback-hero/use-cashback-cards';
 
 const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string }> = [
   { value: 'tech', label: 'Tech' },
@@ -39,7 +40,8 @@ const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string 
 export default function SettingsPage() {
   const { hideAmounts, language, setLanguage, t, toggleHideAmounts } = useI18n();
   const { isDark, toggleDark } = useDarkMode();
-  const { sources, addSource, removeSource, resetSources } = useCashbackSources();
+  const { sources, addSource, removeSource } = useCashbackSources();
+  const { cards, addCard, removeCard } = useCashbackCards();
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
   const backToPath: string | number = locationState?.fromPath ?? (window.history.length > 1 ? -1 : '/');
@@ -393,7 +395,10 @@ export default function SettingsPage() {
         )}
 
         {showCashbackSourcesSettings && (
-          <CashbackSourcesCard sources={sources} onAdd={addSource} onRemove={removeSource} onReset={resetSources} />
+          <div className="space-y-4">
+            <CashbackSourcesCard sources={sources} onAdd={addSource} onRemove={removeSource} />
+            <CashbackCardsCard cards={cards} onAdd={addCard} onRemove={removeCard} />
+          </div>
         )}
       </div>
     </div>
@@ -404,12 +409,10 @@ function CashbackSourcesCard({
   sources,
   onAdd,
   onRemove,
-  onReset,
 }: {
   sources: string[];
   onAdd: (name: string) => Promise<void>;
   onRemove: (name: string) => Promise<void>;
-  onReset: () => Promise<void>;
 }) {
   const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -428,15 +431,15 @@ function CashbackSourcesCard({
           <Coins className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">{t('settings.rewardWalletSourcesTitle')}</h2>
-          <p className="text-xs text-muted-foreground">{t('settings.rewardWalletSourcesDescription')}</p>
+          <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.rewardWalletSourcesTitle')}</h2>
+          <p className="text-xs text-muted-foreground">{t('settingsPage.rewardWalletSourcesDescription')}</p>
         </div>
       </div>
 
       <div className="flex gap-2">
         <Input
           ref={inputRef}
-          placeholder={t('settings.rewardWalletSourcesPlaceholder')}
+          placeholder={t('settingsPage.rewardWalletSourcesPlaceholder')}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
           className="flex-1"
         />
@@ -453,7 +456,7 @@ function CashbackSourcesCard({
               type="button"
               onClick={() => { void onRemove(source); }}
               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              aria-label={t('settings.rewardWalletSourcesRemoveAria', { source })}
+              aria-label={t('settingsPage.rewardWalletSourcesRemoveAria', { source })}
             >
               <X className="h-4 w-4" />
             </button>
@@ -461,18 +464,77 @@ function CashbackSourcesCard({
         ))}
         {sources.length === 0 ? (
           <li className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-            {t('settings.rewardWalletSourcesEmpty')}
+            {t('settingsPage.rewardWalletSourcesEmpty')}
           </li>
         ) : null}
       </ul>
+    </div>
+  );
+}
 
-      <button
-        type="button"
-        onClick={() => { void onReset(); }}
-        className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-      >
-        Repor predefinições
-      </button>
+function CashbackCardsCard({
+  cards,
+  onAdd,
+  onRemove,
+}: {
+  cards: string[];
+  onAdd: (name: string) => Promise<void>;
+  onRemove: (name: string) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleAdd = () => {
+    const value = inputRef.current?.value.trim() ?? '';
+    if (!value) return;
+    void onAdd(value);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  return (
+    <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '220ms' }}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <Coins className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.rewardWalletCardsTitle')}</h2>
+          <p className="text-xs text-muted-foreground">{t('settingsPage.rewardWalletCardsDescription')}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Input
+          ref={inputRef}
+          placeholder={t('settingsPage.rewardWalletCardsPlaceholder')}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
+          className="flex-1"
+        />
+        <Button onClick={handleAdd} size="sm" variant="outline">
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <ul className="space-y-1.5">
+        {cards.map((card) => (
+          <li key={card} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5">
+            <span className="text-sm">{card}</span>
+            <button
+              type="button"
+              onClick={() => { void onRemove(card); }}
+              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              aria-label={t('settingsPage.rewardWalletCardsRemoveAria', { card })}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </li>
+        ))}
+        {cards.length === 0 ? (
+          <li className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+            {t('settingsPage.rewardWalletCardsEmpty')}
+          </li>
+        ) : null}
+      </ul>
     </div>
   );
 }

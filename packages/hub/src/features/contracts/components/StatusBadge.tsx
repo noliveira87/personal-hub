@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
-import { ContractStatus, STATUS_LABELS } from '@/features/contracts/types/contract';
+import { ContractStatus } from '@/features/contracts/types/contract';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const statusStyles: Record<ContractStatus, string> = {
   active: 'bg-success/10 text-success',
@@ -9,9 +10,10 @@ const statusStyles: Record<ContractStatus, string> = {
 };
 
 export function StatusBadge({ status }: { status: ContractStatus }) {
+  const { t } = useI18n();
   return (
     <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', statusStyles[status])}>
-      {STATUS_LABELS[status]}
+      {t(`contracts.statusLabels.${status}`)}
     </span>
   );
 }
