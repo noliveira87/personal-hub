@@ -65,6 +65,7 @@ export const translations = {
       sortByName: "Ordenar por Nome",
       noContractsFound: "Nenhum contrato encontrado.",
       addFirstContract: "Adicionar o primeiro contrato →",
+      searchPlaceholder: "Pesquisar por nome ou fornecedor...",
       namePlaceholder: "ex: Seguro Casa",
       provider: "Fornecedor",
       providerPlaceholder: "ex: Allianz",
@@ -122,6 +123,20 @@ export const translations = {
         cardDebit: "Cartão de Débito",
         gym: "Ginásio",
         other: "Outros",
+      },
+      viewCategories: {
+        cafofo: "Cafofo",
+        apartamento: "Apartamento",
+        carro: "Carro",
+        outros: "Outros",
+      },
+      dashboard: {
+        withinDays: "Até {{days}} dias",
+        expiringSoon: "A expirar em breve",
+        allActive: "Todos os ativos",
+        viewAll: "Ver todos",
+        loadMore: "Carregar mais",
+        hide: "Esconder",
       },
       typeLabels: {
         mortgage: "Crédito Habitação",
@@ -951,7 +966,7 @@ export const translations = {
         },
         monthly: {
           title: "Visao Mensal",
-          subtitle: "Vista tipo folha de calculo. Clica num valor para editar.",
+          subtitle: "Resumo mensal com totais e detalhe por mes.",
         },
         insights: {
           title: "Insights",
@@ -1130,6 +1145,7 @@ export const translations = {
       sortByName: "Sort by Name",
       noContractsFound: "No contracts found.",
       addFirstContract: "Add your first contract →",
+      searchPlaceholder: "Search by name or provider...",
       namePlaceholder: "e.g. Home Insurance",
       provider: "Provider",
       providerPlaceholder: "e.g. Allianz",
@@ -1187,6 +1203,20 @@ export const translations = {
         cardDebit: "Debit Card",
         gym: "Gym",
         other: "Other",
+      },
+      viewCategories: {
+        cafofo: "Home",
+        apartamento: "Apartment",
+        carro: "Car",
+        outros: "Other",
+      },
+      dashboard: {
+        withinDays: "Within {{days}} days",
+        expiringSoon: "Expiring Soon",
+        allActive: "All Active",
+        viewAll: "View all",
+        loadMore: "Load more",
+        hide: "Hide",
       },
       typeLabels: {
         mortgage: "Mortgage",
@@ -2013,7 +2043,7 @@ export const translations = {
         },
         monthly: {
           title: "Monthly View",
-          subtitle: "Spreadsheet-style overview. Click any amount to edit inline.",
+          subtitle: "Monthly summary with totals and month-by-month details.",
         },
         insights: {
           title: "Insights",

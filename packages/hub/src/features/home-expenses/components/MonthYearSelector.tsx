@@ -30,15 +30,17 @@ export default function MonthYearSelector() {
       return MONTHS.map((_, i) => i);
     }
 
+    const currentMonth = new Date().getMonth();
     const expenseMonths = new Set<number>();
     for (const tx of allTransactions) {
       if (tx.type !== 'expense') continue;
       const d = parseLocalDate(tx.date);
       expenseMonths.add(d.getMonth());
     }
+    expenseMonths.add(currentMonth);
 
     const months = MONTHS.map((_, i) => i).filter((m) => expenseMonths.has(m));
-    return months.length > 0 ? months : [new Date().getMonth()];
+    return months.length > 0 ? months : [currentMonth];
   }, [allTransactions, selectedYear, currentYear]);
 
   useEffect(() => {

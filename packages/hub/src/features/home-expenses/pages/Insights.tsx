@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { MONTHS } from '@/features/home-expenses/lib/types';
@@ -28,10 +28,16 @@ const MONTH_KEYS = [
 ] as const;
 
 export default function Insights() {
-  const { allTransactions, selectedYear, selectedMonth } = useData();
+  const { allTransactions, selectedYear, selectedMonth, setSelectedYear, setSelectedMonth } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
   const initialDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
+
+  useEffect(() => {
+    setSelectedYear(currentYear);
+    setSelectedMonth(currentMonth);
+  }, [currentYear, currentMonth, setSelectedMonth, setSelectedYear]);
 
   const data = useMemo(() => {
     const monthTxs = allTransactions.filter((t) => {

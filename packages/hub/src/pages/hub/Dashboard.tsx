@@ -4,17 +4,58 @@ import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost } from '@/features/contracts/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, LayoutDashboard, Loader, TrendingUp } from 'lucide-react';
+import { Plus, ArrowRight, LayoutDashboard, Loader, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { parseISO } from 'date-fns';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 
+type ContractViewCategory = 'cafofo' | 'apartamento' | 'carro' | 'outros';
+
+const VIEW_CATEGORY_ORDER: ContractViewCategory[] = ['cafofo', 'apartamento', 'carro', 'outros'];
+
+function getContractViewCategory(contract: { category: string; housingUsage: string | null; name: string; provider: string; notes: string | null }): ContractViewCategory {
+  const text = `${contract.name} ${contract.provider} ${contract.notes ?? ''}`.toLowerCase();
+
+  if (contract.category === 'car') {
+    return 'carro';
+  }
+
+  if (
+    contract.category === 'apartment-insurance'
+    || contract.housingUsage === 'secondary-home'
+    || text.includes('apartamento')
+  ) {
+    return 'apartamento';
+  }
+
+  if (
+    contract.housingUsage === 'primary-residence'
+    || [
+      'mortgage',
+      'home-insurance',
+      'gas',
+      'electricity',
+      'internet',
+      'mobile',
+      'water',
+      'tv-streaming',
+      'maintenance',
+      'security-alarm',
+    ].includes(contract.category)
+    || text.includes('cafofo')
+  ) {
+    return 'cafofo';
+  }
+
+  return 'outros';
+}
+
 export default function Dashboard() {
   const { t } = useI18n();
   const CARDS_PER_ROW = 3;
-  const INITIAL_VISIBLE = CARDS_PER_ROW * 3;
+  const INITIAL_VISIBLE = CARDS_PER_ROW;
   const { contracts, loading, error } = useContracts();
   const { formatCurrency, hideAmounts } = useI18n();
   const contractIds = useMemo(() => contracts.map((contract) => contract.id), [contracts]);
@@ -25,8 +66,6 @@ export default function Dashboard() {
   );
 
   const active = contracts.filter(c => c.status === 'active');
-  const activeYearly = active.filter(c => c.billingFrequency === 'yearly' || c.billingFrequency === 'one-time');
-  const activeMonthly = active.filter(c => c.billingFrequency === 'monthly' || c.billingFrequency === 'quarterly');
   const expiringSoon = active
     .map(c => ({ ...c, daysLeft: getDaysUntilExpiry(c) }))
     .filter(c => c.daysLeft >= 0 && c.daysLeft <= 60)
@@ -71,15 +110,35 @@ export default function Dashboard() {
   const within7 = expiringSoon.filter(c => c.daysLeft <= 7).length;
   const within15 = expiringSoon.filter(c => c.daysLeft <= 15).length;
   const within30 = expiringSoon.filter(c => c.daysLeft <= 30).length;
-  const [visibleMonthly, setVisibleMonthly] = useState(INITIAL_VISIBLE);
-  const [visibleYearly, setVisibleYearly] = useState(INITIAL_VISIBLE);
+  const [visibleByCategory, setVisibleByCategory] = useState<Record<ContractViewCategory, number>>({
+    cafofo: INITIAL_VISIBLE,
+    apartamento: INITIAL_VISIBLE,
+    carro: INITIAL_VISIBLE,
+    outros: INITIAL_VISIBLE,
+  });
+
+  const activeByCategory = useMemo(() => {
+    const grouped = new Map<ContractViewCategory, typeof active>();
+    VIEW_CATEGORY_ORDER.forEach((category) => grouped.set(category, []));
+
+    active.forEach((contract) => {
+      grouped.get(getContractViewCategory(contract))!.push(contract);
+    });
+
+    return VIEW_CATEGORY_ORDER
+      .map((category) => ({
+        category,
+        contracts: grouped.get(category) ?? [],
+      }))
+      .filter((section) => section.contracts.length > 0);
+  }, [active]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader className="w-4 h-4 animate-spin" />
-          <span className="text-sm">Loading contracts...</span>
+          <span className="text-sm">{t('contracts.loading')}</span>
         </div>
       </div>
     );
@@ -88,10 +147,10 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="text-center py-16 space-y-4">
-        <p className="text-destructive font-medium">Error loading contracts</p>
+        <p className="text-destructive font-medium">{t('contracts.errorLoading')}</p>
         <p className="text-muted-foreground text-sm">{error}</p>
         <Button onClick={() => window.location.reload()} size="sm">
-          Retry
+          {t('contracts.retry')}
         </Button>
       </div>
     );
@@ -115,9 +174,9 @@ export default function Dashboard() {
             </Link>
 
             <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex gap-1.5">
-              <Link to="/contracts/insights" aria-label="Open insights" title="Insights" className="flex items-center gap-1.5">
+              <Link to="/contracts/insights" aria-label={t('layout.nav.insights')} title={t('layout.nav.insights')} className="flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4" />
-                <span>Insights</span>
+                <span>{t('layout.nav.insights')}</span>
               </Link>
             </Button>
 
@@ -126,9 +185,9 @@ export default function Dashboard() {
               size="icon"
               className="h-10 w-10 rounded-xl sm:hidden"
               asChild
-              aria-label="Insights"
+              aria-label={t('layout.nav.insights')}
             >
-              <Link to="/contracts/insights" title="Insights">
+              <Link to="/contracts/insights" title={t('layout.nav.insights')}>
                 <TrendingUp className="h-4 w-4" />
               </Link>
             </Button>
@@ -165,13 +224,13 @@ export default function Dashboard() {
       {expiringSoon.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-up" style={{ animationDelay: '200ms' }}>
           {[
-            { label: '7 days', count: within7, variant: 'urgent' as const },
-            { label: '15 days', count: within15, variant: 'warning' as const },
-            { label: '30 days', count: within30, variant: 'warning' as const },
-            { label: '60 days', count: expiringSoon.length, variant: 'default' as const },
+            { days: 7, count: within7, variant: 'urgent' as const },
+            { days: 15, count: within15, variant: 'warning' as const },
+            { days: 30, count: within30, variant: 'warning' as const },
+            { days: 60, count: expiringSoon.length, variant: 'default' as const },
           ].map(bucket => (
-            <div key={bucket.label} className="bg-card rounded-lg p-3 border-2 border-border text-center shadow-sm">
-              <p className="text-xs text-muted-foreground">Within {bucket.label}</p>
+            <div key={bucket.days} className="bg-card rounded-lg p-3 border-2 border-border text-center shadow-sm">
+              <p className="text-xs text-muted-foreground">{t('contracts.dashboard.withinDays', { days: String(bucket.days) })}</p>
               <p className={`text-xl font-bold tabular-nums ${
                 bucket.variant === 'urgent' && bucket.count > 0 ? 'text-urgent' :
                 bucket.variant === 'warning' && bucket.count > 0 ? 'text-warning' : 'text-foreground'
@@ -187,9 +246,9 @@ export default function Dashboard() {
       {expiringSoon.length > 0 && (
         <section className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '280ms' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground">Expiring Soon</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('contracts.dashboard.expiringSoon')}</h2>
             <Link to="/contracts" className="text-sm text-primary font-medium flex items-center gap-1 hover:underline">
-              View all <ArrowRight className="w-3 h-3" />
+              {t('contracts.dashboard.viewAll')} <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -200,60 +259,62 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* All Active — split by billing frequency */}
+      {/* All Active — grouped by category */}
       <section className="rounded-2xl border-2 border-border bg-card p-4 sm:p-5 animate-fade-up" style={{ animationDelay: '360ms' }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">All Active</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('contracts.dashboard.allActive')}</h2>
           <Link to="/contracts" className="text-sm text-primary font-medium flex items-center gap-1 hover:underline">
-            View all <ArrowRight className="w-3 h-3" />
+            {t('contracts.dashboard.viewAll')} <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
 
-        {/* Monthly */}
-        {activeMonthly.length > 0 && (
-          <div className="mb-5">
-            <p className="text-base font-bold text-foreground mb-3 pl-3 border-l-4 border-primary">Monthly</p>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeMonthly.slice(0, visibleMonthly).map((contract, i) => (
-                <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
-              ))}
-            </div>
-            {activeMonthly.length > visibleMonthly && (
-              <div className="mt-3 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setVisibleMonthly((current) => current + CARDS_PER_ROW)}
-                >
-                  Carregar mais
-                </Button>
+        <div className="space-y-6">
+          {activeByCategory.map((section) => (
+            <div key={section.category}>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-base font-bold text-foreground pl-3 border-l-4 border-primary">
+                  {t(`contracts.viewCategories.${section.category}`)}
+                </p>
+                <span className="text-xs text-muted-foreground">
+                  {t('contracts.payments.contractsCount', { count: String(section.contracts.length) })}
+                </span>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Yearly */}
-        {activeYearly.length > 0 && (
-          <div>
-            <p className="text-base font-bold text-foreground mb-3 pl-3 border-l-4 border-primary">Yearly</p>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeYearly.slice(0, visibleYearly).map((contract, i) => (
-                <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
-              ))}
-            </div>
-            {activeYearly.length > visibleYearly && (
-              <div className="mt-3 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setVisibleYearly((current) => current + CARDS_PER_ROW)}
-                >
-                  Carregar mais
-                </Button>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {section.contracts.slice(0, visibleByCategory[section.category]).map((contract, i) => (
+                  <ContractCard key={contract.id} contract={contract} index={i} latestPrice={priceMap.get(contract.id)} />
+                ))}
               </div>
-            )}
-          </div>
-        )}
+
+              {section.contracts.length > CARDS_PER_ROW && (
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVisibleByCategory((current) => ({
+                      ...current,
+                      [section.category]: current[section.category] >= section.contracts.length
+                        ? CARDS_PER_ROW
+                        : Math.min(current[section.category] + CARDS_PER_ROW, section.contracts.length),
+                    }))}
+                    className="group relative overflow-hidden transition-all duration-200 hover:gap-2 flex items-center gap-1.5 px-4"
+                  >
+                    <span className="transition-all duration-200">
+                      {visibleByCategory[section.category] >= section.contracts.length
+                        ? t('contracts.dashboard.hide')
+                        : t('contracts.dashboard.loadMore')}
+                    </span>
+                    {visibleByCategory[section.category] >= section.contracts.length ? (
+                      <ChevronUp className="w-4 h-4 transition-transform duration-200 group-hover:-translate-y-1" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 transition-transform duration-200 group-hover:translate-y-1" />
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );

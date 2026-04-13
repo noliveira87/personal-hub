@@ -3,7 +3,6 @@ import { useData } from '@/features/home-expenses/lib/DataContext';
 import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { MONTHS, EXPENSE_CATEGORIES, Transaction } from '@/features/home-expenses/lib/types';
 import { Input } from '@/components/ui/input';
-import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { CalendarDays, Plus } from 'lucide-react';
@@ -110,10 +109,6 @@ export default function Monthly() {
       <div>
         <h2 className="text-2xl font-bold text-foreground">{t('homeExpenses.pages.monthly.title')} — {selectedYear}</h2>
         <p className="text-sm text-muted-foreground">{t('homeExpenses.pages.monthly.subtitle')}</p>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <MonthYearSelector />
       </div>
 
       <div className="overflow-x-auto">
