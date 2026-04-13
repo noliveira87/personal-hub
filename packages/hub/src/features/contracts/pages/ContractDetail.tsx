@@ -16,6 +16,7 @@ import { PriceHistoryModal } from '@/features/contracts/components/PriceHistoryM
 import { QuotesSection } from '@/features/contracts/components/QuotesSection';
 import CarElectricityChart from '@/features/contracts/components/CarElectricityChart';
 import ElectricityKwhChart from '@/features/contracts/components/ElectricityKwhChart';
+import WaterConsumptionChart from '@/features/contracts/components/WaterConsumptionChart';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 
@@ -187,6 +188,8 @@ export default function ContractDetail() {
       ) : null}
 
       {contract.category === 'electricity' ? <ElectricityKwhChart contractId={contract.id} /> : null}
+
+      {contract.category === 'water' ? <WaterConsumptionChart contractId={contract.id} /> : null}
 
       {contract.type === 'mortgage' && contract.mortgageDetails ? (
         <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: '170ms' }}>

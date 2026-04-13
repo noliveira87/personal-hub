@@ -26,6 +26,8 @@ function getContractViewCategory(contract: { category: string; housingUsage: str
     contract.category === 'apartment-insurance'
     || contract.housingUsage === 'secondary-home'
     || text.includes('apartamento')
+    || text.includes('sta clara')
+    || text.includes('st clara')
   ) {
     return 'apartamento';
   }

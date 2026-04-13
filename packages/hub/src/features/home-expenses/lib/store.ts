@@ -16,6 +16,10 @@ type TransactionRow = {
   recurring: boolean;
   contract_id: string | null;
   kwh: number | null;
+  cubic_meters: number | null;
+  reading_date: string | null;
+  billing_period_start: string | null;
+  billing_period_end: string | null;
   created_at?: string;
 };
 
@@ -43,6 +47,10 @@ function rowToTransaction(row: TransactionRow): Transaction {
     contractId: row.contract_id ?? undefined,
     isContractExpense: Boolean(row.contract_id),
     kwh: row.kwh != null ? Number(row.kwh) : undefined,
+    cubicMeters: row.cubic_meters != null ? Number(row.cubic_meters) : undefined,
+    readingDate: row.reading_date ?? undefined,
+    billingPeriodStart: row.billing_period_start ?? undefined,
+    billingPeriodEnd: row.billing_period_end ?? undefined,
   };
 }
 
@@ -58,6 +66,10 @@ function transactionToRow(tx: Transaction): TransactionRow {
     recurring: tx.recurring,
     contract_id: tx.contractId ?? null,
     kwh: tx.kwh ?? null,
+    cubic_meters: tx.cubicMeters ?? null,
+    reading_date: tx.readingDate ?? null,
+    billing_period_start: tx.billingPeriodStart ?? null,
+    billing_period_end: tx.billingPeriodEnd ?? null,
   };
 }
 
@@ -66,6 +78,14 @@ function mapTransactionWriteError(error: unknown): Error {
 
   if (/kwh/i.test(message) && /column|schema cache|home_expenses_transactions/i.test(message)) {
     return new Error('Missing database column `kwh` in `home_expenses_transactions`. Run the updated SQL migration first.');
+  }
+
+  if (/(cubic_meters|reading_date)/i.test(message) && /column|schema cache|home_expenses_transactions/i.test(message)) {
+    return new Error('Missing database columns `cubic_meters` or `reading_date` in `home_expenses_transactions`. Run the updated water usage SQL first.');
+  }
+
+  if (/(billing_period_start|billing_period_end)/i.test(message) && /column|schema cache|home_expenses_transactions/i.test(message)) {
+    return new Error('Missing database columns `billing_period_start` or `billing_period_end` in `home_expenses_transactions`. Run the updated billing period SQL first.');
   }
 
   return error instanceof Error ? error : new Error(message);
@@ -144,6 +164,10 @@ export async function updateTransactionInDb(id: string, updates: Partial<Transac
   if (updates.recurring !== undefined) row.recurring = updates.recurring;
   if ('contractId' in updates) row.contract_id = updates.contractId ?? null;
   if ('kwh' in updates) row.kwh = updates.kwh ?? null;
+  if ('cubicMeters' in updates) row.cubic_meters = updates.cubicMeters ?? null;
+  if ('readingDate' in updates) row.reading_date = updates.readingDate ?? null;
+  if ('billingPeriodStart' in updates) row.billing_period_start = updates.billingPeriodStart ?? null;
+  if ('billingPeriodEnd' in updates) row.billing_period_end = updates.billingPeriodEnd ?? null;
   const { error } = await supabase.from(TABLE).update(row).eq('id', id);
   if (error) throw mapTransactionWriteError(error);
 }

@@ -11,6 +11,10 @@ create table if not exists public.home_expenses_transactions (
   recurring boolean not null default false,
   contract_id text references public.contracts(id) on delete set null,
   kwh numeric(10,2),
+  cubic_meters numeric(10,2),
+  reading_date date,
+  billing_period_start date,
+  billing_period_end date,
   created_at timestamptz not null default now()
 );
 
@@ -23,6 +27,18 @@ create index if not exists home_expenses_transactions_contract_id_date_idx
 
 alter table public.home_expenses_transactions
   add column if not exists kwh numeric(10,2);
+
+alter table public.home_expenses_transactions
+  add column if not exists cubic_meters numeric(10,2);
+
+alter table public.home_expenses_transactions
+  add column if not exists reading_date date;
+
+alter table public.home_expenses_transactions
+  add column if not exists billing_period_start date;
+
+alter table public.home_expenses_transactions
+  add column if not exists billing_period_end date;
 
 alter table public.home_expenses_transactions enable row level security;
 

@@ -27,6 +27,10 @@ export interface Transaction {
   isReadOnly?: boolean; // Derived rows shown in the UI but not editable from home-expenses
   source?: 'home-expenses' | 'legacy-car-charging';
   kwh?: number; // kWh for electricity expenses
+  cubicMeters?: number; // m3 for water expenses
+  readingDate?: string; // Meter reading date (YYYY-MM-DD)
+  billingPeriodStart?: string; // Billing period start date (YYYY-MM-DD)
+  billingPeriodEnd?: string; // Billing period end date (YYYY-MM-DD)
 }
 
 export interface MonthData {

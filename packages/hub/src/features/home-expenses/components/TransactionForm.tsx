@@ -58,6 +58,10 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
   const [chargingLocation, setChargingLocation] = useState<CarChargingLocation>('home');
   const [chargingDescription, setChargingDescription] = useState('');
   const [kwh, setKwh] = useState(editTx?.kwh?.toString() ?? '');
+  const [cubicMeters, setCubicMeters] = useState(editTx?.cubicMeters?.toString() ?? '');
+  const [readingDate, setReadingDate] = useState(editTx?.readingDate ?? '');
+  const [billingPeriodStart, setBillingPeriodStart] = useState(editTx?.billingPeriodStart ?? '');
+  const [billingPeriodEnd, setBillingPeriodEnd] = useState(editTx?.billingPeriodEnd ?? '');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,6 +80,10 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
       setChargingLocation(parsedChargingNotes.location ?? 'home');
       setChargingDescription(parsedChargingNotes.description);
       setKwh(editTx.kwh?.toString() ?? '');
+      setCubicMeters(editTx.cubicMeters?.toString() ?? '');
+      setReadingDate(editTx.readingDate ?? '');
+      setBillingPeriodStart(editTx.billingPeriodStart ?? '');
+      setBillingPeriodEnd(editTx.billingPeriodEnd ?? '');
       return;
     }
 
@@ -90,6 +98,10 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     setChargingLocation(parsedChargingNotes.location ?? 'home');
     setChargingDescription(parsedChargingNotes.description);
     setKwh('');
+    setCubicMeters('');
+    setReadingDate('');
+    setBillingPeriodStart('');
+    setBillingPeriodEnd('');
   }, [editTx, initialDate, initialType, initialCategory, initialContractId, initialName, initialNotes]);
 
   const selectedContract = contractId !== 'none'
@@ -137,6 +149,10 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     setChargingLocation('home');
     setChargingDescription('');
     setKwh('');
+    setCubicMeters('');
+    setReadingDate('');
+    setBillingPeriodStart('');
+    setBillingPeriodEnd('');
     setSubmitError(null);
   };
 
@@ -180,6 +196,40 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
       : name.trim();
 
     const parsedKwh = category === 'electricity' && kwh.trim() ? parseFloat(kwh) : undefined;
+    const parsedCubicMeters = category === 'water' && cubicMeters.trim() ? parseFloat(cubicMeters) : undefined;
+    const nextReadingDate = category === 'water' ? (readingDate || undefined) : undefined;
+    const nextBillingPeriodStart = (category === 'electricity' || category === 'water') ? (billingPeriodStart || undefined) : undefined;
+    const nextBillingPeriodEnd = (category === 'electricity' || category === 'water') ? (billingPeriodEnd || undefined) : undefined;
+
+    if (category === 'electricity' && parsedKwh == null) {
+      setSubmitError(t('homeExpenses.form.kwhRequired'));
+      return;
+    }
+
+    if (category === 'water' && parsedCubicMeters == null) {
+      setSubmitError(t('homeExpenses.form.cubicMetersRequired'));
+      return;
+    }
+
+    if (category === 'water' && !nextReadingDate) {
+      setSubmitError(t('homeExpenses.form.readingDateRequired'));
+      return;
+    }
+
+    if ((category === 'electricity' || category === 'water') && !nextBillingPeriodStart) {
+      setSubmitError(t('homeExpenses.form.billingPeriodStartRequired'));
+      return;
+    }
+
+    if ((category === 'electricity' || category === 'water') && !nextBillingPeriodEnd) {
+      setSubmitError(t('homeExpenses.form.billingPeriodEndRequired'));
+      return;
+    }
+
+    if (nextBillingPeriodStart && nextBillingPeriodEnd && nextBillingPeriodEnd < nextBillingPeriodStart) {
+      setSubmitError(t('homeExpenses.form.billingPeriodInvalid'));
+      return;
+    }
 
     try {
       if (editTx) {
@@ -194,6 +244,10 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
           contractId: nextContractId,
           isContractExpense: Boolean(nextContractId),
           kwh: parsedKwh,
+          cubicMeters: parsedCubicMeters,
+          readingDate: nextReadingDate,
+          billingPeriodStart: nextBillingPeriodStart,
+          billingPeriodEnd: nextBillingPeriodEnd,
         });
       } else {
         await addTx({
@@ -207,6 +261,10 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
           contractId: nextContractId,
           isContractExpense: Boolean(nextContractId),
           kwh: parsedKwh,
+          cubicMeters: parsedCubicMeters,
+          readingDate: nextReadingDate,
+          billingPeriodStart: nextBillingPeriodStart,
+          billingPeriodEnd: nextBillingPeriodEnd,
         });
       }
       reset();
@@ -359,10 +417,45 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
               </div>
 
               {category === 'electricity' && (
-                <div>
-                  <Label htmlFor="kwh">kWh ({t('homeExpenses.form.optional')})</Label>
-                  <Input id="kwh" type="number" step="0.01" value={kwh} onChange={(e) => setKwh(e.target.value)} placeholder="0.00" className="mt-1 tabular-nums" />
-                </div>
+                <>
+                  <div>
+                    <Label htmlFor="kwh">kWh</Label>
+                    <Input id="kwh" type="number" step="0.01" value={kwh} onChange={(e) => setKwh(e.target.value)} placeholder="0.00" className="mt-1 tabular-nums" required />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="billingPeriodStart">{t('homeExpenses.form.billingPeriodStart')}</Label>
+                      <Input id="billingPeriodStart" type="date" value={billingPeriodStart} onChange={(e) => setBillingPeriodStart(e.target.value)} className="mt-1" required />
+                    </div>
+                    <div>
+                      <Label htmlFor="billingPeriodEnd">{t('homeExpenses.form.billingPeriodEnd')}</Label>
+                      <Input id="billingPeriodEnd" type="date" value={billingPeriodEnd} onChange={(e) => setBillingPeriodEnd(e.target.value)} className="mt-1" required />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {category === 'water' && (
+                <>
+                  <div>
+                    <Label htmlFor="cubicMeters">{t('homeExpenses.form.cubicMeters')}</Label>
+                    <Input id="cubicMeters" type="number" step="0.01" value={cubicMeters} onChange={(e) => setCubicMeters(e.target.value)} placeholder="0.00" className="mt-1 tabular-nums" required />
+                  </div>
+                  <div>
+                    <Label htmlFor="readingDate">{t('homeExpenses.form.readingDate')}</Label>
+                    <Input id="readingDate" type="date" value={readingDate} onChange={(e) => setReadingDate(e.target.value)} className="mt-1" required />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="billingPeriodStart">{t('homeExpenses.form.billingPeriodStart')}</Label>
+                      <Input id="billingPeriodStart" type="date" value={billingPeriodStart} onChange={(e) => setBillingPeriodStart(e.target.value)} className="mt-1" required />
+                    </div>
+                    <div>
+                      <Label htmlFor="billingPeriodEnd">{t('homeExpenses.form.billingPeriodEnd')}</Label>
+                      <Input id="billingPeriodEnd" type="date" value={billingPeriodEnd} onChange={(e) => setBillingPeriodEnd(e.target.value)} className="mt-1" required />
+                    </div>
+                  </div>
+                </>
               )}
 
               {category === 'car' && (

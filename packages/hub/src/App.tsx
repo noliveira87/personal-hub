@@ -35,6 +35,7 @@ const HomeExpensesIndexPage = lazy(() => import("@/features/home-expenses/pages/
 const HomeExpensesTransactionsPage = lazy(() => import("@/features/home-expenses/pages/Transactions"));
 const HomeExpensesMonthlyPage = lazy(() => import("@/features/home-expenses/pages/Monthly"));
 const HomeExpensesInsightsPage = lazy(() => import("@/features/home-expenses/pages/Insights"));
+const HomeExpensesChecklistPage = lazy(() => import("@/features/home-expenses/pages/Checklist"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -90,6 +91,7 @@ const AppRoutes = () => {
                 <Route path="/home-expenses/transactions" element={<HomeExpensesTransactionsPage />} />
                 <Route path="/home-expenses/monthly" element={<HomeExpensesMonthlyPage />} />
                 <Route path="/home-expenses/insights" element={<HomeExpensesInsightsPage />} />
+                <Route path="/home-expenses/checklist" element={<HomeExpensesChecklistPage />} />
               </Route>
             </Route>
 

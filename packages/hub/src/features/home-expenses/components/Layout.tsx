@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowUpDown, CalendarDays, TrendingUp, X } from 'lucide-react';
+import { LayoutDashboard, ArrowUpDown, CalendarDays, TrendingUp, X, CheckSquare } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 
 const links = [
@@ -8,6 +8,7 @@ const links = [
   { to: '/home-expenses/transactions', labelKey: 'homeExpenses.layout.nav.transactions', icon: ArrowUpDown },
   { to: '/home-expenses/monthly', labelKey: 'homeExpenses.layout.nav.monthly', icon: CalendarDays },
   { to: '/home-expenses/insights', labelKey: 'homeExpenses.layout.nav.insights', icon: TrendingUp },
+  { to: '/home-expenses/checklist', labelKey: 'homeExpenses.layout.nav.checklist', icon: CheckSquare },
 ];
 
 type HomeExpensesMobileNavContextValue = {

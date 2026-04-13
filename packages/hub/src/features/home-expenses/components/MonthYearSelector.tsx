@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { addMonths } from 'date-fns';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { MONTHS } from '@/features/home-expenses/lib/types';
-import { parseLocalDate } from '@/features/home-expenses/lib/store';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nProvider';
 
 const MONTH_KEYS = [
@@ -21,56 +21,45 @@ const MONTH_KEYS = [
 ] as const;
 
 export default function MonthYearSelector() {
-  const { selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, allTransactions } = useData();
+  const { selectedYear, setSelectedYear, selectedMonth, setSelectedMonth } = useData();
   const { t } = useI18n();
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  const monthLabel = t(MONTH_KEYS[selectedMonth]) || MONTHS[selectedMonth];
+  const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
 
-  const availableMonths = useMemo(() => {
-    if (selectedYear !== currentYear) {
-      return MONTHS.map((_, i) => i);
+  const navigateMonth = (direction: -1 | 1) => {
+    const next = addMonths(new Date(selectedYear, selectedMonth, 1), direction);
+    if (direction > 0) {
+      const max = new Date(currentYear, currentMonth, 1);
+      if (next > max) {
+        return;
+      }
     }
-
-    const currentMonth = new Date().getMonth();
-    const expenseMonths = new Set<number>();
-    for (const tx of allTransactions) {
-      if (tx.type !== 'expense') continue;
-      const d = parseLocalDate(tx.date);
-      expenseMonths.add(d.getMonth());
-    }
-    expenseMonths.add(currentMonth);
-
-    const months = MONTHS.map((_, i) => i).filter((m) => expenseMonths.has(m));
-    return months.length > 0 ? months : [currentMonth];
-  }, [allTransactions, selectedYear, currentYear]);
-
-  useEffect(() => {
-    if (!availableMonths.includes(selectedMonth)) {
-      setSelectedMonth(availableMonths[availableMonths.length - 1]);
-    }
-  }, [availableMonths, selectedMonth, setSelectedMonth]);
+    setSelectedYear(next.getFullYear());
+    setSelectedMonth(next.getMonth());
+  };
 
   return (
-    <div className="flex items-center gap-3">
-      <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-        <SelectTrigger className="w-36 bg-card border-border">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {availableMonths.map((i) => (
-            <SelectItem key={i} value={String(i)}>{t(MONTH_KEYS[i]) || MONTHS[i]}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-        <SelectTrigger className="w-24 bg-card border-border">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {[2024, 2025, 2026, 2027].map((y) => (
-            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="flex items-center justify-between rounded-xl border bg-card px-2 py-2 w-full">
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateMonth(-1)}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground capitalize">
+        <Calendar className="h-4 w-4 text-muted-foreground" />
+        <span>{monthLabel} {selectedYear}</span>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 disabled:opacity-40"
+        onClick={() => navigateMonth(1)}
+        disabled={isCurrentMonth}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
