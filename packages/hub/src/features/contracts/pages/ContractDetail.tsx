@@ -9,6 +9,7 @@ import { BILLING_LABELS, RENEWAL_LABELS, TYPE_LABELS, HOUSING_USAGE_LABELS, getC
 import { format, parseISO } from 'date-fns';
 import { Edit, Trash2, CalendarDays, Bell, FileText, TrendingUp } from 'lucide-react';
 import CarElectricityChart from '../components/CarElectricityChart';
+import ElectricityKwhChart from '../components/ElectricityKwhChart';
 import { QuotesSection } from '../components/QuotesSection';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
@@ -163,6 +164,12 @@ export default function ContractDetail() {
       {contract.type === 'car' && (
         <>
           <CarElectricityChart contractId={contract.id} contractName={contract.name} />
+        </>
+      )}
+
+      {contract.category === 'electricity' && (
+        <>
+          <ElectricityKwhChart contractId={contract.id} />
         </>
       )}
 

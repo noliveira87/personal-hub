@@ -21,6 +21,11 @@ import {
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -46,9 +51,7 @@ import {
   CashbackEntry,
   CashbackCategory,
   CashbackPurchase,
-  getCashbackPercent,
   getCategoryLabel,
-  getTotalCashback,
 } from '@/features/cashback-hero/types';
 import { useCashbackStore } from '@/features/cashback-hero/use-cashback-store';
 import {
@@ -69,14 +72,23 @@ function monthKeyFromDate(value: Date): string {
   return format(value, 'yyyy-MM');
 }
 
+function getEntryAmountForDisplay(entry: CashbackEntry): number {
+  const BYBIT_EUR_PER_POINT = 0.002455;
+  if (/bybit/i.test(entry.source) && entry.points != null && Number.isFinite(entry.points) && entry.points > 0) {
+    return Math.round(entry.points * BYBIT_EUR_PER_POINT * 100) / 100;
+  }
+  return entry.amount;
+}
+
 function getEffectiveEntryAmounts(purchase: CashbackPurchase): Array<{ id: string; amount: number }> {
   if (purchase.isReferral) {
-    return purchase.cashbackEntries.map((entry) => ({ id: entry.id, amount: entry.amount }));
+    return purchase.cashbackEntries.map((entry) => ({ id: entry.id, amount: getEntryAmountForDisplay(entry) }));
   }
 
   let remaining = Math.max(0, purchase.amount);
   return purchase.cashbackEntries.map((entry) => {
-    const effectiveAmount = Math.max(0, Math.min(entry.amount, remaining));
+    const amount = getEntryAmountForDisplay(entry);
+    const effectiveAmount = Math.max(0, Math.min(amount, remaining));
     remaining -= effectiveAmount;
     return { id: entry.id, amount: effectiveAmount };
   });
@@ -92,11 +104,24 @@ function getDisplayPercentFromPurchase(purchase: CashbackPurchase): number {
   // For display, never show more than 100% cashback for a purchase.
   const effectiveCashback = getEffectiveTotalCashback(purchase);
   const rawPercent = (effectiveCashback / purchase.amount) * 100;
-  return Math.max(0, Math.min(100, rawPercent));
+  const clampedPercent = Math.max(0, Math.min(100, rawPercent));
+
+  // For Bybit-only purchases, snap display to official tier percentages for a uniform UI.
+  const hasEntries = purchase.cashbackEntries.length > 0;
+  const isBybitOnly = hasEntries && purchase.cashbackEntries.every((entry) => /bybit/i.test(entry.source));
+  if (!isBybitOnly) return clampedPercent;
+
+  // Snap to standard Bybit tiers for a uniform display across purchases.
+  if (clampedPercent >= 1.5 && clampedPercent < 3.5) return 2.45;
+  if (clampedPercent >= 3.5 && clampedPercent < 6) return 4.91;
+  return clampedPercent;
 }
 
 function CashbackPercentBadge({ percent }: { percent: number }) {
-  const displayPercent = Math.max(0, Math.min(100, Math.round(percent)));
+  const displayPercent = Math.max(0, Math.min(100, percent));
+  const formattedPercent = Number.isInteger(displayPercent)
+    ? displayPercent.toFixed(0)
+    : displayPercent.toFixed(2).replace(/\.?0+$/, '');
   const tone = percent >= 5
     ? 'border-emerald-600 bg-emerald-500/20 text-emerald-700 dark:bg-emerald-500/30 dark:text-emerald-200'
     : percent >= 2
@@ -105,7 +130,7 @@ function CashbackPercentBadge({ percent }: { percent: number }) {
 
   return (
     <span className={cn('inline-flex rounded-lg border px-3 py-1.5 text-sm font-bold tabular-nums', tone)}>
-      {displayPercent.toFixed(0)}%
+      {formattedPercent}%
     </span>
   );
 }
@@ -136,6 +161,7 @@ export default function CashbackHeroPage() {
   const [sortByPercent, setSortByPercent] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => monthKeyFromDate(new Date()));
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [visibleCount, setVisibleCount] = useState(5);
 
   const lastSyncSigRef = useRef<Map<string, string>>(new Map());
 
@@ -181,7 +207,7 @@ export default function CashbackHeroPage() {
     }
 
     if (sortByPercent) {
-      result.sort((a, b) => getCashbackPercent(b) - getCashbackPercent(a));
+      result.sort((a, b) => getDisplayPercentFromPurchase(b) - getDisplayPercentFromPurchase(a));
     } else {
       result.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
     }
@@ -191,14 +217,14 @@ export default function CashbackHeroPage() {
 
   const stats = useMemo(() => {
     const monthSpent = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-    const monthCashback = monthPurchases.reduce((sum, purchase) => sum + getTotalCashback(purchase), 0);
+    const monthCashback = monthPurchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase), 0);
     const overallSpent = purchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-    const overallCashback = purchases.reduce((sum, purchase) => sum + getTotalCashback(purchase), 0);
+    const overallCashback = purchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase), 0);
     const avgPercent = monthSpent > 0 ? (monthCashback / monthSpent) * 100 : 0;
 
     const bestPurchase = monthPurchases.reduce<CashbackPurchase | null>((currentBest, purchase) => {
       if (!currentBest) return purchase;
-      return getCashbackPercent(purchase) > getCashbackPercent(currentBest) ? purchase : currentBest;
+      return getDisplayPercentFromPurchase(purchase) > getDisplayPercentFromPurchase(currentBest) ? purchase : currentBest;
     }, null);
 
     return {
@@ -258,7 +284,7 @@ export default function CashbackHeroPage() {
         }));
       }
 
-      const unibancoNoCashbackCount = unibancoEligible.filter((p) => getTotalCashback(p) <= 0).length;
+      const unibancoNoCashbackCount = unibancoEligible.filter((p) => getEffectiveTotalCashback(p) <= 0).length;
       if (unibancoNoCashbackCount > 0) {
         list.push(t('cashbackHero.insights.unibancoNoCashbackDueToCap', {
           count: String(unibancoNoCashbackCount),
@@ -268,7 +294,7 @@ export default function CashbackHeroPage() {
 
     const eligibleForCoverage = monthPurchases.filter((p) => !(p.isReferral ?? false));
     if (eligibleForCoverage.length > 0) {
-      const withCashbackCount = eligibleForCoverage.filter((p) => getTotalCashback(p) > 0).length;
+      const withCashbackCount = eligibleForCoverage.filter((p) => getEffectiveTotalCashback(p) > 0).length;
       const coverageRate = (withCashbackCount / eligibleForCoverage.length) * 100;
       list.push(t('cashbackHero.insights.coverage', {
         covered: String(withCashbackCount),
@@ -298,7 +324,7 @@ export default function CashbackHeroPage() {
     if (stats.bestPurchase) {
       list.push(t('cashbackHero.insights.bestDeal', {
         merchant: stats.bestPurchase.merchant,
-        percent: getCashbackPercent(stats.bestPurchase).toFixed(1),
+        percent: getDisplayPercentFromPurchase(stats.bestPurchase).toFixed(2).replace(/\.?0+$/, ''),
       }));
     }
 
@@ -482,47 +508,63 @@ export default function CashbackHeroPage() {
             </div>
             <p className="mt-1 truncate text-sm font-semibold text-foreground">{stats.bestPurchase?.merchant ?? t('cashbackHero.stats.noData')}</p>
             {stats.bestPurchase ? (
-              <p className="mt-1 text-xs text-muted-foreground">{getCashbackPercent(stats.bestPurchase).toFixed(1)}%</p>
+              <p className="mt-1 text-xs text-muted-foreground">{getDisplayPercentFromPurchase(stats.bestPurchase).toFixed(2).replace(/\.?0+$/, '')}%</p>
             ) : null}
           </div>
         </div>
 
         {insights.length > 0 ? (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-amber-500/10">
-            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
-                  <Lightbulb className="h-4 w-4" />
-                </span>
-                {t('cashbackHero.insights.title')}
-              </div>
-              <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                {insights.length}
-              </span>
-            </div>
-
-            <div className="grid gap-2 p-3 sm:grid-cols-2">
-              {insights.map((line, index) => (
-                <div
-                  key={`${line}-${index}`}
-                  className="group rounded-xl border border-border/70 bg-background/80 p-3 backdrop-blur-sm transition-colors hover:border-primary/35"
+          <div className="mt-4 flex justify-end">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="relative h-9 w-9 rounded-full border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                  aria-label={t('cashbackHero.insights.title')}
                 >
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1 text-[11px] font-bold text-primary">
-                      {index + 1}
+                  <Lightbulb className="h-4 w-4" />
+                  <span className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                    {insights.length}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-amber-500/10">
+                <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                      <Lightbulb className="h-4 w-4" />
                     </span>
-                    <p className="text-sm leading-5 text-foreground/90">
-                      {line.includes(':') ? (
-                        <>
-                          <span className="font-semibold">{line.slice(0, line.indexOf(':'))}:</span>
-                          {line.slice(line.indexOf(':') + 1)}
-                        </>
-                      ) : line}
-                    </p>
+                    {t('cashbackHero.insights.title')}
                   </div>
+                  <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                    {insights.length}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="flex flex-col gap-2 p-3">
+                  {insights.slice(0, 5).map((line, index) => (
+                    <div
+                      key={`${line}-${index}`}
+                      className="group rounded-xl border border-border/70 bg-background/80 p-3 backdrop-blur-sm transition-colors hover:border-primary/35"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1 text-[11px] font-bold text-primary">
+                          {index + 1}
+                        </span>
+                        <p className="text-sm leading-5 text-foreground/90">
+                          {line.includes(':') ? (
+                            <>
+                              <span className="font-semibold">{line.slice(0, line.indexOf(':'))}:</span>
+                              {line.slice(line.indexOf(':') + 1)}
+                            </>
+                          ) : line}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : null}
 
@@ -581,7 +623,7 @@ export default function CashbackHeroPage() {
               {t('cashbackHero.noCompras')}
             </div>
           ) : !loading ? (
-            filteredPurchases.map((purchase) => {
+            filteredPurchases.slice(0, visibleCount).map((purchase) => {
               const isExpanded = Boolean(expandedIds[purchase.id]);
               const totalCashback = getEffectiveTotalCashback(purchase);
               const effectiveEntries = new Map(getEffectiveEntryAmounts(purchase).map((item) => [item.id, item.amount]));
@@ -635,75 +677,86 @@ export default function CashbackHeroPage() {
                         <p className="mb-3 text-xs italic text-muted-foreground">{purchase.notes}</p>
                       ) : null}
 
+                      <div className="rounded-lg border bg-background/70 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('cashbackHero.cashback.purchaseActionsTitle')}</p>
+                          <div className="flex items-center gap-1 rounded-md border bg-muted/30 p-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                              setEditingCashback(null);
+                              setCashbackPurchaseId(purchase.id);
+                            }} title={t('cashbackHero.cashback.addCashbackToPurchase')} aria-label={t('cashbackHero.cashback.addCashbackToPurchase')}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingPurchase(purchase)} title={t('cashbackHero.editPurchase')} aria-label={t('cashbackHero.editPurchase')}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { void requestDeletePurchase(purchase.id); }} title={`Eliminar compra (${purchase.merchant})`} aria-label={`Eliminar compra (${purchase.merchant})`}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
                       {purchase.cashbackEntries.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="mt-3 space-y-2">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('cashbackHero.cashback.purchaseCashbackTitle')}</p>
                           {purchase.cashbackEntries.map((entry) => (
                             <div key={entry.id} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2">
                               <div>
                                 <p className="text-sm font-medium text-foreground">{entry.source}</p>
                                 <p className="text-xs text-muted-foreground">{formatDateLabel(entry.dateReceived)}</p>
                               </div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-2">
                                 <p className="text-sm font-semibold text-primary">+{formatCurrency(effectiveEntries.get(entry.id) ?? entry.amount, 'EUR')}</p>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5"
-                                  onClick={() => {
-                                    setEditingCashback({ purchaseId: purchase.id, entry });
-                                    setCashbackPurchaseId(purchase.id);
-                                  }}
-                                  title={t('cashbackHero.cashback.editCashback')}
-                                  aria-label={t('cashbackHero.cashback.editCashback')}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  <span className="text-xs">Cashback</span>
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-                                  onClick={() => { void requestDeleteCashback(purchase.id, entry.id); }}
-                                  title={`Eliminar cashback (${entry.source})`}
-                                  aria-label={`Eliminar cashback (${entry.source})`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  <span className="text-xs">Cashback</span>
-                                </Button>
+                                <div className="flex items-center gap-1 rounded-md border bg-muted/30 p-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => {
+                                      setEditingCashback({ purchaseId: purchase.id, entry });
+                                      setCashbackPurchaseId(purchase.id);
+                                    }}
+                                    title={t('cashbackHero.cashback.editCashback')}
+                                    aria-label={t('cashbackHero.cashback.editCashback')}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() => { void requestDeleteCashback(purchase.id, entry.id); }}
+                                    title={t('cashbackHero.cashback.deleteCashbackWithSource', { source: entry.source })}
+                                    aria-label={t('cashbackHero.cashback.deleteCashbackWithSource', { source: entry.source })}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-muted-foreground">{t('cashbackHero.cashback.noCashback')}</p>
+                        <p className="mt-3 text-xs text-muted-foreground">{t('cashbackHero.cashback.noCashback')}</p>
                       )}
-
-                      <div className="mt-3 space-y-2">
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Acoes da compra</p>
-                        <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => {
-                          setEditingCashback(null);
-                          setCashbackPurchaseId(purchase.id);
-                        }} title="Adicionar cashback a esta compra" aria-label="Adicionar cashback a esta compra">
-                          <Plus className="h-3.5 w-3.5" />
-                          <span className="text-xs">Adicionar cashback</span>
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setEditingPurchase(purchase)} title="Editar compra" aria-label="Editar compra">
-                          <Pencil className="h-3.5 w-3.5" />
-                          <span className="text-xs">Editar compra</span>
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => { void requestDeletePurchase(purchase.id); }} title={`Eliminar compra (${purchase.merchant})`} aria-label={`Eliminar compra (${purchase.merchant})`}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span className="text-xs">Eliminar compra</span>
-                        </Button>
-                        </div>
-                      </div>
                     </div>
                   ) : null}
                 </div>
               );
             })
             ) : null}
+          {!loading && filteredPurchases.length > visibleCount ? (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((prev) => prev + 5)}
+              >
+                {t('cashbackHero.loadMore')}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -931,7 +984,8 @@ function AddCashbackDialog({
   onSubmit: (value: { source: string; amount: number; points?: number; dateReceived: string }) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const BYBIT_EUR_PER_POINT = 0.002;
+  const BYBIT_EUR_PER_POINT = 0.002455;
+  const CURVE_CASH_DEFAULT_GBP_RATE = 1.17;
   const availableSources = useMemo(() => {
     const hasBybit = sources.some((value) => /bybit/i.test(value));
     return hasBybit ? sources : [...sources, 'Bybit'];
@@ -940,9 +994,12 @@ function AddCashbackDialog({
   const [source, setSource] = useState(() => availableSources[0] ?? '');
   const [amount, setAmount] = useState('');
   const [points, setPoints] = useState('');
+  const [gbpAmount, setGbpAmount] = useState('');
+  const [gbpEurRate, setGbpEurRate] = useState(CURVE_CASH_DEFAULT_GBP_RATE);
   const [dateReceived, setDateReceived] = useState(format(new Date(), 'yyyy-MM-dd'));
   const isEditing = editingEntry !== null;
   const isBybitSource = /bybit/i.test(source);
+  const isCurveCashSource = /curve/i.test(source);
 
   // Reset source when sources list changes and current is gone
   useEffect(() => {
@@ -964,8 +1021,13 @@ function AddCashbackDialog({
           const inferredPoints = Math.round((editingEntry.amount / BYBIT_EUR_PER_POINT) * 100) / 100;
           setPoints(String(inferredPoints));
         }
+        setGbpAmount('');
+      } else if (/curve/i.test(editingEntry.source)) {
+        setPoints('');
+        setGbpAmount(editingEntry.points != null ? String(editingEntry.points) : '');
       } else {
         setPoints('');
+        setGbpAmount('');
       }
       setDateReceived(editingEntry.dateReceived);
       return;
@@ -974,6 +1036,7 @@ function AddCashbackDialog({
     setSource((prev) => (availableSources.includes(prev) ? prev : (availableSources[0] ?? '')));
     setAmount('');
     setPoints('');
+    setGbpAmount('');
     setDateReceived(format(new Date(), 'yyyy-MM-dd'));
   }, [open, editingEntry, availableSources, BYBIT_EUR_PER_POINT]);
 
@@ -991,6 +1054,35 @@ function AddCashbackDialog({
     setAmount(Math.min(converted, maxAmount).toFixed(2));
   }, [isBybitSource, points, targetPurchase]);
 
+  // Fetch live GBP/EUR rate when Curve Cash is selected
+  useEffect(() => {
+    if (!isCurveCashSource || !open) return;
+    let cancelled = false;
+    fetch('https://api.frankfurter.app/latest?from=GBP&to=EUR')
+      .then((res) => res.json())
+      .then((data: unknown) => {
+        if (!cancelled && typeof data === 'object' && data !== null && 'rates' in data) {
+          const rates = (data as { rates: Record<string, number> }).rates;
+          if (typeof rates.EUR === 'number') setGbpEurRate(rates.EUR);
+        }
+      })
+      .catch(() => { /* keep default */ });
+    return () => { cancelled = true; };
+  }, [isCurveCashSource, open]);
+
+  // Convert GBP → EUR automatically for Curve Cash
+  useEffect(() => {
+    if (!isCurveCashSource) return;
+    const parsed = Number(gbpAmount.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      if (gbpAmount.trim() !== '') setAmount('');
+      return;
+    }
+    const converted = Math.round(parsed * gbpEurRate * 100) / 100;
+    const maxAmount = targetPurchase && !targetPurchase.isReferral ? targetPurchase.amount : Number.POSITIVE_INFINITY;
+    setAmount(Math.min(converted, maxAmount).toFixed(2));
+  }, [isCurveCashSource, gbpAmount, gbpEurRate, targetPurchase]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     let parsedAmount = Number(amount.replace(',', '.'));
@@ -1004,6 +1096,14 @@ function AddCashbackDialog({
       }
       parsedPoints = parsedBybitPoints;
       parsedAmount = Math.round(parsedBybitPoints * BYBIT_EUR_PER_POINT * 100) / 100;
+    } else if (isCurveCashSource && gbpAmount.trim() !== '') {
+      const parsedGbp = Number(gbpAmount.replace(',', '.'));
+      if (!Number.isFinite(parsedGbp) || parsedGbp <= 0) {
+        toast.error(t('cashbackHero.cashback.curveCashGbpLabel'));
+        return;
+      }
+      parsedPoints = parsedGbp;
+      parsedAmount = Math.round(parsedGbp * gbpEurRate * 100) / 100;
     }
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -1060,10 +1160,13 @@ function AddCashbackDialog({
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0.00"
-              readOnly={isBybitSource}
+              readOnly={isBybitSource || isCurveCashSource}
             />
             {isBybitSource ? (
               <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitConvertedHint')}</p>
+            ) : null}
+            {isCurveCashSource ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashConvertedHint')} {gbpEurRate > 0 ? `• 1 £ ≈ €${gbpEurRate.toFixed(4)}` : null}</p>
             ) : null}
           </div>
 
@@ -1078,6 +1181,20 @@ function AddCashbackDialog({
                 placeholder="10000"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitPointsHint')}</p>
+            </div>
+          ) : null}
+
+          {isCurveCashSource ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpLabel')}</label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={gbpAmount}
+                onChange={(event) => setGbpAmount(event.target.value)}
+                placeholder="0.00"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpHint')}</p>
             </div>
           ) : null}
 

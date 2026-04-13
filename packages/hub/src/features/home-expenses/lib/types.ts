@@ -26,6 +26,7 @@ export interface Transaction {
   isContractExpense?: boolean; // Flag to indicate this expense is linked to a contract
   isReadOnly?: boolean; // Derived rows shown in the UI but not editable from home-expenses
   source?: 'home-expenses' | 'legacy-car-charging';
+  kwh?: number; // kWh for electricity expenses
 }
 
 export interface MonthData {

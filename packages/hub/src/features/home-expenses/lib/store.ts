@@ -15,6 +15,7 @@ type TransactionRow = {
   date: string;
   recurring: boolean;
   contract_id: string | null;
+  kwh: number | null;
   created_at?: string;
 };
 
@@ -41,6 +42,7 @@ function rowToTransaction(row: TransactionRow): Transaction {
     recurring: row.recurring,
     contractId: row.contract_id ?? undefined,
     isContractExpense: Boolean(row.contract_id),
+    kwh: row.kwh != null ? Number(row.kwh) : undefined,
   };
 }
 
@@ -55,7 +57,18 @@ function transactionToRow(tx: Transaction): TransactionRow {
     date: tx.date,
     recurring: tx.recurring,
     contract_id: tx.contractId ?? null,
+    kwh: tx.kwh ?? null,
   };
+}
+
+function mapTransactionWriteError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (/kwh/i.test(message) && /column|schema cache|home_expenses_transactions/i.test(message)) {
+    return new Error('Missing database column `kwh` in `home_expenses_transactions`. Run the updated SQL migration first.');
+  }
+
+  return error instanceof Error ? error : new Error(message);
 }
 
 export async function fetchTransactions(): Promise<Transaction[]> {
@@ -69,7 +82,7 @@ export async function fetchTransactions(): Promise<Transaction[]> {
 
 export async function insertTransaction(tx: Transaction): Promise<void> {
   const { error } = await supabase.from(TABLE).insert(transactionToRow(tx));
-  if (error) throw error;
+  if (error) throw mapTransactionWriteError(error);
 }
 
 export async function fetchLegacyCarChargingEntries(contractIds: string[]): Promise<LegacyCarChargingRow[]> {
@@ -130,8 +143,9 @@ export async function updateTransactionInDb(id: string, updates: Partial<Transac
   if (updates.date !== undefined) row.date = updates.date;
   if (updates.recurring !== undefined) row.recurring = updates.recurring;
   if ('contractId' in updates) row.contract_id = updates.contractId ?? null;
+  if ('kwh' in updates) row.kwh = updates.kwh ?? null;
   const { error } = await supabase.from(TABLE).update(row).eq('id', id);
-  if (error) throw error;
+  if (error) throw mapTransactionWriteError(error);
 }
 
 export async function deleteTransactionFromDb(id: string): Promise<void> {

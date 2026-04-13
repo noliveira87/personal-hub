@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { Transaction, EXPENSE_CATEGORIES, TransactionType, ExpenseCategory } from '@/features/home-expenses/lib/types';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +57,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
   const [contractId, setContractId] = useState(editTx?.contractId ?? initialContractId ?? 'none');
   const [chargingLocation, setChargingLocation] = useState<CarChargingLocation>('home');
   const [chargingDescription, setChargingDescription] = useState('');
+  const [kwh, setKwh] = useState(editTx?.kwh?.toString() ?? '');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
       setContractId(editTx.contractId ?? 'none');
       setChargingLocation(parsedChargingNotes.location ?? 'home');
       setChargingDescription(parsedChargingNotes.description);
+      setKwh(editTx.kwh?.toString() ?? '');
       return;
     }
 
@@ -87,6 +89,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     setContractId(initialContractId ?? 'none');
     setChargingLocation(parsedChargingNotes.location ?? 'home');
     setChargingDescription(parsedChargingNotes.description);
+    setKwh('');
   }, [editTx, initialDate, initialType, initialCategory, initialContractId, initialName, initialNotes]);
 
   const selectedContract = contractId !== 'none'
@@ -133,6 +136,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
     setContractId(initialContractId ?? 'none');
     setChargingLocation('home');
     setChargingDescription('');
+    setKwh('');
     setSubmitError(null);
   };
 
@@ -175,6 +179,8 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
         : name.trim()
       : name.trim();
 
+    const parsedKwh = category === 'electricity' && kwh.trim() ? parseFloat(kwh) : undefined;
+
     try {
       if (editTx) {
         await updateTx(editTx.id, {
@@ -187,6 +193,7 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
           recurring,
           contractId: nextContractId,
           isContractExpense: Boolean(nextContractId),
+          kwh: parsedKwh,
         });
       } else {
         await addTx({
@@ -199,12 +206,13 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
           recurring,
           contractId: nextContractId,
           isContractExpense: Boolean(nextContractId),
+          kwh: parsedKwh,
         });
       }
       reset();
       setOpen(false);
-    } catch {
-      setSubmitError('Could not save transaction. Please try again.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Could not save transaction. Please try again.');
     }
   };
 
@@ -222,9 +230,12 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
           )}
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100vw-1rem)] max-h-[92vh] overflow-y-auto p-4 sm:max-w-md sm:p-6">
         <DialogHeader>
           <DialogTitle>{editTx ? t('homeExpenses.form.editTransaction') : t('homeExpenses.form.newTransaction')}</DialogTitle>
+          <DialogDescription>
+            {type === 'expense' ? t('homeExpenses.form.addTransaction') : t('homeExpenses.form.newTransaction')}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex gap-2">
@@ -347,6 +358,13 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
                 <Input id="amount" type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t('homeExpenses.form.amountPlaceholder')} className="mt-1 tabular-nums" required />
               </div>
 
+              {category === 'electricity' && (
+                <div>
+                  <Label htmlFor="kwh">kWh ({t('homeExpenses.form.optional')})</Label>
+                  <Input id="kwh" type="number" step="0.01" value={kwh} onChange={(e) => setKwh(e.target.value)} placeholder="0.00" className="mt-1 tabular-nums" />
+                </div>
+              )}
+
               {category === 'car' && (
                 <>
                   <div>
@@ -407,12 +425,14 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
             </div>
           )}
 
-          <Button type="submit" className="w-full">
-            {editTx ? t('homeExpenses.form.saveChanges') : t('homeExpenses.form.addTransaction')}
-          </Button>
-          {submitError && (
-            <p className="text-sm text-destructive">{submitError}</p>
-          )}
+          <div className="sticky bottom-0 -mx-4 border-t bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur sm:-mx-6 sm:px-6">
+            <Button type="submit" className="w-full">
+              {editTx ? t('homeExpenses.form.saveChanges') : t('homeExpenses.form.addTransaction')}
+            </Button>
+            {submitError && (
+              <p className="mt-3 text-sm text-destructive">{submitError}</p>
+            )}
+          </div>
         </form>
       </DialogContent>
     </Dialog>
