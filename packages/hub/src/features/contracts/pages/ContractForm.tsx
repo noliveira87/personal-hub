@@ -467,6 +467,9 @@ export default function ContractForm() {
                     paymentSource: nextPaymentType === 'direct-debit'
                       ? (DIRECT_DEBIT_SOURCES.includes((prev.paymentSource ?? '') as typeof DIRECT_DEBIT_SOURCES[number]) ? prev.paymentSource : null)
                       : prev.paymentSource,
+                    directDebitTiming: nextPaymentType === 'direct-debit'
+                      ? (prev.directDebitTiming ?? 'end')
+                      : null,
                   }));
                 }}
                 disabled={submitting}

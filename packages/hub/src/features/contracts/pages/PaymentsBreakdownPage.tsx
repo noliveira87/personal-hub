@@ -1,15 +1,19 @@
-import { useMemo } from 'react';
-import { FileText, Wallet, Building2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Building2, ChevronDown, FileText, Wallet } from 'lucide-react';
 
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { ContractPaymentType } from '@/features/contracts/types/contract';
-import { getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
+
+const PAYMENT_TYPE_ORDER: ContractPaymentType[] = ['direct-debit', 'entity-reference', 'card'];
+const DIRECT_DEBIT_BANKS = ['ABanca', 'Santander', 'Crédito Agrícola'] as const;
+const DIRECT_DEBIT_TIMINGS = ['start', 'end', 'undefined'] as const;
 
 export default function PaymentsBreakdownPage() {
   const { contracts } = useContracts();
   const { t } = useI18n();
+  const [openPaymentType, setOpenPaymentType] = useState<ContractPaymentType | null>(null);
 
   const contractsWithPayment = useMemo(
     () => contracts.filter((contract) => !!contract.paymentType),
@@ -17,110 +21,87 @@ export default function PaymentsBreakdownPage() {
   );
 
   const byPaymentType = useMemo(() => {
-    const map = new Map<ContractPaymentType, { count: number; monthlyTotal: number }>();
-
-    contractsWithPayment.forEach((contract) => {
-      if (!contract.paymentType) return;
-      const current = map.get(contract.paymentType) ?? { count: 0, monthlyTotal: 0 };
-      map.set(contract.paymentType, {
-        count: current.count + 1,
-        monthlyTotal: current.monthlyTotal + getMonthlyEquivalent(contract),
-      });
-    });
-
-    return Array.from(map.entries())
-      .map(([paymentType, value]) => ({
-        paymentType,
-        count: value.count,
-        monthlyTotal: Math.round(value.monthlyTotal * 100) / 100,
-      }))
-      .sort((a, b) => b.monthlyTotal - a.monthlyTotal);
+    return PAYMENT_TYPE_ORDER.map((paymentType) => ({
+      paymentType,
+      count: contractsWithPayment.filter((contract) => contract.paymentType === paymentType).length,
+    }));
   }, [contractsWithPayment]);
 
   const byDirectDebitBank = useMemo(() => {
-    const map = new Map<string, { contracts: typeof contracts; timing: string }[]>();
+    return DIRECT_DEBIT_BANKS.map((bank) => {
+      const bankContracts = contractsWithPayment.filter(
+        (contract) => contract.paymentType === 'direct-debit' && contract.paymentSource?.trim() === bank,
+      );
 
-    contractsWithPayment.forEach((contract) => {
-      if (contract.paymentType !== 'direct-debit' || !contract.paymentSource) return;
-
-      const bank = contract.paymentSource.trim();
-      if (!map.has(bank)) {
-        map.set(bank, []);
-      }
-
-      const bankData = map.get(bank)!;
-      const key = `${bank}|${contract.directDebitTiming}`;
-      const existing = bankData.find(d => d.timing === contract.directDebitTiming);
-      
-      if (existing) {
-        existing.contracts.push(contract);
-      } else {
-        bankData.push({
-          contracts: [contract],
-          timing: contract.directDebitTiming || 'unknown',
-        });
-      }
-    });
-
-    return Array.from(map.entries())
-      .map(([bank, timingData]) => ({
+      return {
         bank,
-        totalCount: timingData.reduce((sum, td) => sum + td.contracts.length, 0),
-        timings: timingData.map(td => ({
-          timing: td.timing,
-          timingLabel: td.timing === 'start' ? t('contracts.form.directDebitStart') : t('contracts.form.directDebitEnd'),
-          count: td.contracts.length,
-          contracts: td.contracts,
-        })),
-      }))
-      .sort((a, b) => b.totalCount - a.totalCount);
+        totalCount: bankContracts.length,
+        timings: DIRECT_DEBIT_TIMINGS.map((timing) => {
+          const timingContracts = bankContracts.filter((contract) => {
+            if (timing === 'undefined') {
+              return contract.directDebitTiming == null;
+            }
+
+            return contract.directDebitTiming === timing;
+          });
+
+          return {
+            timing,
+            timingLabel:
+              timing === 'start'
+                ? t('contracts.form.directDebitStart')
+                : timing === 'end'
+                  ? t('contracts.form.directDebitEnd')
+                  : t('contracts.payments.undefinedTiming'),
+            count: timingContracts.length,
+            contracts: timingContracts,
+          };
+        }),
+      };
+    });
   }, [contractsWithPayment, t]);
 
   const byCardType = useMemo(() => {
-    const map = new Map<string, typeof contracts>();
+    const grouped = new Map<string, typeof contracts>();
 
     contractsWithPayment.forEach((contract) => {
-      if (contract.paymentType !== 'card' || !contract.paymentSource) return;
+      if (contract.paymentType !== 'card') return;
 
-      const card = contract.paymentSource.trim();
-      if (!map.has(card)) {
-        map.set(card, []);
-      }
-      map.get(card)!.push(contract);
+      const cardName = contract.paymentSource?.trim() || t('contracts.notDefined');
+      const current = grouped.get(cardName) ?? [];
+      current.push(contract);
+      grouped.set(cardName, current);
     });
 
-    return Array.from(map.entries())
-      .map(([card, contracts]) => ({
-        card,
-        count: contracts.length,
-        contracts,
+    return Array.from(grouped.entries())
+      .map(([label, groupedContracts]) => ({
+        label,
+        count: groupedContracts.length,
+        contracts: groupedContracts,
       }))
       .sort((a, b) => b.count - a.count);
-  }, [contractsWithPayment]);
+  }, [contractsWithPayment, t]);
 
   const byEntityReference = useMemo(() => {
-    const contracts = contractsWithPayment.filter(c => c.paymentType === 'entity-reference' && c.paymentSource);
-    
-    if (contracts.length === 0) return [];
+    const grouped = new Map<string, typeof contracts>();
 
-    const map = new Map<string, typeof contractsWithPayment>();
+    contractsWithPayment.forEach((contract) => {
+      if (contract.paymentType !== 'entity-reference') return;
 
-    contracts.forEach((contract) => {
-      const entity = contract.paymentSource!.trim();
-      if (!map.has(entity)) {
-        map.set(entity, []);
-      }
-      map.get(entity)!.push(contract);
+      const entityLabel = contract.paymentSource?.trim() || t('contracts.notDefined');
+      const current = grouped.get(entityLabel) ?? [];
+      current.push(contract);
+      grouped.set(entityLabel, current);
     });
 
-    return Array.from(map.entries())
-      .map(([entity, refs]) => ({
-        entity,
-        count: refs.length,
-        contracts: refs,
+    return Array.from(grouped.entries())
+      .map(([label, groupedContracts]) => ({
+        label,
+        count: groupedContracts.length,
+        contracts: groupedContracts,
       }))
       .sort((a, b) => b.count - a.count);
-  }, [contractsWithPayment]);
+  }, [contractsWithPayment, t]);
 
   return (
     <div className="space-y-8">
@@ -137,12 +118,19 @@ export default function PaymentsBreakdownPage() {
         </div>
       ) : (
         <>
-          {/* Payment Types Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: '80ms' }}>
             {byPaymentType.map((row, i) => (
-              <div
+              <button
                 key={row.paymentType}
-                className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm hover:shadow-md transition-all duration-300 animate-fade-up"
+                type="button"
+                onClick={() => {
+                  setOpenPaymentType((value) => (value === row.paymentType ? null : row.paymentType));
+                }}
+                className={[
+                  'rounded-2xl border border-border/80 bg-card p-6 shadow-sm transition-all duration-300 animate-fade-up text-left',
+                  'cursor-pointer hover:shadow-md hover:border-primary/40',
+                  openPaymentType === row.paymentType ? 'border-primary/50 shadow-md' : '',
+                ].join(' ')}
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -156,24 +144,34 @@ export default function PaymentsBreakdownPage() {
                     <p className="text-2xl font-bold tracking-tight text-foreground">{row.count}</p>
                     <p className="text-xs text-muted-foreground mt-1">{t('contracts.payments.contractsCount', { count: String(row.count) })}</p>
                   </div>
+                  <ChevronDown
+                    className={[
+                      'mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300',
+                      openPaymentType === row.paymentType ? 'rotate-180' : '',
+                    ].join(' ')}
+                  />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
 
-          {/* Direct Debit Banks Breakdown */}
-          {byDirectDebitBank.length > 0 && (
-            <div className="animate-fade-up" style={{ animationDelay: '120ms' }}>
-              <h2 className="text-lg font-semibold text-foreground mb-4">{t('contracts.payments.byDirectDebitBank')}</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div
+            className={[
+              'overflow-hidden transition-all duration-500 ease-out',
+              openPaymentType === 'direct-debit' ? 'max-h-[2400px] opacity-100' : 'max-h-0 opacity-0',
+            ].join(' ')}
+          >
+            <div className="animate-fade-up space-y-4 pt-2" style={{ animationDelay: '120ms' }}>
+              <h2 className="text-lg font-semibold text-foreground">{t('contracts.payments.byDirectDebitBank')}</h2>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
                 {byDirectDebitBank.map((bankData, i) => (
                   <div
                     key={bankData.bank}
-                    className="rounded-2xl border border-border/80 bg-card shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden animate-fade-up"
+                    className="rounded-2xl border border-border/80 bg-card shadow-sm overflow-hidden animate-fade-up"
                     style={{ animationDelay: `${(i + byPaymentType.length) * 60}ms` }}
                   >
-                    <div className="p-6">
-                      <div className="flex items-center gap-3 mb-4">
+                    <div className="border-b border-border/60 bg-muted/20 px-6 py-4">
+                      <div className="flex items-center gap-3">
                         <div className="rounded-xl p-2.5 bg-primary/10">
                           <Building2 className="w-5 h-5 text-primary" />
                         </div>
@@ -182,141 +180,137 @@ export default function PaymentsBreakdownPage() {
                           <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(bankData.totalCount) })}</p>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="space-y-3">
-                        {bankData.timings.map((timing) => (
-                          <div
-                            key={`${bankData.bank}-${timing.timing}`}
-                            className="rounded-lg bg-muted/30 p-3.5 border border-border/40"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{timing.timingLabel}</p>
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/20 text-primary font-semibold text-xs">
-                                {timing.count}
-                              </span>
-                            </div>
-                            <div className="space-y-1.5">
-                              {timing.contracts.slice(0, 3).map((contract) => (
-                                <div key={contract.id} className="text-xs">
-                                  <p className="text-foreground truncate">
-                                    • {contract.name || t('contracts.form.unnamedContract')}
+                    <div className="p-4 space-y-3">
+                      {bankData.timings.map((timing) => (
+                        <div
+                          key={`${bankData.bank}-${timing.timing}`}
+                          className="rounded-xl border border-border/50 bg-background/70 p-4"
+                        >
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {timing.timingLabel}
+                            </p>
+                            <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-primary/15 px-2 py-1 text-xs font-semibold text-primary">
+                              {timing.count}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {timing.contracts.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">{t('contracts.payments.noContractsInTiming')}</p>
+                            ) : (
+                              timing.contracts.map((contract) => (
+                                <div key={contract.id} className="rounded-lg bg-muted/30 px-3 py-2">
+                                  <p className="text-xs font-medium text-foreground truncate">
+                                    {contract.name || t('contracts.form.unnamedContract')}
                                   </p>
                                   {contract.provider && (
-                                    <p className="text-muted-foreground text-xs ml-4">{contract.provider}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground truncate">{contract.provider}</p>
                                   )}
                                 </div>
-                              ))}
-                              {timing.contracts.length > 3 && (
-                                <p className="text-xs text-muted-foreground italic">
-                                  {t('contracts.payments.moreCount', { count: String(timing.contracts.length - 3) })}
-                                </p>
-                              )}
-                            </div>
+                              ))
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Cards Breakdown */}
-          {byCardType.length > 0 && (
-            <div className="animate-fade-up" style={{ animationDelay: `${120 + byDirectDebitBank.length * 60}ms` }}>
-              <h2 className="text-lg font-semibold text-foreground mb-4">{t(`contracts.paymentTypeLabels.card`)}</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {byCardType.map((cardData, i) => (
+          <div
+            className={[
+              'overflow-hidden transition-all duration-500 ease-out',
+              openPaymentType === 'entity-reference' ? 'max-h-[2400px] opacity-100' : 'max-h-0 opacity-0',
+            ].join(' ')}
+          >
+            <div className="animate-fade-up space-y-4 pt-2" style={{ animationDelay: '120ms' }}>
+              <h2 className="text-lg font-semibold text-foreground">{t('contracts.paymentTypeLabels.entity-reference')}</h2>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                {byEntityReference.map((group, i) => (
                   <div
-                    key={cardData.card}
-                    className="rounded-2xl border border-border/80 bg-card shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden animate-fade-up"
-                    style={{ animationDelay: `${(i + byPaymentType.length + byDirectDebitBank.length) * 60}ms` }}
+                    key={group.label}
+                    className="rounded-2xl border border-border/80 bg-card shadow-sm overflow-hidden animate-fade-up"
+                    style={{ animationDelay: `${(i + byPaymentType.length) * 60}ms` }}
                   >
-                    <div className="p-6">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="rounded-xl p-2.5 bg-primary/10">
-                          <Wallet className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{cardData.card}</p>
-                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(cardData.count) })}</p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg bg-muted/30 p-3.5 border border-border/40">
-                        <div className="space-y-1.5">
-                          {cardData.contracts.slice(0, 3).map((contract) => (
-                            <div key={contract.id} className="text-xs">
-                              <p className="text-foreground truncate">
-                                • {contract.name || t('contracts.form.unnamedContract')}
-                              </p>
-                              {contract.provider && (
-                                <p className="text-muted-foreground text-xs ml-4">{contract.provider}</p>
-                              )}
-                            </div>
-                          ))}
-                          {cardData.contracts.length > 3 && (
-                            <p className="text-xs text-muted-foreground italic">
-                              {t('contracts.payments.moreCount', { count: String(cardData.contracts.length - 3) })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Entity References Breakdown */}
-          {byEntityReference.length > 0 && (
-            <div className="animate-fade-up" style={{ animationDelay: `${120 + (byDirectDebitBank.length + byCardType.length) * 60}ms` }}>
-              <h2 className="text-lg font-semibold text-foreground mb-4">{t(`contracts.paymentTypeLabels.entity-reference`)}</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {byEntityReference.map((entityData, i) => (
-                  <div
-                    key={entityData.entity}
-                    className="rounded-2xl border border-border/80 bg-card shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden animate-fade-up"
-                    style={{ animationDelay: `${(i + byPaymentType.length + byDirectDebitBank.length + byCardType.length) * 60}ms` }}
-                  >
-                    <div className="p-6">
-                      <div className="flex items-center gap-3 mb-4">
+                    <div className="border-b border-border/60 bg-muted/20 px-6 py-4">
+                      <div className="flex items-center gap-3">
                         <div className="rounded-xl p-2.5 bg-primary/10">
                           <Building2 className="w-5 h-5 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{entityData.entity}</p>
-                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(entityData.count) })}</p>
+                          <p className="text-sm font-semibold text-foreground">{group.label}</p>
+                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(group.count) })}</p>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="rounded-lg bg-muted/30 p-3.5 border border-border/40">
-                        <div className="space-y-1.5">
-                          {entityData.contracts.slice(0, 3).map((contract) => (
-                            <div key={contract.id} className="text-xs">
-                              <p className="text-foreground truncate">
-                                • {contract.name || t('contracts.form.unnamedContract')}
-                              </p>
-                              {contract.provider && (
-                                <p className="text-muted-foreground text-xs ml-4">{contract.provider}</p>
-                              )}
-                            </div>
-                          ))}
-                          {entityData.contracts.length > 3 && (
-                            <p className="text-xs text-muted-foreground italic">
-                              {t('contracts.payments.moreCount', { count: String(entityData.contracts.length - 3) })}
-                            </p>
+                    <div className="p-4 space-y-2">
+                      {group.contracts.map((contract) => (
+                        <div key={contract.id} className="rounded-lg bg-muted/30 px-3 py-2">
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {contract.name || t('contracts.form.unnamedContract')}
+                          </p>
+                          {contract.provider && (
+                            <p className="mt-1 text-xs text-muted-foreground truncate">{contract.provider}</p>
                           )}
                         </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
+          </div>
+
+          <div
+            className={[
+              'overflow-hidden transition-all duration-500 ease-out',
+              openPaymentType === 'card' ? 'max-h-[2400px] opacity-100' : 'max-h-0 opacity-0',
+            ].join(' ')}
+          >
+            <div className="animate-fade-up space-y-4 pt-2" style={{ animationDelay: '120ms' }}>
+              <h2 className="text-lg font-semibold text-foreground">{t('contracts.paymentTypeLabels.card')}</h2>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                {byCardType.map((group, i) => (
+                  <div
+                    key={group.label}
+                    className="rounded-2xl border border-border/80 bg-card shadow-sm overflow-hidden animate-fade-up"
+                    style={{ animationDelay: `${(i + byPaymentType.length) * 60}ms` }}
+                  >
+                    <div className="border-b border-border/60 bg-muted/20 px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl p-2.5 bg-primary/10">
+                          <Wallet className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{group.label}</p>
+                          <p className="text-xs text-muted-foreground">{t('contracts.payments.contractsCount', { count: String(group.count) })}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-2">
+                      {group.contracts.map((contract) => (
+                        <div key={contract.id} className="rounded-lg bg-muted/30 px-3 py-2">
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {contract.name || t('contracts.form.unnamedContract')}
+                          </p>
+                          {contract.provider && (
+                            <p className="mt-1 text-xs text-muted-foreground truncate">{contract.provider}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </>
       )}
     </div>
