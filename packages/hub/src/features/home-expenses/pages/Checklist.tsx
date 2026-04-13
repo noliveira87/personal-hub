@@ -192,7 +192,7 @@ function ChecklistRow({
 
 export default function Checklist() {
   const { t, formatCurrency } = useI18n();
-  const { contracts } = useContracts();
+  const { contracts, updateContract } = useContracts();
   const { allTransactions, selectedYear, selectedMonth } = useData();
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
@@ -203,8 +203,28 @@ export default function Checklist() {
   const contractIds = useMemo(() => activeContracts.map((c) => c.id), [activeContracts]);
   const { priceMap } = usePriceHistoryMap(contractIds);
 
-  const { paidSet, excludedContractSet, customItems, togglePaid, addCustomItem, removeCustomItem, excludeContract, includeContract } = usePaymentChecklist(monthKey);
+  const { paidSet, customItems, togglePaid, addCustomItem, removeCustomItem } = usePaymentChecklist(monthKey);
   const [showContractPicker, setShowContractPicker] = useState(false);
+  const [savingVisibilityIds, setSavingVisibilityIds] = useState<string[]>([]);
+
+  const excludedContractSet = useMemo(
+    () => new Set(activeContracts.filter((c) => c.showInChecklist === false).map((c) => c.id)),
+    [activeContracts],
+  );
+
+  const updateChecklistVisibility = async (contract: Contract, visible: boolean) => {
+    setSavingVisibilityIds((prev) => (prev.includes(contract.id) ? prev : [...prev, contract.id]));
+    try {
+      await updateContract({
+        ...contract,
+        showInChecklist: visible,
+      });
+    } catch (error) {
+      console.error('Failed to update checklist visibility', error);
+    } finally {
+      setSavingVisibilityIds((prev) => prev.filter((id) => id !== contract.id));
+    }
+  };
 
   // Auto-detect which contracts already have a transaction registered in this month
   const autoCheckedIds = useMemo(() => {
@@ -339,12 +359,9 @@ export default function Checklist() {
                   <input
                     type="checkbox"
                     checked={checked}
+                    disabled={savingVisibilityIds.includes(contract.id)}
                     onChange={(e) => {
-                      if (e.target.checked) {
-                        includeContract(contract.id);
-                      } else {
-                        excludeContract(contract.id);
-                      }
+                      void updateChecklistVisibility(contract, e.target.checked);
                     }}
                     className="h-4 w-4"
                   />

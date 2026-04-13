@@ -12,8 +12,6 @@ interface PersistedState {
   custom: CustomChecklistItem[];
 }
 
-const EXCLUDED_CONTRACTS_STORAGE_KEY = 'payment-checklist-excluded-contracts-v1';
-
 function getStorageKey(monthKey: string) {
   return `payment-checklist-${monthKey}`;
 }
@@ -40,28 +38,8 @@ function saveState(monthKey: string, state: PersistedState) {
   }
 }
 
-function loadExcludedContracts(): string[] {
-  try {
-    const raw = localStorage.getItem(EXCLUDED_CONTRACTS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveExcludedContracts(ids: string[]) {
-  try {
-    localStorage.setItem(EXCLUDED_CONTRACTS_STORAGE_KEY, JSON.stringify(ids));
-  } catch {
-    // silently ignore quota errors
-  }
-}
-
 export function usePaymentChecklist(monthKey: string) {
   const [state, setStateRaw] = useState<PersistedState>(() => loadState(monthKey));
-  const [excludedContractIds, setExcludedContractIds] = useState<string[]>(() => loadExcludedContracts());
 
   // When monthKey changes (navigation), reload from storage
   const [currentMonthKey, setCurrentMonthKey] = useState(monthKey);
@@ -115,39 +93,13 @@ export function usePaymentChecklist(monthKey: string) {
     [setState],
   );
 
-  const excludeContract = useCallback(
-    (id: string) => {
-      setExcludedContractIds((prev) => {
-        const next = prev.includes(id) ? prev : [...prev, id];
-        saveExcludedContracts(next);
-        return next;
-      });
-    },
-    [],
-  );
-
-  const includeContract = useCallback(
-    (id: string) => {
-      setExcludedContractIds((prev) => {
-        const next = prev.filter((x) => x !== id);
-        saveExcludedContracts(next);
-        return next;
-      });
-    },
-    [],
-  );
-
   const paidSet = new Set(state.paid);
-  const excludedContractSet = new Set(excludedContractIds);
 
   return {
     paidSet,
-    excludedContractSet,
     customItems: state.custom,
     togglePaid,
     addCustomItem,
     removeCustomItem,
-    excludeContract,
-    includeContract,
   };
 }

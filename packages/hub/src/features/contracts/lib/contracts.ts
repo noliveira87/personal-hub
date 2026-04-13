@@ -22,6 +22,7 @@ type ContractRow = {
   status: string;
   alerts: unknown;
   telegram_alert_enabled: boolean;
+  show_in_checklist: boolean | null;
   document_links: string[] | null;
   price_history_enabled: boolean;
   default_monthly_value: number | null;
@@ -56,6 +57,7 @@ function mapRowToContract(row: ContractRow): Contract {
       ? row.alerts.map(normalizeAlertSetting)
       : [],
     telegramAlertEnabled: row.telegram_alert_enabled,
+    showInChecklist: row.show_in_checklist ?? true,
     documentLinks: row.document_links,
     priceHistoryEnabled: row.price_history_enabled ?? true, // Default to true if null
     defaultMonthlyValue: row.default_monthly_value ?? null,
@@ -89,6 +91,7 @@ function mapContractToRow(contract: Contract) {
     status: contract.status,
     alerts: contract.alerts,
     telegram_alert_enabled: contract.telegramAlertEnabled,
+    show_in_checklist: contract.showInChecklist ?? true,
     document_links: contract.documentLinks,
     price_history_enabled: contract.priceHistoryEnabled,
     default_monthly_value: contract.defaultMonthlyValue ?? null,

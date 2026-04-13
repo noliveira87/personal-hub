@@ -108,6 +108,7 @@ export interface Contract {
   status: ContractStatus;
   alerts: AlertSetting[];
   telegramAlertEnabled: boolean;
+  showInChecklist?: boolean;
   documentLinks: string[] | null;
   priceHistoryEnabled: boolean;
   defaultMonthlyValue: number | null;
