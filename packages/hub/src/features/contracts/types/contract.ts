@@ -22,6 +22,8 @@ export type HousingUsage = 'primary-residence' | 'secondary-home';
 export type RenewalType = 'manual' | 'auto-renew' | 'no-renewal';
 export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly' | 'one-time';
 export type ContractStatus = 'active' | 'pending-cancellation' | 'expired' | 'archived';
+export type ContractPaymentType = 'direct-debit' | 'bank-transfer' | 'card' | 'entity-reference' | 'mbway' | 'cash' | 'other';
+export type DirectDebitTiming = 'start' | 'end';
 
 export interface MortgageDetails {
   principalAmount: number | null;
@@ -97,6 +99,9 @@ export interface Contract {
   noEndDate: boolean;
   renewalType: RenewalType;
   billingFrequency: BillingFrequency;
+  paymentType: ContractPaymentType | null;
+  paymentSource: string | null;
+  directDebitTiming: DirectDebitTiming | null;
   price: number;
   currency: string;
   notes: string | null;
@@ -217,6 +222,16 @@ export const BILLING_LABELS: Record<BillingFrequency, string> = {
   quarterly: 'Quarterly',
   yearly: 'Yearly',
   'one-time': 'One-time',
+};
+
+export const PAYMENT_TYPE_LABELS: Record<ContractPaymentType, string> = {
+  'direct-debit': 'Direct Debit',
+  'bank-transfer': 'Bank Transfer',
+  'card': 'Card',
+  'entity-reference': 'Entity & Reference',
+  'mbway': 'MB Way',
+  'cash': 'Cash',
+  'other': 'Other',
 };
 
 export const RENEWAL_LABELS: Record<RenewalType, string> = {

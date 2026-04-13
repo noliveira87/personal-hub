@@ -14,6 +14,8 @@ type ContractRow = {
   no_end_date: boolean;
   renewal_type: string;
   billing_frequency: string;
+  payment_type: string | null;
+  payment_source: string | null;
   price: number;
   currency: string;
   notes: string | null;
@@ -43,6 +45,9 @@ function mapRowToContract(row: ContractRow): Contract {
     noEndDate: row.no_end_date,
     renewalType: row.renewal_type as Contract['renewalType'],
     billingFrequency: row.billing_frequency as Contract['billingFrequency'],
+    paymentType: (row.payment_type as Contract['paymentType']) ?? null,
+    paymentSource: row.payment_source ?? null,
+    directDebitTiming: (row.direct_debit_timing as Contract['directDebitTiming']) ?? null,
     price: row.price,
     currency: row.currency,
     notes: row.notes,
@@ -75,6 +80,9 @@ function mapContractToRow(contract: Contract) {
     no_end_date: contract.noEndDate,
     renewal_type: contract.renewalType,
     billing_frequency: contract.billingFrequency,
+    payment_type: contract.paymentType,
+    payment_source: contract.paymentSource,
+    direct_debit_timing: contract.directDebitTiming,
     price: contract.price,
     currency: contract.currency,
     notes: contract.notes,

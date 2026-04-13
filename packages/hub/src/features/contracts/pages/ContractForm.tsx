@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import {
-  Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus,
-  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, STATUS_LABELS, AlertSetting, HOUSING_USAGE_LABELS, normalizeAlertSetting,
+  Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus, ContractPaymentType,
+  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, PAYMENT_TYPE_LABELS, AlertSetting, HOUSING_USAGE_LABELS, normalizeAlertSetting,
 } from '@/features/contracts/types/contract';
 import { Plus, X, Loader, FileText, Send } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -43,6 +43,7 @@ const emptyContract = (): Omit<Contract, 'id' | 'createdAt' | 'updatedAt'> => ({
   endDate: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
   noEndDate: false,
   renewalType: 'auto-renew', billingFrequency: 'monthly',
+  paymentType: null, paymentSource: null, directDebitTiming: null,
   price: 0, currency: 'EUR', notes: null, status: 'active',
   alerts: [defaultAlert()], telegramAlertEnabled: false, documentLinks: null,
   priceHistoryEnabled: true,
@@ -72,6 +73,8 @@ function getDefaultCategory(type: ContractType): ContractCategory {
 function isCategoryAllowed(type: ContractType, category: ContractCategory): boolean {
   return getAllowedCategories(type).includes(category);
 }
+
+const DIRECT_DEBIT_SOURCES = ['ABanca', 'Santander', 'Crédito Agrícola'] as const;
 
 export default function ContractForm() {
   const { t } = useI18n();
@@ -118,12 +121,12 @@ export default function ContractForm() {
       const normalizedEndDate = form.noEndDate ? null : form.endDate;
 
       if (!form.noEndDate && !normalizedEndDate) {
-        alert('Please set an end date or enable "No end date".');
+        alert(t('contracts.form.validation.endDateRequired'));
         return;
       }
 
       if (normalizedEndDate && normalizedEndDate < form.startDate) {
-        alert('End date must be on or after the start date.');
+        alert(t('contracts.form.validation.endDateAfterStart'));
         return;
       }
 
@@ -131,7 +134,7 @@ export default function ContractForm() {
         (alert) => alert.kind === 'specific-date' && (!alert.specificDate || !alert.reason?.trim()),
       );
       if (hasInvalidSpecificAlert) {
-        alert('Specific-date alerts require both date and reason.');
+        alert(t('contracts.form.validation.specificAlertRequiresDateAndReason'));
         return;
       }
 
@@ -152,7 +155,7 @@ export default function ContractForm() {
       navigate(`/contracts/${savedContract.id}`);
     } catch (err) {
       console.error('Error saving contract:', err);
-      alert('Failed to save contract. Please try again.');
+      alert(t('contracts.form.validation.saveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -183,26 +186,38 @@ export default function ContractForm() {
   };
 
   const buildAlertTestMessage = (alertConfig: AlertSetting): string => {
-    const contractName = form.name.trim() || 'Unnamed contract';
-    const provider = form.provider.trim() || 'Unknown provider';
+    const contractName = form.name.trim() || t('contracts.form.unnamedContract');
+    const provider = form.provider.trim() || t('contracts.form.unknownProvider');
     const triggerText = alertConfig.kind === 'specific-date'
-      ? `Specific date: ${alertConfig.specificDate ?? 'n/a'}`
-      : `${alertConfig.daysBefore} days before expiration`;
-    const reasonText = alertConfig.reason?.trim() ? `\nReason: ${alertConfig.reason.trim()}` : '';
+      ? t('contracts.alerts.triggerTextDate', { date: alertConfig.specificDate ?? 'n/a' })
+      : t('contracts.alerts.triggerTextDaysBefore', { days: String(alertConfig.daysBefore) });
+    const reasonText = alertConfig.reason?.trim()
+      ? `\n${t('contracts.alerts.telegramMessageLabel')}: ${alertConfig.reason.trim()}`
+      : '';
+    
+    let paymentText = '';
+    if (form.paymentType === 'direct-debit') {
+      const timing = form.directDebitTiming === 'start' 
+        ? t('contracts.form.directDebitStart')
+        : form.directDebitTiming === 'end'
+        ? t('contracts.form.directDebitEnd')
+        : 'N/A';
+      paymentText = `\n${t('contracts.alerts.telegramPaymentTypeLabel')}: ${t('contracts.alerts.telegramDirectDebitLabel')} (${timing})`;
+    }
 
-    return `🧪 <b>D12 Contracts — Alert Test</b>\n\nContract: <b>${contractName}</b>\nProvider: ${provider}\nTrigger: ${triggerText}${reasonText}`;
+    return `🧪 <b>${t('contracts.alerts.telegramTitle')}</b>\n\n${t('contracts.alerts.telegramContractLabel')}: <b>${contractName}</b>\n${t('contracts.alerts.telegramProviderLabel')}: ${provider}\n${t('contracts.alerts.telegramTriggerLabel')}: ${triggerText}${reasonText}${paymentText}`;
   };
 
   const testAlert = async (alertConfig: AlertSetting, index: number) => {
     if (!alertConfig.enabled && !alertConfig.telegramEnabled) {
-      toast.error('Enable at least one channel (App or Telegram) before testing.');
+      toast.error(t('contracts.alerts.validation.enableOneChannel'));
       return;
     }
 
-    const preview = `Alert test for ${form.name.trim() || 'Unnamed contract'}\n${
+    const preview = `${t('contracts.alerts.previewTitle', { contract: form.name.trim() || t('contracts.form.unnamedContract') })}\n${
       alertConfig.kind === 'specific-date'
-        ? `Specific date: ${alertConfig.specificDate ?? 'n/a'}\nReason: ${alertConfig.reason ?? 'n/a'}`
-        : `${alertConfig.daysBefore} days before expiration`
+        ? `${t('contracts.alerts.form.specificDate')}: ${alertConfig.specificDate ?? 'n/a'}\n${t('contracts.alerts.telegramMessageLabel')}: ${alertConfig.reason ?? 'n/a'}`
+        : t('contracts.alerts.triggerTextDaysBefore', { days: String(alertConfig.daysBefore) })
     }`;
 
     try {
@@ -211,28 +226,28 @@ export default function ContractForm() {
       if (alertConfig.enabled) {
         addTestAppAlert({
           contractId: id ?? `draft:${form.name.trim() || 'contract'}`,
-          contractName: form.name.trim() || 'Unnamed contract',
-          provider: form.provider.trim() || 'Unknown provider',
+          contractName: form.name.trim() || t('contracts.form.unnamedContract'),
+          provider: form.provider.trim() || t('contracts.form.unknownProvider'),
           triggerDate: new Date(),
-          triggerLabel: 'Test alert',
+          triggerLabel: t('contracts.alerts.testAlertLabel'),
           reason: alertConfig.reason?.trim() || preview,
         });
-        toast('App test preview', {
+        toast(t('contracts.alerts.appTestPreviewTitle'), {
           description: preview,
         });
       }
 
       if (alertConfig.telegramEnabled) {
         if (!form.telegramAlertEnabled) {
-          throw new Error('Enable Telegram notifications for this contract first.');
+          throw new Error(t('contracts.alerts.validation.enableContractTelegramFirst'));
         }
         await sendTelegramMessage(buildAlertTestMessage(alertConfig));
       }
 
-      toast.success('Test alert sent successfully.');
+      toast.success(t('contracts.alerts.toast.testSent'));
     } catch (error) {
       console.error('Failed to test alert:', error);
-      const message = error instanceof Error ? error.message : 'Failed to send test alert.';
+      const message = error instanceof Error ? error.message : t('contracts.alerts.toast.testFailed');
       toast.error(message);
     } finally {
       setTestingAlertIndex(null);
@@ -273,7 +288,7 @@ export default function ContractForm() {
       <form onSubmit={handleSubmit} className="space-y-6 animate-fade-up" style={{ animationDelay: '120ms' }}>
         {/* Basic info */}
         <div className="bg-card rounded-xl p-6 border space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Basic Information</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('contracts.form.basicInformation')}</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>{t('common.name')} *</label>
@@ -284,7 +299,7 @@ export default function ContractForm() {
               <input className={inputClass} value={form.provider} onChange={e => set('provider', e.target.value)} required placeholder={t('contracts.providerPlaceholder') ?? 'e.g. Allianz'} disabled={submitting} />
             </div>
             <div>
-              <label className={labelClass}>Type</label>
+              <label className={labelClass}>{t('contracts.detail.type')}</label>
               <select
                 className={inputClass}
                 value={form.type}
@@ -302,22 +317,22 @@ export default function ContractForm() {
                 }}
                 disabled={submitting}
               >
-                {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {Object.keys(TYPE_LABELS).map((k) => <option key={k} value={k}>{t(`contracts.typeLabels.${k}`)}</option>)}
               </select>
             </div>
             {form.type !== 'mortgage' && (
               <div>
-                <label className={labelClass}>Category</label>
+                <label className={labelClass}>{t('contracts.form.category')}</label>
                 <select className={inputClass} value={form.category} onChange={e => set('category', e.target.value as ContractCategory)} disabled={submitting}>
                   {categoryOptions.map(category => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}
                 </select>
-                <p className="mt-2 text-xs text-muted-foreground">As categorias dependem do tipo escolhido.</p>
+                <p className="mt-2 text-xs text-muted-foreground">{t('contracts.form.categoryDependsOnType')}</p>
               </div>
             )}
             {form.type === 'mortgage' && (
               <div className="sm:col-span-2">
-                <p className="mb-2 text-xs text-muted-foreground">A categoria passa automaticamente para Mortgage.</p>
-                <label className={labelClass}>Tipo de habitação</label>
+                <p className="mb-2 text-xs text-muted-foreground">{t('contracts.form.mortgageCategoryAuto')}</p>
+                <label className={labelClass}>{t('contracts.detail.housingUse')}</label>
                 <select
                   className={inputClass}
                   value={form.housingUsage ?? 'primary-residence'}
@@ -333,10 +348,10 @@ export default function ContractForm() {
 
         {form.type === 'mortgage' && (
           <div className="bg-card rounded-xl p-6 border space-y-4">
-            <h2 className="text-sm font-semibold text-foreground">Dados do Crédito Habitação</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('contracts.detail.mortgage.title')}</h2>
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelClass}>Valor total</label>
+                <label className={labelClass}>{t('contracts.detail.mortgage.principalAmount')}</label>
                 <input type="number" step="0.01" className={inputClass} value={form.mortgageDetails?.principalAmount ?? ''} onChange={e => updateMortgage('principalAmount', e.target.value ? parseFloat(e.target.value) : null)} disabled={submitting} />
               </div>
               <div />
@@ -386,14 +401,14 @@ export default function ContractForm() {
 
         {/* Dates & billing */}
         <div className="bg-card rounded-xl p-6 border space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Dates & Billing</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('contracts.form.datesAndBilling')}</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Start Date</label>
+              <label className={labelClass}>{t('contracts.detail.startDate')}</label>
               <input type="date" className={inputClass} value={form.startDate} onChange={e => set('startDate', e.target.value)} disabled={submitting} />
             </div>
             <div className="relative">
-              <label className={labelClass}>End Date</label>
+              <label className={labelClass}>{t('contracts.detail.endDate')}</label>
               <input 
                 type="date" 
                 className={inputClass} 
@@ -404,7 +419,7 @@ export default function ContractForm() {
               {form.noEndDate && (
                 <div className="absolute inset-0 bg-gradient-to-r from-muted/80 to-muted/60 backdrop-blur-sm rounded-lg flex items-center justify-center pointer-events-none">
                   <div className="text-center">
-                    <p className="text-xs font-medium text-muted-foreground">No end date set</p>
+                    <p className="text-xs font-medium text-muted-foreground">{t('contracts.detail.noEndDate')}</p>
                   </div>
                 </div>
               )}
@@ -424,21 +439,85 @@ export default function ContractForm() {
                   }}
                   disabled={submitting}
                 />
-                <span>No end date</span>
+                <span>{t('contracts.detail.noEndDate')}</span>
               </label>
             </div>
             <div>
-              <label className={labelClass}>Renewal Type</label>
+              <label className={labelClass}>{t('contracts.detail.renewal')}</label>
               <select className={inputClass} value={form.renewalType} onChange={e => set('renewalType', e.target.value as RenewalType)} disabled={submitting}>
                 {Object.entries(RENEWAL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </div>
             <div>
-              <label className={labelClass}>Billing Frequency</label>
+              <label className={labelClass}>{t('contracts.detail.billing')}</label>
               <select className={inputClass} value={form.billingFrequency} onChange={e => set('billingFrequency', e.target.value as BillingFrequency)} disabled={submitting}>
-                {Object.entries(BILLING_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {Object.entries(BILLING_LABELS).map(([k, v]) => <option key={k} value={k}>{t(`contracts.billingLabels.${k}`) || v}</option>)}
               </select>
             </div>
+            <div>
+              <label className={labelClass}>{t('contracts.paymentType')}</label>
+              <select
+                className={inputClass}
+                value={form.paymentType ?? ''}
+                onChange={e => {
+                  const nextPaymentType = (e.target.value || null) as ContractPaymentType | null;
+                  setForm(prev => ({
+                    ...prev,
+                    paymentType: nextPaymentType,
+                    paymentSource: nextPaymentType === 'direct-debit'
+                      ? (DIRECT_DEBIT_SOURCES.includes((prev.paymentSource ?? '') as typeof DIRECT_DEBIT_SOURCES[number]) ? prev.paymentSource : null)
+                      : prev.paymentSource,
+                  }));
+                }}
+                disabled={submitting}
+              >
+                <option value="">{t('contracts.notDefined')}</option>
+                {Object.entries(PAYMENT_TYPE_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{t(`contracts.paymentTypeLabels.${k}`) || v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>
+                {form.paymentType === 'direct-debit' ? t('contracts.form.directDebitBank') : t('contracts.paymentSource')}
+              </label>
+              {form.paymentType === 'direct-debit' ? (
+                <select
+                  className={inputClass}
+                  value={form.paymentSource ?? ''}
+                  onChange={e => set('paymentSource', e.target.value || null)}
+                  disabled={submitting}
+                >
+                  <option value="">{t('contracts.form.selectOption')}</option>
+                  {DIRECT_DEBIT_SOURCES.map((source) => (
+                    <option key={source} value={source}>{source}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className={inputClass}
+                  value={form.paymentSource ?? ''}
+                  onChange={e => set('paymentSource', e.target.value || null)}
+                  placeholder={t('contracts.paymentSourcePlaceholder')}
+                  disabled={submitting}
+                />
+              )}
+            </div>
+            {form.paymentType === 'direct-debit' && (
+            <div>
+              <label className={labelClass}>{t('contracts.form.directDebitTiming')}</label>
+              <select
+                className={inputClass}
+                value={form.directDebitTiming ?? ''}
+                onChange={e => set('directDebitTiming', (e.target.value || null) as any)}
+                disabled={submitting}
+              >
+                <option value="">{t('contracts.form.selectOption')}</option>
+                <option value="start">{t('contracts.form.directDebitStart')}</option>
+                <option value="end">{t('contracts.form.directDebitEnd')}</option>
+              </select>
+            </div>
+            )}
             <div>
               <label className={labelClass}>{t('contracts.defaultMonthlyValue')}</label>
               <input
@@ -454,7 +533,7 @@ export default function ContractForm() {
               <p className="mt-1 text-xs text-muted-foreground">{t('contracts.defaultMonthlyValueHint')}</p>
             </div>
             <div>
-              <label className={labelClass}>Currency</label>
+              <label className={labelClass}>{t('contracts.detail.currency')}</label>
               <select className={inputClass} value={form.currency} onChange={e => set('currency', e.target.value)} disabled={submitting}>
                 <option value="EUR">EUR</option>
                 <option value="USD">USD</option>
@@ -483,13 +562,13 @@ export default function ContractForm() {
           </div>
           <div>
             <label className={labelClass}>{t('common.notes')}</label>
-            <textarea className={inputClass + ' min-h-[80px] resize-y'} value={form.notes ?? ''} onChange={e => set('notes', e.target.value || null)} placeholder="Optional notes..." disabled={submitting} />
+            <textarea className={inputClass + ' min-h-[80px] resize-y'} value={form.notes ?? ''} onChange={e => set('notes', e.target.value || null)} placeholder={t('contracts.form.optionalNotesPlaceholder')} disabled={submitting} />
           </div>
           
           {/* Info about price */}
           <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <p className="text-sm text-blue-700 dark:text-blue-400">
-              <strong>💡 Tip:</strong> After creating the contract, add the monthly expense in Home Expenses and link it to this contract. The contract price history now reads from those linked expenses.
+              <strong>{t('contracts.form.tipLabel')}</strong> {t('contracts.form.priceLinkTip')}
             </p>
           </div>
         </div>
@@ -497,14 +576,14 @@ export default function ContractForm() {
         {/* Alerts */}
         <div className="bg-card rounded-xl p-6 border space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Alerts</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('contracts.alerts.title')}</h2>
             <button type="button" onClick={addAlert} disabled={submitting} className="text-xs text-primary font-medium flex items-center gap-1 hover:underline disabled:opacity-50">
-              <Plus className="w-3 h-3" /> Add Alert
+              <Plus className="w-3 h-3" /> {t('contracts.form.addAlert')}
             </button>
           </div>
           <div className="flex items-center gap-3">
             <input type="checkbox" checked={form.telegramAlertEnabled} onChange={e => set('telegramAlertEnabled', e.target.checked)} disabled={submitting} className="rounded" />
-            <label className="text-sm text-foreground">Enable Telegram notifications</label>
+            <label className="text-sm text-foreground">{t('contracts.form.enableTelegramNotifications')}</label>
           </div>
           {form.alerts.map((alertItem, i) => (
             <div key={i} className="space-y-3 p-3 rounded-lg bg-muted/50 border">
@@ -515,8 +594,8 @@ export default function ContractForm() {
                   disabled={submitting}
                   className="px-2 py-1.5 rounded border bg-card text-sm"
                 >
-                  <option value="days-before">Days before expiration</option>
-                  <option value="specific-date">Specific date</option>
+                  <option value="days-before">{t('contracts.alerts.form.daysBeforeExpiry')}</option>
+                  <option value="specific-date">{t('contracts.alerts.form.specificDate')}</option>
                 </select>
 
                 {alertItem.kind === 'days-before' ? (
@@ -529,7 +608,7 @@ export default function ContractForm() {
                       disabled={submitting}
                       className="w-20 px-2 py-1.5 rounded border bg-card text-sm text-center"
                     />
-                    <span className="text-sm text-muted-foreground">days before</span>
+                    <span className="text-sm text-muted-foreground">{t('contracts.form.daysBefore')}</span>
                   </>
                 ) : (
                   <>
@@ -546,7 +625,7 @@ export default function ContractForm() {
                       onChange={e => updateAlert(i, { reason: e.target.value || null })}
                       disabled={submitting}
                       className="flex-1 min-w-[180px] px-2 py-1.5 rounded border bg-card text-sm"
-                      placeholder="Reason for this alert"
+                      placeholder={t('contracts.form.reasonForAlertPlaceholder')}
                     />
                   </>
                 )}
@@ -564,11 +643,11 @@ export default function ContractForm() {
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1.5 text-xs">
                   <input type="checkbox" checked={alertItem.enabled} onChange={e => updateAlert(i, { enabled: e.target.checked })} disabled={submitting} />
-                  App
+                  {t('contracts.alerts.channelApp')}
                 </label>
                 <label className="flex items-center gap-1.5 text-xs">
                   <input type="checkbox" checked={alertItem.telegramEnabled} onChange={e => updateAlert(i, { telegramEnabled: e.target.checked })} disabled={submitting} />
-                  Telegram
+                  {t('contracts.alerts.channelTelegram')}
                 </label>
                 <button
                   type="button"
@@ -577,7 +656,7 @@ export default function ContractForm() {
                   className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded border bg-card hover:bg-muted disabled:opacity-50"
                 >
                   {testingAlertIndex === i ? <Loader className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                  Test
+                  {t('contracts.alerts.form.test')}
                 </button>
               </div>
             </div>

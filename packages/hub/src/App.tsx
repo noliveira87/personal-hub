@@ -20,6 +20,7 @@ const CalendarPage = lazy(() => import("@/features/contracts/pages/CalendarPage"
 const AlertsPage = lazy(() => import("@/features/contracts/pages/AlertsPage"));
 const InsightsPage = lazy(() => import("@/features/contracts/pages/InsightsPage"));
 const QuotesPage = lazy(() => import("@/features/contracts/pages/QuotesPage"));
+const PaymentsBreakdownPage = lazy(() => import("@/features/contracts/pages/PaymentsBreakdownPage"));
 const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
 const CashbackHeroPage = lazy(() => import("@/pages/CashbackHeroPage"));
@@ -81,6 +82,7 @@ const AppRoutes = () => {
               <Route path="/contracts/alerts" element={<AlertsPage />} />
               <Route path="/contracts/insights" element={<InsightsPage />} />
               <Route path="/contracts/quotes" element={<QuotesPage />} />
+              <Route path="/contracts/payments" element={<PaymentsBreakdownPage />} />
 
               {/* Home Expenses (needs ContractProvider for income from contracts) */}
               <Route element={<HomeExpensesScope />}>

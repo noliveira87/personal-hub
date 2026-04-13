@@ -72,6 +72,17 @@ export default function ContractDetail() {
       ? [{ label: t('contracts.detail.housingUse'), value: t(`contracts.housingUsageLabels.${contract.housingUsage}`) }]
       : []),
     { label: t('contracts.detail.billing'), value: t(`contracts.billingLabels.${contract.billingFrequency}`) },
+    {
+      label: t('contracts.detail.paymentType'),
+      value: contract.paymentType ? t(`contracts.paymentTypeLabels.${contract.paymentType}`) : '—',
+    },
+    {
+      label: t('contracts.detail.paymentSource'),
+      value: contract.paymentSource || '—',
+    },
+    ...(contract.paymentType === 'direct-debit' && contract.directDebitTiming
+      ? [{ label: t('contracts.form.directDebitTiming'), value: t(`contracts.form.directDebit${contract.directDebitTiming === 'start' ? 'Start' : 'End'}`) }]
+      : []),
     { label: t('contracts.detail.renewal'), value: t(`contracts.renewalLabels.${contract.renewalType}`) },
     { label: t('contracts.detail.startDate'), value: format(parseISO(contract.startDate), 'MMM d, yyyy') },
     {

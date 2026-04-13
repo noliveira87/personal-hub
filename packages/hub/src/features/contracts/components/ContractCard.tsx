@@ -17,7 +17,7 @@ interface LatestPrice {
 
 export function ContractCard({ contract, index = 0, latestPrice }: { contract: Contract; index?: number; latestPrice?: LatestPrice }) {
   const navigate = useNavigate();
-  const { formatCurrency } = useI18n();
+  const { formatCurrency, t } = useI18n();
   const [, setReadStateVersion] = useState(0);
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
@@ -48,6 +48,11 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
           <div className="min-w-0">
             <h3 className="font-semibold text-sm text-foreground truncate">{contract.name}</h3>
             <p className="text-xs text-muted-foreground truncate">{contract.provider}</p>
+            {contract.paymentType ? (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">
+                {t(`contracts.paymentTypeLabels.${contract.paymentType}`)}{contract.paymentSource ? ` · ${contract.paymentSource}` : ''}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2">
