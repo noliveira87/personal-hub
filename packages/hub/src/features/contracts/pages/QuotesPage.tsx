@@ -223,7 +223,7 @@ export default function QuotesPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{q.title}</p>
+                    <p className="text-lg font-semibold text-foreground leading-tight sm:text-xl">{q.title}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       {q.provider && (
                         <span className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
@@ -234,11 +234,6 @@ export default function QuotesPage() {
                       {q.date && (
                         <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
                           {format(parseISO(q.date), 'd MMM yyyy')}
-                        </span>
-                      )}
-                      {q.vatRate != null && (
-                        <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                          {t('contracts.quotes.vatRateBadge', { rate: q.vatRate })}
                         </span>
                       )}
                     </div>
@@ -283,7 +278,7 @@ export default function QuotesPage() {
                 </div>
                 {q.price != null && (
                   <div className="space-y-1">
-                    <p className="text-lg font-bold tabular-nums text-foreground">
+                    <p className="text-base font-bold tabular-nums text-primary sm:text-lg">
                       {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(q.price, q.currency)}
                     </p>
                     {remainingToPay != null && (

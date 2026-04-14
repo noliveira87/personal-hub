@@ -257,7 +257,7 @@ export function QuotesSection({
                 {/* Top row: title + actions */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground leading-tight">{quote.title}</p>
+                    <p className="text-lg font-semibold text-foreground leading-tight sm:text-xl">{quote.title}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       {quote.provider && (
                         <span className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
@@ -268,11 +268,6 @@ export function QuotesSection({
                       {quote.date && (
                         <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
                           {format(parseISO(quote.date), 'd MMM yyyy')}
-                        </span>
-                      )}
-                      {quote.vatRate != null && (
-                        <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                          {t('contracts.quotes.vatRateBadge', { rate: quote.vatRate })}
                         </span>
                       )}
                     </div>
@@ -319,7 +314,7 @@ export function QuotesSection({
                 {/* Price */}
                 {quote.price != null && (
                   <div className="space-y-1">
-                    <p className="text-base font-bold tabular-nums text-foreground">
+                    <p className="text-sm font-bold tabular-nums text-primary sm:text-base">
                       {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(quote.price, quote.currency)}
                     </p>
                     {remainingToPay != null && (

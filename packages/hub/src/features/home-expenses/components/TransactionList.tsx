@@ -95,6 +95,17 @@ export default function TransactionList() {
     return `expense:${tx.category ?? 'other'}`;
   };
 
+  const getTransactionDisplayMeta = (tx: Transaction) => {
+    const isPositiveFlow = (tx.type === 'income' && tx.amount >= 0) || (tx.type === 'expense' && tx.amount < 0);
+
+    return {
+      amount: Math.abs(tx.amount),
+      colorClass: isPositiveFlow ? 'text-income' : 'text-expense',
+      sign: isPositiveFlow ? '+' : '-',
+      accentClass: isPositiveFlow ? 'bg-income' : 'bg-expense',
+    };
+  };
+
   const isContractTx = (tx: Transaction): boolean => isContractTransaction(tx);
 
   return (
@@ -132,6 +143,7 @@ export default function TransactionList() {
         const previous = index > 0 ? filtered[index - 1] : null;
         const shouldShowCategoryHeader = !previous || getGroupKey(previous) !== getGroupKey(tx);
         const categoryHeaderLabel = getCategoryHeaderLabel(tx);
+        const displayMeta = getTransactionDisplayMeta(tx);
 
         return (
           <div key={tx.id} className="space-y-2">
@@ -144,7 +156,7 @@ export default function TransactionList() {
             <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm animate-fade-in sm:p-5">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2">
                 <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-2 h-8 rounded-full ${tx.type === 'income' ? 'bg-income' : 'bg-expense'}`} />
+                <div className={`w-2 h-8 rounded-full ${displayMeta.accentClass}`} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="block min-w-0 flex-1 font-medium text-sm text-foreground truncate" title={tx.name}>{tx.name}</span>
@@ -179,8 +191,8 @@ export default function TransactionList() {
               </div>
 
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  <span className={`tabular-nums font-semibold text-sm whitespace-nowrap ${tx.type === 'income' ? 'text-income' : 'text-expense'}`}>
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                  <span className={`tabular-nums font-semibold text-sm whitespace-nowrap ${displayMeta.colorClass}`}>
+                    {displayMeta.sign}{formatCurrency(displayMeta.amount)}
                   </span>
                   {!tx.isReadOnly && (
                     <div className="flex items-center gap-1">
