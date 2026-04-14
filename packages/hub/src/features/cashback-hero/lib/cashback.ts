@@ -218,6 +218,29 @@ export async function createCashbackPurchase(
   return mapPurchaseRow(data as CashbackPurchaseRow, []);
 }
 
+export async function createCashbackHomeExpenseLink(
+  purchaseId: string,
+  homeExpenseTransactionId: string,
+  contractId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('cashback_purchase_home_expense_links')
+    .insert([{
+      id: crypto.randomUUID(),
+      purchase_id: purchaseId,
+      home_expense_transaction_id: homeExpenseTransactionId,
+      contract_id: contractId,
+      created_at: now,
+      updated_at: now,
+    }]);
+
+  if (error) {
+    throw new Error(formatSupabaseError('Failed to link cashback purchase to home expense', error));
+  }
+}
+
 export async function createCashbackEntry(
   purchaseId: string,
   entry: Omit<CashbackEntry, 'id'>,
@@ -248,13 +271,36 @@ export async function createCashbackEntry(
 }
 
 export async function removeCashbackPurchase(purchaseId: string): Promise<void> {
+  const { data: linkRow, error: linkError } = await supabase
+    .from('cashback_purchase_home_expense_links')
+    .select('home_expense_transaction_id')
+    .eq('purchase_id', purchaseId)
+    .maybeSingle();
+
+  const relationMissing = String(linkError?.message ?? '').toLowerCase().includes('cashback_purchase_home_expense_links');
+  if (linkError && !relationMissing) {
+    throw new Error(formatSupabaseError('Failed to load cashback-home-expense link before deleting purchase', linkError));
+  }
+
+  const linkedHomeExpenseTransactionId = (linkRow as { home_expense_transaction_id?: string } | null)?.home_expense_transaction_id;
+  if (linkedHomeExpenseTransactionId) {
+    const { error: deleteLinkedTxError } = await supabase
+      .from('home_expenses_transactions')
+      .delete()
+      .eq('id', linkedHomeExpenseTransactionId);
+
+    if (deleteLinkedTxError) {
+      throw new Error(formatSupabaseError('Failed to delete linked home expense transaction', deleteLinkedTxError));
+    }
+  }
+
   const { error } = await supabase
     .from('cashback_purchases')
     .delete()
     .eq('id', purchaseId);
 
   if (error) {
-    throw new Error(`Failed to delete purchase: ${error.message}`);
+    throw new Error(formatSupabaseError('Failed to delete purchase', error));
   }
 }
 

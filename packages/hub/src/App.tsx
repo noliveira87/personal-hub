@@ -69,7 +69,7 @@ const AppRoutes = () => {
             {/* Hub */}
             <Route path="/" element={<Index />} />
 
-            {/* All routes that need ContractProvider (Contracts, Dashboard, HomeExpenses) */}
+            {/* All routes that need ContractProvider (Contracts, Dashboard, HomeExpenses, Reward Wallet) */}
             <Route element={<RepositoriesScope />}>
               {/* Dashboard (needs ContractProvider) */}
               <Route path="/dashboard" element={<Dashboard />} />
@@ -93,14 +93,14 @@ const AppRoutes = () => {
                 <Route path="/home-expenses/insights" element={<HomeExpensesInsightsPage />} />
                 <Route path="/home-expenses/checklist" element={<HomeExpensesChecklistPage />} />
               </Route>
+
+              {/* Reward Wallet (needs ContractProvider for optional home-expense linking) */}
+              <Route path="/cashback-hero" element={<CashbackHeroPage />} />
             </Route>
 
             {/* Portfolio */}
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/portfolio/insights" element={<PortfolioMonthlyInsightsPage />} />
-
-            {/* Reward Wallet */}
-            <Route path="/cashback-hero" element={<CashbackHeroPage />} />
 
             {/* Trips */}
             <Route path="/trips" element={<TripsPage />} />

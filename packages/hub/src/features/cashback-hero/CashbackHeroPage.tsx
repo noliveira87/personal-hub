@@ -37,7 +37,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -56,10 +58,16 @@ import {
 } from '@/features/cashback-hero/types';
 import { useCashbackStore } from '@/features/cashback-hero/use-cashback-store';
 import {
+  createCashbackHomeExpenseLink,
   getActiveTier,
   getNextTier,
   UNIBANCO_TIERS,
 } from '@/features/cashback-hero/lib/cashback';
+import { useOptionalContracts } from '@/features/contracts/context/ContractContext';
+import { mapContractCategoryToExpenseCategory } from '@/features/home-expenses/lib/contractMapping';
+import { insertTransaction } from '@/features/home-expenses/lib/store';
+import { getContractCategoryIcon, type Contract } from '@/features/contracts/types/contract';
+import type { ExpenseCategory } from '@/features/home-expenses/lib/types';
 
 function formatDateLabel(raw: string): string {
   try {
@@ -104,6 +112,38 @@ function buildNotesWithCard(notes: string, cardUsed: string): string | undefined
 
 function isUnibancoCard(cardUsed: string): boolean {
   return /unibanco/i.test(cardUsed.trim());
+}
+
+const CONTRACT_CATEGORY_ORDER: Record<Contract['category'], number> = {
+  'mortgage': 0,
+  'home-insurance': 1,
+  'apartment-insurance': 2,
+  'electricity': 3,
+  'gas': 4,
+  'water': 5,
+  'internet': 6,
+  'mobile': 7,
+  'tv-streaming': 8,
+  'security-alarm': 9,
+  'maintenance': 10,
+  'car': 11,
+  'gym': 12,
+  'software': 13,
+  'card-credit': 14,
+  'card-debit': 15,
+  'other': 99,
+};
+
+function getContractCategoryTranslationKey(category: Contract['category']): string {
+  return `contracts.categoryNames.${category.replace(/-([a-z])/g, (_: string, letter: string) => letter.toUpperCase())}`;
+}
+
+function getHomeExpenseCategoryFromContract(contract: Contract): ExpenseCategory {
+  if (contract.category === 'car') {
+    return 'carRenting';
+  }
+
+  return mapContractCategoryToExpenseCategory(contract.category) ?? 'other';
 }
 
 function monthKeyFromDate(value: Date): string {
@@ -187,6 +227,8 @@ function CashbackBadge({ purchase }: { purchase: CashbackPurchase }) {
 export default function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
   const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
+  const contractsContext = useOptionalContracts();
+  const contracts = contractsContext?.contracts ?? [];
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
   const { cards } = useCashbackCards();
 
@@ -201,6 +243,13 @@ export default function CashbackHeroPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => monthKeyFromDate(new Date()));
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(5);
+
+  const activeContracts = useMemo(
+    () => contracts
+      .filter((contract) => contract.status === 'active')
+      .sort((a, b) => a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider)),
+    [contracts],
+  );
 
   const lastSyncSigRef = useRef<Map<string, string>>(new Map());
 
@@ -826,11 +875,45 @@ export default function CashbackHeroPage() {
       <AddPurchaseDialog
         open={showAddPurchase}
         cardOptions={cards}
+        activeContracts={activeContracts}
         onOpenChange={setShowAddPurchase}
         onSubmit={async (payload) => {
-          await addPurchase(payload);
-          if (payload.isUnibanco) {
-            await syncUnibancoForMonths([payload.date.slice(0, 7)]);
+          const {
+            linkedHomeExpenseContractId,
+            ...purchasePayload
+          } = payload;
+
+          const savedPurchase = await addPurchase(purchasePayload);
+
+          if (linkedHomeExpenseContractId) {
+            const selectedContract = activeContracts.find((contract) => contract.id === linkedHomeExpenseContractId);
+            if (!selectedContract) {
+              throw new Error(t('cashbackHero.form.linkedContractRequired'));
+            }
+
+            const homeExpenseTransactionId = crypto.randomUUID();
+            await insertTransaction({
+              id: homeExpenseTransactionId,
+              name: `${selectedContract.name} (${selectedContract.provider})`,
+              type: 'expense',
+              category: getHomeExpenseCategoryFromContract(selectedContract),
+              notes: purchasePayload.notes,
+              amount: purchasePayload.amount,
+              date: purchasePayload.date,
+              recurring: false,
+              contractId: selectedContract.id,
+              isContractExpense: true,
+            });
+
+            await createCashbackHomeExpenseLink(
+              savedPurchase.id,
+              homeExpenseTransactionId,
+              selectedContract.id,
+            );
+          }
+
+          if (purchasePayload.isUnibanco) {
+            await syncUnibancoForMonths([purchasePayload.date.slice(0, 7)]);
           }
           toast.success(t('cashbackHero.addPurchase'));
         }}
@@ -890,13 +973,24 @@ export default function CashbackHeroPage() {
 function AddPurchaseDialog({
   open,
   cardOptions,
+  activeContracts,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   cardOptions: string[];
+  activeContracts: Contract[];
   onOpenChange: (open: boolean) => void;
-  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
+  onSubmit: (value: {
+    merchant: string;
+    category: CashbackCategory;
+    date: string;
+    amount: number;
+    notes?: string;
+    isReferral?: boolean;
+    isUnibanco?: boolean;
+    linkedHomeExpenseContractId?: string;
+  }) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [merchant, setMerchant] = useState('');
@@ -906,6 +1000,27 @@ function AddPurchaseDialog({
   const [notes, setNotes] = useState('');
   const [cardUsed, setCardUsed] = useState('');
   const [isReferral, setIsReferral] = useState(false);
+  const [linkToHomeExpense, setLinkToHomeExpense] = useState(false);
+  const [linkedContractId, setLinkedContractId] = useState('');
+
+  const groupedActiveContracts = useMemo(() => {
+    const sorted = [...activeContracts].sort((a, b) => {
+      const orderA = CONTRACT_CATEGORY_ORDER[a.category] ?? 50;
+      const orderB = CONTRACT_CATEGORY_ORDER[b.category] ?? 50;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider);
+    });
+
+    const grouped = new Map<Contract['category'], Contract[]>();
+    for (const contract of sorted) {
+      if (!grouped.has(contract.category)) {
+        grouped.set(contract.category, []);
+      }
+      grouped.get(contract.category)!.push(contract);
+    }
+
+    return grouped;
+  }, [activeContracts]);
 
   useEffect(() => {
     if (!open) return;
@@ -915,6 +1030,24 @@ function AddPurchaseDialog({
     }
     setCardUsed((prev) => (prev && cardOptions.includes(prev) ? prev : cardOptions[0]));
   }, [open, cardOptions]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (activeContracts.length === 0) {
+      setLinkToHomeExpense(false);
+      setLinkedContractId('');
+      return;
+    }
+    setLinkedContractId((prev) => (prev && activeContracts.some((contract) => contract.id === prev)
+      ? prev
+      : activeContracts[0].id));
+  }, [open, activeContracts]);
+
+  useEffect(() => {
+    if (isReferral && linkToHomeExpense) {
+      setLinkToHomeExpense(false);
+    }
+  }, [isReferral, linkToHomeExpense]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -935,6 +1068,16 @@ function AddPurchaseDialog({
       return;
     }
 
+    if (linkToHomeExpense && !linkedContractId) {
+      toast.error(t('cashbackHero.form.linkedContractRequired'));
+      return;
+    }
+
+    if (linkToHomeExpense && isReferral) {
+      toast.error(t('cashbackHero.form.referralCannotLinkHomeExpense'));
+      return;
+    }
+
     try {
       await onSubmit({
         merchant: merchant.trim(),
@@ -944,6 +1087,7 @@ function AddPurchaseDialog({
         notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
         isUnibanco: !isReferral && isUnibancoCard(cardUsed),
+        linkedHomeExpenseContractId: linkToHomeExpense ? linkedContractId : undefined,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -956,6 +1100,8 @@ function AddPurchaseDialog({
     setNotes('');
     setCardUsed('');
     setIsReferral(false);
+    setLinkToHomeExpense(false);
+    setLinkedContractId(activeContracts[0]?.id ?? '');
     onOpenChange(false);
   };
 
@@ -1036,6 +1182,53 @@ function AddPurchaseDialog({
             <label htmlFor="is-referral" className="text-xs font-medium text-muted-foreground cursor-pointer">
               {t('cashbackHero.form.isReferral')}
             </label>
+          </div>
+
+          <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="link-home-expense"
+                checked={linkToHomeExpense}
+                onChange={(event) => setLinkToHomeExpense(event.target.checked)}
+                className="rounded border border-input"
+                disabled={isReferral || activeContracts.length === 0}
+              />
+              <label htmlFor="link-home-expense" className="text-xs font-medium text-muted-foreground cursor-pointer">
+                {t('cashbackHero.form.linkToHomeExpense')}
+              </label>
+            </div>
+
+            {linkToHomeExpense ? (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.linkedContract')}</label>
+                <Select value={linkedContractId} onValueChange={setLinkedContractId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('cashbackHero.form.linkedContract')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...groupedActiveContracts.entries()].map(([category, contractsInCategory]) => (
+                      <SelectGroup key={category}>
+                        <SelectLabel className="flex items-center gap-1.5">
+                          <span>{getContractCategoryIcon(category)}</span>
+                          <span>{t(getContractCategoryTranslationKey(category))}</span>
+                        </SelectLabel>
+                        {contractsInCategory.map((contract) => (
+                          <SelectItem key={contract.id} value={contract.id} className="pl-6">
+                            {contract.name}
+                            {contract.provider ? <span className="text-muted-foreground ml-1">· {contract.provider}</span> : null}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            {activeContracts.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">{t('cashbackHero.form.noActiveContractsToLink')}</p>
+            ) : null}
           </div>
 
           <Button type="submit" className="w-full">{t('cashbackHero.addPurchase')}</Button>

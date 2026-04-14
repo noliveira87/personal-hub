@@ -67,8 +67,49 @@ create index if not exists cashback_entries_purchase_id_idx
 create index if not exists cashback_entries_date_received_idx
   on public.cashback_entries (date_received desc);
 
+-- Link cashback purchases with home-expense transactions (optional)
+create table if not exists public.cashback_purchase_home_expense_links (
+  id text primary key,
+  purchase_id text not null references public.cashback_purchases(id) on delete cascade,
+  home_expense_transaction_id uuid not null references public.home_expenses_transactions(id) on delete cascade,
+  contract_id text not null references public.contracts(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (purchase_id)
+);
+
+alter table public.cashback_purchase_home_expense_links
+  add column if not exists purchase_id text,
+  add column if not exists home_expense_transaction_id uuid,
+  add column if not exists contract_id text,
+  add column if not exists created_at timestamptz default now(),
+  add column if not exists updated_at timestamptz default now();
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'cashback_purchase_home_expense_links'
+      and column_name = 'home_expense_transaction_id'
+      and data_type = 'text'
+  ) then
+    alter table public.cashback_purchase_home_expense_links
+      alter column home_expense_transaction_id type uuid
+      using home_expense_transaction_id::uuid;
+  end if;
+end $$;
+
+create index if not exists cashback_purchase_home_expense_links_purchase_id_idx
+  on public.cashback_purchase_home_expense_links (purchase_id);
+
+create index if not exists cashback_purchase_home_expense_links_contract_id_idx
+  on public.cashback_purchase_home_expense_links (contract_id);
+
 alter table public.cashback_purchases enable row level security;
 alter table public.cashback_entries enable row level security;
+alter table public.cashback_purchase_home_expense_links enable row level security;
 
 drop policy if exists "cashback_purchases_select" on public.cashback_purchases;
 create policy "cashback_purchases_select"
@@ -124,6 +165,35 @@ create policy "cashback_entries_update"
 drop policy if exists "cashback_entries_delete" on public.cashback_entries;
 create policy "cashback_entries_delete"
   on public.cashback_entries
+  for delete
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "cashback_purchase_home_expense_links_select" on public.cashback_purchase_home_expense_links;
+create policy "cashback_purchase_home_expense_links_select"
+  on public.cashback_purchase_home_expense_links
+  for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "cashback_purchase_home_expense_links_insert" on public.cashback_purchase_home_expense_links;
+create policy "cashback_purchase_home_expense_links_insert"
+  on public.cashback_purchase_home_expense_links
+  for insert
+  to anon, authenticated
+  with check (true);
+
+drop policy if exists "cashback_purchase_home_expense_links_update" on public.cashback_purchase_home_expense_links;
+create policy "cashback_purchase_home_expense_links_update"
+  on public.cashback_purchase_home_expense_links
+  for update
+  to anon, authenticated
+  using (true)
+  with check (true);
+
+drop policy if exists "cashback_purchase_home_expense_links_delete" on public.cashback_purchase_home_expense_links;
+create policy "cashback_purchase_home_expense_links_delete"
+  on public.cashback_purchase_home_expense_links
   for delete
   to anon, authenticated
   using (true);

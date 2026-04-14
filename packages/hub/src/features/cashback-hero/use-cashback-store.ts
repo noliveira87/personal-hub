@@ -40,6 +40,7 @@ export function useCashbackStore() {
   const addPurchase = useCallback(async (purchase: Omit<CashbackPurchase, 'id' | 'cashbackEntries'>) => {
     const saved = await createCashbackPurchase(purchase);
     setPurchases((prev) => [saved, ...prev]);
+    return saved;
   }, []);
 
   const addCashbackEntry = useCallback(async (purchaseId: string, entry: Omit<CashbackEntry, 'id'>) => {
