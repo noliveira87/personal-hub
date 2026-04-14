@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Receipt, Plus, Pencil, Trash2, ExternalLink, Loader2, Bell, Building2 } from 'lucide-react';
+import { Receipt, Plus, Pencil, Trash2, ExternalLink, Loader2, Building2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ContractQuote } from '@/features/contracts/types/contract';
 import { loadQuotesByContract, deleteQuote } from '@/features/contracts/lib/quotes';
@@ -13,6 +14,14 @@ interface QuotesSectionProps {
   animationDelay?: string;
 }
 
+type PaymentTermBalance = {
+  amount: string;
+  percentage: string;
+  paid: boolean;
+};
+
+const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
+
 function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
   if (status === 'approved') {
     return 'bg-success/10 text-success border-success/20';
@@ -25,16 +34,6 @@ function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
   return 'bg-muted text-muted-foreground border-border';
 }
 
-type DisplayPaymentTerm = {
-  text: string;
-  amount: string;
-  percentage: string;
-  paymentDate: string;
-  paid: boolean;
-};
-
-const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
-
 function parseLocalizedNumber(value: string): number | null {
   const normalized = value.trim().replace(',', '.');
   if (!normalized) return null;
@@ -46,44 +45,23 @@ function roundToCents(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function computePaymentTermAmount(percentageText: string, quoteTotal: number | null): number | null {
-  if (quoteTotal == null) return null;
-  const percentage = parseLocalizedNumber(percentageText);
-  if (percentage == null) return null;
-  return roundToCents((quoteTotal * percentage) / 100);
-}
-
-function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
+function parsePaymentTermsForBalance(paymentTerms: string): PaymentTermBalance[] {
   const raw = paymentTerms.trim();
 
   if (raw.startsWith(PAYMENT_TERMS_V2_PREFIX)) {
     try {
       const parsed = JSON.parse(raw.slice(PAYMENT_TERMS_V2_PREFIX.length)) as Array<{
         percentage?: string;
-        description?: string;
         amount?: string;
-        paymentDate?: string;
         paid?: boolean;
       }>;
 
       if (Array.isArray(parsed)) {
-        return parsed
-          .map(term => {
-            const percentage = (term.percentage ?? '').trim();
-            const description = (term.description ?? '').trim();
-            const amount = (term.amount ?? '').trim();
-            const paymentDate = (term.paymentDate ?? '').trim();
-            const paid = Boolean(term.paid);
-
-            const text = percentage && description
-              ? `${percentage}% ${description}`
-              : percentage
-                ? `${percentage}%`
-                : description;
-
-            return { text, amount, percentage, paymentDate, paid };
-          })
-          .filter(term => term.text || term.amount || term.paymentDate || term.paid);
+        return parsed.map(term => ({
+          percentage: (term.percentage ?? '').trim(),
+          amount: (term.amount ?? '').trim(),
+          paid: Boolean(term.paid),
+        }));
       }
     } catch {
       // Fallback to legacy plain-text format.
@@ -95,17 +73,47 @@ function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
     .map(line => line.trim())
     .filter(Boolean)
     .map(line => line.replace(/^[-•]\s*/, ''))
-    .map(line => ({ text: line, amount: '', percentage: '', paymentDate: '', paid: false }));
+    .map(line => {
+      const percentageMatch = line.match(/^(\d{1,3}(?:[.,]\d+)?)%/);
+      return {
+        percentage: percentageMatch?.[1] ?? '',
+        amount: '',
+        paid: false,
+      };
+    });
 }
 
-function formatPaymentTermDate(value: string): string {
-  if (!value) return '';
-
-  try {
-    return format(parseISO(value), 'd MMM yyyy');
-  } catch {
-    return value;
+function resolvePaymentTermAmount(term: PaymentTermBalance, quoteTotal: number): number | null {
+  const amountFromField = parseLocalizedNumber(term.amount);
+  if (amountFromField != null) {
+    return roundToCents(amountFromField);
   }
+
+  const percentage = parseLocalizedNumber(term.percentage);
+  if (percentage == null) {
+    return null;
+  }
+
+  return roundToCents((quoteTotal * percentage) / 100);
+}
+
+function computeRemainingToPay(quote: ContractQuote): number | null {
+  if (quote.approvalStatus !== 'approved') return null;
+  if (quote.price == null) return null;
+
+  const quoteTotal = roundToCents(quote.price);
+  if (!quote.paymentTerms) {
+    return quoteTotal;
+  }
+
+  const paymentTerms = parsePaymentTermsForBalance(quote.paymentTerms);
+  const paidTotal = paymentTerms.reduce((sum, term) => {
+    if (!term.paid) return sum;
+    const resolvedAmount = resolvePaymentTermAmount(term, quoteTotal);
+    return sum + (resolvedAmount ?? 0);
+  }, 0);
+
+  return roundToCents(Math.max(quoteTotal - paidTotal, 0));
 }
 
 export function QuotesSection({
@@ -114,6 +122,7 @@ export function QuotesSection({
   animationDelay = '0ms',
 }: QuotesSectionProps) {
   const { t, formatCurrency } = useI18n();
+  const navigate = useNavigate();
   const [quotes, setQuotes] = useState<ContractQuote[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -189,10 +198,10 @@ export function QuotesSection({
     setEditingQuote(null);
   };
 
-  const getQuoteStatusLabel = (status: ContractQuote['approvalStatus']) => {
-    if (status === 'approved') return t('contracts.quotes.approvalStatusApproved');
-    if (status === 'rejected') return t('contracts.quotes.approvalStatusRejected');
-    return t('contracts.quotes.approvalStatusPending');
+  const getQuoteApprovalSimpleLabel = (status: ContractQuote['approvalStatus']) => {
+    return status === 'approved'
+      ? t('contracts.quotes.approvedYes')
+      : t('contracts.quotes.approvedNo');
   };
 
   return (
@@ -228,36 +237,56 @@ export function QuotesSection({
           <p className="text-sm text-muted-foreground py-2">{t('contracts.quotes.empty')}</p>
         ) : (
           <div className="space-y-3">
-            {quotes.map(quote => (
-              <div
-                key={quote.id}
-                className="rounded-lg border bg-muted/20 p-4 flex flex-col gap-2"
-              >
+            {quotes.map(quote => {
+              const remainingToPay = computeRemainingToPay(quote);
+
+              return (
+                <div
+                  key={quote.id}
+                  className="rounded-lg border bg-muted/20 p-4 flex flex-col gap-2 cursor-pointer transition-colors hover:bg-muted/30"
+                  onClick={() => navigate(`/contracts/quotes/${quote.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/contracts/quotes/${quote.id}`);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
                 {/* Top row: title + actions */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground leading-tight">{quote.title}</p>
-                    {quote.provider && (
-                      <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
-                        <Building2 className="h-3 w-3" />
-                        {quote.provider}
-                      </span>
-                    )}
-                    {quote.date && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(parseISO(quote.date), 'd MMM yyyy')}
-                      </p>
-                    )}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {quote.provider && (
+                        <span className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                          <Building2 className="h-3 w-3" />
+                          {quote.provider}
+                        </span>
+                      )}
+                      {quote.date && (
+                        <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                          {format(parseISO(quote.date), 'd MMM yyyy')}
+                        </span>
+                      )}
+                      {quote.vatRate != null && (
+                        <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                          {t('contracts.quotes.vatRateBadge', { rate: quote.vatRate })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${getQuoteStatusBadgeClasses(quote.approvalStatus)}`}>
-                      {getQuoteStatusLabel(quote.approvalStatus)}
+                      {t('contracts.quotes.approvedSimpleLabel')}: {getQuoteApprovalSimpleLabel(quote.approvalStatus)}
                     </span>
                     {quote.pdfUrl && (
                       <a
                         href={quote.pdfUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(event) => event.stopPropagation()}
                         className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
                         title={t('contracts.quotes.openPdf')}
                       >
@@ -265,14 +294,20 @@ export function QuotesSection({
                       </a>
                     )}
                     <button
-                      onClick={() => handleEdit(quote)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleEdit(quote);
+                      }}
                       className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
                       title={t('contracts.quotes.edit')}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(quote)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDelete(quote);
+                      }}
                       className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
                       title={t('contracts.quotes.delete')}
                     >
@@ -283,65 +318,21 @@ export function QuotesSection({
 
                 {/* Price */}
                 {quote.price != null && (
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     <p className="text-base font-bold tabular-nums text-foreground">
-                      {t('contracts.quotes.priceWithVatLabel')}: {formatCurrency(quote.price, quote.currency)}
+                      {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(quote.price, quote.currency)}
                     </p>
-                    {quote.priceNet != null && (
-                      <p className="text-xs text-muted-foreground">
-                        {t('contracts.quotes.priceNetLabel')}: {formatCurrency(quote.priceNet, quote.currency)}
-                        {quote.vatRate != null ? ` • ${t('contracts.quotes.vatRateLabel')}: ${quote.vatRate}%` : ''}
-                      </p>
+                    {remainingToPay != null && (
+                      <div className="inline-flex w-fit items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
+                        <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
+                        <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, quote.currency)}</span>
+                      </div>
                     )}
                   </div>
                 )}
-
-                {/* Description */}
-                {quote.description && (
-                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                    {quote.description}
-                  </p>
-                )}
-
-                {quote.paymentTerms && (
-                  <div className="text-xs text-muted-foreground leading-relaxed">
-                    <p className="font-medium text-foreground mb-1">{t('contracts.quotes.paymentTermsLabel')}</p>
-                    <ul className="space-y-0.5">
-                      {parsePaymentTermsLines(quote.paymentTerms).map((term, idx) => (
-                        <li key={`${quote.id}-payment-term-${idx}`} className="flex flex-wrap items-center gap-1.5">
-                          <span>• {term.text}{term.amount ? ` - ${term.amount}` : ''}</span>
-                          {computePaymentTermAmount(term.percentage, quote.price) != null && (
-                            <span className="text-[11px] text-foreground/85">
-                              ({t('contracts.quotes.paymentTermsCalculatedAmountLabel')} {formatCurrency(computePaymentTermAmount(term.percentage, quote.price)!, quote.currency)})
-                            </span>
-                          )}
-                          {term.paymentDate && (
-                            <span className="text-[11px] text-muted-foreground/90">
-                              {t('contracts.quotes.paymentTermsPaymentDateLabel')}: {formatPaymentTermDate(term.paymentDate)}
-                            </span>
-                          )}
-                          {term.paid && (
-                            <span className="rounded-full border border-success/30 bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
-                              {t('contracts.quotes.paymentTermsPaidLabel')}
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Alert badge */}
-                {(quote.alertEnabled || quote.telegramAlertEnabled) && quote.alertDate && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Bell className="w-3 h-3" />
-                    <span>{quote.alertDate}</span>
-                    {quote.alertEnabled && <span className="text-success">· App</span>}
-                    {quote.telegramAlertEnabled && <span className="text-primary">· Telegram</span>}
-                  </div>
-                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -81,6 +81,25 @@ export async function loadQuotesByContract(contractId: string): Promise<Contract
   return (data ?? []).map(mapRowToQuote);
 }
 
+export async function loadQuoteById(id: string): Promise<ContractQuote | null> {
+  const { data, error } = await supabase
+    .from('contract_quotes')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error loading quote by id:', error);
+    throw new Error(`Failed to load quote: ${error.message}`);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return mapRowToQuote(data);
+}
+
 export async function createQuote(
   quote: Omit<ContractQuote, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<ContractQuote> {
