@@ -29,7 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <HomeExpensesMobileNavContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-background flex">
+      <div className="min-h-screen bg-background flex overflow-x-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card/50 backdrop-blur-xl fixed h-full z-30 pt-16">
         <nav className="flex-1 p-4 space-y-1 border-t border-border">
@@ -93,8 +93,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 pt-16">
-        <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      <main className="flex-1 lg:ml-64 pt-16 overflow-x-hidden">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto w-full min-w-0">
           {children}
         </div>
       </main>

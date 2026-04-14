@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
+import { toast } from '@/components/ui/sonner';
 
 type ContractViewCategory = 'cafofo' | 'apartamento' | 'carro' | 'outros';
 
@@ -37,6 +38,10 @@ const CONTRACT_CATEGORY_SORT_ORDER: Record<string, number> = {
   'card-debit': 14,
   'other': 99,
 };
+
+function getContractCategoryTranslationKey(category: Contract['category']): string {
+  return `contracts.categoryNames.${category.replace(/-([a-z])/g, (_: string, letter: string) => letter.toUpperCase())}`;
+}
 
 function sortContractItems(items: ContractItem[]): ContractItem[] {
   return [...items].sort((a, b) => {
@@ -122,7 +127,7 @@ function ChecklistRow({
 }) {
   return (
     <div className={cn(
-      'flex items-center gap-3 rounded-xl border-2 bg-card px-4 py-3.5 transition-all duration-200',
+      'w-full max-w-full min-w-0 flex items-start gap-2 rounded-xl border-2 bg-card px-3 py-3 transition-all duration-200 sm:items-center sm:gap-3 sm:px-4 sm:py-3.5',
       paid ? 'border-green-500/40 bg-green-500/5' : 'border-border',
     )}>
       <button
@@ -131,7 +136,7 @@ function ChecklistRow({
         disabled={autoDetected}
         title={autoDetected ? 'Detetado automaticamente nos movimentos' : undefined}
         className={cn(
-          'flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors',
+          'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors sm:mt-0',
           paid && !autoDetected && 'bg-green-500 border-green-500 text-white',
           autoDetected && 'bg-primary/10 border-primary text-primary cursor-default',
           !paid && 'border-border bg-background',
@@ -145,43 +150,60 @@ function ChecklistRow({
         {autoDetected && <Zap className="w-3 h-3" />}
       </button>
 
-      {icon
-        ? <span className="text-xl flex-shrink-0">{icon}</span>
-        : <ClipboardList className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              {icon
+                ? <span className="text-xl leading-none flex-shrink-0">{icon}</span>
+                : <ClipboardList className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
+              <p className={cn('text-[15px] font-semibold leading-tight line-clamp-2 sm:text-sm sm:font-medium sm:line-clamp-1', paid && 'line-through text-muted-foreground')}>{name}</p>
+            </div>
+            {provider && <p className="mt-1 text-xs text-muted-foreground truncate">{provider}</p>}
+          </div>
 
-      <div className="flex-1 min-w-0">
-        <p className={cn('text-sm font-medium truncate', paid && 'line-through text-muted-foreground')}>{name}</p>
-        {provider && <p className="text-xs text-muted-foreground truncate mt-0.5">{provider}</p>}
+          <div className="hidden text-right flex-shrink-0 sm:block">
+            <p className={cn('text-sm font-semibold tabular-nums leading-none whitespace-nowrap', paid && 'text-muted-foreground')}>
+              {formatCurrency(monthly, currency)}
+            </p>
+            {billingFrequency && (
+              <p className="mt-1 text-xs text-muted-foreground">/mês</p>
+            )}
+          </div>
+        </div>
+
         {(paymentTypeLabel || paymentSourceLabel) && (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {paymentTypeLabel && (
-              <span className="inline-flex items-center rounded-full border border-violet-300 bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-800 dark:border-violet-700 dark:bg-violet-950/70 dark:text-violet-200">
+              <span className="inline-flex items-center rounded-full border border-violet-300 bg-violet-100 px-2.5 py-1 text-[10px] font-medium text-violet-800 dark:border-violet-700 dark:bg-violet-950/70 dark:text-violet-200">
                 Tipo: {paymentTypeLabel}
               </span>
             )}
             {paymentSourceLabel && (
-              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-200">
+              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-medium text-amber-800 dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-200">
                 Origem: {paymentSourceLabel}
               </span>
             )}
           </div>
         )}
-      </div>
 
-      <div className="text-right flex-shrink-0">
-        <p className={cn('text-sm font-semibold tabular-nums', paid && 'text-muted-foreground')}>
-          {formatCurrency(monthly, currency)}
-        </p>
-        {billingFrequency && (
-          <p className="text-xs text-muted-foreground">/mês</p>
-        )}
+        <div className="mt-2 flex items-end justify-end sm:hidden">
+          <div className="text-right">
+            <p className={cn('text-base font-semibold tabular-nums leading-none whitespace-nowrap', paid && 'text-muted-foreground')}>
+              {formatCurrency(monthly, currency)}
+            </p>
+            {billingFrequency && (
+              <p className="mt-1 text-xs text-muted-foreground">/mês</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {onRemove && (
         <button
           type="button"
           onClick={onRemove}
-          className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+          className="mt-0.5 flex-shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:text-destructive sm:mt-0"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -205,24 +227,104 @@ export default function Checklist() {
 
   const { paidSet, customItems, togglePaid, addCustomItem, removeCustomItem } = usePaymentChecklist(monthKey);
   const [showContractPicker, setShowContractPicker] = useState(false);
-  const [savingVisibilityIds, setSavingVisibilityIds] = useState<string[]>([]);
+  const [draftExcludedContractIds, setDraftExcludedContractIds] = useState<string[]>([]);
+  const [isSavingContractSelection, setIsSavingContractSelection] = useState(false);
 
   const excludedContractSet = useMemo(
     () => new Set(activeContracts.filter((c) => c.showInChecklist === false).map((c) => c.id)),
     [activeContracts],
   );
 
-  const updateChecklistVisibility = async (contract: Contract, visible: boolean) => {
-    setSavingVisibilityIds((prev) => (prev.includes(contract.id) ? prev : [...prev, contract.id]));
+  const draftExcludedContractSet = useMemo(
+    () => new Set(draftExcludedContractIds),
+    [draftExcludedContractIds],
+  );
+
+  // Enrich contracts for checklist calculations and UI
+  const contractItems = useMemo(
+    (): ContractItem[] =>
+      activeContracts.map((contract) => {
+        const latestPrice = priceMap.get(contract.id);
+        const price = latestPrice?.price ?? contract.price;
+        const currency = latestPrice?.currency ?? contract.currency;
+        return { contract, currency, monthly: getMonthlyEquivalent({ ...contract, price }) };
+      }),
+    [activeContracts, priceMap],
+  );
+
+  const hasPendingContractSelectionChanges = useMemo(() => {
+    if (!showContractPicker) return false;
+    if (draftExcludedContractSet.size !== excludedContractSet.size) return true;
+    for (const id of draftExcludedContractSet) {
+      if (!excludedContractSet.has(id)) return true;
+    }
+    return false;
+  }, [showContractPicker, draftExcludedContractSet, excludedContractSet]);
+
+  const pendingContractSelectionCount = useMemo(() => {
+    if (!showContractPicker) return 0;
+    return contractItems.filter(({ contract }) => {
+      const currentlyVisible = !excludedContractSet.has(contract.id);
+      const draftVisible = !draftExcludedContractSet.has(contract.id);
+      return currentlyVisible !== draftVisible;
+    }).length;
+  }, [showContractPicker, contractItems, excludedContractSet, draftExcludedContractSet]);
+
+  const toggleDraftContractVisibility = (contractId: string, visible: boolean) => {
+    setDraftExcludedContractIds((prev) => {
+      const next = new Set(prev);
+      if (visible) {
+        next.delete(contractId);
+      } else {
+        next.add(contractId);
+      }
+      return [...next];
+    });
+  };
+
+  const openContractPicker = () => {
+    setDraftExcludedContractIds([...excludedContractSet]);
+    setShowContractPicker(true);
+  };
+
+  const cancelContractPickerChanges = () => {
+    setDraftExcludedContractIds([...excludedContractSet]);
+    setShowContractPicker(false);
+  };
+
+  const saveContractPickerChanges = async () => {
+    if (!hasPendingContractSelectionChanges) {
+      setShowContractPicker(false);
+      return;
+    }
+
+    const updates = contractItems
+      .map(({ contract }) => {
+        const currentlyVisible = !excludedContractSet.has(contract.id);
+        const draftVisible = !draftExcludedContractSet.has(contract.id);
+        if (currentlyVisible === draftVisible) return null;
+        return {
+          ...contract,
+          showInChecklist: draftVisible,
+        };
+      })
+      .filter((item): item is Contract => item !== null);
+
+    if (updates.length === 0) {
+      setShowContractPicker(false);
+      return;
+    }
+
+    setIsSavingContractSelection(true);
     try {
-      await updateContract({
-        ...contract,
-        showInChecklist: visible,
-      });
+      await Promise.all(updates.map((nextContract) => updateContract(nextContract)));
+      toast.success(t('homeExpenses.checklist.contractSelectionSaved'));
+      setShowContractPicker(false);
     } catch (error) {
-      console.error('Failed to update checklist visibility', error);
+      console.error('Failed to save checklist contract selection', error);
+      toast.error(t('homeExpenses.checklist.contractSelectionSaveError'));
     } finally {
-      setSavingVisibilityIds((prev) => prev.filter((id) => id !== contract.id));
+      setIsSavingContractSelection(false);
     }
   };
 
@@ -253,22 +355,23 @@ export default function Checklist() {
     setShowAddForm(false);
   };
 
-  // Enrich contracts and group by view category
-  const contractItems = useMemo(
-    (): ContractItem[] =>
-      activeContracts.map((contract) => {
-        const latestPrice = priceMap.get(contract.id);
-        const price = latestPrice?.price ?? contract.price;
-        const currency = latestPrice?.currency ?? contract.currency;
-        return { contract, currency, monthly: getMonthlyEquivalent({ ...contract, price }) };
-      }),
-    [activeContracts, priceMap],
-  );
-
   const visibleContractItems = useMemo(
     () => contractItems.filter((item) => !excludedContractSet.has(item.contract.id)),
     [contractItems, excludedContractSet],
   );
+
+  const groupedContractPickerItems = useMemo(() => {
+    const sorted = sortContractItems(contractItems);
+    const groups = new Map<Contract['category'], ContractItem[]>();
+
+    for (const item of sorted) {
+      const key = item.contract.category;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    }
+
+    return Array.from(groups.entries()).map(([category, items]) => ({ category, items }));
+  }, [contractItems]);
 
   const groupedContracts = useMemo(() => {
     const map = new Map<ContractViewCategory, ContractItem[]>(CATEGORY_ORDER.map((cat) => [cat, []]));
@@ -301,24 +404,24 @@ export default function Checklist() {
   const progress = totalItems > 0 ? (paidCount / totalItems) * 100 : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-5 overflow-x-hidden sm:space-y-6">
       <AppSectionHeader title={t('homeExpenses.appTitle')} icon={CheckSquare} backTo="/" />
 
       <MonthYearSelector />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border bg-card p-4 space-y-1">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+        <div className="rounded-xl border bg-card p-3.5 space-y-1 sm:p-4">
           <p className="text-xs text-muted-foreground">{t('homeExpenses.checklist.totalBudget')}</p>
-          <p className="text-lg font-bold tabular-nums">{formatCurrency(totalBudget)}</p>
+          <p className="text-[clamp(1.5rem,6vw,2rem)] font-bold tabular-nums leading-none whitespace-nowrap">{formatCurrency(totalBudget)}</p>
         </div>
-        <div className="rounded-xl border bg-card p-4 space-y-1">
+        <div className="rounded-xl border bg-card p-3.5 space-y-1 sm:p-4">
           <p className="text-xs text-muted-foreground">{t('homeExpenses.checklist.paid')}</p>
-          <p className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400">{formatCurrency(totalPaid)}</p>
+          <p className="text-[clamp(1.5rem,6vw,2rem)] font-bold tabular-nums leading-none whitespace-nowrap text-green-600 dark:text-green-400">{formatCurrency(totalPaid)}</p>
         </div>
-        <div className="rounded-xl border bg-card p-4 space-y-1">
+        <div className="col-span-2 rounded-xl border bg-card p-3.5 space-y-1 sm:col-span-1 sm:p-4">
           <p className="text-xs text-muted-foreground">{t('homeExpenses.checklist.remaining')}</p>
-          <p className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(totalRemaining)}</p>
+          <p className="text-[clamp(1.5rem,6vw,2rem)] font-bold tabular-nums leading-none whitespace-nowrap text-amber-600 dark:text-amber-400">{formatCurrency(totalRemaining)}</p>
         </div>
       </div>
 
@@ -342,34 +445,82 @@ export default function Checklist() {
 
       {/* Grouped contract sections */}
       <div className="flex justify-end">
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowContractPicker((v) => !v)}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-center gap-1.5 sm:w-auto"
+          onClick={() => {
+            if (showContractPicker) {
+              cancelContractPickerChanges();
+              return;
+            }
+            openContractPicker();
+          }}
+        >
           <Eye className="w-3.5 h-3.5" />
-          {t('homeExpenses.checklist.chooseContracts')}
+          {t('homeExpenses.checklist.manageContracts')}
         </Button>
       </div>
 
       {showContractPicker && (
         <section className="space-y-3 rounded-xl border bg-card p-4">
-          <h3 className="text-sm font-semibold text-foreground">{t('homeExpenses.checklist.chooseContracts')}</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-foreground">{t('homeExpenses.checklist.contractSelectionTitle')}</h3>
+            {hasPendingContractSelectionChanges && (
+              <span className="text-xs text-amber-600 dark:text-amber-400">
+                {t('homeExpenses.checklist.contractSelectionPending', { count: String(pendingContractSelectionCount) })}
+              </span>
+            )}
+          </div>
           <div className="space-y-2 max-h-64 overflow-auto pr-1">
-            {sortContractItems(contractItems).map(({ contract }) => {
-              const checked = !excludedContractSet.has(contract.id);
-              return (
-                <label key={contract.id} className="flex items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer hover:bg-muted/40">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={savingVisibilityIds.includes(contract.id)}
-                    onChange={(e) => {
-                      void updateChecklistVisibility(contract, e.target.checked);
-                    }}
-                    className="h-4 w-4"
-                  />
-                  <span className="text-sm flex-1 min-w-0 truncate">{contract.name}</span>
-                  <span className="text-xs text-muted-foreground truncate">{contract.provider}</span>
-                </label>
-              );
-            })}
+            {groupedContractPickerItems.map(({ category, items }) => (
+              <div key={`checklist-picker-group-${category}`} className="space-y-2">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {getContractCategoryIcon(category)} {t(getContractCategoryTranslationKey(category))}
+                </p>
+                <div className="space-y-2">
+                  {items.map(({ contract }) => {
+                    const checked = !draftExcludedContractSet.has(contract.id);
+                    return (
+                      <label key={contract.id} className="flex w-full min-w-0 items-center gap-3 rounded-lg border px-3 py-2 cursor-pointer hover:bg-muted/40 overflow-hidden">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={isSavingContractSelection}
+                          onChange={(e) => {
+                            toggleDraftContractVisibility(contract.id, e.target.checked);
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-base leading-none">{getContractCategoryIcon(contract.category, contract.type)}</span>
+                        <span className="text-sm flex-1 min-w-0 w-0 truncate">{contract.name}</span>
+                        <span className="text-xs text-muted-foreground truncate max-w-[34%] text-right flex-shrink-0">{contract.provider}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={cancelContractPickerChanges}
+              disabled={isSavingContractSelection}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              className="w-full sm:w-auto"
+              onClick={() => { void saveContractPickerChanges(); }}
+              disabled={isSavingContractSelection || !hasPendingContractSelectionChanges}
+            >
+              {isSavingContractSelection ? t('common.saving') : t('common.save')}
+            </Button>
           </div>
         </section>
       )}
@@ -435,7 +586,7 @@ export default function Checklist() {
               onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 placeholder={t('homeExpenses.checklist.itemAmount')}
                 type="number"
@@ -446,10 +597,10 @@ export default function Checklist() {
                 onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
                 className="flex-1"
               />
-              <Button size="sm" onClick={handleAddItem} disabled={!newName.trim() || !newAmount}>
+              <Button size="sm" className="w-full sm:w-auto" onClick={handleAddItem} disabled={!newName.trim() || !newAmount}>
                 {t('homeExpenses.checklist.addItem')}
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => { setShowAddForm(false); setNewName(''); setNewAmount(''); }}>
+              <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={() => { setShowAddForm(false); setNewName(''); setNewAmount(''); }}>
                 {t('common.cancel')}
               </Button>
             </div>

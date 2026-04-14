@@ -41,20 +41,20 @@ export default function MonthYearSelector() {
   };
 
   return (
-    <div className="flex items-center justify-between rounded-xl border bg-card px-2 py-2 w-full">
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateMonth(-1)}>
+    <div className="flex w-full min-w-0 items-center justify-between rounded-xl border bg-card px-2 py-2 overflow-hidden">
+      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => navigateMonth(-1)}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      <div className="flex items-center gap-2 text-sm font-medium text-foreground capitalize">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-2 text-sm font-medium text-foreground capitalize">
         <Calendar className="h-4 w-4 text-muted-foreground" />
-        <span>{monthLabel} {selectedYear}</span>
+        <span className="truncate">{monthLabel} {selectedYear}</span>
       </div>
 
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 disabled:opacity-40"
+        className="h-8 w-8 flex-shrink-0 disabled:opacity-40"
         onClick={() => navigateMonth(1)}
         disabled={isCurrentMonth}
       >
