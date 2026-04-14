@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, ExternalLink, Image, Loader2, MapPin, Pencil, Plus, Trash2, Upload, UtensilsCrossed, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import AppSectionHeader from "@/components/AppSectionHeader";
+import AppLoadingState from "@/components/AppLoadingState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -242,7 +243,7 @@ export function JourneyBiteDetail() {
   if (loading) {
     return (
       <main className="container max-w-5xl px-4 py-8 sm:px-6">
-        <p className="text-sm text-muted-foreground">{t("journeyBites.loading")}</p>
+        <AppLoadingState label={t("journeyBites.loading")} variant="table" />
       </main>
     );
   }

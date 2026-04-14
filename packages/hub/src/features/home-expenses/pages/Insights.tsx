@@ -8,6 +8,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { useI18n } from '@/i18n/I18nProvider';
 import { Button } from '@/components/ui/button';
 import { chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle, renderChartLegendLabel } from '@/lib/chartTheme';
@@ -28,7 +29,7 @@ const MONTH_KEYS = [
 ] as const;
 
 export default function Insights() {
-  const { allTransactions, selectedYear, selectedMonth, setSelectedYear, setSelectedMonth } = useData();
+  const { allTransactions, selectedYear, selectedMonth, setSelectedYear, setSelectedMonth, loading } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
@@ -164,6 +165,10 @@ export default function Insights() {
     { icon: Target, label: t('homeExpenses.insights.afterFixedExpenses'), value: formatCurrency(data.moneyAfterFixed), sub: `${t('homeExpenses.insights.fixedPrefix')}: ${formatCurrency(data.fixedExpenses)}`, color: data.moneyAfterFixed >= 0 ? 'text-positive' : 'text-negative' },
     { icon: TrendingUp, label: t('homeExpenses.insights.endOfMonthForecast'), value: formatCurrency(data.forecastBalance), sub: `${t('homeExpenses.insights.estimatedExpensesPrefix')}: ${formatCurrency(data.forecastExpenses)}`, color: data.forecastBalance >= 0 ? 'text-positive' : 'text-negative' },
   ], [data, t, formatCurrency]);
+
+  if (loading) {
+    return <AppLoadingState label={t('app.loadingRoute')} variant="dashboard" />;
+  }
 
   return (
     <div className="space-y-6">

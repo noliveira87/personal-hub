@@ -7,13 +7,16 @@ import AnnualSummarySection from '@/features/home-expenses/components/dashboard/
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { House, Plus, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useData } from '@/features/home-expenses/lib/DataContext';
 import { Link } from 'react-router-dom';
 
 export default function Index() {
   const { t } = useI18n();
+  const { loading } = useData();
   const topRightRef = useRef<HTMLDivElement | null>(null);
   const [topRightHeight, setTopRightHeight] = useState<number | null>(null);
 
@@ -28,6 +31,10 @@ export default function Index() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  if (loading) {
+    return <AppLoadingState label={t('app.loadingRoute')} variant="dashboard" />;
+  }
 
   return (
     <div className="space-y-6">

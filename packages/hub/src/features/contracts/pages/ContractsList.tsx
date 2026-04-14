@@ -4,9 +4,10 @@ import { useContracts } from '@/features/contracts/context/ContractContext';
 import { useI18n } from '@/i18n/I18nProvider';
 import { Contract, ContractStatus } from '@/features/contracts/types/contract';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
-import { Plus, Search, SlidersHorizontal, Loader, FileText, TrendingUp } from 'lucide-react';
+import { Plus, Search, SlidersHorizontal, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
 
 type ContractViewCategory = 'cafofo' | 'apartamento' | 'carro' | 'outros';
@@ -150,11 +151,9 @@ export default function ContractsList() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader className="w-4 h-4 animate-spin" />
-          <span className="text-sm">{t('contracts.loading')}</span>
-        </div>
+      <div className="space-y-6">
+        <AppSectionHeader title={t('contracts.menu')} icon={FileText} />
+        <AppLoadingState label={t('contracts.loading')} variant="cards" />
       </div>
     );
   }

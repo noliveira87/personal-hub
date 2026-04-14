@@ -21,6 +21,7 @@ type DefaultYears = 2 | 3;
 const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
   { value: 'tech', label: 'Tech' },
   { value: 'appliances', label: 'Appliances' },
+  { value: 'tools', label: 'Tools' },
   { value: 'others', label: 'Others' },
 ];
 
@@ -109,7 +110,7 @@ export function WarrantySettingsMenuSection() {
 
       <div>
         <p className="mb-1 text-xs font-medium text-muted-foreground">Default category</p>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {CATEGORY_OPTIONS.map((option) => (
             <button
               key={option.value}

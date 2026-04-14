@@ -26,7 +26,7 @@ export const DEFAULT_WARRANTY_DEFAULTS_SETTINGS: WarrantyDefaultsSettings = {
 };
 
 function normalizeDefaultCategory(value: string | null | undefined): WarrantyCategory {
-  if (value === 'tech' || value === 'appliances' || value === 'others') return value;
+  if (value === 'tech' || value === 'appliances' || value === 'tools' || value === 'others') return value;
   return DEFAULT_WARRANTY_DEFAULTS_SETTINGS.defaultCategory;
 }
 

@@ -22,6 +22,7 @@ type DefaultYears = 2 | 3;
 const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
   { value: 'tech', label: 'Tech' },
   { value: 'appliances', label: 'Appliances' },
+  { value: 'tools', label: 'Tools' },
   { value: 'others', label: 'Others' },
 ];
 
@@ -136,7 +137,7 @@ export function WarrantySettingsDialog({ trigger }: { trigger?: ReactNode }) {
         <div className="space-y-5 pt-2">
           <div className="space-y-2">
             <p className="text-sm font-medium text-foreground">Default category</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {CATEGORY_OPTIONS.map((option) => (
                 <button
                   key={option.value}

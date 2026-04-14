@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, Image, Store, Package, CalendarDays, Clock, Tag, Banknote, X } from "lucide-react";
 import { calculateExpiration, deleteReceiptByUrl, type Warranty, type WarrantyCategory, uploadReceipt } from "@/lib/warranties";
+import { useI18n } from "@/i18n/I18nProvider";
 
 interface Props {
   warranty: Warranty;
@@ -20,10 +21,13 @@ interface Props {
 const CATEGORY_OPTIONS: { value: WarrantyCategory; label: string }[] = [
   { value: "tech", label: "Tech" },
   { value: "appliances", label: "Appliances" },
+  { value: "tools", label: "Tools" },
   { value: "others", label: "Others" },
 ];
 
 export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Props) {
+  const { t, formatDate } = useI18n();
+  const existingReceiptLabel = t("warranties.existingReceipt");
   const [name, setName] = useState(warranty.productName);
   const [category, setCategory] = useState<WarrantyCategory>(warranty.category ?? "others");
   const [price, setPrice] = useState(warranty.price?.toString() ?? "");
@@ -31,7 +35,7 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
   const [date, setDate] = useState(warranty.purchaseDate);
   const [years, setYears] = useState<2 | 3>(warranty.warrantyYears);
   const [receiptFile, setReceiptFile] = useState<File | undefined>();
-  const [receiptName, setReceiptName] = useState(warranty.receiptDataUrl ? "Existing receipt" : "");
+  const [receiptName, setReceiptName] = useState(warranty.receiptDataUrl ? existingReceiptLabel : "");
   const [currentReceiptUrl, setCurrentReceiptUrl] = useState(warranty.receiptDataUrl);
   const [removeCurrentReceipt, setRemoveCurrentReceipt] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -46,11 +50,11 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
       setDate(warranty.purchaseDate);
       setYears(warranty.warrantyYears);
       setReceiptFile(undefined);
-      setReceiptName(warranty.receiptDataUrl ? "Existing receipt" : "");
+      setReceiptName(warranty.receiptDataUrl ? existingReceiptLabel : "");
       setCurrentReceiptUrl(warranty.receiptDataUrl);
       setRemoveCurrentReceipt(false);
     }
-  }, [open, warranty]);
+  }, [open, warranty, existingReceiptLabel]);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,8 +128,8 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
       console.error("Error:", error);
       alert(
         error instanceof Error
-          ? `Failed to save changes: ${error.message}`
-          : "Failed to save changes. Please try again."
+          ? t("warranties.errors.saveWithMessage", { message: error.message })
+          : t("warranties.errors.save")
       );
     } finally {
       setIsUploading(false);
@@ -136,16 +140,16 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit warranty</DialogTitle>
+          <DialogTitle>{t("warranties.editWarranty")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <Package className="h-3.5 w-3.5" />
-              Product name
+              {t("warranties.productName")}
             </label>
             <Input
-              placeholder="e.g. Samsung Dishwasher"
+              placeholder={t("warranties.productNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -155,10 +159,10 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <Store className="h-3.5 w-3.5" />
-              Purchased from
+              {t("warranties.purchasedFrom")}
             </label>
             <Input
-              placeholder="e.g. Worten, Amazon, IKEA"
+              placeholder={t("warranties.purchasedFromPlaceholder")}
               value={purchasedFrom}
               onChange={(e) => setPurchasedFrom(e.target.value)}
             />
@@ -167,13 +171,13 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <Banknote className="h-3.5 w-3.5" />
-              Price
+              {t("warranties.price")}
             </label>
             <Input
               type="number"
               min="0"
               step="0.01"
-              placeholder="e.g. 299.99"
+              placeholder={t("warranties.pricePlaceholder")}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
@@ -182,21 +186,21 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <Tag className="h-3.5 w-3.5" />
-              Category
+              {t("warranties.categoryLabel")}
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {CATEGORY_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   onClick={() => setCategory(option.value)}
-                  className={`h-10 rounded-lg text-sm font-medium transition-all active:scale-[0.96] ${
+                  className={`h-10 rounded-lg px-2 text-xs font-medium transition-all active:scale-[0.96] sm:text-sm ${
                     category === option.value
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "bg-secondary text-secondary-foreground hover:bg-secondary/70"
                   }`}
                 >
-                  {option.label}
+                  {t(`warranties.category.${option.value}`)}
                 </button>
               ))}
             </div>
@@ -206,7 +210,7 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
                 <CalendarDays className="h-3.5 w-3.5" />
-                Purchase date
+                {t("warranties.purchaseDate")}
               </label>
               <Input
                 type="date"
@@ -217,7 +221,7 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
-                Warranty
+                {t("warranties.warrantyLength")}
               </label>
               <div className="flex gap-2">
                 {([2, 3] as const).map((y) => (
@@ -231,7 +235,7 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
                         : "bg-secondary text-secondary-foreground hover:bg-secondary/70"
                     }`}
                   >
-                    {y} years
+                    {t("warranties.yearsCount", { count: y })}
                   </button>
                 ))}
               </div>
@@ -240,9 +244,9 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
 
           {date && (
             <p className="text-sm text-muted-foreground">
-              Expires on{" "}
+              {t("warranties.expiresOn")} {" "}
               <span className="font-medium text-foreground">
-                {new Date(calculateExpiration(date, years)).toLocaleDateString("en-US", {
+                {formatDate(calculateExpiration(date, years), {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
@@ -274,7 +278,7 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
                 ) : (
                   <>
                     <Upload className="h-4 w-4 shrink-0" />
-                    <span>Upload receipt (optional)</span>
+                    <span>{t("warranties.uploadReceiptOptional")}</span>
                   </>
                 )}
               </button>
@@ -287,14 +291,14 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
                   className="w-full h-9 rounded-lg border border-border bg-secondary text-secondary-foreground hover:bg-secondary/70 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   <X className="h-4 w-4" />
-                  Remove receipt
+                  {t("warranties.removeReceipt")}
                 </button>
               )}
             </div>
           </div>
 
           <Button type="submit" className="w-full active:scale-[0.97] transition-transform" disabled={!name.trim() || !date || isUploading}>
-            {isUploading ? "Uploading..." : "Save changes"}
+            {isUploading ? t("warranties.uploading") : t("warranties.saveChanges")}
           </Button>
         </form>
       </DialogContent>

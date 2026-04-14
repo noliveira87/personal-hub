@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ContractProvider } from "@/features/contracts/context/ContractContext";
 import { I18nProvider, useI18n } from "@/i18n/I18nProvider";
 import Layout from "@/components/Layout";
+import AppLoadingState from "@/components/AppLoadingState";
 import { DataProvider } from "@/features/home-expenses/lib/DataContext";
 import HomeExpensesLayout from "@/features/home-expenses/components/Layout";
 import { hydrateContractAlertReadState } from "@/features/contracts/lib/alertReadState";
@@ -65,7 +66,7 @@ const AppRoutes = () => {
   return (
     <BrowserRouter>
       <Layout>
-        <Suspense fallback={<div className="container py-10 text-sm text-muted-foreground">{t("app.loadingRoute")}</div>}>
+        <Suspense fallback={<div className="container py-10"><AppLoadingState label={t("app.loadingRoute")} variant="dashboard" /></div>}>
           <Routes>
             {/* Hub */}
             <Route path="/" element={<Index />} />

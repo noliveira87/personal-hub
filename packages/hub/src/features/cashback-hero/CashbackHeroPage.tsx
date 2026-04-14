@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -719,7 +720,7 @@ export default function CashbackHeroPage() {
 
         <div className="mt-4 space-y-2">
           {loading ? (
-            <div className="rounded-xl border p-10 text-center text-sm text-muted-foreground">{t('common.loading')}</div>
+            <AppLoadingState label={t('common.loading')} variant="list" />
           ) : null}
 
           {!loading && filteredPurchases.length === 0 ? (

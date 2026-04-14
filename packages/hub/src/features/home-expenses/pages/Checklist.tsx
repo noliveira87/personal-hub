@@ -9,6 +9,7 @@ import { usePaymentChecklist } from '@/features/home-expenses/hooks/use-payment-
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import MonthYearSelector from '@/features/home-expenses/components/MonthYearSelector';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -210,7 +211,7 @@ function ChecklistRow({
 export default function Checklist() {
   const { t, formatCurrency } = useI18n();
   const { contracts, updateContract } = useContracts();
-  const { allTransactions, selectedYear, selectedMonth } = useData();
+  const { allTransactions, selectedYear, selectedMonth, loading } = useData();
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
 
   const activeContracts = useMemo(
@@ -397,6 +398,10 @@ export default function Checklist() {
   const totalItems = allIds.length;
   const allPaid = totalItems > 0 && paidCount === totalItems;
   const progress = totalItems > 0 ? (paidCount / totalItems) * 100 : 0;
+
+  if (loading) {
+    return <AppLoadingState label={t('app.loadingRoute')} variant="list" />;
+  }
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5 overflow-x-hidden sm:space-y-6">

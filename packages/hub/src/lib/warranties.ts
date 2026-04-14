@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { compressPdfFile } from "@/lib/pdfCompression";
 
-export type WarrantyCategory = "tech" | "appliances" | "others";
+export type WarrantyCategory = "tech" | "appliances" | "tools" | "others";
 
 export interface Warranty {
   id: string;
@@ -34,7 +34,7 @@ type WarrantyRow = {
 };
 
 function normalizeCategory(category: string | null | undefined): WarrantyCategory {
-  if (category === "tech" || category === "appliances" || category === "others") {
+  if (category === "tech" || category === "appliances" || category === "tools" || category === "others") {
     return category;
   }
 

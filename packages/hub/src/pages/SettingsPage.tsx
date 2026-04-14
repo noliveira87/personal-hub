@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation } from 'react-router-dom';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
@@ -34,6 +35,7 @@ import { useCashbackCards } from '@/features/cashback-hero/use-cashback-cards';
 const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string }> = [
   { value: 'tech', label: 'Tech' },
   { value: 'appliances', label: 'Appliances' },
+  { value: 'tools', label: 'Tools' },
   { value: 'others', label: 'Others' },
 ];
 
@@ -174,10 +176,7 @@ export default function SettingsPage() {
       <div className="min-h-screen bg-background">
         <AppSectionHeader title={t('settingsPage.title')} icon={Settings} showSettings={false} backTo={backToPath} backLabel={t('common.back')} />
         <div className="mx-auto max-w-2xl space-y-6 px-4 pt-20 sm:px-6 lg:px-0">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{t('settingsPage.title')}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{t('settingsPage.loadingPreferences')}</p>
-          </div>
+          <AppLoadingState label={t('settingsPage.loadingPreferences')} variant="compact" />
         </div>
       </div>
     );

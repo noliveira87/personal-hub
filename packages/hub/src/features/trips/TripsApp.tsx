@@ -4,6 +4,7 @@ import { Search, Plus, Compass } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import AppLoadingState from "@/components/AppLoadingState";
 import { Header } from "@/features/trips/components/Header";
 import { TripCard } from "@/features/trips/components/TripCard";
 import { TripDetail } from "@/features/trips/components/TripDetail";
@@ -233,7 +234,11 @@ export function TripsApp() {
     return (
       <>
         <Header />
-        <main className="min-h-screen flex items-center justify-center text-muted-foreground">{t("trips.loadingTrips")}</main>
+        <main className="min-h-screen px-4 py-8 sm:px-6">
+          <div className="mx-auto max-w-6xl">
+            <AppLoadingState label={t("trips.loadingTrips")} variant="cards" />
+          </div>
+        </main>
       </>
     );
   }

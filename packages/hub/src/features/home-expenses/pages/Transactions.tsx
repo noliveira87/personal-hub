@@ -4,6 +4,7 @@ import MonthYearSelector from '@/features/home-expenses/components/MonthYearSele
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import TransactionList from '@/features/home-expenses/components/TransactionList';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { ArrowUpDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -26,7 +27,7 @@ const ALLOWED_CATEGORIES = new Set<ExpenseCategory>([
 
 export default function Transactions() {
   const { t } = useI18n();
-  const { selectedYear, selectedMonth } = useData();
+  const { selectedYear, selectedMonth, loading } = useData();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
   const [quickAddOpen, setQuickAddOpen] = useState(searchParams.get('open') === '1');
@@ -54,6 +55,10 @@ export default function Transactions() {
     nextParams.delete('notes');
     setSearchParams(nextParams, { replace: true });
   };
+
+  if (loading) {
+    return <AppLoadingState label={t('app.loadingRoute')} variant="list" />;
+  }
 
   return (
     <div className="space-y-6">

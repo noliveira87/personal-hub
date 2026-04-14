@@ -12,6 +12,7 @@ import L from "leaflet";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import AppSectionHeader from "@/components/AppSectionHeader";
+import AppLoadingState from "@/components/AppLoadingState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -506,7 +507,7 @@ export function JourneyBitesMap() {
             <CardDescription>{t("journeyBites.map.helper")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loading ? <p className="text-sm text-muted-foreground">{t("journeyBites.loading")}</p> : null}
+            {loading ? <AppLoadingState label={t("journeyBites.loading")} variant="table" /> : null}
             {locating ? (
               <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />

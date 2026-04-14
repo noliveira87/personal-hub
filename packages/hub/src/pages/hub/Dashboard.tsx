@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
+import AppLoadingState from '@/components/AppLoadingState';
 import { StatsCard } from '@/components/StatsCard';
 import { ContractCard } from '@/features/contracts/components/ContractCard';
 import { getDaysUntilExpiry, getMonthlyEquivalent, getCurrentMonthCost } from '@/features/contracts/lib/contractUtils';
 import { Link } from 'react-router-dom';
-import { Plus, ArrowRight, LayoutDashboard, Loader, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, ArrowRight, LayoutDashboard, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { parseISO } from 'date-fns';
@@ -137,11 +138,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader className="w-4 h-4 animate-spin" />
-          <span className="text-sm">{t('contracts.loading')}</span>
-        </div>
+      <div className="py-6">
+        <AppLoadingState label={t('contracts.loading')} variant="dashboard" />
       </div>
     );
   }

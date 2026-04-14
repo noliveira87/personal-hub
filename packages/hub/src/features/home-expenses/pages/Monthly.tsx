@@ -5,6 +5,7 @@ import { MONTHS, EXPENSE_CATEGORIES, Transaction } from '@/features/home-expense
 import { Input } from '@/components/ui/input';
 import TransactionForm from '@/features/home-expenses/components/TransactionForm';
 import AppSectionHeader from '@/components/AppSectionHeader';
+import AppLoadingState from '@/components/AppLoadingState';
 import { CalendarDays, Plus } from 'lucide-react';
 import { isContractTransaction } from '@/features/home-expenses/lib/contractMapping';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -26,7 +27,7 @@ const MONTH_KEYS = [
 ] as const;
 
 export default function Monthly() {
-  const { allTransactions, updateTx, selectedYear, selectedMonth } = useData();
+  const { allTransactions, updateTx, selectedYear, selectedMonth, loading } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
   const currentYear = new Date().getFullYear();
   const initialDate = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-01`;
@@ -81,6 +82,10 @@ export default function Monthly() {
     }
     setEditingCell(null);
   };
+
+  if (loading) {
+    return <AppLoadingState label={t('app.loadingRoute')} variant="table" />;
+  }
 
   return (
     <div className="space-y-6">

@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "re
 import { Image, Loader2, Map, Plus, Save, Upload, UtensilsCrossed, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import AppSectionHeader from "@/components/AppSectionHeader";
+import AppLoadingState from "@/components/AppLoadingState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -261,7 +262,7 @@ export function JourneyBitesApp() {
           </CardHeader>
           <CardContent className="space-y-6">
             {loading ? (
-              <p className="text-sm text-muted-foreground">{t("journeyBites.loading")}</p>
+              <AppLoadingState label={t("journeyBites.loading")} variant="cards" />
             ) : null}
 
             {!loading && setupRequired ? (
