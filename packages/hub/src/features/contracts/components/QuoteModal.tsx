@@ -35,6 +35,30 @@ type StoredPaymentPhaseV2 = {
 
 const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
 
+function parseLocalizedNumber(value: string): number | null {
+  const normalized = value.trim().replace(',', '.');
+  if (!normalized) return null;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundToCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function calculateTotalWithVat(priceNet: number | null, vatRate: number | null): number | null {
+  if (priceNet == null) return null;
+  if (vatRate == null) return roundToCents(priceNet);
+  return roundToCents(priceNet * (1 + vatRate / 100));
+}
+
+function calculatePhaseAmount(percentageText: string, totalWithVat: number | null): number | null {
+  if (totalWithVat == null) return null;
+  const percentage = parseLocalizedNumber(percentageText);
+  if (percentage == null) return null;
+  return roundToCents(totalWithVat * (percentage / 100));
+}
+
 function parsePaymentTermsV2(paymentTerms: string): PaymentPhase[] | null {
   if (!paymentTerms.startsWith(PAYMENT_TERMS_V2_PREFIX)) {
     return null;
@@ -131,7 +155,7 @@ export function QuoteModal({
   onClose,
   onSaved,
 }: QuoteModalProps) {
-  const { t } = useI18n();
+  const { t, formatCurrency } = useI18n();
   const isEdit = !!quote;
 
   // Whether we should show the contract selector (not locked to a specific contract)
@@ -141,7 +165,12 @@ export function QuoteModal({
   const [title, setTitle] = useState(quote?.title ?? '');
   const [provider, setProvider] = useState(quote?.provider ?? '');
   const [description, setDescription] = useState(quote?.description ?? '');
-  const [price, setPrice] = useState(quote?.price != null ? String(quote.price) : '');
+  const [priceNet, setPriceNet] = useState(() => {
+    if (quote?.priceNet != null) return String(quote.priceNet);
+    if (quote?.price != null) return String(quote.price);
+    return '';
+  });
+  const [vatRate, setVatRate] = useState(quote?.vatRate != null ? String(quote.vatRate) : '');
   const [currency, setCurrency] = useState(quote?.currency ?? defaultCurrency);
   const [date, setDate] = useState(quote?.date ?? '');
   const [pdfUrl, setPdfUrl] = useState<string | null>(quote?.pdfUrl ?? null);
@@ -155,6 +184,9 @@ export function QuoteModal({
   const [saving, setSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const parsedPriceNet = parseLocalizedNumber(priceNet);
+  const parsedVatRate = parseLocalizedNumber(vatRate);
+  const totalPriceWithVat = calculateTotalWithVat(parsedPriceNet, parsedVatRate);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -214,7 +246,6 @@ export function QuoteModal({
 
     setSaving(true);
     try {
-      const parsedPrice = price.trim() ? parseFloat(price.replace(',', '.')) : null;
       const serializedPaymentTerms = serializePaymentPhases(paymentPhases);
       let finalPdfUrl: string | null = removePdf ? null : pdfUrl;
       const quoteId = quote?.id ?? crypto.randomUUID();
@@ -228,7 +259,9 @@ export function QuoteModal({
         title: title.trim(),
         provider: provider.trim() || null,
         description: description.trim() || null,
-        price: parsedPrice != null && !Number.isNaN(parsedPrice) ? parsedPrice : null,
+        priceNet: parsedPriceNet,
+        vatRate: parsedVatRate,
+        price: totalPriceWithVat,
         currency,
         date: date || null,
         pdfUrl: finalPdfUrl,
@@ -338,22 +371,39 @@ export function QuoteModal({
             />
           </div>
 
-          {/* Price + Currency */}
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-xs font-medium text-muted-foreground mb-1">
-                {t('contracts.quotes.priceLabel')}
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={price}
-                onChange={e => setPrice(e.target.value)}
-                placeholder={t('contracts.quotes.pricePlaceholder')}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
+          {/* Price + VAT + Currency */}
+          <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('contracts.quotes.priceNetLabel')}
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={priceNet}
+                  onChange={e => setPriceNet(e.target.value)}
+                  placeholder={t('contracts.quotes.priceNetPlaceholder')}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  {t('contracts.quotes.vatRateLabel')}
+                </label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={vatRate}
+                  onChange={e => setVatRate(e.target.value)}
+                  placeholder={t('contracts.quotes.vatRatePlaceholder')}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
             </div>
-            <div className="w-24">
+
+            <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">
                 {t('contracts.quotes.currencyLabel')}
               </label>
@@ -364,6 +414,15 @@ export function QuoteModal({
                 maxLength={3}
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 uppercase"
               />
+            </div>
+
+            <div className="sm:col-span-2 rounded-lg border bg-muted/20 px-3 py-2">
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                {t('contracts.quotes.priceWithVatLabel')}
+              </label>
+              <p className="text-sm font-semibold text-foreground">
+                {totalPriceWithVat != null ? t('contracts.quotes.priceWithVatValue', { amount: formatCurrency(totalPriceWithVat, currency) }) : '—'}
+              </p>
             </div>
           </div>
 
@@ -403,6 +462,10 @@ export function QuoteModal({
             <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
               {paymentPhases.map((phase, index) => (
                 <div key={phase.id} className="rounded-lg border bg-background/70 p-2.5 space-y-2.5">
+                  {(() => {
+                    const calculatedAmount = calculatePhaseAmount(phase.percentage, totalPriceWithVat);
+                    return (
+                      <>
                   <div className="flex items-center justify-between">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {t('contracts.quotes.paymentTermsLabel')} {index + 1}
@@ -449,6 +512,13 @@ export function QuoteModal({
                     </div>
                   </div>
 
+                  <p className="text-[11px] text-muted-foreground">
+                    {t('contracts.quotes.paymentTermsCalculatedAmountLabel')}{' '}
+                    <span className="font-medium text-foreground">
+                      {calculatedAmount != null ? formatCurrency(calculatedAmount, currency) : '—'}
+                    </span>
+                  </p>
+
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_160px_auto] sm:items-end">
                     <div className="space-y-1">
                       <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -489,6 +559,9 @@ export function QuoteModal({
                       <span>{t('contracts.quotes.paymentTermsPaidLabel')}</span>
                     </label>
                   </div>
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
 

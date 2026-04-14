@@ -10,6 +10,8 @@ type QuoteRow = {
   title: string;
   provider: string | null;
   description: string | null;
+  price_net: number | null;
+  vat_rate: number | null;
   price: number | null;
   currency: string;
   date: string | null;
@@ -31,6 +33,8 @@ function mapRowToQuote(row: QuoteRow): ContractQuote {
     title: row.title,
     provider: row.provider,
     description: row.description,
+    priceNet: row.price_net != null ? Number(row.price_net) : null,
+    vatRate: row.vat_rate != null ? Number(row.vat_rate) : null,
     price: row.price != null ? Number(row.price) : null,
     currency: row.currency,
     date: row.date,
@@ -91,6 +95,8 @@ export async function createQuote(
       title: quote.title,
       provider: quote.provider ?? null,
       description: quote.description ?? null,
+      price_net: quote.priceNet ?? null,
+      vat_rate: quote.vatRate ?? null,
       price: quote.price ?? null,
       currency: quote.currency,
       date: quote.date ?? null,
@@ -122,6 +128,8 @@ export async function updateQuote(quote: ContractQuote): Promise<ContractQuote> 
       title: quote.title,
       provider: quote.provider ?? null,
       description: quote.description ?? null,
+      price_net: quote.priceNet ?? null,
+      vat_rate: quote.vatRate ?? null,
       price: quote.price ?? null,
       currency: quote.currency,
       date: quote.date ?? null,

@@ -122,6 +122,8 @@ export interface ContractQuote {
   title: string;
   provider: string | null;
   description: string | null;
+  priceNet: number | null;
+  vatRate: number | null;
   price: number | null;
   currency: string;
   date: string | null;

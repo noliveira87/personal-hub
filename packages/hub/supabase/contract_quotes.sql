@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS contract_quotes (
   title TEXT NOT NULL,
   provider TEXT,
   description TEXT,
+  price_net NUMERIC(10, 2),
+  vat_rate NUMERIC(5, 2),
   price NUMERIC(10, 2),
   currency TEXT NOT NULL DEFAULT 'EUR',
   date DATE,
@@ -20,7 +22,9 @@ CREATE TABLE IF NOT EXISTS contract_quotes (
 ALTER TABLE contract_quotes
   ADD COLUMN IF NOT EXISTS provider TEXT,
   ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending',
-  ADD COLUMN IF NOT EXISTS payment_terms TEXT;
+  ADD COLUMN IF NOT EXISTS payment_terms TEXT,
+  ADD COLUMN IF NOT EXISTS price_net NUMERIC(10, 2),
+  ADD COLUMN IF NOT EXISTS vat_rate NUMERIC(5, 2);
 
 CREATE INDEX IF NOT EXISTS contract_quotes_contract_id_idx
   ON contract_quotes(contract_id);

@@ -28,11 +28,30 @@ function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
 type DisplayPaymentTerm = {
   text: string;
   amount: string;
+  percentage: string;
   paymentDate: string;
   paid: boolean;
 };
 
 const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
+
+function parseLocalizedNumber(value: string): number | null {
+  const normalized = value.trim().replace(',', '.');
+  if (!normalized) return null;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundToCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function computePaymentTermAmount(percentageText: string, quoteTotal: number | null): number | null {
+  if (quoteTotal == null) return null;
+  const percentage = parseLocalizedNumber(percentageText);
+  if (percentage == null) return null;
+  return roundToCents((quoteTotal * percentage) / 100);
+}
 
 function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
   const raw = paymentTerms.trim();
@@ -43,6 +62,7 @@ function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
         percentage?: string;
         description?: string;
         amount?: string;
+        paymentDate?: string;
         paid?: boolean;
       }>;
 
@@ -61,7 +81,7 @@ function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
                 ? `${percentage}%`
                 : description;
 
-            return { text, amount, paymentDate, paid };
+            return { text, amount, percentage, paymentDate, paid };
           })
           .filter(term => term.text || term.amount || term.paymentDate || term.paid);
       }
@@ -75,7 +95,7 @@ function parsePaymentTermsLines(paymentTerms: string): DisplayPaymentTerm[] {
     .map(line => line.trim())
     .filter(Boolean)
     .map(line => line.replace(/^[-•]\s*/, ''))
-    .map(line => ({ text: line, amount: '', paymentDate: '', paid: false }));
+    .map(line => ({ text: line, amount: '', percentage: '', paymentDate: '', paid: false }));
 }
 
 function formatPaymentTermDate(value: string): string {
@@ -263,9 +283,17 @@ export function QuotesSection({
 
                 {/* Price */}
                 {quote.price != null && (
-                  <p className="text-base font-bold tabular-nums text-foreground">
-                    {formatCurrency(quote.price, quote.currency)}
-                  </p>
+                  <div className="space-y-0.5">
+                    <p className="text-base font-bold tabular-nums text-foreground">
+                      {t('contracts.quotes.priceWithVatLabel')}: {formatCurrency(quote.price, quote.currency)}
+                    </p>
+                    {quote.priceNet != null && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('contracts.quotes.priceNetLabel')}: {formatCurrency(quote.priceNet, quote.currency)}
+                        {quote.vatRate != null ? ` • ${t('contracts.quotes.vatRateLabel')}: ${quote.vatRate}%` : ''}
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {/* Description */}
@@ -282,6 +310,11 @@ export function QuotesSection({
                       {parsePaymentTermsLines(quote.paymentTerms).map((term, idx) => (
                         <li key={`${quote.id}-payment-term-${idx}`} className="flex flex-wrap items-center gap-1.5">
                           <span>• {term.text}{term.amount ? ` - ${term.amount}` : ''}</span>
+                          {computePaymentTermAmount(term.percentage, quote.price) != null && (
+                            <span className="text-[11px] text-foreground/85">
+                              ({t('contracts.quotes.paymentTermsCalculatedAmountLabel')} {formatCurrency(computePaymentTermAmount(term.percentage, quote.price)!, quote.currency)})
+                            </span>
+                          )}
                           {term.paymentDate && (
                             <span className="text-[11px] text-muted-foreground/90">
                               {t('contracts.quotes.paymentTermsPaymentDateLabel')}: {formatPaymentTermDate(term.paymentDate)}

@@ -90,7 +90,7 @@ type CategoryCard = {
   items: Array<TimelineItem & { year: string }>;
 };
 
-const DEFAULT_VISIBLE_CATEGORY_COUNT = 4;
+const DEFAULT_VISIBLE_CATEGORY_COUNT = 3;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 let _draftKey = 0;
@@ -216,7 +216,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   const [cholesterolNewEntry, setCholesterolNewEntry] = useState<DraftCholesterolRow | null>(null);
   const [deletedCholesterolIds, setDeletedCholesterolIds] = useState<string[]>([]);
   const [savingCholesterol, setSavingCholesterol] = useState(false);
-  const [visibleYearCount, setVisibleYearCount] = useState(4);
+  const [visibleYearCount, setVisibleYearCount] = useState(3);
   const [visibleCategoryCounts, setVisibleCategoryCounts] = useState<Record<CategorySectionKey, number>>({
     consultas: DEFAULT_VISIBLE_CATEGORY_COUNT,
     exames: DEFAULT_VISIBLE_CATEGORY_COUNT,
@@ -310,7 +310,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     [timelineYears, visibleYearCount],
   );
   const remainingTimelineYears = Math.max(0, timelineYears.length - visibleTimelineYears.length);
-  const nextYearsToLoad = Math.min(4, remainingTimelineYears);
+  const nextYearsToLoad = Math.min(3, remainingTimelineYears);
   const visibleCategoryCards = useMemo(() => {
     const byCategory: Record<string, Array<TimelineItem & { year: string }>> = {};
 
@@ -419,7 +419,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
       }
     };
     loadSettings();
-    setVisibleYearCount(4);
+    setVisibleYearCount(3);
     setVisibleCategoryCounts({
       consultas: DEFAULT_VISIBLE_CATEGORY_COUNT,
       exames: DEFAULT_VISIBLE_CATEGORY_COUNT,
@@ -433,7 +433,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
   useEffect(() => {
     if (timelineYears.length < visibleYearCount) {
-      setVisibleYearCount(Math.max(4, timelineYears.length));
+      setVisibleYearCount(Math.max(3, timelineYears.length));
     }
   }, [timelineYears.length, visibleYearCount]);
 
@@ -964,15 +964,16 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
                               <div className="p-2 space-y-1.5">
                                 {(() => {
-                                  const visibleCount = categoryItemCounts[category] ?? 4;
-                                  const visibleItems = items.slice(0, visibleCount);
-                                  const remainingItems = Math.max(0, items.length - visibleCount);
-                                  const itemsByYear = visibleItems.reduce<Record<string, typeof visibleItems>>((acc, item) => {
+                                  const visibleYearCountForCategory = categoryItemCounts[category] ?? DEFAULT_VISIBLE_CATEGORY_COUNT;
+                                  const allItemsByYear = items.reduce<Record<string, typeof items>>((acc, item) => {
                                     if (!acc[item.year]) acc[item.year] = [];
                                     acc[item.year].push(item);
                                     return acc;
                                   }, {});
-                                  const yearGroups = Object.entries(itemsByYear).sort((a, b) => Number(b[0]) - Number(a[0]));
+                                  const allYearGroups = Object.entries(allItemsByYear).sort((a, b) => Number(b[0]) - Number(a[0]));
+                                  const yearGroups = allYearGroups.slice(0, visibleYearCountForCategory);
+                                  const visibleItems = yearGroups.flatMap(([, yearItems]) => yearItems);
+                                  const remainingYears = Math.max(0, allYearGroups.length - yearGroups.length);
 
                                   return (
                                     <>
@@ -1017,16 +1018,16 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                                           Sem registos
                                         </p>
                                       )}
-                                      {remainingItems > 0 && (
+                                      {remainingYears > 0 && (
                                         <button
                                           type="button"
                                           onClick={() => setCategoryItemCounts((prev) => ({
                                             ...prev,
-                                            [category]: (prev[category] ?? 4) + 4,
+                                            [category]: (prev[category] ?? DEFAULT_VISIBLE_CATEGORY_COUNT) + DEFAULT_VISIBLE_CATEGORY_COUNT,
                                           }))}
                                           className="w-full text-center py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded transition-colors"
                                         >
-                                          Carregar mais ({remainingItems} {remainingItems === 1 ? 'entrada' : 'entradas'})
+                                          Carregar mais ({remainingYears} {remainingYears === 1 ? 'ano' : 'anos'})
                                         </button>
                                       )}
                                     </>
@@ -1085,21 +1086,6 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 <p className="text-xs text-muted-foreground mt-1">
                   Exemplo: se Total = 240 e HDL = 60, então rácio = 4. Em geral, quanto menor este valor, melhor.
                 </p>
-
-                {hasHiddenCholesterolYears && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllCholesterolYears((prev) => !prev)}
-                    className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    {showAllCholesterolYears ? 'Esconder anos antigos' : 'Mostrar anos antigos'}
-                    {!showAllCholesterolYears && (
-                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
-                        +{hiddenCholesterolYearsCount}
-                      </span>
-                    )}
-                  </button>
-                )}
               </div>
 
               <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
@@ -1553,6 +1539,23 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
             </tbody>
           </table>
           </div>
+
+          {hasHiddenCholesterolYears && (
+            <div className="border-t px-4 py-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAllCholesterolYears((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {showAllCholesterolYears ? 'Esconder anos antigos' : 'Mostrar anos antigos'}
+                {!showAllCholesterolYears && (
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                    +{hiddenCholesterolYearsCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
       {/* Edit modal */}
