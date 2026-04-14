@@ -1121,6 +1121,12 @@ export const translations = {
         contractTag: "(contrato)",
         linkedContract: "Contrato ligado",
         recurring: "Recorrente",
+        deleteDialog: {
+          title: "Apagar movimento?",
+          description: "Tens a certeza que queres apagar \"{{name}}\"? Esta ação não pode ser anulada.",
+          cancel: "Cancelar",
+          confirm: "Apagar",
+        },
       },
     },
     notFound: {
@@ -2238,6 +2244,12 @@ export const translations = {
         contractTag: "(contract)",
         linkedContract: "Linked contract",
         recurring: "Recurring",
+        deleteDialog: {
+          title: "Delete transaction?",
+          description: "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+          cancel: "Cancel",
+          confirm: "Delete",
+        },
       },
     },
     notFound: {

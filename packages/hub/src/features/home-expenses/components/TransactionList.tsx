@@ -4,6 +4,16 @@ import { parseLocalDate } from '@/features/home-expenses/lib/store';
 import { EXPENSE_CATEGORIES, Transaction } from '@/features/home-expenses/lib/types';
 import { Pencil, Trash2, RotateCcw, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import TransactionForm from './TransactionForm';
 import { isContractTransaction } from '@/features/home-expenses/lib/contractMapping';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -12,6 +22,7 @@ export default function TransactionList() {
   const { allTransactions, deleteTx, selectedYear, selectedMonth } = useData();
   const { t, locale, hideAmounts, formatCurrency } = useI18n();
   const [editTx, setEditTx] = useState<Transaction | null>(null);
+  const [txPendingDelete, setTxPendingDelete] = useState<Transaction | null>(null);
 
   const filtered = useMemo(() => {
     return allTransactions
@@ -23,7 +34,7 @@ export default function TransactionList() {
   }, [allTransactions, selectedYear, selectedMonth, hideAmounts]);
 
   const handleDelete = (id: string) => {
-    deleteTx(id);
+    void deleteTx(id);
   };
 
   const getCategoryLabel = (cat?: string) => {
@@ -36,6 +47,31 @@ export default function TransactionList() {
   return (
     <div className="space-y-2">
       {editTx && <TransactionForm editTx={editTx} onClose={() => setEditTx(null)} open />}
+      <AlertDialog open={txPendingDelete !== null} onOpenChange={(open) => { if (!open) setTxPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('homeExpenses.list.deleteDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('homeExpenses.list.deleteDialog.description', {
+                name: txPendingDelete?.name ?? '',
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('homeExpenses.list.deleteDialog.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!txPendingDelete) return;
+                handleDelete(txPendingDelete.id);
+                setTxPendingDelete(null);
+              }}
+            >
+              {t('homeExpenses.list.deleteDialog.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {filtered.length === 0 && (
         <div className="text-center py-12 text-muted-foreground text-sm">{t('homeExpenses.list.noTransactionsThisMonth')}</div>
       )}
@@ -86,7 +122,7 @@ export default function TransactionList() {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditTx(tx)}>
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(tx.id)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setTxPendingDelete(tx)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
