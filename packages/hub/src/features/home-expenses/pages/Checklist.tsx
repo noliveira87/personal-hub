@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckSquare, ClipboardList, Eye, Plus, Trash2, Zap } from 'lucide-react';
+import { AlertTriangle, Check, CheckSquare, ClipboardList, Eye, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { Contract, getContractCategoryIcon } from '@/features/contracts/types/contract';
@@ -137,17 +137,12 @@ function ChecklistRow({
         title={autoDetected ? 'Detetado automaticamente nos movimentos' : undefined}
         className={cn(
           'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors sm:mt-0',
-          paid && !autoDetected && 'bg-green-500 border-green-500 text-white',
-          autoDetected && 'bg-primary/10 border-primary text-primary cursor-default',
-          !paid && 'border-border bg-background',
+          paid && 'bg-green-500 border-green-500 text-white',
+          !paid && 'border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-300',
+          autoDetected && 'cursor-default',
         )}
       >
-        {paid && !autoDetected && (
-          <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-        {autoDetected && <Zap className="w-3 h-3" />}
+        {paid ? <Check className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
       </button>
 
       <div className="min-w-0 flex-1">
