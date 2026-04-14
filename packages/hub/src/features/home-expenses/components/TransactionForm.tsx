@@ -4,7 +4,7 @@ import { Transaction, EXPENSE_CATEGORIES, TransactionType, ExpenseCategory } fro
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { mapContractCategoryToExpenseCategory, sanitizeCarContractName } from '@/features/home-expenses/lib/contractMapping';
+import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { encodeCarChargingNotes, parseCarChargingNotes, type CarChargingLocation } from '@/features/home-expenses/lib/carCharging';
 
 interface Props {
@@ -119,6 +120,28 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
 
     return true;
   });
+
+  const CONTRACT_CATEGORY_ORDER: Record<string, number> = {
+    'mortgage': 0, 'home-insurance': 1, 'apartment-insurance': 2,
+    'electricity': 3, 'gas': 4, 'water': 5, 'internet': 6, 'mobile': 7,
+    'tv-streaming': 8, 'security-alarm': 9, 'maintenance': 10,
+    'car': 11, 'gym': 12, 'software': 13, 'card-credit': 14, 'card-debit': 15, 'other': 99,
+  };
+
+  const groupedFilteredContracts = (() => {
+    const sorted = [...filteredContracts].sort((a, b) => {
+      const orderA = CONTRACT_CATEGORY_ORDER[a.category] ?? 50;
+      const orderB = CONTRACT_CATEGORY_ORDER[b.category] ?? 50;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider);
+    });
+    const groups = new Map<string, typeof sorted>();
+    for (const c of sorted) {
+      if (!groups.has(c.category)) groups.set(c.category, []);
+      groups.get(c.category)!.push(c);
+    }
+    return groups;
+  })();
 
   const isSelectedContractAvailable = contractId === 'none'
     || filteredContracts.some((contract) => contract.id === contractId);
@@ -356,11 +379,20 @@ export default function TransactionForm({ editTx, onClose, open: controlledOpen,
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">{t('homeExpenses.form.noLinkedContract')}</SelectItem>
-                      {filteredContracts.map(contract => (
-                          <SelectItem key={contract.id} value={contract.id}>
-                            {contract.name} ({contract.provider})
-                          </SelectItem>
-                        ))}
+                      {[...groupedFilteredContracts.entries()].map(([cat, items]) => (
+                        <SelectGroup key={cat}>
+                          <SelectLabel className="flex items-center gap-1.5">
+                            <span>{getContractCategoryIcon(cat as Parameters<typeof getContractCategoryIcon>[0])}</span>
+                            <span>{t(`contracts.categoryNames.${cat.replace(/-([a-z])/g, (_: string, l: string) => l.toUpperCase())}`)}</span>
+                          </SelectLabel>
+                          {items.map(contract => (
+                            <SelectItem key={contract.id} value={contract.id} className="pl-6">
+                              {contract.name}
+                              {contract.provider ? <span className="text-muted-foreground ml-1">· {contract.provider}</span> : null}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
                     </SelectContent>
                   </Select>
                   {selectedContract && (

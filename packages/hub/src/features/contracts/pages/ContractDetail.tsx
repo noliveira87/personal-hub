@@ -102,7 +102,7 @@ export default function ContractDetail() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/dashboard" backLabel={t('common.back')} />
+      <AppSectionHeader title="D12 Contracts" icon={FileText} backTo="/contracts" backLabel={t('common.back')} />
 
       <div className="animate-fade-up rounded-xl border bg-card p-6" style={{ animationDelay: '60ms' }}>
         <div className="flex items-start justify-between gap-4">
