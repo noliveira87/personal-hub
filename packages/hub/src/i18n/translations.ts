@@ -48,6 +48,7 @@ export const translations = {
     },
     contracts: {
       menu: "Contratos",
+      hubTitle: "Contratos e Orçamentos",
       backToContracts: "Voltar aos contratos",
       addContract: "Adicionar Contrato",
       allContracts: "Todos os Contratos",
@@ -600,7 +601,7 @@ export const translations = {
         trips: { title: "Livro de Memórias", subtitle: "Viagens" },
         journeyBites: { title: "Dentadas pelo Mundo", subtitle: "Comidas e memórias" },
         health: { title: "Saúde", subtitle: "Histórico de exames" },
-        contracts: { title: "Contratos", subtitle: "Prazos e renovações" },
+        contracts: { title: "Contratos e Orçamentos", subtitle: "Prazos, renovações e propostas" },
         warranties: { title: "Garantias", subtitle: "Garantias de Equipamentos" },
       },
     },
@@ -1192,6 +1193,7 @@ export const translations = {
     },
     contracts: {
       menu: "Contracts",
+      hubTitle: "Contracts and Quotes",
       backToContracts: "Back to contracts",
       addContract: "Add Contract",
       allContracts: "All Contracts",
@@ -1744,7 +1746,7 @@ export const translations = {
         trips: { title: "Book of Memories", subtitle: "Lifetime trips and memories!" },
         journeyBites: { title: "Journey Bites", subtitle: "Food moments from your trips" },
         health: { title: "Health", subtitle: "Medical timeline" },
-        contracts: { title: "Contracts", subtitle: "Due dates and renewals" },
+        contracts: { title: "Contracts and Quotes", subtitle: "Due dates, renewals, and proposals" },
         warranties: { title: "Warranties", subtitle: "Equipment Warranties" },
       },
     },

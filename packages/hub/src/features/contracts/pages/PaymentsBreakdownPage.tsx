@@ -16,7 +16,7 @@ export default function PaymentsBreakdownPage() {
   const [openPaymentType, setOpenPaymentType] = useState<ContractPaymentType | null>(null);
 
   const contractsWithPayment = useMemo(
-    () => contracts.filter((contract) => !!contract.paymentType),
+    () => contracts.filter((contract) => contract.status === 'active' && !!contract.paymentType),
     [contracts],
   );
 

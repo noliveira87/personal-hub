@@ -161,7 +161,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <AppSectionHeader
-        title={t('contracts.menu')}
+        title={t('contracts.hubTitle')}
         icon={LayoutDashboard}
         actions={(
           <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export default function Dashboard() {
       />
 
       <div className="animate-fade-up" style={{ animationDelay: '60ms' }}>
-        <h1 className="text-2xl font-bold text-foreground">{t('contracts.menu')}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('contracts.hubTitle')}</h1>
         <p className="text-muted-foreground text-sm mt-1">{t('contracts.overview')}</p>
       </div>
 

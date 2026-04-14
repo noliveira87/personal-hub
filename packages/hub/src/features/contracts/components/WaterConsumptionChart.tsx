@@ -25,9 +25,12 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
+const READINGS_PAGE_SIZE = 5;
+
 export default function WaterConsumptionChart({ contractId }: { contractId: string }) {
   const { t } = useI18n();
   const [data, setData] = useState<WaterDataPoint[]>([]);
+  const [visibleRows, setVisibleRows] = useState(READINGS_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,6 +64,10 @@ export default function WaterConsumptionChart({ contractId }: { contractId: stri
     void loadWaterData();
   }, [contractId]);
 
+  useEffect(() => {
+    setVisibleRows(READINGS_PAGE_SIZE);
+  }, [data.length]);
+
   const stats = useMemo(() => {
     if (data.length === 0) {
       return { total: 0, average: 0, min: 0, max: 0, lastReadingDate: null as string | null };
@@ -80,6 +87,14 @@ export default function WaterConsumptionChart({ contractId }: { contractId: stri
       lastReadingDate,
     };
   }, [data]);
+
+  const tableRows = useMemo(
+    () => [...data].sort((a, b) => b.date.localeCompare(a.date)).slice(0, visibleRows),
+    [data, visibleRows],
+  );
+
+  const remainingRows = Math.max(0, data.length - visibleRows);
+  const canHideRows = visibleRows > READINGS_PAGE_SIZE;
 
   if (loading) {
     return (
@@ -150,7 +165,7 @@ export default function WaterConsumptionChart({ contractId }: { contractId: stri
             </tr>
           </thead>
           <tbody>
-            {data.map((row, index) => (
+            {tableRows.map((row, index) => (
               <tr key={index} className="border-b last:border-0">
                 <td className="py-2 text-foreground">{format(parseISO(row.date), 'MMM d, yyyy')}</td>
                 <td className="text-right text-foreground font-medium tabular-nums">{row.cubicMeters?.toFixed(2)} m3</td>
@@ -159,6 +174,30 @@ export default function WaterConsumptionChart({ contractId }: { contractId: stri
           </tbody>
         </table>
       </div>
+
+      {(remainingRows > 0 || canHideRows) && (
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-4">
+          {remainingRows > 0 && (
+            <button
+              type="button"
+              onClick={() => setVisibleRows((current) => Math.min(current + READINGS_PAGE_SIZE, data.length))}
+              className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-muted"
+            >
+              {t('contracts.dashboard.loadMore')}
+            </button>
+          )}
+
+          {canHideRows && (
+            <button
+              type="button"
+              onClick={() => setVisibleRows(READINGS_PAGE_SIZE)}
+              className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              {t('contracts.dashboard.hide')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
