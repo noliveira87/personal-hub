@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { useI18n } from '@/i18n/I18nProvider';
 import { Contract, ContractStatus } from '@/features/contracts/types/contract';
-import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { Plus, Search, SlidersHorizontal, Loader, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,47 @@ import { ContractCard } from '@/features/contracts/components/ContractCard';
 type ContractViewCategory = 'cafofo' | 'apartamento' | 'carro' | 'outros';
 
 const VIEW_CATEGORY_ORDER: ContractViewCategory[] = ['cafofo', 'apartamento', 'carro', 'outros'];
+const CONTRACT_CATEGORY_SORT_ORDER: Record<Contract['category'], number> = {
+  'mortgage': 0,
+  'home-insurance': 1,
+  'apartment-insurance': 2,
+  'electricity': 3,
+  'gas': 4,
+  'water': 5,
+  'internet': 6,
+  'mobile': 7,
+  'tv-streaming': 8,
+  'security-alarm': 9,
+  'maintenance': 10,
+  'car': 11,
+  'gym': 12,
+  'software': 13,
+  'card-credit': 14,
+  'card-debit': 15,
+  'other': 99,
+};
+
+function getComparableContractDate(contract: Contract): number {
+  return Date.parse(contract.endDate ?? contract.startDate);
+}
+
+function compareContractsByTypeAndDate(a: Contract, b: Contract): number {
+  const categoryOrderA = CONTRACT_CATEGORY_SORT_ORDER[a.category] ?? 50;
+  const categoryOrderB = CONTRACT_CATEGORY_SORT_ORDER[b.category] ?? 50;
+
+  if (categoryOrderA !== categoryOrderB) {
+    return categoryOrderA - categoryOrderB;
+  }
+
+  const comparableDateA = getComparableContractDate(a);
+  const comparableDateB = getComparableContractDate(b);
+
+  if (comparableDateA !== comparableDateB) {
+    return comparableDateA - comparableDateB;
+  }
+
+  return a.name.localeCompare(b.name) || a.provider.localeCompare(b.provider);
+}
 
 function getContractViewCategory(contract: Contract): ContractViewCategory {
   const text = `${contract.name} ${contract.provider} ${contract.notes ?? ''}`.toLowerCase();
@@ -76,9 +116,17 @@ export default function ContractsList() {
     });
 
     result.sort((a, b) => {
-      if (sortBy === 'renewal') return getDaysUntilExpiry(a) - getDaysUntilExpiry(b);
-      if (sortBy === 'price') return (priceMap.get(b.id)?.price ?? b.price) - (priceMap.get(a.id)?.price ?? a.price);
-      return a.name.localeCompare(b.name);
+      if (sortBy === 'renewal') {
+        return compareContractsByTypeAndDate(a, b);
+      }
+
+      if (sortBy === 'price') {
+        const priceDifference = (priceMap.get(b.id)?.price ?? b.price) - (priceMap.get(a.id)?.price ?? a.price);
+        return priceDifference || compareContractsByTypeAndDate(a, b);
+      }
+
+      const nameDifference = a.name.localeCompare(b.name);
+      return nameDifference || compareContractsByTypeAndDate(a, b);
     });
 
     return result;

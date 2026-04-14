@@ -6,7 +6,6 @@ import { hasUnreadContractAlerts, subscribeContractAlertReadState } from '@/feat
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Bell, BellDot, CalendarDays } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { useI18n } from '@/i18n/I18nProvider';
 
 interface LatestPrice {
@@ -17,7 +16,7 @@ interface LatestPrice {
 
 export function ContractCard({ contract, index = 0, latestPrice }: { contract: Contract; index?: number; latestPrice?: LatestPrice }) {
   const navigate = useNavigate();
-  const { formatCurrency, t } = useI18n();
+  const { formatCurrency, formatDate, t } = useI18n();
   const [, setReadStateVersion] = useState(0);
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
@@ -28,6 +27,13 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   const displayPrice = latestPrice?.price ?? contract.price;
   const displayCurrency = latestPrice?.currency || contract.currency;
   const priceDate = latestPrice?.date;
+  const startDateLabel = formatDate(contract.startDate, { month: 'short', day: 'numeric', year: 'numeric' });
+  const endDateLabel = contract.endDate
+    ? formatDate(contract.endDate, { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+  const contractDateLabel = endDateLabel
+    ? `${startDateLabel} - ${endDateLabel}`
+    : startDateLabel;
 
   useEffect(() => subscribeContractAlertReadState(() => setReadStateVersion((prev) => prev + 1)), []);
 
@@ -77,7 +83,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
             {formatCurrency(displayPrice, displayCurrency)}
             {priceDate && (
               <span className="text-xs font-normal text-muted-foreground ml-2">
-                • {format(parseISO(priceDate), 'MMM d')}
+                • {formatDate(priceDate, { month: 'short', day: 'numeric' })}
               </span>
             )}
             <span className="block text-xs font-normal text-muted-foreground sm:inline sm:ml-1">
@@ -88,7 +94,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
         <div className="min-w-0 sm:text-right">
           <div className="flex items-center gap-1 text-xs text-muted-foreground sm:justify-end">
             <CalendarDays className="w-3 h-3" />
-            <span className="truncate">{contract.endDate ? format(parseISO(contract.endDate), 'MMM d, yyyy') : 'No date'}</span>
+            <span className="truncate">{contractDateLabel}</span>
           </div>
           {contract.status !== 'archived' && contract.status !== 'expired' && (
             <p className={cn(
