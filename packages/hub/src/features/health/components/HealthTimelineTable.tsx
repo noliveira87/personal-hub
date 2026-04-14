@@ -90,7 +90,8 @@ type CategoryCard = {
   items: Array<TimelineItem & { year: string }>;
 };
 
-const DEFAULT_VISIBLE_CATEGORY_COUNT = 3;
+const DEFAULT_VISIBLE_CATEGORY_CARD_COUNT = 2;
+const DEFAULT_VISIBLE_CATEGORY_YEAR_COUNT = 3;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 let _draftKey = 0;
@@ -218,9 +219,9 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
   const [savingCholesterol, setSavingCholesterol] = useState(false);
   const [visibleYearCount, setVisibleYearCount] = useState(3);
   const [visibleCategoryCounts, setVisibleCategoryCounts] = useState<Record<CategorySectionKey, number>>({
-    consultas: DEFAULT_VISIBLE_CATEGORY_COUNT,
-    exames: DEFAULT_VISIBLE_CATEGORY_COUNT,
-    semGrupo: DEFAULT_VISIBLE_CATEGORY_COUNT,
+    consultas: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
+    exames: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
+    semGrupo: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
   });
   const [categoryItemCounts, setCategoryItemCounts] = useState<Record<string, number>>({});
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
@@ -421,9 +422,9 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     loadSettings();
     setVisibleYearCount(3);
     setVisibleCategoryCounts({
-      consultas: DEFAULT_VISIBLE_CATEGORY_COUNT,
-      exames: DEFAULT_VISIBLE_CATEGORY_COUNT,
-      semGrupo: DEFAULT_VISIBLE_CATEGORY_COUNT,
+      consultas: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
+      exames: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
+      semGrupo: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
     });
     setCategoryItemCounts({});
     setIsEditingCholesterol(false);
@@ -920,8 +921,8 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                 .filter((section) => section.totalCards > 0)
                 .map((section) => {
                   const remainingSectionCount = Math.max(0, section.totalCards - section.cards.length);
-                  const canShowLess = section.totalCards > DEFAULT_VISIBLE_CATEGORY_COUNT
-                    && visibleCategoryCounts[section.key] > DEFAULT_VISIBLE_CATEGORY_COUNT;
+                  const canShowLess = section.totalCards > DEFAULT_VISIBLE_CATEGORY_CARD_COUNT
+                    && visibleCategoryCounts[section.key] > DEFAULT_VISIBLE_CATEGORY_CARD_COUNT;
 
                   return (
                     <div key={section.key} className="space-y-3">
@@ -964,7 +965,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
                               <div className="p-2 space-y-1.5">
                                 {(() => {
-                                  const visibleYearCountForCategory = categoryItemCounts[category] ?? DEFAULT_VISIBLE_CATEGORY_COUNT;
+                                  const visibleYearCountForCategory = categoryItemCounts[category] ?? DEFAULT_VISIBLE_CATEGORY_YEAR_COUNT;
                                   const allItemsByYear = items.reduce<Record<string, typeof items>>((acc, item) => {
                                     if (!acc[item.year]) acc[item.year] = [];
                                     acc[item.year].push(item);
@@ -1023,7 +1024,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                                           type="button"
                                           onClick={() => setCategoryItemCounts((prev) => ({
                                             ...prev,
-                                            [category]: (prev[category] ?? DEFAULT_VISIBLE_CATEGORY_COUNT) + DEFAULT_VISIBLE_CATEGORY_COUNT,
+                                            [category]: (prev[category] ?? DEFAULT_VISIBLE_CATEGORY_YEAR_COUNT) + DEFAULT_VISIBLE_CATEGORY_YEAR_COUNT,
                                           }))}
                                           className="w-full text-center py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 rounded transition-colors"
                                         >
@@ -1045,7 +1046,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                               type="button"
                               onClick={() => setVisibleCategoryCounts((prev) => ({
                                 ...prev,
-                                [section.key]: Math.min(prev[section.key] + DEFAULT_VISIBLE_CATEGORY_COUNT, section.totalCards),
+                                [section.key]: Math.min(prev[section.key] + DEFAULT_VISIBLE_CATEGORY_CARD_COUNT, section.totalCards),
                               }))}
                               className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:-translate-y-0.5 hover:bg-muted"
                             >
@@ -1058,7 +1059,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                               type="button"
                               onClick={() => setVisibleCategoryCounts((prev) => ({
                                 ...prev,
-                                [section.key]: DEFAULT_VISIBLE_CATEGORY_COUNT,
+                                [section.key]: DEFAULT_VISIBLE_CATEGORY_CARD_COUNT,
                               }))}
                               className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
