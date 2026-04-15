@@ -74,20 +74,16 @@ export default function ExpensePieChart() {
 
   const outerRadius = data.length <= 2 ? '74%' : data.length <= 4 ? '78%' : '82%';
 
-  if (data.length === 0) {
-    return (
-      <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">{t('homeExpenses.charts.noExpensesThisMonth')}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
-      <div ref={chartRef} key={chartKey} className="flex-1 min-h-[16rem] w-full" style={{ height: Math.max(chartHeight, 200) }}>
-        {width > 0 && (
-          <PieChart width={width} height={Math.max(chartHeight, 200)}>
+      <div ref={chartRef} className="flex-1 min-h-[16rem] w-full" style={{ height: Math.max(chartHeight, 200) }}>
+        {data.length === 0 ? (
+          <div className="flex h-full min-h-[16rem] items-center justify-center">
+            <p className="text-sm text-muted-foreground">{t('homeExpenses.charts.noExpensesThisMonth')}</p>
+          </div>
+        ) : width > 0 ? (
+          <PieChart key={chartKey} width={width} height={Math.max(chartHeight, 200)}>
             <Pie data={data} cx="50%" cy="50%" innerRadius="50%" outerRadius={outerRadius} paddingAngle={2} dataKey="value">
               {data.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -95,22 +91,24 @@ export default function ExpensePieChart() {
             </Pie>
             <Tooltip content={<CustomPieTooltip fallbackTitle={t('homeExpenses.form.expense')} formatCurrency={formatCurrency} />} />
           </PieChart>
-        )}
+        ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-2.5 mt-4 sm:grid-cols-2">
-        {data.map((d, i) => (
-          <div key={d.name} className="rounded-xl border border-border bg-background/80 px-3 py-2 text-xs shadow-sm">
-            <p className="flex items-center gap-2 text-foreground/90">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-              <span className="truncate font-medium">{d.name}</span>
-            </p>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="tabular-nums font-semibold text-foreground">{d.share.toFixed(1)}%</span>
-              <span className="tabular-nums font-semibold text-foreground/90">{formatCurrency(d.value)}</span>
+      {data.length > 0 && (
+        <div className="grid grid-cols-1 gap-2.5 mt-4 sm:grid-cols-2">
+          {data.map((d, i) => (
+            <div key={d.name} className="rounded-xl border border-border bg-background/80 px-3 py-2 text-xs shadow-sm">
+              <p className="flex items-center gap-2 text-foreground/90">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                <span className="truncate font-medium">{d.name}</span>
+              </p>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="tabular-nums font-semibold text-foreground">{d.share.toFixed(1)}%</span>
+                <span className="tabular-nums font-semibold text-foreground/90">{formatCurrency(d.value)}</span>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
