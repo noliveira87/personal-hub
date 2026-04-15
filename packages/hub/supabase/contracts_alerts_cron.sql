@@ -16,7 +16,6 @@ declare
   v_expiry_hint text;
   v_item record;
 
-  -- 👇 NOVOS
   v_response jsonb;
   v_count integer := 0;
 begin
@@ -74,7 +73,8 @@ begin
         e.name,
         e.provider,
         case
-          when coalesce(e.end_date::text, '') ~ '^\d{4}-\d{2}-\d{2}$' then e.end_date::date
+          when coalesce(e.end_date::text, '') ~ '^\d{4}-\d{2}-\d{2}$'
+          then e.end_date::date
           else null
         end as end_date,
         e.alert_index,
@@ -115,7 +115,7 @@ begin
         n.telegram_enabled,
         case
           when n.kind = 'specific-date' then n.specific_date
-          when n.end_date is not null then (n.end_date - n.days_before)
+          when n.end_date is not null then (n.end_date::date - n.days_before) -- ✅ FIX AQUI
           else null
         end as trigger_date,
         case
