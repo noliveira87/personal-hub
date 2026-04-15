@@ -318,10 +318,16 @@ export function QuotesSection({
                       {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(quote.price, quote.currency)}
                     </p>
                     {remainingToPay != null && (
-                      <div className="inline-flex w-fit items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
-                        <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
-                        <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, quote.currency)}</span>
-                      </div>
+                      remainingToPay > 0 ? (
+                        <div className="inline-flex w-fit items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
+                          <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
+                          <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, quote.currency)}</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex w-fit items-center gap-2 rounded-md border border-positive/30 bg-positive/10 px-2.5 py-1">
+                          <span className="text-[11px] font-medium text-positive">{t('contracts.quotes.fullyPaidLabel')}</span>
+                        </div>
+                      )
                     )}
                   </div>
                 )}

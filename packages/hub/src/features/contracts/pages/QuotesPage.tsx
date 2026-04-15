@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ExternalLink, Loader2, Receipt, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -121,6 +121,7 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<ContractQuote | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending'>('approved');
 
   const load = useCallback(async () => {
     try {
@@ -165,6 +166,22 @@ export default function QuotesPage() {
       : t('contracts.quotes.approvedNo');
   };
 
+  const filteredQuotes = quotes.filter(q => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'approved') return q.approvalStatus === 'approved';
+    if (filterStatus === 'pending') return q.approvalStatus !== 'approved';
+    return true;
+  });
+
+  const quoteCounts = useMemo(() => {
+    const c = { all: quotes.length, approved: 0, pending: 0 };
+    quotes.forEach(q => {
+      if (q.approvalStatus === 'approved') c.approved++;
+      else c.pending++;
+    });
+    return c;
+  }, [quotes]);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <AppSectionHeader
@@ -180,9 +197,55 @@ export default function QuotesPage() {
         )}
       />
 
-      <div>
-        <h1 className="text-xl font-bold text-foreground">{t('contracts.quotes.pageTitle')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{t('contracts.quotes.pageSubtitle')}</p>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">{t('contracts.quotes.pageTitle')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('contracts.quotes.pageSubtitle')}</p>
+        </div>
+        <div className="space-y-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('contracts.quotes.filterByApprovalLabel')}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilterStatus('approved')}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.96] ${
+                filterStatus === 'approved'
+                  ? 'bg-success text-background shadow-sm'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/70'
+              }`}
+            >
+              {t('contracts.quotes.approvedYes')}
+              {quoteCounts.approved > 0 && (
+                <span className="ml-1.5 opacity-60">{quoteCounts.approved}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setFilterStatus('pending')}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.96] ${
+                filterStatus === 'pending'
+                  ? 'bg-warning text-background shadow-sm'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/70'
+              }`}
+            >
+              {t('contracts.quotes.approvedNo')}
+              {quoteCounts.pending > 0 && (
+                <span className="ml-1.5 opacity-60">{quoteCounts.pending}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setFilterStatus('all')}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all active:scale-[0.96] ${
+                filterStatus === 'all'
+                  ? 'bg-foreground text-background shadow-sm'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/70'
+              }`}
+            >
+              {t('contracts.quotes.allStatusLabel')}
+              {quoteCounts.all > 0 && (
+                <span className="ml-1.5 opacity-60">{quoteCounts.all}</span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -190,7 +253,7 @@ export default function QuotesPage() {
           <Loader2 className="w-5 h-5 animate-spin mr-2" />
           <span className="text-sm">{t('contracts.quotes.loading')}</span>
         </div>
-      ) : quotes.length === 0 ? (
+      ) : filteredQuotes.length === 0 ? (
         <div className="bg-card rounded-xl p-10 border text-center">
           <Receipt className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">{t('contracts.quotes.empty')}</p>
@@ -204,7 +267,7 @@ export default function QuotesPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {quotes.map(q => {
+          {filteredQuotes.map(q => {
             const remainingToPay = computeRemainingToPay(q);
 
             return (
@@ -282,10 +345,16 @@ export default function QuotesPage() {
                       {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(q.price, q.currency)}
                     </p>
                     {remainingToPay != null && (
-                      <div className="inline-flex w-fit items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
-                        <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
-                        <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, q.currency)}</span>
-                      </div>
+                      remainingToPay > 0 ? (
+                        <div className="inline-flex w-fit items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
+                          <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
+                          <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, q.currency)}</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex w-fit items-center gap-2 rounded-md border border-positive/30 bg-positive/10 px-2.5 py-1">
+                          <span className="text-[11px] font-medium text-positive">{t('contracts.quotes.fullyPaidLabel')}</span>
+                        </div>
+                      )
                     )}
                   </div>
                 )}
