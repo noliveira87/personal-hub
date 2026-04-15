@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { useData } from '@/features/home-expenses/lib/DataContext';
 import { EXPENSE_CATEGORIES } from '@/features/home-expenses/lib/types';
 import { parseLocalDate } from '@/features/home-expenses/lib/store';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useMeasuredWidth } from '@/hooks/useMeasuredWidth';
 
 const COLORS = [
   'hsl(221, 83%, 53%)',
@@ -36,6 +37,7 @@ function CustomPieTooltip({ active, payload, fallbackTitle, formatCurrency }: { 
 export default function ExpensePieChart() {
   const { allTransactions, selectedYear, selectedMonth } = useData();
   const { t, hideAmounts, formatCurrency } = useI18n();
+  const { ref: chartRef, width } = useMeasuredWidth<HTMLDivElement>();
 
   const data = useMemo(() => {
     const monthExpenses = allTransactions.filter((t) => {
@@ -83,9 +85,9 @@ export default function ExpensePieChart() {
   return (
     <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
-      <div key={chartKey} className="flex-1 min-h-[16rem] w-full flex" style={{ height: Math.max(chartHeight, 200) }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
+      <div ref={chartRef} key={chartKey} className="flex-1 min-h-[16rem] w-full" style={{ height: Math.max(chartHeight, 200) }}>
+        {width > 0 && (
+          <PieChart width={width} height={Math.max(chartHeight, 200)}>
             <Pie data={data} cx="50%" cy="50%" innerRadius="50%" outerRadius={outerRadius} paddingAngle={2} dataKey="value">
               {data.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -93,7 +95,7 @@ export default function ExpensePieChart() {
             </Pie>
             <Tooltip content={<CustomPieTooltip fallbackTitle={t('homeExpenses.form.expense')} formatCurrency={formatCurrency} />} />
           </PieChart>
-        </ResponsiveContainer>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-2.5 mt-4 sm:grid-cols-2">
         {data.map((d, i) => (

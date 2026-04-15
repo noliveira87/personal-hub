@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import SummaryCards from '@/features/home-expenses/components/dashboard/SummaryCards';
 import BalanceChart from '@/features/home-expenses/components/dashboard/BalanceChart';
 import ExpensePieChart from '@/features/home-expenses/components/dashboard/ExpensePieChart';
@@ -17,20 +16,6 @@ import { Link } from 'react-router-dom';
 export default function Index() {
   const { t } = useI18n();
   const { loading } = useData();
-  const topRightRef = useRef<HTMLDivElement | null>(null);
-  const [topRightHeight, setTopRightHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    const el = topRightRef.current;
-    if (!el) return;
-
-    const update = () => setTopRightHeight(el.getBoundingClientRect().height);
-    update();
-
-    const ro = new ResizeObserver(() => update());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   if (loading) {
     return <AppLoadingState label={t('app.loadingRoute')} variant="dashboard" />;
@@ -93,14 +78,11 @@ export default function Index() {
 
       <SummaryCards />
 
-      <div
-        className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start"
-        style={{ ['--top-right-height' as string]: topRightHeight ? `${topRightHeight}px` : 'auto' } as React.CSSProperties}
-      >
-        <div className="order-1 lg:order-1 lg:col-span-8 min-h-[20rem] lg:min-h-[var(--top-right-height)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start">
+        <div className="order-1 lg:order-1 lg:col-span-8 min-h-[20rem]">
           <BalanceChart />
         </div>
-        <div ref={topRightRef} className="order-2 lg:order-2 lg:col-span-4 min-h-[20rem]">
+        <div className="order-2 lg:order-2 lg:col-span-4 min-h-[20rem]">
           <ExpensePieChart />
         </div>
         <div className="order-3 lg:order-3 lg:col-span-8">
