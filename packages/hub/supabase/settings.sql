@@ -41,6 +41,9 @@ alter table public.app_settings
 alter table public.app_settings
   add column if not exists health_category_groups jsonb not null default '{}'::jsonb;
 
+alter table public.app_settings
+  add column if not exists cashback_chart_months integer not null default 12;
+
 alter table public.app_settings enable row level security;
 
 -- Public anon read/write for single shared family setup (Mode A).

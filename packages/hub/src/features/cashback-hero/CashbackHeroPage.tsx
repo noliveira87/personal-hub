@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { format, parse, addMonths, subMonths, parseISO } from 'date-fns';
+import { format, parse, addMonths, subMonths, parseISO, getDaysInMonth, endOfMonth } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { chartAxisTickStyle, chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipLabelStyle, chartTooltipItemStyle } from '@/lib/chartTheme';
 import { pt } from 'date-fns/locale';
 import {
   ArrowUpDown,
@@ -58,6 +60,11 @@ import {
   CashbackPurchase,
   getCategoryLabel,
 } from '@/features/cashback-hero/types';
+import {
+  type CashbackChartMonths,
+  loadCashbackChartMonths,
+  persistCashbackChartMonths,
+} from '@/features/cashback-hero/lib/cashbackSettings';
 import { useCashbackStore } from '@/features/cashback-hero/use-cashback-store';
 import {
   createCashbackHomeExpenseLink,
@@ -185,8 +192,10 @@ function getUniversoCycleRangeFromMonthKey(monthKey: string): { start: string; e
   const year = Number(yearRaw);
   const month = Number(monthRaw);
 
-  const end = new Date(year, month - 1, 15);
-  const start = new Date(year, month - 2, 15);
+  // Cycle key '2026-03' means the cycle that starts on Mar 15 and ends on Apr 15,
+  // matching getUniversoCycleKey which anchors on the 15th of the same month for day >= 15.
+  const start = new Date(year, month - 1, 15);
+  const end = new Date(year, month, 15);
 
   return {
     start: format(start, 'yyyy-MM-dd'),
@@ -364,7 +373,7 @@ function getCashbackComponentSources(purchase: CashbackPurchase): string[] {
   );
 }
 
-export default function CashbackHeroPage() {
+function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
   const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const contractsContext = useOptionalContracts();
@@ -438,6 +447,101 @@ export default function CashbackHeroPage() {
   );
 
   const cappedEntryAmounts = useMemo(() => computeUniversoEntryCapMap(purchases), [purchases]);
+
+  const [chartMonths, setChartMonths] = useState<CashbackChartMonths>(12);
+
+  useEffect(() => {
+    void loadCashbackChartMonths().then((months) => setChartMonths(months));
+  }, []);
+
+  const handleChartMonthsChange = (value: string) => {
+    const months = Number(value) as CashbackChartMonths;
+    setChartMonths(months);
+    void persistCashbackChartMonths(months);
+  };
+
+  const monthlyChartData = useMemo(() => {
+    const now = new Date();
+    const monthMap = new Map<string, number>();
+    for (let i = 11; i >= 0; i--) {
+      const d = subMonths(now, i);
+      monthMap.set(format(d, 'yyyy-MM'), 0);
+    }
+    purchases.forEach((purchase) => {
+      const month = purchase.date.slice(0, 7);
+      if (monthMap.has(month)) {
+        monthMap.set(month, (monthMap.get(month) ?? 0) + getEffectiveTotalCashback(purchase, cappedEntryAmounts));
+      }
+    });
+    return Array.from(monthMap.entries()).map(([month, cashback]) => ({
+      month,
+      label: format(parse(`${month}-01`, 'yyyy-MM-dd', new Date()), 'MMM yy', { locale: pt }),
+      cashback: Math.round(cashback * 100) / 100,
+    }));
+  }, [purchases, cappedEntryAmounts]);
+
+  const universoCycles = useMemo(() => {
+    if (selectedMonth === 'all') return [];
+
+    // Collect all Universo entries from purchases in the selected month
+    const universoEntries = monthPurchases
+      .flatMap((p) => p.cashbackEntries.map((e) => ({ entry: e })))
+      .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source));
+
+    if (universoEntries.length === 0) return [];
+
+    // Find the unique cycle keys these entries belong to
+    const cycleKeys = Array.from(new Set(universoEntries.map(({ entry }) => getUniversoCycleKey(entry.dateReceived))));
+
+    // For each cycle key, compute full cycle metrics using ALL purchases (cycle spans months)
+    return cycleKeys
+      .map((cycleKey) => {
+        const cycleRange = getUniversoCycleRangeFromMonthKey(cycleKey);
+        const allInCycle = purchases
+          .flatMap((p) => p.cashbackEntries.map((e) => ({ entry: e })))
+          .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+          .filter(({ entry }) => entry.dateReceived >= cycleRange.start && entry.dateReceived < cycleRange.endExclusive);
+        const effectiveTotal = allInCycle.reduce(
+          (sum, { entry }) => sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry)), 0,
+        );
+        const capReached = effectiveTotal + 0.0001 >= UNIVERSO_CYCLE_CAP_EUR;
+        const remaining = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - effectiveTotal);
+        const pct = Math.min(100, (effectiveTotal / UNIVERSO_CYCLE_CAP_EUR) * 100);
+        const cycleLabel = `${format(parseISO(cycleRange.start), 'dd/MM')}\u2013${format(parseISO(cycleRange.endExclusive), 'dd/MM')}`;
+        return { cycleKey, effectiveTotal, capReached, remaining, pct, cycleLabel };
+      })
+      .sort((a, b) => a.cycleKey.localeCompare(b.cycleKey));
+  }, [selectedMonth, monthPurchases, purchases, cappedEntryAmounts]);
+
+  const unibancoStatus = useMemo(() => {
+    if (selectedMonth === 'all') return null;
+    const eligible = monthPurchases.filter((p) => (p.isUnibanco ?? false) && !(p.isReferral ?? false));
+    if (eligible.length === 0) return null;
+    const spent = eligible.reduce((sum, p) => sum + p.amount, 0);
+    const activeTier = getActiveTier(spent);
+    const nextTier = getNextTier(spent);
+    const topTier = UNIBANCO_TIERS[0];
+    const isTopTier = activeTier?.minSpend === topTier.minSpend;
+    const target = nextTier?.minSpend ?? topTier.minSpend;
+    const pct = isTopTier ? 100 : Math.min(100, (spent / target) * 100);
+    const remaining = Math.max(0, target - spent);
+    const currentCashback = activeTier?.cashback ?? 0;
+    const targetCashback = isTopTier ? topTier.cashback : (nextTier?.cashback ?? topTier.cashback);
+    const cashbackPct = isTopTier ? 100 : targetCashback > 0 ? Math.min(100, (currentCashback / targetCashback) * 100) : 0;
+    
+    // Calculate Unibanco cycle (1st to last day of month) and days remaining
+    const [yearStr, monthStr] = selectedMonth.split('-');
+    const yearNum = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10) - 1;
+    const monthDate = new Date(yearNum, monthNum, 1);
+    const monthEnd = endOfMonth(monthDate);
+    const currentDate = new Date();
+    const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const daysRemaining = today.getTime() <= monthEnd.getTime() ? Math.ceil((monthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
+    const cycleLabel = `1–${getDaysInMonth(monthDate)} ${format(monthDate, 'MMM', { locale: pt })}`;
+    
+    return { spent, activeTier, nextTier, isTopTier, target, pct, remaining, currentCashback, targetCashback, cashbackPct, daysRemaining, cycleLabel };
+  }, [selectedMonth, monthPurchases]);
 
   const filteredPurchases = useMemo(() => {
     let result = [...monthPurchases];
@@ -582,7 +686,6 @@ export default function CashbackHeroPage() {
         list.push(t('cashbackHero.insights.universoCapReached', {
           cycle: cycleLabel,
           cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR'),
-          used: formatCurrency(universoEffectiveTotal, 'EUR'),
         }));
       } else {
         list.push(t('cashbackHero.insights.universoNoCapHit', {
@@ -650,6 +753,7 @@ export default function CashbackHeroPage() {
     return insights.slice(0, 5).map((line) => {
       const normalized = line.toLowerCase();
       const isCardSpecific = normalized.includes('unibanco')
+        || normalized.includes('universo')
         || normalized.includes('cartão universo')
         || normalized.includes('universo card');
 
@@ -839,6 +943,153 @@ export default function CashbackHeroPage() {
             ) : null}
           </div>
         </div>
+
+        {/* Monthly cashback bar chart */}
+        {monthlyChartData.some((d) => d.cashback > 0) ? (
+          <div className="mt-4 rounded-xl border bg-card p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {t('cashbackHero.chart.monthlyTitle')}
+              </p>
+              <Select value={String(chartMonths)} onValueChange={handleChartMonthsChange}>
+                <SelectTrigger className="h-7 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">{t('cashbackHero.chart.months3')}</SelectItem>
+                  <SelectItem value="6">{t('cashbackHero.chart.months6')}</SelectItem>
+                  <SelectItem value="12">{t('cashbackHero.chart.months12')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="h-44 sm:h-56">
+              <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyChartData.slice(-chartMonths)} margin={{ left: 2, right: 6, top: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                <XAxis dataKey="label" tick={chartAxisTickStyleCompact as any} />
+                <YAxis tickFormatter={(value: number) => `€${value}`} width={40} tick={chartAxisTickStyleCompact as any} />
+                <Tooltip
+                  contentStyle={chartTooltipContentStyle}
+                  labelStyle={chartTooltipLabelStyle}
+                  itemStyle={chartTooltipItemStyle}
+                  formatter={(value: number) => [formatCurrency(value), t('cashbackHero.chart.tooltipLabel')]}
+                />
+                <Bar
+                  dataKey="cashback"
+                  fill="hsl(var(--primary))"
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Card progress widgets: Unibanco tier + Universo cap(s) */}
+        {(unibancoStatus ?? universoCycles.length > 0) ? (
+          <div className={cn('mt-4 grid gap-3', unibancoStatus && universoCycles.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}>
+
+            {/* Unibanco tier */}
+            {unibancoStatus ? (
+              <div className={cn(
+                'h-full rounded-xl border p-4 lg:min-h-[142px]',
+                unibancoStatus.isTopTier
+                  ? 'border-primary/40 bg-primary/5'
+                  : 'border-border bg-card',
+              )}>
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">Unibanco</span>
+                  </div>
+                  <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-1">
+                    {unibancoStatus.daysRemaining > 0 && (
+                      <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                        {t('cashbackHero.cardWidget.unibancoDaysRemaining', { days: unibancoStatus.daysRemaining })}
+                      </span>
+                    )}
+                    {unibancoStatus.activeTier ? (
+                      <span className="whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                        +{formatCurrency(unibancoStatus.activeTier.cashback, 'EUR')}
+                      </span>
+                    ) : (
+                      <span className="whitespace-nowrap rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {t('cashbackHero.cardWidget.unibancoNoTier')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="mb-2 tabular-nums text-lg font-bold text-foreground">
+                  {formatCurrency(unibancoStatus.currentCashback, 'EUR')}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">/ {formatCurrency(unibancoStatus.targetCashback, 'EUR')}</span>
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn('h-full rounded-full transition-all', unibancoStatus.isTopTier ? 'bg-primary' : 'bg-primary/60')}
+                    style={{ width: `${unibancoStatus.cashbackPct}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {unibancoStatus.isTopTier
+                    ? t('cashbackHero.cardWidget.unibancoTopTier', { cashback: formatCurrency(unibancoStatus.activeTier!.cashback, 'EUR') })
+                    : unibancoStatus.nextTier
+                      ? t('cashbackHero.cardWidget.unibancoNextTier', { remaining: formatCurrency(unibancoStatus.remaining, 'EUR'), cashback: formatCurrency(unibancoStatus.nextTier.cashback, 'EUR') })
+                      : t('cashbackHero.cardWidget.unibancoFirstTier', { remaining: formatCurrency(unibancoStatus.remaining, 'EUR') })}
+                </p>
+              </div>
+            ) : null}
+
+            {/* Universo cap cycles */}
+            {universoCycles.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {universoCycles.map((cycle) => (
+                  <div
+                    key={cycle.cycleKey}
+                    className={cn(
+                      'h-full rounded-xl border p-4 lg:min-h-[142px]',
+                      cycle.capReached
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border bg-card',
+                    )}
+                  >
+                    <div className="mb-1 flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs font-medium text-foreground">Universo</span>
+                      </div>
+                      <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-1">
+                        <span className="whitespace-nowrap rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {t('cashbackHero.cardWidget.universoCycleLabel', { cycle: cycle.cycleLabel })}
+                        </span>
+                        {cycle.capReached ? (
+                          <span className="whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                            {t('cashbackHero.cardWidget.universoCapReachedBadge')}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="mb-2 tabular-nums text-lg font-bold text-foreground">
+                      {formatCurrency(cycle.effectiveTotal, 'EUR')}
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">/ {formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR')}</span>
+                    </p>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn('h-full rounded-full transition-all', cycle.capReached ? 'bg-amber-500' : 'bg-primary/60')}
+                        style={{ width: `${cycle.pct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      {cycle.capReached
+                        ? t('cashbackHero.cardWidget.universoCapReachedFull', { cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR') })
+                        : t('cashbackHero.cardWidget.universoRemaining', { remaining: formatCurrency(cycle.remaining, 'EUR') })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+          </div>
+        ) : null}
 
         {insights.length > 0 ? (
           <div className="mt-4 flex justify-end">
@@ -2063,3 +2314,5 @@ function SourcesSettings({
     </div>
   );
 }
+
+export default CashbackHeroPage;
