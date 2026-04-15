@@ -95,12 +95,12 @@ export default function Index() {
 
       <div
         className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-start"
-        style={{ ['--top-right-height' as string]: topRightHeight ? `${topRightHeight}px` : undefined } as React.CSSProperties}
+        style={{ ['--top-right-height' as string]: topRightHeight ? `${topRightHeight}px` : 'auto' } as React.CSSProperties}
       >
-        <div className="order-1 lg:order-1 lg:col-span-8 lg:h-[var(--top-right-height)]">
+        <div className="order-1 lg:order-1 lg:col-span-8 min-h-[20rem] lg:min-h-[var(--top-right-height)]">
           <BalanceChart />
         </div>
-        <div ref={topRightRef} className="order-2 lg:order-2 lg:col-span-4">
+        <div ref={topRightRef} className="order-2 lg:order-2 lg:col-span-4 min-h-[20rem]">
           <ExpensePieChart />
         </div>
         <div className="order-3 lg:order-3 lg:col-span-8">

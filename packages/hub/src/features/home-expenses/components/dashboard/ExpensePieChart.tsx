@@ -81,9 +81,9 @@ export default function ExpensePieChart() {
   }
 
   return (
-    <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
+    <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
-      <div key={chartKey} className="w-full" style={{ height: chartHeight }}>
+      <div key={chartKey} className="flex-1 min-h-[16rem] w-full flex" style={{ height: Math.max(chartHeight, 200) }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={data} cx="50%" cy="50%" innerRadius="50%" outerRadius={outerRadius} paddingAngle={2} dataKey="value">
