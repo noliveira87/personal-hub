@@ -16,6 +16,7 @@ import {
   Tag,
   Trash2,
   Wallet,
+  CreditCard,
   X,
 } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -159,29 +160,157 @@ function getEntryAmountForDisplay(entry: CashbackEntry): number {
   return entry.amount;
 }
 
-function getEffectiveEntryAmounts(purchase: CashbackPurchase): Array<{ id: string; amount: number }> {
+const UNIVERSO_SOURCE_REGEX = /universo/i;
+const UNIVERSO_CYCLE_CAP_EUR = 10;
+const UNIVERSO_DEFAULT_RATE = 0.05;
+
+function getUniversoCycleKey(dateRaw: string): string {
+  const parsed = parseISO(dateRaw);
+  if (Number.isNaN(parsed.getTime())) {
+    return dateRaw.slice(0, 7);
+  }
+
+  const year = parsed.getFullYear();
+  const month = parsed.getMonth();
+  const day = parsed.getDate();
+  const cycleAnchor = day >= 15
+    ? new Date(year, month, 15)
+    : new Date(year, month - 1, 15);
+
+  return format(cycleAnchor, 'yyyy-MM');
+}
+
+function getUniversoCycleRangeFromMonthKey(monthKey: string): { start: string; endExclusive: string } {
+  const [yearRaw, monthRaw] = monthKey.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+
+  const end = new Date(year, month - 1, 15);
+  const start = new Date(year, month - 2, 15);
+
+  return {
+    start: format(start, 'yyyy-MM-dd'),
+    endExclusive: format(end, 'yyyy-MM-dd'),
+  };
+}
+
+function getUniversoExpectedAmountForPurchase(purchase: CashbackPurchase): number {
+  if (!Number.isFinite(purchase.amount) || purchase.amount <= 0) return 0;
+  return Math.round(purchase.amount * UNIVERSO_DEFAULT_RATE * 100) / 100;
+}
+
+function getUniversoPotentialAmount(purchase: CashbackPurchase, entry: CashbackEntry): number {
+  const raw = getEntryAmountForDisplay(entry);
+  const expected = getUniversoExpectedAmountForPurchase(purchase);
+  return Math.max(raw, expected);
+}
+
+function computeUniversoEntryCapMap(purchases: CashbackPurchase[]): Map<string, number> {
+  const universoEntries = purchases
+    .flatMap((purchase) => purchase.cashbackEntries.map((entry) => ({
+      entryId: entry.id,
+      source: entry.source,
+      rawAmount: getEntryAmountForDisplay(entry),
+      entryDate: entry.dateReceived,
+      purchaseDate: purchase.date,
+      purchaseCreatedAt: purchase.createdAt ?? '',
+      purchaseId: purchase.id,
+      cycleKey: getUniversoCycleKey(entry.dateReceived),
+    })))
+    .filter((entry) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+    .sort((a, b) => (
+      a.entryDate.localeCompare(b.entryDate)
+      || a.purchaseDate.localeCompare(b.purchaseDate)
+      || a.purchaseCreatedAt.localeCompare(b.purchaseCreatedAt)
+      || a.purchaseId.localeCompare(b.purchaseId)
+      || a.entryId.localeCompare(b.entryId)
+    ));
+
+  const capByEntryId = new Map<string, number>();
+  const cycleUsage = new Map<string, number>();
+
+  universoEntries.forEach((entry) => {
+    const used = cycleUsage.get(entry.cycleKey) ?? 0;
+    const remaining = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - used);
+    const effectiveAmount = Math.max(0, Math.min(entry.rawAmount, remaining));
+
+    capByEntryId.set(entry.entryId, effectiveAmount);
+    cycleUsage.set(entry.cycleKey, used + effectiveAmount);
+  });
+
+  return capByEntryId;
+}
+
+function getEffectiveEntryAmounts(
+  purchase: CashbackPurchase,
+  cappedEntryAmounts?: Map<string, number>,
+): Array<{ id: string; amount: number }> {
   if (purchase.isReferral) {
-    return purchase.cashbackEntries.map((entry) => ({ id: entry.id, amount: getEntryAmountForDisplay(entry) }));
+    return purchase.cashbackEntries.map((entry) => ({
+      id: entry.id,
+      amount: Math.max(0, cappedEntryAmounts?.get(entry.id) ?? getEntryAmountForDisplay(entry)),
+    }));
   }
 
   let remaining = Math.max(0, purchase.amount);
   return purchase.cashbackEntries.map((entry) => {
-    const amount = getEntryAmountForDisplay(entry);
+    const amount = Math.max(0, cappedEntryAmounts?.get(entry.id) ?? getEntryAmountForDisplay(entry));
     const effectiveAmount = Math.max(0, Math.min(amount, remaining));
     remaining -= effectiveAmount;
     return { id: entry.id, amount: effectiveAmount };
   });
 }
 
-function getEffectiveTotalCashback(purchase: CashbackPurchase): number {
-  return getEffectiveEntryAmounts(purchase).reduce((sum, item) => sum + item.amount, 0);
+type MerchantCategoryHint = {
+  displayMerchant: string;
+  normalizedMerchant: string;
+  category: CashbackCategory;
+  count: number;
+};
+
+function normalizeMerchantName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function getDisplayPercentFromPurchase(purchase: CashbackPurchase): number {
+function inferCategoryFromMerchant(
+  merchant: string,
+  hints: MerchantCategoryHint[],
+): CashbackCategory | null {
+  const normalized = normalizeMerchantName(merchant);
+  if (!normalized) return null;
+
+  const exact = hints.find((hint) => hint.normalizedMerchant === normalized);
+  if (exact) return exact.category;
+
+  const keywordRules: Array<{ pattern: RegExp; category: CashbackCategory }> = [
+    { pattern: /\b(continente|pingo doce|mercadona|auchan|lidl|aldi|intermarche|mini preco|minipreco|supermercado)\b/, category: 'groceries' },
+    { pattern: /\b(amazon|worten|fnac|radio popular|mediamarkt|pc diga|globaldata)\b/, category: 'tech' },
+    { pattern: /\b(uber|bolt|via verde|galp|bp|repsol|prio|moove|cp|fertagus|carris|metro)\b/, category: 'transport' },
+    { pattern: /\b(booking|airbnb|ryanair|easyjet|tap|hotel|viagem)\b/, category: 'travel' },
+    { pattern: /\b(mc ?donald|burger king|kfc|glovo|uber eats|restaurante|pizzaria|cafe)\b/, category: 'dining' },
+    { pattern: /\b(farmacia|wells|hospital|clinica|dental|saude)\b/, category: 'health' },
+    { pattern: /\b(zara|h&m|primark|shein|temu|ali express|aliexpress|shop)\b/, category: 'shopping' },
+  ];
+
+  const matched = keywordRules.find((rule) => rule.pattern.test(normalized));
+  return matched?.category ?? null;
+}
+
+function getEffectiveTotalCashback(purchase: CashbackPurchase, cappedEntryAmounts?: Map<string, number>): number {
+  return getEffectiveEntryAmounts(purchase, cappedEntryAmounts).reduce((sum, item) => sum + item.amount, 0);
+}
+
+function getDisplayPercentFromPurchase(purchase: CashbackPurchase, cappedEntryAmounts?: Map<string, number>): number {
   if (!Number.isFinite(purchase.amount) || purchase.amount <= 0) return 0;
 
   // For display, never show more than 100% cashback for a purchase.
-  const effectiveCashback = getEffectiveTotalCashback(purchase);
+  const effectiveCashback = getEffectiveTotalCashback(purchase, cappedEntryAmounts);
   const rawPercent = (effectiveCashback / purchase.amount) * 100;
   const clampedPercent = Math.max(0, Math.min(100, rawPercent));
 
@@ -214,7 +343,7 @@ function CashbackPercentBadge({ percent }: { percent: number }) {
   );
 }
 
-function CashbackBadge({ purchase }: { purchase: CashbackPurchase }) {
+function CashbackBadge({ purchase, cappedEntryAmounts }: { purchase: CashbackPurchase; cappedEntryAmounts?: Map<string, number> }) {
   if (purchase.isReferral) {
     return (
       <span className="inline-flex rounded-lg border border-blue-600 bg-blue-500/20 px-3 py-1.5 text-sm font-bold text-blue-700 dark:bg-blue-500/30 dark:text-blue-200">
@@ -222,7 +351,17 @@ function CashbackBadge({ purchase }: { purchase: CashbackPurchase }) {
       </span>
     );
   }
-  return <CashbackPercentBadge percent={getDisplayPercentFromPurchase(purchase)} />;
+  return <CashbackPercentBadge percent={getDisplayPercentFromPurchase(purchase, cappedEntryAmounts)} />;
+}
+
+function getCashbackComponentSources(purchase: CashbackPurchase): string[] {
+  return Array.from(
+    new Set(
+      purchase.cashbackEntries
+        .map((entry) => entry.source.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 export default function CashbackHeroPage() {
@@ -258,6 +397,47 @@ export default function CashbackHeroPage() {
     if (selectedMonth === 'all') return purchases;
     return purchases.filter((purchase) => purchase.date.startsWith(selectedMonth));
   }, [purchases, selectedMonth]);
+
+  const merchantCategoryHints = useMemo<MerchantCategoryHint[]>(() => {
+    const grouped = new Map<string, { displayMerchant: string; categoryCounts: Map<CashbackCategory, number>; total: number }>();
+
+    purchases.forEach((purchase) => {
+      const normalized = normalizeMerchantName(purchase.merchant);
+      if (!normalized) return;
+
+      const current = grouped.get(normalized) ?? {
+        displayMerchant: purchase.merchant,
+        categoryCounts: new Map<CashbackCategory, number>(),
+        total: 0,
+      };
+
+      current.displayMerchant = purchase.merchant;
+      current.total += 1;
+      current.categoryCounts.set(purchase.category, (current.categoryCounts.get(purchase.category) ?? 0) + 1);
+      grouped.set(normalized, current);
+    });
+
+    return Array.from(grouped.entries())
+      .map(([normalizedMerchant, info]) => {
+        const sortedCategories = Array.from(info.categoryCounts.entries())
+          .sort((a, b) => b[1] - a[1]);
+        const topCategory = sortedCategories[0]?.[0] ?? 'other';
+        return {
+          normalizedMerchant,
+          displayMerchant: info.displayMerchant,
+          category: topCategory,
+          count: info.total,
+        };
+      })
+      .sort((a, b) => b.count - a.count || a.displayMerchant.localeCompare(b.displayMerchant));
+  }, [purchases]);
+
+  const merchantSuggestions = useMemo(
+    () => merchantCategoryHints.map((hint) => hint.displayMerchant),
+    [merchantCategoryHints],
+  );
+
+  const cappedEntryAmounts = useMemo(() => computeUniversoEntryCapMap(purchases), [purchases]);
 
   const filteredPurchases = useMemo(() => {
     let result = [...monthPurchases];
@@ -296,27 +476,27 @@ export default function CashbackHeroPage() {
     }
 
     if (sortByPercent) {
-      result.sort((a, b) => getDisplayPercentFromPurchase(b) - getDisplayPercentFromPurchase(a));
+      result.sort((a, b) => getDisplayPercentFromPurchase(b, cappedEntryAmounts) - getDisplayPercentFromPurchase(a, cappedEntryAmounts));
     } else {
       result.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
     }
 
     return result;
-  }, [monthPurchases, search, categoryFilter, sourceFilter, sortByPercent]);
+  }, [monthPurchases, search, categoryFilter, sourceFilter, sortByPercent, cappedEntryAmounts]);
 
   const stats = useMemo(() => {
     const monthSpent = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-    const monthCashback = monthPurchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase), 0);
+    const monthCashback = monthPurchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase, cappedEntryAmounts), 0);
     const overallSpent = purchases.reduce((sum, purchase) => sum + purchase.amount, 0);
-    const overallCashback = purchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase), 0);
+    const overallCashback = purchases.reduce((sum, purchase) => sum + getEffectiveTotalCashback(purchase, cappedEntryAmounts), 0);
     const eligibleAveragePurchases = monthPurchases.filter((purchase) => !purchase.isReferral);
     const avgPercent = eligibleAveragePurchases.length > 0
-      ? eligibleAveragePurchases.reduce((sum, purchase) => sum + getDisplayPercentFromPurchase(purchase), 0) / eligibleAveragePurchases.length
+      ? eligibleAveragePurchases.reduce((sum, purchase) => sum + getDisplayPercentFromPurchase(purchase, cappedEntryAmounts), 0) / eligibleAveragePurchases.length
       : 0;
 
     const bestPurchase = monthPurchases.reduce<CashbackPurchase | null>((currentBest, purchase) => {
       if (!currentBest) return purchase;
-      return getDisplayPercentFromPurchase(purchase) > getDisplayPercentFromPurchase(currentBest) ? purchase : currentBest;
+      return getDisplayPercentFromPurchase(purchase, cappedEntryAmounts) > getDisplayPercentFromPurchase(currentBest, cappedEntryAmounts) ? purchase : currentBest;
     }, null);
 
     return {
@@ -328,7 +508,7 @@ export default function CashbackHeroPage() {
       eligibleAveragePurchasesCount: eligibleAveragePurchases.length,
       bestPurchase,
     };
-  }, [monthPurchases, purchases]);
+  }, [monthPurchases, purchases, cappedEntryAmounts]);
 
   const insights = useMemo(() => {
     if (monthPurchases.length === 0) return [] as string[];
@@ -377,17 +557,46 @@ export default function CashbackHeroPage() {
         }));
       }
 
-      const unibancoNoCashbackCount = unibancoEligible.filter((p) => getEffectiveTotalCashback(p) <= 0).length;
+      const unibancoNoCashbackCount = unibancoEligible.filter((p) => getEffectiveTotalCashback(p, cappedEntryAmounts) <= 0).length;
       if (unibancoNoCashbackCount > 0) {
         list.push(t('cashbackHero.insights.unibancoNoCashbackDueToCap', {
           count: String(unibancoNoCashbackCount),
+        }));
+      }
+
+      // --- Universo cap insight (cycle 15 -> 15, cap €10) ---
+      const universoCycleRange = getUniversoCycleRangeFromMonthKey(selectedMonth);
+      const universoEntriesInCycle = purchases
+        .flatMap((purchase) => purchase.cashbackEntries.map((entry) => ({ purchase, entry })))
+        .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+        .filter(({ entry }) => entry.dateReceived >= universoCycleRange.start && entry.dateReceived < universoCycleRange.endExclusive);
+
+      const universoEffectiveTotal = universoEntriesInCycle.reduce((sum, { entry }) => {
+        return sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry));
+      }, 0);
+      const capReached = universoEffectiveTotal + 0.0001 >= UNIVERSO_CYCLE_CAP_EUR;
+      const remainingToCap = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - universoEffectiveTotal);
+      const cycleLabel = `${format(parseISO(universoCycleRange.start), 'dd/MM')}–${format(parseISO(universoCycleRange.endExclusive), 'dd/MM')}`;
+
+      if (capReached) {
+        list.push(t('cashbackHero.insights.universoCapReached', {
+          cycle: cycleLabel,
+          cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR'),
+          used: formatCurrency(universoEffectiveTotal, 'EUR'),
+        }));
+      } else {
+        list.push(t('cashbackHero.insights.universoNoCapHit', {
+          cycle: cycleLabel,
+          cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR'),
+          used: formatCurrency(universoEffectiveTotal, 'EUR'),
+          remaining: formatCurrency(remainingToCap, 'EUR'),
         }));
       }
     }
 
     const eligibleForCoverage = monthPurchases.filter((p) => !(p.isReferral ?? false));
     if (eligibleForCoverage.length > 0) {
-      const withCashbackCount = eligibleForCoverage.filter((p) => getEffectiveTotalCashback(p) > 0).length;
+      const withCashbackCount = eligibleForCoverage.filter((p) => getEffectiveTotalCashback(p, cappedEntryAmounts) > 0).length;
       const coverageRate = (withCashbackCount / eligibleForCoverage.length) * 100;
       list.push(t('cashbackHero.insights.coverage', {
         covered: String(withCashbackCount),
@@ -397,8 +606,10 @@ export default function CashbackHeroPage() {
     }
 
     const sourceTotals = monthPurchases.reduce<Record<string, number>>((acc, purchase) => {
+      const effectiveByEntryId = new Map(getEffectiveEntryAmounts(purchase, cappedEntryAmounts).map((item) => [item.id, item.amount]));
       for (const entry of purchase.cashbackEntries) {
-        acc[entry.source] = (acc[entry.source] ?? 0) + entry.amount;
+        const effectiveAmount = effectiveByEntryId.get(entry.id) ?? 0;
+        acc[entry.source] = (acc[entry.source] ?? 0) + effectiveAmount;
       }
       return acc;
     }, {});
@@ -417,7 +628,7 @@ export default function CashbackHeroPage() {
     if (stats.bestPurchase) {
       list.push(t('cashbackHero.insights.bestDeal', {
         merchant: stats.bestPurchase.merchant,
-        percent: getDisplayPercentFromPurchase(stats.bestPurchase).toFixed(2).replace(/\.?0+$/, ''),
+        percent: getDisplayPercentFromPurchase(stats.bestPurchase, cappedEntryAmounts).toFixed(2).replace(/\.?0+$/, ''),
       }));
     }
 
@@ -433,7 +644,18 @@ export default function CashbackHeroPage() {
     }
 
     return list;
-  }, [monthPurchases, selectedMonth, stats, formatCurrency, t]);
+  }, [monthPurchases, selectedMonth, stats, formatCurrency, t, cappedEntryAmounts, purchases]);
+
+  const visibleInsights = useMemo(() => {
+    return insights.slice(0, 5).map((line) => {
+      const normalized = line.toLowerCase();
+      const isCardSpecific = normalized.includes('unibanco')
+        || normalized.includes('cartão universo')
+        || normalized.includes('universo card');
+
+      return { line, isCardSpecific };
+    });
+  }, [insights]);
 
   const monthLabel = selectedMonth === 'all'
     ? t('cashbackHero.months.all')
@@ -613,7 +835,7 @@ export default function CashbackHeroPage() {
             </div>
             <p className="mt-1 truncate text-sm font-semibold text-foreground">{stats.bestPurchase?.merchant ?? t('cashbackHero.stats.noData')}</p>
             {stats.bestPurchase ? (
-              <p className="mt-1 text-xs text-muted-foreground">{getDisplayPercentFromPurchase(stats.bestPurchase).toFixed(2).replace(/\.?0+$/, '')}%</p>
+              <p className="mt-1 text-xs text-muted-foreground">{getDisplayPercentFromPurchase(stats.bestPurchase, cappedEntryAmounts).toFixed(2).replace(/\.?0+$/, '')}%</p>
             ) : null}
           </div>
         </div>
@@ -647,15 +869,28 @@ export default function CashbackHeroPage() {
                   </span>
                 </div>
                 <div className="flex flex-col gap-2 p-3">
-                  {insights.slice(0, 5).map((line, index) => (
+                  {visibleInsights.map(({ line, isCardSpecific }, index) => (
                     <div
                       key={`${line}-${index}`}
-                      className="group rounded-xl border border-border/70 bg-background/80 p-3 backdrop-blur-sm transition-colors hover:border-primary/35"
+                      className={cn(
+                        'group rounded-xl border bg-background/80 p-3 backdrop-blur-sm transition-colors',
+                        isCardSpecific
+                          ? 'border-primary/35 ring-1 ring-primary/15'
+                          : 'border-border/70 hover:border-primary/35',
+                      )}
                     >
-                      <div className="flex items-start gap-2.5">
-                        <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1 text-[11px] font-bold text-primary">
-                          {index + 1}
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className={cn(
+                          'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                          isCardSpecific
+                            ? 'border border-primary/30 bg-primary/10 text-primary'
+                            : 'border border-border bg-muted/60 text-muted-foreground',
+                        )}>
+                          {isCardSpecific ? <CreditCard className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
+                          {isCardSpecific ? t('cashbackHero.insights.cardRulePill') : t('cashbackHero.insights.generalPill')}
                         </span>
+                      </div>
+                      <div className="flex items-start gap-2.5">
                         <p className="text-sm leading-5 text-foreground/90">
                           {line.includes(':') ? (
                             <>
@@ -730,10 +965,13 @@ export default function CashbackHeroPage() {
           ) : !loading ? (
             filteredPurchases.slice(0, visibleCount).map((purchase) => {
               const isExpanded = Boolean(expandedIds[purchase.id]);
-              const totalCashback = getEffectiveTotalCashback(purchase);
-              const effectiveEntries = new Map(getEffectiveEntryAmounts(purchase).map((item) => [item.id, item.amount]));
+              const totalCashback = getEffectiveTotalCashback(purchase, cappedEntryAmounts);
+              const effectiveEntries = new Map(getEffectiveEntryAmounts(purchase, cappedEntryAmounts).map((item) => [item.id, item.amount]));
               const purchaseNotes = stripCardFromNotes(purchase.notes);
               const purchaseCardUsed = extractCardFromNotes(purchase.notes);
+              const componentSources = getCashbackComponentSources(purchase);
+              const visibleComponentSources = componentSources.slice(0, 3);
+              const hiddenComponentCount = Math.max(0, componentSources.length - visibleComponentSources.length);
 
               return (
                 <div key={purchase.id} className="overflow-hidden rounded-xl border bg-card">
@@ -750,7 +988,7 @@ export default function CashbackHeroPage() {
                           <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                             {getCategoryLabel(purchase.category)}
                           </span>
-                          {purchase.isUnibanco ? (
+                          {purchase.isUnibanco && componentSources.length === 0 ? (
                             <span className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                               {t('cashbackHero.badges.unibanco')}
                             </span>
@@ -765,12 +1003,32 @@ export default function CashbackHeroPage() {
                             <span className="text-primary">+{formatCurrency(totalCashback, 'EUR')}</span>
                           ) : null}
                         </div>
+                        {componentSources.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {t('cashbackHero.cashback.componentsLabel')}:
+                            </span>
+                            {visibleComponentSources.map((source) => (
+                              <span
+                                key={`${purchase.id}-${source}`}
+                                className="rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                              >
+                                {source}
+                              </span>
+                            ))}
+                            {hiddenComponentCount > 0 ? (
+                              <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                {t('cashbackHero.cashback.componentsMore', { count: hiddenComponentCount })}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Right side: Highlight (Badge + Amount) */}
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end gap-1">
-                          <CashbackBadge purchase={purchase} />
+                          <CashbackBadge purchase={purchase} cappedEntryAmounts={cappedEntryAmounts} />
                           <p className="text-xs font-medium text-muted-foreground">{formatCurrency(purchase.amount, 'EUR')}</p>
                         </div>
                         <ChevronDown className={cn('h-5 w-5 text-muted-foreground transition-transform', isExpanded && 'rotate-180')} />
@@ -813,14 +1071,37 @@ export default function CashbackHeroPage() {
                       {purchase.cashbackEntries.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('cashbackHero.cashback.purchaseCashbackTitle')}</p>
-                          {purchase.cashbackEntries.map((entry) => (
+                          {purchase.cashbackEntries.map((entry) => {
+                            const rawEntryAmount = getEntryAmountForDisplay(entry);
+                            const universoPotentialAmount = UNIVERSO_SOURCE_REGEX.test(entry.source)
+                              ? getUniversoPotentialAmount(purchase, entry)
+                              : rawEntryAmount;
+                            const effectiveEntryAmount = effectiveEntries.get(entry.id) ?? entry.amount;
+                            const isUniversoCapped = UNIVERSO_SOURCE_REGEX.test(entry.source)
+                              && effectiveEntryAmount + 0.0001 < universoPotentialAmount;
+
+                            return (
                             <div key={entry.id} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2">
                               <div>
                                 <p className="text-sm font-medium text-foreground">{entry.source}</p>
-                                <p className="text-xs text-muted-foreground">{formatDateLabel(entry.dateReceived)}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{formatDateLabel(entry.dateReceived)}</span>
+                                  {isUniversoCapped ? (
+                                    <span className="rounded-md border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                                      {t('cashbackHero.cashback.universoCapReachedLabel')}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <p className="text-sm font-semibold text-primary">+{formatCurrency(effectiveEntries.get(entry.id) ?? entry.amount, 'EUR')}</p>
+                                <div className="flex flex-col items-end leading-tight">
+                                  <p className="text-sm font-semibold text-primary">+{formatCurrency(effectiveEntryAmount, 'EUR')}</p>
+                                  {isUniversoCapped ? (
+                                    <p className="text-[11px] text-muted-foreground line-through">
+                                      +{formatCurrency(universoPotentialAmount, 'EUR')}
+                                    </p>
+                                  ) : null}
+                                </div>
                                 <div className="flex items-center gap-1 rounded-md border bg-muted/30 p-1">
                                   <Button
                                     variant="ghost"
@@ -848,7 +1129,8 @@ export default function CashbackHeroPage() {
                                 </div>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="mt-3 text-xs text-muted-foreground">{t('cashbackHero.cashback.noCashback')}</p>
@@ -877,6 +1159,8 @@ export default function CashbackHeroPage() {
         open={showAddPurchase}
         cardOptions={cards}
         activeContracts={activeContracts}
+        merchantCategoryHints={merchantCategoryHints}
+        merchantSuggestions={merchantSuggestions}
         onOpenChange={setShowAddPurchase}
         onSubmit={async (payload) => {
           const {
@@ -923,6 +1207,8 @@ export default function CashbackHeroPage() {
       <EditPurchaseDialog
         purchase={editingPurchase}
         cardOptions={cards}
+        merchantCategoryHints={merchantCategoryHints}
+        merchantSuggestions={merchantSuggestions}
         onOpenChange={(open) => { if (!open) setEditingPurchase(null); }}
         onSubmit={async (payload) => {
           if (!editingPurchase) return;
@@ -975,12 +1261,16 @@ function AddPurchaseDialog({
   open,
   cardOptions,
   activeContracts,
+  merchantCategoryHints,
+  merchantSuggestions,
   onOpenChange,
   onSubmit,
 }: {
   open: boolean;
   cardOptions: string[];
   activeContracts: Contract[];
+  merchantCategoryHints: MerchantCategoryHint[];
+  merchantSuggestions: string[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: {
     merchant: string;
@@ -1003,6 +1293,7 @@ function AddPurchaseDialog({
   const [isReferral, setIsReferral] = useState(false);
   const [linkToHomeExpense, setLinkToHomeExpense] = useState(false);
   const [linkedContractId, setLinkedContractId] = useState('');
+  const [categoryEditedManually, setCategoryEditedManually] = useState(false);
 
   const groupedActiveContracts = useMemo(() => {
     const sorted = [...activeContracts].sort((a, b) => {
@@ -1101,9 +1392,21 @@ function AddPurchaseDialog({
     setNotes('');
     setCardUsed('');
     setIsReferral(false);
+    setCategoryEditedManually(false);
     setLinkToHomeExpense(false);
     setLinkedContractId(activeContracts[0]?.id ?? '');
     onOpenChange(false);
+  };
+
+  const handleMerchantChange = (value: string) => {
+    setMerchant(value);
+
+    if (categoryEditedManually) return;
+
+    const suggested = inferCategoryFromMerchant(value, merchantCategoryHints);
+    if (suggested && suggested !== category) {
+      setCategory(suggested);
+    }
   };
 
   return (
@@ -1117,13 +1420,29 @@ function AddPurchaseDialog({
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.merchant')}</label>
-            <Input value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder={t('cashbackHero.form.merchant')} />
+            <Input
+              value={merchant}
+              onChange={(event) => handleMerchantChange(event.target.value)}
+              placeholder={t('cashbackHero.form.merchant')}
+              list="cashback-merchant-suggestions-add"
+            />
+            <datalist id="cashback-merchant-suggestions-add">
+              {merchantSuggestions.map((suggestion) => (
+                <option key={`add-${suggestion}`} value={suggestion} />
+              ))}
+            </datalist>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.category')}</label>
-              <Select value={category} onValueChange={(value) => setCategory(value as CashbackCategory)}>
+              <Select
+                value={category}
+                onValueChange={(value) => {
+                  setCategory(value as CashbackCategory);
+                  setCategoryEditedManually(true);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1484,11 +1803,15 @@ function AddCashbackDialog({
 function EditPurchaseDialog({
   purchase,
   cardOptions,
+  merchantCategoryHints,
+  merchantSuggestions,
   onOpenChange,
   onSubmit,
 }: {
   purchase: CashbackPurchase | null;
   cardOptions: string[];
+  merchantCategoryHints: MerchantCategoryHint[];
+  merchantSuggestions: string[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
 }) {
@@ -1500,6 +1823,7 @@ function EditPurchaseDialog({
   const [notes, setNotes] = useState('');
   const [cardUsed, setCardUsed] = useState('');
   const [isReferral, setIsReferral] = useState(false);
+  const [categoryEditedManually, setCategoryEditedManually] = useState(false);
   const availableCardOptions = useMemo(() => {
     if (!cardUsed.trim()) return cardOptions;
     return cardOptions.includes(cardUsed) ? cardOptions : [...cardOptions, cardUsed];
@@ -1515,8 +1839,20 @@ function EditPurchaseDialog({
       setNotes(stripCardFromNotes(purchase.notes));
       setCardUsed(extractCardFromNotes(purchase.notes));
       setIsReferral(purchase.isReferral ?? false);
+      setCategoryEditedManually(false);
     }
   }, [purchase]);
+
+  const handleMerchantChange = (value: string) => {
+    setMerchant(value);
+
+    if (categoryEditedManually) return;
+
+    const suggested = inferCategoryFromMerchant(value, merchantCategoryHints);
+    if (suggested && suggested !== category) {
+      setCategory(suggested);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -1564,13 +1900,29 @@ function EditPurchaseDialog({
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.merchant')}</label>
-            <Input value={merchant} onChange={(event) => setMerchant(event.target.value)} placeholder={t('cashbackHero.form.merchant')} />
+            <Input
+              value={merchant}
+              onChange={(event) => handleMerchantChange(event.target.value)}
+              placeholder={t('cashbackHero.form.merchant')}
+              list="cashback-merchant-suggestions-edit"
+            />
+            <datalist id="cashback-merchant-suggestions-edit">
+              {merchantSuggestions.map((suggestion) => (
+                <option key={`edit-${suggestion}`} value={suggestion} />
+              ))}
+            </datalist>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.category')}</label>
-              <Select value={category} onValueChange={(value) => setCategory(value as CashbackCategory)}>
+              <Select
+                value={category}
+                onValueChange={(value) => {
+                  setCategory(value as CashbackCategory);
+                  setCategoryEditedManually(true);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
