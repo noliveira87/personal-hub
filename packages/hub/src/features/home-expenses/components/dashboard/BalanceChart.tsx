@@ -27,13 +27,23 @@ export default function BalanceChart() {
   const currentYear = new Date().getFullYear();
 
   const chartData = useMemo(() => {
+    const yearTransactions = allTransactions.filter((tx) => parseLocalDate(tx.date).getFullYear() === selectedYear);
+
+    if (yearTransactions.length === 0) {
+      // Fallback: show current month with zero values if no data
+      const currentMonth = new Date().getMonth();
+      const monthName = MONTHS[currentMonth];
+      const translated = t(MONTH_KEYS[currentMonth]) || monthName;
+      return [{ name: translated.slice(0, 3), income: 0, expenses: 0, balance: 0 }];
+    }
+
     const visibleMonths = (() => {
       if (selectedYear !== currentYear) {
         return MONTHS.map((_, i) => i);
       }
 
       const expenseMonths = new Set<number>();
-      for (const tx of allTransactions) {
+      for (const tx of yearTransactions) {
         if (tx.type !== 'expense') continue;
         const d = parseLocalDate(tx.date);
         expenseMonths.add(d.getMonth());
@@ -45,9 +55,9 @@ export default function BalanceChart() {
 
     return visibleMonths.map((i) => {
       const name = MONTHS[i];
-      const monthTxs = allTransactions.filter((t) => {
+      const monthTxs = yearTransactions.filter((t) => {
         const d = parseLocalDate(t.date);
-        return d.getFullYear() === selectedYear && d.getMonth() === i;
+        return d.getMonth() === i;
       });
       const income = monthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
       const expenses = monthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
