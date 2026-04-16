@@ -471,20 +471,20 @@ export default function InsightsPage() {
                   formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
                   labelFormatter={(label) => String(label)}
                 />
-                {isElectricityScope && milestoneMarkers.map((marker, index) => (
+                {isElectricityScope && milestoneMarkers.map((marker) => (
                   <ReferenceLine
                     key={marker.id}
                     x={marker.month}
                     stroke="hsl(var(--warning))"
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
-                    label={index === milestoneMarkers.length - 1 ? {
-                      value: t('contracts.insights.solarInstallMarkerLabel'),
+                    label={{
+                      value: milestoneTypeLabel(marker.type),
                       position: 'insideTopRight',
                       fill: 'hsl(var(--warning))',
                       fontSize: 11,
                       fontWeight: 700,
-                    } : undefined}
+                    }}
                   />
                 ))}
                 <Line

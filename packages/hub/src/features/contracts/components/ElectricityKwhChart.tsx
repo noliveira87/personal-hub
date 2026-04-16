@@ -247,20 +247,20 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
                   label={{ value: 'kWh', angle: -90, position: 'insideLeft' }}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                {milestoneMarkers.map((milestone, index) => (
+                {milestoneMarkers.map((milestone) => (
                   <ReferenceLine
                     key={milestone.id}
                     x={milestone.month}
                     stroke="hsl(var(--warning))"
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
-                    label={index === milestoneMarkers.length - 1 ? {
-                      value: t('contracts.kwh.solarInstallMarkerLabel'),
+                    label={{
+                      value: milestoneTypeLabel(milestone.type),
                       position: 'insideTopRight',
                       fill: 'hsl(var(--warning))',
                       fontSize: 11,
                       fontWeight: 700,
-                    } : undefined}
+                    }}
                   />
                 ))}
                 {milestoneMarkers[0] && (
