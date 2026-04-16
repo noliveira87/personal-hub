@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
 interface Transaction {
@@ -29,6 +29,21 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   const { t } = useI18n();
   const [data, setData] = useState<KwhDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [solarInstallMonth, setSolarInstallMonth] = useState('');
+
+  const solarInstallStorageKey = useMemo(
+    () => `contracts:kwh:solar-install-month:${contractId}`,
+    [contractId],
+  );
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(solarInstallStorageKey);
+      setSolarInstallMonth(saved ?? '');
+    } catch {
+      setSolarInstallMonth('');
+    }
+  }, [solarInstallStorageKey]);
 
   useEffect(() => {
     async function loadKwhData() {
@@ -75,6 +90,32 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
     };
   }, [data]);
 
+  const solarInstallMarker = useMemo(() => {
+    if (!solarInstallMonth) return null;
+
+    const pointInMonth = data.find((point) => format(parseISO(point.date), 'yyyy-MM') === solarInstallMonth);
+    if (!pointInMonth) return null;
+
+    return {
+      month: pointInMonth.month,
+      label: format(parseISO(`${solarInstallMonth}-01`), 'MMM yyyy'),
+    };
+  }, [data, solarInstallMonth]);
+
+  const handleSolarInstallMonthChange = (value: string) => {
+    setSolarInstallMonth(value);
+
+    try {
+      if (value) {
+        localStorage.setItem(solarInstallStorageKey, value);
+      } else {
+        localStorage.removeItem(solarInstallStorageKey);
+      }
+    } catch {
+      // Ignore storage failures and keep in-memory value.
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
@@ -94,7 +135,18 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
 
   return (
     <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
-      <h2 className="text-sm font-semibold text-foreground mb-4">{t('contracts.kwh.title')}</h2>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-sm font-semibold text-foreground">{t('contracts.kwh.title')}</h2>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{t('contracts.kwh.solarInstallMonthLabel')}</span>
+          <input
+            type="month"
+            value={solarInstallMonth}
+            onChange={(event) => handleSolarInstallMonthChange(event.target.value)}
+            className="h-8 rounded-md border bg-background px-2 text-xs text-foreground"
+          />
+        </label>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -134,6 +186,20 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
                   label={{ value: 'kWh', angle: -90, position: 'insideLeft' }}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
+                {solarInstallMarker && (
+                  <ReferenceLine
+                    x={solarInstallMarker.month}
+                    stroke="hsl(var(--warning))"
+                    strokeWidth={2}
+                    strokeDasharray="5 4"
+                    label={{
+                      value: t('contracts.kwh.solarInstallMarkerLabel'),
+                      position: 'top',
+                      fill: 'hsl(var(--warning))',
+                      fontSize: 11,
+                    }}
+                  />
+                )}
                 <Line
                   type="monotone"
                   dataKey="kwh"
@@ -144,6 +210,11 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
               </LineChart>
             </ResponsiveContainer>
           </ChartContainer>
+          {solarInstallMonth && !solarInstallMarker && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t('contracts.kwh.solarInstallMonthNoData')}
+            </p>
+          )}
         </div>
       )}
 

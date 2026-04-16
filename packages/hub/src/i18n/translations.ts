@@ -366,6 +366,9 @@ export const translations = {
         average: "Média",
         min: "Mínimo",
         max: "Máximo",
+        solarInstallMonthLabel: "Mês de instalação painéis",
+        solarInstallMarkerLabel: "Painéis",
+        solarInstallMonthNoData: "Este mês não existe no gráfico atual. Escolhe um mês com consumo registado.",
       },
       waterConsumption: {
         title: "💧 Consumo de Água",
@@ -1678,6 +1681,9 @@ export const translations = {
         average: "Average",
         min: "Min",
         max: "Max",
+        solarInstallMonthLabel: "Solar panels install month",
+        solarInstallMarkerLabel: "Solar",
+        solarInstallMonthNoData: "This month does not exist in the current chart. Pick a month with recorded consumption.",
       },
       waterConsumption: {
         title: "💧 Water Consumption",
