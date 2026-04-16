@@ -29,6 +29,34 @@ ALTER TABLE contract_quotes
 CREATE INDEX IF NOT EXISTS contract_quotes_contract_id_idx
   ON contract_quotes(contract_id);
 
+-- Row Level Security
+ALTER TABLE public.contract_quotes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow select for anon and authenticated" ON public.contract_quotes;
+CREATE POLICY "Allow select for anon and authenticated"
+  ON public.contract_quotes FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Allow insert for anon and authenticated" ON public.contract_quotes;
+CREATE POLICY "Allow insert for anon and authenticated"
+  ON public.contract_quotes FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow update for anon and authenticated" ON public.contract_quotes;
+CREATE POLICY "Allow update for anon and authenticated"
+  ON public.contract_quotes FOR UPDATE
+  TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow delete for anon and authenticated" ON public.contract_quotes;
+CREATE POLICY "Allow delete for anon and authenticated"
+  ON public.contract_quotes FOR DELETE
+  TO anon, authenticated
+  USING (true);
+
 -- Storage bucket for contract quote PDFs
 -- Run in Supabase Dashboard > Storage > New bucket:
 --   Name: contract-quotes
