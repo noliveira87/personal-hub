@@ -184,6 +184,18 @@ export default function QuotesPage() {
     return c;
   }, [quotes]);
 
+  const approvedSummary = useMemo(() => {
+    const approvedQuotes = quotes.filter(q => q.approvalStatus === 'approved' && q.price != null);
+    const total = roundToCents(approvedQuotes.reduce((sum, q) => sum + (q.price ?? 0), 0));
+    const remaining = roundToCents(approvedQuotes.reduce((sum, q) => {
+      const r = computeRemainingToPay(q);
+      return sum + (r ?? 0);
+    }, 0));
+    const paid = roundToCents(total - remaining);
+    const currency = approvedQuotes[0]?.currency ?? 'EUR';
+    return { total, paid, remaining, currency, hasData: approvedQuotes.length > 0 };
+  }, [quotes]);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <AppSectionHeader
@@ -249,6 +261,36 @@ export default function QuotesPage() {
           </div>
         </div>
       </div>
+
+      {!loading && approvedSummary.hasData && (
+        <div className="rounded-xl border bg-card p-4 space-y-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('contracts.quotes.summaryApprovedTotal')}</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] text-muted-foreground">{t('contracts.quotes.summaryApprovedTotal')}</span>
+              <span className="text-base font-bold tabular-nums text-foreground">{formatCurrency(approvedSummary.total, approvedSummary.currency)}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] text-muted-foreground">{t('contracts.quotes.summaryPaid')}</span>
+              <span className="text-base font-bold tabular-nums text-success">{formatCurrency(approvedSummary.paid, approvedSummary.currency)}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] text-muted-foreground">{t('contracts.quotes.summaryRemainingTotal')}</span>
+              <span className={`text-base font-bold tabular-nums ${approvedSummary.remaining > 0 ? 'text-warning' : 'text-success'}`}>
+                {formatCurrency(approvedSummary.remaining, approvedSummary.currency)}
+              </span>
+            </div>
+          </div>
+          {approvedSummary.remaining > 0 && (
+            <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-success transition-all"
+                style={{ width: `${Math.min(100, (approvedSummary.paid / approvedSummary.total) * 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
