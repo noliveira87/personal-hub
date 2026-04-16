@@ -18,6 +18,7 @@ import {
   serializeInvestmentNotes,
 } from "@/features/portfolio/lib/crypto";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 const InvestmentDialog = lazy(() =>
   import("@/features/portfolio/components/InvestmentDialog").then((module) => ({ default: module.InvestmentDialog })),
@@ -53,32 +54,104 @@ const Index = () => {
   );
   const { pricesEur: cryptoSpotEur, loading: cryptoQuoteLoading } = useCryptoQuotes(hasCryptoInvestments);
   const earningsSectionRef = useRef<HTMLDivElement | null>(null);
+  const { confirm, confirmDialog } = useConfirmDialog();
+
+  const linkedCashbackByAsset = useMemo(() => {
+    return earnings.reduce<Record<'BTC' | 'ETH', Array<{ id: string; date: string; amountEur: number; units: number }>>>((acc, earning) => {
+      if (earning.externalSource !== 'cashback_hero' || earning.kind !== 'crypto_cashback') {
+        return acc;
+      }
+
+      if ((earning.cryptoAsset !== 'BTC' && earning.cryptoAsset !== 'ETH') || !earning.cryptoUnits || earning.cryptoUnits <= 0) {
+        return acc;
+      }
+
+      acc[earning.cryptoAsset].push({
+        id: `linked-cashback-entry:${earning.id}`,
+        date: earning.date,
+        amountEur: earning.amountEur,
+        units: earning.cryptoUnits,
+      });
+      return acc;
+    }, { BTC: [], ETH: [] });
+  }, [earnings]);
 
   const scrollToEarnings = () => {
     earningsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const resolvedInvestments = useMemo(() => {
-    return investments.map((investment) => ({
-      ...investment,
-      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
+  const resolveInvestmentWithLinkedCashback = (investment: Investment): Investment => {
+    if (investment.type !== 'crypto') {
+      return {
+        ...investment,
+        currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
+      };
+    }
+
+    const parsed = parseCryptoNotes(investment.notes);
+    const linkedEntries = linkedCashbackByAsset[parsed.cashbackAsset] ?? [];
+    if (linkedEntries.length <= 0) {
+      return {
+        ...investment,
+        currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
+      };
+    }
+
+    const shouldMergeLinkedCashback = investment.investedAmount === 0 && !parsed.units;
+    if (!shouldMergeLinkedCashback) {
+      return {
+        ...investment,
+        currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
+      };
+    }
+
+    const linkedUnits = linkedEntries.reduce((sum, item) => sum + item.units, 0);
+    const baseMovements = parseInvestmentMovements(investment.notes)
+      .filter((movement) => !movement.id.startsWith('linked-cashback-entry:'));
+    const linkedMovements = linkedEntries.map((item) => ({
+      id: item.id,
+      date: item.date,
+      kind: 'cashback' as const,
+      amount: item.amountEur,
+      units: item.units,
+      note: 'Synced from Reward Wallet',
     }));
-  }, [investments, cryptoSpotEur]);
+    const mergedMovements = [...baseMovements, ...linkedMovements]
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const mergedNotes = serializeInvestmentNotes({
+      asset: parsed.asset,
+      units: parsed.units,
+      cashbackAsset: parsed.cashbackAsset,
+      cashbackUnits: Math.round((((parsed.cashbackUnits ?? 0) + linkedUnits) * 1e8)) / 1e8,
+      cashbackDate: parsed.cashbackDate,
+      movements: mergedMovements,
+      userNotes: parsed.userNotes,
+    });
+
+    const mergedInvestment: Investment = {
+      ...investment,
+      notes: mergedNotes,
+    };
+
+    return {
+      ...mergedInvestment,
+      currentValue: resolveInvestmentCurrentValue(mergedInvestment, cryptoSpotEur),
+    };
+  };
+
+  const resolvedInvestments = useMemo(() => {
+    return investments.map((investment) => resolveInvestmentWithLinkedCashback(investment));
+  }, [investments, cryptoSpotEur, linkedCashbackByAsset]);
 
   const resolvedShortTerm = useMemo(
-    () => shortTerm.map((investment) => ({
-      ...investment,
-      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
-    })),
-    [shortTerm, cryptoSpotEur],
+    () => shortTerm.map((investment) => resolveInvestmentWithLinkedCashback(investment)),
+    [shortTerm, cryptoSpotEur, linkedCashbackByAsset],
   );
 
   const resolvedLongTerm = useMemo(
-    () => longTerm.map((investment) => ({
-      ...investment,
-      currentValue: resolveInvestmentCurrentValue(investment, cryptoSpotEur),
-    })),
-    [longTerm, cryptoSpotEur],
+    () => longTerm.map((investment) => resolveInvestmentWithLinkedCashback(investment)),
+    [longTerm, cryptoSpotEur, linkedCashbackByAsset],
   );
 
   const portfolioEarnings = useMemo(() => {
@@ -130,10 +203,14 @@ const Index = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Delete this investment?")) {
-      deleteInvestment(id);
-    }
+  const handleDelete = async (id: string) => {
+    const approved = await confirm({
+      title: "Delete this investment?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!approved) return;
+    deleteInvestment(id);
   };
 
   const handleSaveEarning = (data: Omit<PortfolioEarning, "id" | "createdAt" | "updatedAt">) => {
@@ -149,10 +226,18 @@ const Index = () => {
     setEarningDialogOpen(true);
   };
 
-  const handleDeleteEarning = (id: string) => {
-    if (window.confirm("Delete this earning?")) {
-      deleteEarning(id);
-    }
+  const handleDeleteEarning = async (id: string) => {
+    const approved = await confirm({
+      title: "Delete this earning?",
+      description: "This action cannot be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!approved) return;
+    deleteEarning(id);
+  };
+
+  const handleDeleteLinkedEarning = (id: string) => {
+    deleteEarning(id);
   };
 
   const handleQuickContribution = (
@@ -458,6 +543,7 @@ const Index = () => {
             investment={syncedEditingInvestment}
             cryptoSpotEur={cryptoSpotEur}
             onSave={handleSave}
+            onDeleteLinkedEarning={handleDeleteLinkedEarning}
           />
         </Suspense>
       ) : null}
@@ -473,6 +559,8 @@ const Index = () => {
           />
         </Suspense>
       ) : null}
+
+      {confirmDialog}
     </div>
   );
 };

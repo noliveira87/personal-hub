@@ -9,6 +9,7 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 import AppLoadingState from '@/components/AppLoadingState';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useLocation } from 'react-router-dom';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import {
   getSettingsPersistenceMode,
@@ -414,6 +415,7 @@ function CashbackSourcesCard({
   onRemove: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [newSource, setNewSource] = useState('');
   const [draftSources, setDraftSources] = useState<string[]>(sources);
   const [saving, setSaving] = useState(false);
@@ -517,7 +519,12 @@ function CashbackSourcesCard({
             <span className="text-[15px] leading-5">{source}</span>
             <button
               type="button"
-              onClick={() => setDraftSources((prev) => prev.filter((item) => item !== source))}
+              onClick={async () => {
+                if (!await confirm({ title: t('settingsPage.rewardWalletSourcesConfirmRemove', { source }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
+                  return;
+                }
+                setDraftSources((prev) => prev.filter((item) => item !== source));
+              }}
               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               aria-label={t('settingsPage.rewardWalletSourcesRemoveAria', { source })}
             >
@@ -531,6 +538,7 @@ function CashbackSourcesCard({
           </li>
         ) : null}
       </ul>
+      {confirmDialog}
     </div>
   );
 }
@@ -545,6 +553,7 @@ function CashbackCardsCard({
   onRemove: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [newCard, setNewCard] = useState('');
   const [draftCards, setDraftCards] = useState<string[]>(cards);
   const [saving, setSaving] = useState(false);
@@ -648,7 +657,12 @@ function CashbackCardsCard({
             <span className="text-[15px] leading-5">{card}</span>
             <button
               type="button"
-              onClick={() => setDraftCards((prev) => prev.filter((item) => item !== card))}
+              onClick={async () => {
+                if (!await confirm({ title: t('settingsPage.rewardWalletCardsConfirmRemove', { card }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
+                  return;
+                }
+                setDraftCards((prev) => prev.filter((item) => item !== card));
+              }}
               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               aria-label={t('settingsPage.rewardWalletCardsRemoveAria', { card })}
             >
@@ -662,6 +676,7 @@ function CashbackCardsCard({
           </li>
         ) : null}
       </ul>
+      {confirmDialog}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n/I18nProvider';
 import { toast } from '@/components/ui/sonner';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 type ContractViewCategory = 'cafofo' | 'apartamento' | 'carro' | 'outros';
 
@@ -210,6 +211,7 @@ function ChecklistRow({
 
 export default function Checklist() {
   const { t, formatCurrency } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const { contracts, updateContract } = useContracts();
   const { allTransactions, selectedYear, selectedMonth, loading } = useData();
   const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
@@ -618,7 +620,12 @@ export default function Checklist() {
                 currency={item.currency}
                 paid={paidSet.has(item.id)}
                 onToggle={() => togglePaid(item.id)}
-                onRemove={() => removeCustomItem(item.id)}
+                onRemove={async () => {
+                  if (!await confirm({ title: t('homeExpenses.checklist.confirmRemoveItem', { name: item.name }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
+                    return;
+                  }
+                  removeCustomItem(item.id);
+                }}
                 formatCurrency={formatCurrency}
               />
             ))}
@@ -627,6 +634,7 @@ export default function Checklist() {
           <p className="text-sm text-muted-foreground text-center py-4">{t('homeExpenses.checklist.emptyCustom')}</p>
         )}
       </section>
+      {confirmDialog}
     </div>
   );
 }

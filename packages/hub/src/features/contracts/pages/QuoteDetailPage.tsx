@@ -11,6 +11,7 @@ import { useContracts } from '@/features/contracts/context/ContractContext';
 import { deleteQuote, loadQuoteById } from '@/features/contracts/lib/quotes';
 import { ContractQuote } from '@/features/contracts/types/contract';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 const PAYMENT_TERMS_V2_PREFIX = '__payment_phases_v2__:';
 
@@ -112,6 +113,7 @@ export default function QuoteDetailPage() {
   const navigate = useNavigate();
   const { t, formatCurrency } = useI18n();
   const { contracts } = useContracts();
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const [quote, setQuote] = useState<ContractQuote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,7 @@ export default function QuoteDetailPage() {
 
   const handleDelete = async () => {
     if (!quote) return;
-    if (!window.confirm(t('contracts.quotes.confirmDelete'))) return;
+    if (!await confirm({ title: t('contracts.quotes.confirmDelete'), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) return;
 
     try {
       await deleteQuote(quote.id, quote.pdfUrl);
@@ -323,6 +325,7 @@ export default function QuoteDetailPage() {
           onSaved={handleSaved}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

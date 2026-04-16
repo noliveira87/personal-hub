@@ -9,6 +9,7 @@ import { FlightLeg, Trip, TripExpense, TripFood, TripHotel, TripTicket } from "@
 import { Header } from "@/features/trips/components/Header";
 import { useI18n } from "@/i18n/I18nProvider";
 import { supabase } from "@/lib/supabase";
+import { toast } from "@/components/ui/sonner";
 import { getTicketsTotal } from "@/features/trips/utils/totals";
 
 interface TripFormProps {
@@ -444,7 +445,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       setPhotos((prev) => [...prev, ...urls]);
     } catch (error) {
       console.error("Error uploading photos:", error);
-      alert(t("trips.photoUploadError"));
+      toast.error(t("trips.photoUploadError"));
     } finally {
       setIsUploading(false);
       event.target.value = "";
@@ -468,7 +469,7 @@ export function TripForm({ trip, onSave, onCancel }: TripFormProps) {
       setFoods((prev) => prev.map((food, i) => (i === index ? { ...food, image: imageUrl } : food)));
     } catch (error) {
       console.error("Error uploading food thumbnail:", error);
-      alert(t("trips.foodThumbnailUploadError"));
+      toast.error(t("trips.foodThumbnailUploadError"));
     } finally {
       setIsUploadingFoodThumb(false);
       event.target.value = "";

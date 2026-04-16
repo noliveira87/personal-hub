@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Upload, Image, Store, Package, CalendarDays, Clock, Tag, Banknote, X } from "lucide-react";
 import { calculateExpiration, deleteReceiptByUrl, type Warranty, type WarrantyCategory, uploadReceipt } from "@/lib/warranties";
 import { useI18n } from "@/i18n/I18nProvider";
+import { toast } from "@/components/ui/sonner";
 
 interface Props {
   warranty: Warranty;
@@ -126,7 +127,7 @@ export function EditWarrantyDialog({ warranty, open, onOpenChange, onSave }: Pro
         }
       }
       console.error("Error:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? t("warranties.errors.saveWithMessage", { message: error.message })
           : t("warranties.errors.save")

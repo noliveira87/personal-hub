@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trip } from "@/features/trips/types/trip";
 import { useI18n } from "@/i18n/I18nProvider";
 import { loadTrips } from "@/lib/trips";
+import { toast } from "@/components/ui/sonner";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import {
   JourneyBite,
   JourneyBiteInput,
@@ -91,6 +93,7 @@ export function JourneyBiteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, formatDate } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [item, setItem] = useState<JourneyBite | null>(null);
@@ -194,7 +197,7 @@ export function JourneyBiteDetail() {
     } catch (error) {
       console.error("Error uploading journey bite photo:", error);
       const message = error instanceof Error ? error.message : t("journeyBites.uploadError");
-      alert(message);
+      toast.error(message);
     } finally {
       setUploading(false);
       event.target.value = "";
@@ -206,7 +209,7 @@ export function JourneyBiteDetail() {
     if (!id) return;
 
     if (!form.tripId || !form.dishName.trim()) {
-      alert(t("journeyBites.requiredFields"));
+      toast.error(t("journeyBites.requiredFields"));
       return;
     }
 
@@ -217,7 +220,7 @@ export function JourneyBiteDetail() {
       setFormOpen(false);
     } catch (error) {
       console.error("Error updating journey bite:", error);
-      alert(t("journeyBites.saveError"));
+      toast.error(t("journeyBites.saveError"));
     } finally {
       setSaving(false);
     }
@@ -225,7 +228,7 @@ export function JourneyBiteDetail() {
 
   const handleDelete = async () => {
     if (!id) return;
-    const confirmed = window.confirm(t("journeyBites.confirmDelete"));
+    const confirmed = await confirm({ title: t("journeyBites.confirmDelete"), confirmLabel: t("common.delete"), cancelLabel: t("common.cancel") });
     if (!confirmed) return;
 
     setSaving(true);
@@ -234,7 +237,7 @@ export function JourneyBiteDetail() {
       navigate("/journey-bites");
     } catch (error) {
       console.error("Error deleting journey bite:", error);
-      alert(t("journeyBites.deleteError"));
+      toast.error(t("journeyBites.deleteError"));
     } finally {
       setSaving(false);
     }
@@ -565,6 +568,7 @@ export function JourneyBiteDetail() {
           </form>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   );
 }

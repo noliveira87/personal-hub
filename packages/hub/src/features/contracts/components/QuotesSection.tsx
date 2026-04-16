@@ -7,6 +7,7 @@ import { loadQuotesByContract, deleteQuote } from '@/features/contracts/lib/quot
 import { QuoteModal } from './QuoteModal';
 import { toast } from '@/components/ui/sonner';
 import { format, parseISO } from 'date-fns';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface QuotesSectionProps {
   contractId: string;
@@ -123,6 +124,7 @@ export function QuotesSection({
 }: QuotesSectionProps) {
   const { t, formatCurrency } = useI18n();
   const navigate = useNavigate();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [quotes, setQuotes] = useState<ContractQuote[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -173,7 +175,7 @@ export function QuotesSection({
   };
 
   const handleDelete = async (quote: ContractQuote) => {
-    if (!window.confirm(t('contracts.quotes.confirmDelete'))) return;
+    if (!await confirm({ title: t('contracts.quotes.confirmDelete'), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) return;
     try {
       await deleteQuote(quote.id, quote.pdfUrl);
       setQuotes(prev => prev.filter(q => q.id !== quote.id));
@@ -347,6 +349,7 @@ export function QuotesSection({
           onSaved={handleSaved}
         />
       )}
+      {confirmDialog}
     </>
   );
 }

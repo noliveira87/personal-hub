@@ -19,6 +19,8 @@ import {
   isInternationalTrip,
 } from "@/features/trips/utils/locations";
 import { useI18n } from "@/i18n/I18nProvider";
+import { toast } from "@/components/ui/sonner";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { getTripTotal } from "@/features/trips/utils/totals";
 import { loadJourneyBitePhotoThumbnailsByTrip } from "@/lib/journeyBites";
 
@@ -78,6 +80,7 @@ const buildTripChanges = (current: Trip, next: EditableTripFields): Partial<Edit
 
 export function TripsApp() {
   const { t, formatCurrency, language } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [biteThumbnailsByTrip, setBiteThumbnailsByTrip] = useState<Record<string, string[]>>({});
@@ -162,8 +165,12 @@ export function TripsApp() {
   }, [occurredTrips]);
 
   const handleDelete = async (id: string) => {
-    const confirmed = window.confirm(t("trips.confirmDelete"));
-    if (!confirmed) return;
+    const approved = await confirm({
+      title: t("trips.confirmDelete"),
+      confirmLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!approved) return;
 
     try {
       await deleteTrip(id);
@@ -176,7 +183,7 @@ export function TripsApp() {
       setSelectedTrip(null);
     } catch (error) {
       console.error("Error deleting trip:", error);
-      alert(t("trips.deleteError"));
+      toast.error(t("trips.deleteError"));
     }
   };
 
@@ -196,7 +203,7 @@ export function TripsApp() {
       setView("dashboard");
     } catch (error) {
       console.error("Error creating trip:", error);
-      alert(t("trips.createError"));
+      toast.error(t("trips.createError"));
     }
   };
 
@@ -226,7 +233,7 @@ export function TripsApp() {
       setView("detail");
     } catch (error) {
       console.error("Error updating trip:", error);
-      alert(t("trips.saveError"));
+      toast.error(t("trips.saveError"));
     }
   };
 
@@ -239,6 +246,7 @@ export function TripsApp() {
             <AppLoadingState label={t("trips.loadingTrips")} variant="cards" />
           </div>
         </main>
+        {confirmDialog}
       </>
     );
   }
@@ -265,6 +273,7 @@ export function TripsApp() {
           }}
           onEdit={() => handleEdit(current)}
         />
+        {confirmDialog}
       </>
     );
   }
@@ -446,6 +455,7 @@ export function TripsApp() {
           </AnimatePresence>
         </section>
       </main>
+      {confirmDialog}
     </>
   );
 }

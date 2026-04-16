@@ -121,12 +121,12 @@ export default function ContractForm() {
       const normalizedEndDate = form.noEndDate ? null : form.endDate;
 
       if (!form.noEndDate && !normalizedEndDate) {
-        alert(t('contracts.form.validation.endDateRequired'));
+        toast.error(t('contracts.form.validation.endDateRequired'));
         return;
       }
 
       if (normalizedEndDate && normalizedEndDate < form.startDate) {
-        alert(t('contracts.form.validation.endDateAfterStart'));
+        toast.error(t('contracts.form.validation.endDateAfterStart'));
         return;
       }
 
@@ -134,7 +134,7 @@ export default function ContractForm() {
         (alert) => alert.kind === 'specific-date' && (!alert.specificDate || !alert.reason?.trim()),
       );
       if (hasInvalidSpecificAlert) {
-        alert(t('contracts.form.validation.specificAlertRequiresDateAndReason'));
+        toast.error(t('contracts.form.validation.specificAlertRequiresDateAndReason'));
         return;
       }
 
@@ -155,7 +155,7 @@ export default function ContractForm() {
       navigate(`/contracts/${savedContract.id}`);
     } catch (err) {
       console.error('Error saving contract:', err);
-      alert(t('contracts.form.validation.saveFailed'));
+      toast.error(t('contracts.form.validation.saveFailed'));
     } finally {
       setSubmitting(false);
     }

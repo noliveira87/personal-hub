@@ -1,6 +1,16 @@
 import { useMemo, useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +26,17 @@ interface InvestmentDialogProps {
   investment?: Investment | null;
   cryptoSpotEur?: CryptoQuoteMap | null;
   onSave: (data: Omit<Investment, "id" | "createdAt" | "updatedAt">) => void;
+  onDeleteLinkedEarning?: (earningId: string) => void | Promise<void>;
 }
 
-export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur, onSave }: InvestmentDialogProps) {
+export function InvestmentDialog({
+  open,
+  onOpenChange,
+  investment,
+  cryptoSpotEur,
+  onSave,
+  onDeleteLinkedEarning,
+}: InvestmentDialogProps) {
   const parseNumericInput = (value: string) => {
     const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
     if (!normalized) return 0;
@@ -52,6 +70,8 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
   const [editingMovementAmount, setEditingMovementAmount] = useState("");
   const [editingMovementUnits, setEditingMovementUnits] = useState("");
   const [editingMovementNote, setEditingMovementNote] = useState("");
+  const [pendingRemoveMovement, setPendingRemoveMovement] = useState<InvestmentMovement | null>(null);
+  const [removingMovement, setRemovingMovement] = useState(false);
   // Track whether currentValue was manually edited by the user
   const [currentValueEditedByUser, setCurrentValueEditedByUser] = useState(false);
 
@@ -90,6 +110,8 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
       const months = Array.from(new Set(parsed.map((m) => m.date.slice(0, 7)))).sort();
       setHistoryMonth(months.length ? months[months.length - 1] : null);
       setEditingMovementId(null);
+      setPendingRemoveMovement(null);
+      setRemovingMovement(false);
       setCurrentValueEditedByUser(false);
     } else {
       setName("");
@@ -106,6 +128,8 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
       setNotes("");
       setMovements([]);
       setEditingMovementId(null);
+      setPendingRemoveMovement(null);
+      setRemovingMovement(false);
       setCurrentValueEditedByUser(false);
     }
   }, [investment, open]);
@@ -151,13 +175,33 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
     }
   };
 
-  const handleRemoveMovement = (id: string) => {
-    const removed = movements.find((m) => m.id === id);
-    if (!removed) return;
+  const handleRequestRemoveMovement = (movement: InvestmentMovement) => {
+    setPendingRemoveMovement(movement);
+  };
 
-    applyMovementImpact(removed, -1);
-    if (editingMovementId === id) setEditingMovementId(null);
-    setMovements((prev) => prev.filter((m) => m.id !== id));
+  const handleConfirmRemoveMovement = async () => {
+    if (!pendingRemoveMovement) return;
+
+    const removed = pendingRemoveMovement;
+    const id = removed.id;
+    const isLinkedCashbackMovement = id.startsWith("linked-cashback-entry:");
+
+    setRemovingMovement(true);
+    try {
+      if (isLinkedCashbackMovement) {
+        const earningId = id.replace("linked-cashback-entry:", "");
+        if (earningId && onDeleteLinkedEarning) {
+          await onDeleteLinkedEarning(earningId);
+        }
+      }
+
+      applyMovementImpact(removed, -1);
+      if (editingMovementId === id) setEditingMovementId(null);
+      setMovements((prev) => prev.filter((m) => m.id !== id));
+      setPendingRemoveMovement(null);
+    } finally {
+      setRemovingMovement(false);
+    }
   };
 
   const startEditMovement = (movement: InvestmentMovement) => {
@@ -225,7 +269,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
     // or by the user editing the field directly. Trust what's in the field.
     const finalCurrentValue = normalizedCurrentValue;
 
-    const allMovements = movements;
+    const allMovements = movements.filter((movement) => !movement.id.startsWith("linked-cashback-entry:"));
 
     onSave({
       name,
@@ -497,6 +541,7 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                 {visibleMovements.length ? (
                   <div className="space-y-2 rounded-lg bg-muted/30 p-3">
                     {visibleMovements.map((movement) => {
+                      const isLinkedCashbackMovement = movement.id.startsWith("linked-cashback-entry:");
                       const kindLabel: Record<string, string> = {
                         contribution: "Contribution",
                         withdrawal: "Withdrawal",
@@ -528,8 +573,10 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
                             {movement.note ? <p className="text-xs text-muted-foreground truncate">{movement.note}</p> : null}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => startEditMovement(movement)}>Edit</Button>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveMovement(movement.id)}>Remove</Button>
+                            {isLinkedCashbackMovement ? null : (
+                              <Button type="button" variant="ghost" size="sm" onClick={() => startEditMovement(movement)}>Edit</Button>
+                            )}
+                            <Button type="button" variant="ghost" size="sm" onClick={() => handleRequestRemoveMovement(movement)}>Remove</Button>
                           </div>
                           </div>
                           {editingMovementId === movement.id ? (
@@ -576,6 +623,38 @@ export function InvestmentDialog({ open, onOpenChange, investment, cryptoSpotEur
             <Button type="submit" className="w-full sm:w-auto">{investment ? "Save Changes" : "Add Investment"}</Button>
           </div>
         </form>
+
+        <AlertDialog
+          open={pendingRemoveMovement !== null}
+          onOpenChange={(openState) => {
+            if (!openState && !removingMovement) setPendingRemoveMovement(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pendingRemoveMovement?.id.startsWith("linked-cashback-entry:")
+                  ? "Remove synced cashback entry?"
+                  : "Remove movement?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingRemoveMovement?.id.startsWith("linked-cashback-entry:")
+                  ? "This action also deletes the cashback entry from Reward Wallet."
+                  : "This action cannot be undone."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={removingMovement}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => { void handleConfirmRemoveMovement(); }}
+                disabled={removingMovement}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {removingMovement ? "Removing..." : "Remove"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

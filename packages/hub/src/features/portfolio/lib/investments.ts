@@ -50,6 +50,7 @@ type CashbackHeroEntryRow = {
   id: string;
   source: string;
   amount: number | null;
+  points: number | null;
   date_received: string;
   created_at: string;
   updated_at: string;
@@ -62,6 +63,14 @@ const SOCIAL_MEDIA_NOTE_PREFIX = "KIND:social_media";
 const CASHBACK_HERO_CUTOFF_DATE = "2026-04-01";
 const CASHBACK_HERO_ENTRY_PREFIX = "cashback-entry:";
 const CASHBACK_HERO_CUTOFF_TS = Date.parse(`${CASHBACK_HERO_CUTOFF_DATE}T00:00:00Z`);
+
+function parseWhitebitAsset(source?: string | null): "BTC" | "ETH" | null {
+  if (!source) return null;
+  if (!/white\s*bit/i.test(source)) return null;
+  if (/eth/i.test(source)) return "ETH";
+  if (/btc/i.test(source)) return "BTC";
+  return "BTC";
+}
 
 function isOnOrAfterCashbackCutoff(rawDate?: string | null): boolean {
   if (!rawDate) return false;
@@ -304,7 +313,7 @@ export async function loadPortfolioEarningsFromDb(): Promise<PortfolioEarning[] 
 
   const { data: cashbackRows, error: cashbackError } = await supabase
     .from("cashback_entries")
-    .select("id, source, amount, date_received, created_at, updated_at, cashback_purchases(merchant)")
+    .select("id, source, amount, points, date_received, created_at, updated_at, cashback_purchases(merchant)")
     .gte("date_received", CASHBACK_HERO_CUTOFF_DATE)
     .order("date_received", { ascending: false });
 
@@ -314,21 +323,28 @@ export async function loadPortfolioEarningsFromDb(): Promise<PortfolioEarning[] 
   }
 
   const linkedCashbackRows = ((cashbackRows ?? []) as CashbackHeroEntryRow[])
-    .map((row): PortfolioEarning => ({
-      id: `${CASHBACK_HERO_ENTRY_PREFIX}${row.id}`,
-      title: row.cashback_purchases?.merchant ?? "Cashback",
-      provider: row.source,
-      kind: "cashback",
-      externalSource: "cashback_hero",
-      date: row.date_received,
-      amountEur: Number(row.amount ?? 0),
-      notes: undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      cryptoAsset: undefined,
-      cryptoUnits: null,
-      spotEurAtEarned: null,
-    }))
+    .map((row): PortfolioEarning => {
+      const amountEur = Number(row.amount ?? 0);
+      const parsedPoints = row.points != null ? Number(row.points) : null;
+      const cryptoAsset = parseWhitebitAsset(row.source);
+      const isWhitebitCrypto = cryptoAsset !== null && parsedPoints != null && Number.isFinite(parsedPoints) && parsedPoints > 0;
+
+      return {
+        id: `${CASHBACK_HERO_ENTRY_PREFIX}${row.id}`,
+        title: row.cashback_purchases?.merchant ?? "Cashback",
+        provider: row.source,
+        kind: isWhitebitCrypto ? "crypto_cashback" : "cashback",
+        externalSource: "cashback_hero",
+        date: row.date_received,
+        amountEur,
+        notes: undefined,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        cryptoAsset: isWhitebitCrypto ? cryptoAsset : undefined,
+        cryptoUnits: isWhitebitCrypto ? parsedPoints : null,
+        spotEurAtEarned: isWhitebitCrypto && parsedPoints ? Math.round((amountEur / parsedPoints) * 100) / 100 : null,
+      };
+    })
     .filter((entry) => entry.amountEur > 0);
 
   return [...legacyRows, ...linkedCashbackRows].sort((a, b) => b.date.localeCompare(a.date));
@@ -371,6 +387,21 @@ export async function upsertPortfolioEarningsInDb(earnings: PortfolioEarning[]):
 
 export async function deletePortfolioEarningFromDb(id: string): Promise<void> {
   if (!supabase) return;
+
+  if (id.startsWith(CASHBACK_HERO_ENTRY_PREFIX)) {
+    const cashbackEntryId = id.slice(CASHBACK_HERO_ENTRY_PREFIX.length);
+
+    const { error } = await supabase
+      .from("cashback_entries")
+      .delete()
+      .eq("id", cashbackEntryId);
+
+    if (error) {
+      console.error("Error deleting linked Reward Wallet cashback entry:", error);
+    }
+
+    return;
+  }
 
   const { error } = await supabase
     .from("portfolio_earnings")

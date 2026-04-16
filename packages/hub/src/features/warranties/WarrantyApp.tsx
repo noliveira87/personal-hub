@@ -22,6 +22,7 @@ import { ChevronDown, Plus, Search, ShieldCheck } from "lucide-react";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import { useSearchParams } from "react-router-dom";
 import { useI18n } from "@/i18n/I18nProvider";
+import { toast } from "@/components/ui/sonner";
 
 const FILTER_VALUES: Array<WarrantyStatus | "all"> = ["all", "active", "expiring", "expired"];
 const CATEGORY_FILTER_VALUES: Array<WarrantyCategory | "all"> = ["all", "tech", "appliances", "tools", "others"];
@@ -151,7 +152,7 @@ export function WarrantyApp() {
       setWarranties((prev) => prev.filter((w) => w.id !== id));
     } catch (error) {
       console.error("Error deleting warranty:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? t("warranties.errors.deleteWithMessage", { message: error.message })
           : t("warranties.errors.delete"),

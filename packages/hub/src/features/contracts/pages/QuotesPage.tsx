@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/sonner';
 import { format, parseISO } from 'date-fns';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 function getQuoteStatusBadgeClasses(status: ContractQuote['approvalStatus']) {
   if (status === 'approved') {
@@ -117,6 +118,7 @@ export default function QuotesPage() {
   const { t, formatCurrency } = useI18n();
   const navigate = useNavigate();
   const { contracts } = useContracts();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const [quotes, setQuotes] = useState<ContractQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -140,7 +142,7 @@ export default function QuotesPage() {
   const handleEdit = (q: ContractQuote) => { setEditingQuote(q); setModalOpen(true); };
 
   const handleDelete = async (q: ContractQuote) => {
-    if (!window.confirm(t('contracts.quotes.confirmDelete'))) return;
+    if (!await confirm({ title: t('contracts.quotes.confirmDelete'), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) return;
     try {
       await deleteQuote(q.id, q.pdfUrl);
       setQuotes(prev => prev.filter(x => x.id !== q.id));
@@ -372,6 +374,7 @@ export default function QuotesPage() {
           onSaved={handleSaved}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

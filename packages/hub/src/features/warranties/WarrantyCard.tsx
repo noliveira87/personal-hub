@@ -1,5 +1,15 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getStatus, getDaysLeft, type Warranty } from "@/lib/warranties";
 import { formatHiddenAmount, isHideAmountsEnabled } from "@/lib/moneyPrivacy";
@@ -20,6 +30,7 @@ export function WarrantyCard({ warranty, onDelete, onEdit, onArchive, onUnarchiv
   const { t, formatDate: formatDateValue } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const status = getStatus(warranty);
   const daysLeft = getDaysLeft(warranty);
   const categoryLabel = {
@@ -190,7 +201,7 @@ export function WarrantyCard({ warranty, onDelete, onEdit, onArchive, onUnarchiv
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDelete(warranty.id);
+                  setConfirmDeleteOpen(true);
                 }}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors active:scale-[0.96]"
               >
@@ -208,6 +219,29 @@ export function WarrantyCard({ warranty, onDelete, onEdit, onArchive, onUnarchiv
         onOpenChange={setEditOpen}
         onSave={onEdit}
       />
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent onClick={(event) => event.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("warranties.confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {warranty.productName}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDelete(warranty.id);
+                setConfirmDeleteOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("warranties.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

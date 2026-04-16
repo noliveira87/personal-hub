@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useCashbackSources } from '@/features/cashback-hero/use-cashback-sources';
 import { useCashbackCards } from '@/features/cashback-hero/use-cashback-cards';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,7 @@ import {
   getNextTier,
   UNIBANCO_TIERS,
 } from '@/features/cashback-hero/lib/cashback';
+import { useCryptoQuotes } from '@/features/portfolio/hooks/use-btc-quote';
 import { useOptionalContracts } from '@/features/contracts/context/ContractContext';
 import { mapContractCategoryToExpenseCategory } from '@/features/home-expenses/lib/contractMapping';
 import { insertTransaction } from '@/features/home-expenses/lib/store';
@@ -384,6 +386,7 @@ function getCashbackComponentSources(purchase: CashbackPurchase): string[] {
 
 function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, syncCetelemPurchase, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const contractsContext = useOptionalContracts();
   const contracts = contractsContext?.contracts ?? [];
@@ -948,7 +951,12 @@ function CashbackHeroPage() {
   }, [loading, purchases, syncUnibancoForMonths]);
 
   const requestDeletePurchase = async (id: string) => {
-    if (!window.confirm(t('cashbackHero.confirmDelete'))) return;
+    const approved = await confirm({
+      title: t('cashbackHero.confirmDelete'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+    });
+    if (!approved) return;
     try {
       const purchase = purchases.find((item) => item.id === id);
       await deletePurchase(id);
@@ -966,7 +974,12 @@ function CashbackHeroPage() {
   };
 
   const requestDeleteCashback = async (purchaseId: string, entryId: string) => {
-    if (!window.confirm(t('cashbackHero.cashback.deleteCashback'))) return;
+    const approved = await confirm({
+      title: t('cashbackHero.cashback.deleteCashback'),
+      confirmLabel: t('common.delete'),
+      cancelLabel: t('common.cancel'),
+    });
+    if (!approved) return;
     try {
       await deleteCashbackEntry(purchaseId, entryId);
       toast.success(t('cashbackHero.cashback.deleteCashback'));
@@ -1734,6 +1747,8 @@ function CashbackHeroPage() {
           }
         }}
       />
+
+      {confirmDialog}
     </div>
   );
 }
@@ -2059,20 +2074,29 @@ function AddCashbackDialog({
   const { t } = useI18n();
   const BYBIT_EUR_PER_POINT = 0.002455;
   const CURVE_CASH_DEFAULT_GBP_RATE = 0;
+  const WHITEBIT_ASSETS = ['BTC', 'ETH'] as const;
   const availableSources = useMemo(() => {
     const hasBybit = sources.some((value) => /bybit/i.test(value));
-    return hasBybit ? sources : [...sources, 'Bybit'];
+    const hasWhitebit = sources.some((value) => /white\s*bit/i.test(value));
+    let values = hasBybit ? sources : [...sources, 'Bybit'];
+    if (!hasWhitebit) values = [...values, 'WhiteBIT'];
+    return values;
   }, [sources]);
 
   const [source, setSource] = useState(() => availableSources[0] ?? '');
   const [amount, setAmount] = useState('');
   const [points, setPoints] = useState('');
   const [gbpAmount, setGbpAmount] = useState('');
+  const [whitebitAsset, setWhitebitAsset] = useState<(typeof WHITEBIT_ASSETS)[number]>('BTC');
+  const [whitebitAmount, setWhitebitAmount] = useState('');
   const [gbpEurRate, setGbpEurRate] = useState(CURVE_CASH_DEFAULT_GBP_RATE);
   const [dateReceived, setDateReceived] = useState(format(new Date(), 'yyyy-MM-dd'));
   const isEditing = editingEntry !== null;
   const isBybitSource = /bybit/i.test(source);
   const isCurveCashSource = /curve/i.test(source);
+  const isWhitebitSource = /white\s*bit/i.test(source);
+  const { pricesEur: cryptoPricesEur } = useCryptoQuotes(isWhitebitSource && open);
+  const whitebitEurRate = cryptoPricesEur[whitebitAsset] ?? 0;
 
   // Reset source when sources list changes and current is gone
   useEffect(() => {
@@ -2095,12 +2119,20 @@ function AddCashbackDialog({
           setPoints(String(inferredPoints));
         }
         setGbpAmount('');
+        setWhitebitAmount('');
       } else if (/curve/i.test(editingEntry.source)) {
         setPoints('');
         setGbpAmount(editingEntry.points != null ? String(editingEntry.points) : '');
+        setWhitebitAmount('');
+      } else if (/white\s*bit/i.test(editingEntry.source)) {
+        setPoints('');
+        setGbpAmount('');
+        setWhitebitAsset('BTC');
+        setWhitebitAmount(editingEntry.points != null ? String(editingEntry.points) : '');
       } else {
         setPoints('');
         setGbpAmount('');
+        setWhitebitAmount('');
       }
       setDateReceived(editingEntry.dateReceived);
       return;
@@ -2110,6 +2142,8 @@ function AddCashbackDialog({
     setAmount('');
     setPoints('');
     setGbpAmount('');
+    setWhitebitAsset('BTC');
+    setWhitebitAmount('');
     setDateReceived(format(new Date(), 'yyyy-MM-dd'));
   }, [open, editingEntry, availableSources, BYBIT_EUR_PER_POINT]);
 
@@ -2184,6 +2218,19 @@ function AddCashbackDialog({
     setAmount(Math.min(converted, maxAmount).toFixed(2));
   }, [isCurveCashSource, gbpAmount, gbpEurRate, targetPurchase]);
 
+  // Convert WhiteBIT crypto units (BTC/ETH) → EUR automatically
+  useEffect(() => {
+    if (!isWhitebitSource) return;
+    const parsed = Number(whitebitAmount.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed <= 0 || whitebitEurRate <= 0) {
+      if (whitebitAmount.trim() !== '') setAmount('');
+      return;
+    }
+    const converted = Math.round(parsed * whitebitEurRate * 100) / 100;
+    const maxAmount = targetPurchase && !targetPurchase.isReferral ? targetPurchase.amount : Number.POSITIVE_INFINITY;
+    setAmount(Math.min(converted, maxAmount).toFixed(2));
+  }, [isWhitebitSource, whitebitAmount, whitebitEurRate, targetPurchase]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     let parsedAmount = Number(amount.replace(',', '.'));
@@ -2205,6 +2252,18 @@ function AddCashbackDialog({
       }
       parsedPoints = parsedGbp;
       parsedAmount = Math.round(parsedGbp * gbpEurRate * 100) / 100;
+    } else if (isWhitebitSource && whitebitAmount.trim() !== '') {
+      const parsedCrypto = Number(whitebitAmount.replace(',', '.'));
+      if (!Number.isFinite(parsedCrypto) || parsedCrypto <= 0) {
+        toast.error(t('cashbackHero.cashback.whitebitCryptoAmountLabel'));
+        return;
+      }
+      if (!(whitebitEurRate > 0)) {
+        toast.error(t('cashbackHero.cashback.whitebitQuoteUnavailable'));
+        return;
+      }
+      parsedPoints = parsedCrypto;
+      parsedAmount = Math.round(parsedCrypto * whitebitEurRate * 100) / 100;
     }
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -2216,8 +2275,10 @@ function AddCashbackDialog({
       parsedAmount = Math.min(parsedAmount, targetPurchase.amount);
     }
 
+    const sourceToPersist = isWhitebitSource ? `WhiteBIT ${whitebitAsset}` : source;
+
     try {
-      await onSubmit({ source, amount: parsedAmount, points: parsedPoints, dateReceived });
+      await onSubmit({ source: sourceToPersist, amount: parsedAmount, points: parsedPoints, dateReceived });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(message);
@@ -2261,13 +2322,18 @@ function AddCashbackDialog({
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0.00"
-              readOnly={isBybitSource || isCurveCashSource}
+              readOnly={isBybitSource || isCurveCashSource || isWhitebitSource}
             />
             {isBybitSource ? (
               <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitConvertedHint')}</p>
             ) : null}
             {isCurveCashSource ? (
               <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashConvertedHint')} {gbpEurRate > 0 ? `• 1 £ ≈ €${gbpEurRate.toFixed(4)}` : null}</p>
+            ) : null}
+            {isWhitebitSource ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {t('cashbackHero.cashback.whitebitConvertedHint')} {whitebitEurRate > 0 ? `• 1 ${whitebitAsset} ≈ €${whitebitEurRate.toFixed(2)}` : null}
+              </p>
             ) : null}
           </div>
 
@@ -2296,6 +2362,34 @@ function AddCashbackDialog({
                 placeholder="0.00"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpHint')}</p>
+            </div>
+          ) : null}
+
+          {isWhitebitSource ? (
+            <div className="space-y-2">
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.whitebitAssetLabel')}</label>
+              <Select value={whitebitAsset} onValueChange={(value) => setWhitebitAsset(value as (typeof WHITEBIT_ASSETS)[number])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WHITEBIT_ASSETS.map((asset) => (
+                    <SelectItem key={asset} value={asset}>{asset}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.whitebitCryptoAmountLabel')}</label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={whitebitAmount}
+                  onChange={(event) => setWhitebitAmount(event.target.value)}
+                  placeholder="0.00"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.whitebitCryptoAmountHint')}</p>
+              </div>
             </div>
           ) : null}
 

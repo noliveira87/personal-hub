@@ -19,6 +19,8 @@ import ElectricityKwhChart from '@/features/contracts/components/ElectricityKwhC
 import WaterConsumptionChart from '@/features/contracts/components/WaterConsumptionChart';
 import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
 import { getContractCategoryIcon } from '@/features/contracts/types/contract';
+import { toast } from '@/components/ui/sonner';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 function formatAlertSummary(alert: { kind: 'days-before' | 'specific-date'; daysBefore: number; specificDate: string | null; reason: string | null }): string {
   if (alert.kind === 'specific-date') {
@@ -36,6 +38,7 @@ export default function ContractDetail() {
   const navigate = useNavigate();
   const { getContract, deleteContract } = useContracts();
   const { formatCurrency, t } = useI18n();
+  const { confirm, confirmDialog } = useConfirmDialog();
   const contract = getContract(id!);
   const [showPriceHistory, setShowPriceHistory] = useState(false);
 
@@ -56,13 +59,13 @@ export default function ContractDetail() {
   const urgency = getUrgencyLevel(getDaysUntilExpiry(contract));
 
   const handleDelete = async () => {
-    if (!window.confirm(t('contracts.detail.deleteDialog'))) return;
+    if (!await confirm({ title: t('contracts.detail.deleteDialog'), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) return;
     try {
       await deleteContract(contract.id);
       navigate('/contracts');
     } catch (err) {
       console.error('Error deleting contract:', err);
-      alert(t('contracts.detail.deleteFailed'));
+      toast.error(t('contracts.detail.deleteFailed'));
     }
   };
 
@@ -310,6 +313,7 @@ export default function ContractDetail() {
           onClose={() => setShowPriceHistory(false)}
         />
       ) : null}
+      {confirmDialog}
     </div>
   );
 }

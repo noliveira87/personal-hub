@@ -13,6 +13,7 @@ import { calculateExpiration, deleteReceiptByUrl, type Warranty, type WarrantyCa
 import { generateUUID } from "@/lib/utils";
 import { DEFAULT_WARRANTY_DEFAULTS_SETTINGS, loadWarrantyDefaultsSettings, type WarrantyDefaultsSettings } from "./lib/defaultSettings";
 import { useI18n } from "@/i18n/I18nProvider";
+import { toast } from "@/components/ui/sonner";
 
 interface Props {
   onAdd: (warranty: Warranty) => Promise<void> | void;
@@ -118,7 +119,7 @@ export function AddWarrantyDialog({ onAdd, trigger }: Props) {
         }
       }
       console.error("Error:", error);
-      alert(t("warranties.errors.upload"));
+      toast.error(t("warranties.errors.upload"));
     } finally {
       setIsUploading(false);
     }
