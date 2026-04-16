@@ -109,15 +109,22 @@ export default function InsightsPage() {
   }, [contracts]);
 
   const storedEnergyMilestones = useMemo(() => {
-    const global = getGlobalEnergyMilestones();
-    if (global.length > 0) return global;
+    const merged = electricityContractIds.flatMap((contractId) => getEnergyMilestonesForContract(contractId));
 
-    for (const contractId of electricityContractIds) {
-      const perContract = getEnergyMilestonesForContract(contractId);
-      if (perContract.length > 0) return perContract;
+    if (merged.length > 0) {
+      const byKey = new Map<string, (typeof merged)[number]>();
+      merged.forEach((milestone) => {
+        const dedupeKey = `${milestone.monthKey}:${milestone.type}`;
+        if (!byKey.has(dedupeKey)) {
+          byKey.set(dedupeKey, milestone);
+        }
+      });
+
+      return Array.from(byKey.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
     }
 
-    return [];
+    // Legacy fallback for older data where only the global value existed.
+    return getGlobalEnergyMilestones();
   }, [electricityContractIds]);
 
   const monthlyEvolutionData = useMemo(() => {
