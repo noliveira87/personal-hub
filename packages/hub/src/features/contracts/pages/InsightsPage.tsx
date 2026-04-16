@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
@@ -8,6 +8,7 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle } from '@/lib/chartTheme';
+import { getGlobalSolarInstallMonth, getSolarInstallMonthForContract } from '@/features/contracts/lib/solarInstallMonth';
 
 const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
 
@@ -20,18 +21,6 @@ export default function InsightsPage() {
   const { priceMap } = usePriceHistoryMap(contractIds);
   const [selectedScope, setSelectedScope] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [solarInstallMonth, setSolarInstallMonth] = useState<string>('');
-
-  const solarMarkerStorageKey = 'contracts:insights:electricity:solar-install-month';
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(solarMarkerStorageKey);
-      setSolarInstallMonth(saved ?? '');
-    } catch {
-      setSolarInstallMonth('');
-    }
-  }, []);
 
   const activeWithResolvedPrices = useMemo(() => {
     return active.map((contract) => {
@@ -112,6 +101,18 @@ export default function InsightsPage() {
       .map((contract) => contract.id);
   }, [contracts]);
 
+  const storedSolarInstallMonth = useMemo(() => {
+    const global = getGlobalSolarInstallMonth();
+    if (global) return global;
+
+    for (const contractId of electricityContractIds) {
+      const perContract = getSolarInstallMonthForContract(contractId);
+      if (perContract) return perContract;
+    }
+
+    return '';
+  }, [electricityContractIds]);
+
   const monthlyEvolutionData = useMemo(() => {
     const byMonth = new Map<number, number>();
 
@@ -163,30 +164,30 @@ export default function InsightsPage() {
   const isElectricityScope = selectedScope === 'category:electricity';
 
   const solarMarkerMonthLabel = useMemo(() => {
-    if (!isElectricityScope || solarInstallMonth === '') return null;
-    const markerIndex = Number(solarInstallMonth);
-    if (Number.isNaN(markerIndex)) return null;
-    return monthlyEvolutionData.find((point) => point.monthIndex === markerIndex)?.month ?? null;
-  }, [isElectricityScope, monthlyEvolutionData, solarInstallMonth]);
+    if (!isElectricityScope || storedSolarInstallMonth === '') return null;
 
-  const handleSolarInstallMonthChange = (nextValue: string) => {
-    setSolarInstallMonth(nextValue);
-
-    try {
-      if (nextValue) {
-        localStorage.setItem(solarMarkerStorageKey, nextValue);
-      } else {
-        localStorage.removeItem(solarMarkerStorageKey);
-      }
-    } catch {
-      // Ignore localStorage failures.
+    const [yearRaw, monthRaw] = storedSolarInstallMonth.split('-');
+    const markerYear = Number(yearRaw);
+    const markerMonth = Number(monthRaw);
+    if (Number.isNaN(markerYear) || Number.isNaN(markerMonth) || markerYear !== effectiveYear) {
+      return null;
     }
-  };
+
+    return monthlyEvolutionData.find((point) => point.monthIndex === markerMonth - 1)?.month ?? null;
+  }, [isElectricityScope, monthlyEvolutionData, storedSolarInstallMonth, effectiveYear]);
 
   const renderEvolutionDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { monthIndex: number } }) => {
     if (cx == null || cy == null) return null;
 
-    const isMarkerMonth = solarInstallMonth !== '' && Number(solarInstallMonth) === payload?.monthIndex;
+    const markerMonthIndex = (() => {
+      const [yearRaw, monthRaw] = storedSolarInstallMonth.split('-');
+      const markerYear = Number(yearRaw);
+      const markerMonth = Number(monthRaw);
+      if (Number.isNaN(markerYear) || Number.isNaN(markerMonth) || markerYear !== effectiveYear) return null;
+      return markerMonth - 1;
+    })();
+
+    const isMarkerMonth = markerMonthIndex != null && markerMonthIndex === payload?.monthIndex;
     if (isMarkerMonth) {
       return (
         <g>
@@ -254,25 +255,14 @@ export default function InsightsPage() {
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
-            {isElectricityScope && (
-              <select
-                value={solarInstallMonth}
-                onChange={(e) => handleSolarInstallMonthChange(e.target.value)}
-                className="h-9 rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="">{t('contracts.insights.solarInstallMonthPlaceholder')}</option>
-                {monthlyEvolutionData.map((point) => (
-                  <option key={point.monthIndex} value={String(point.monthIndex)}>
-                    {point.month}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
         </div>
 
-        {isElectricityScope && (
-          <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthLabel')}</p>
+        {isElectricityScope && storedSolarInstallMonth && (
+          <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthAutoLabel')}</p>
+        )}
+        {isElectricityScope && !storedSolarInstallMonth && (
+          <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthMissingLabel')}</p>
         )}
 
         {monthlyEvolutionData.some((point) => point.value != null) ? (

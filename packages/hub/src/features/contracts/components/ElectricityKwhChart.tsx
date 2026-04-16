@@ -4,6 +4,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
+import { getSolarInstallMonthForContract, setSolarInstallMonthForContract } from '@/features/contracts/lib/solarInstallMonth';
 
 interface Transaction {
   id: string;
@@ -32,19 +33,9 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   const [loading, setLoading] = useState(true);
   const [solarInstallMonth, setSolarInstallMonth] = useState('');
 
-  const solarInstallStorageKey = useMemo(
-    () => `contracts:kwh:solar-install-month:${contractId}`,
-    [contractId],
-  );
-
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(solarInstallStorageKey);
-      setSolarInstallMonth(saved ?? '');
-    } catch {
-      setSolarInstallMonth('');
-    }
-  }, [solarInstallStorageKey]);
+    setSolarInstallMonth(getSolarInstallMonthForContract(contractId));
+  }, [contractId]);
 
   useEffect(() => {
     async function loadKwhData() {
@@ -151,16 +142,7 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
 
   const handleSolarInstallMonthChange = (value: string) => {
     setSolarInstallMonth(value);
-
-    try {
-      if (value) {
-        localStorage.setItem(solarInstallStorageKey, value);
-      } else {
-        localStorage.removeItem(solarInstallStorageKey);
-      }
-    } catch {
-      // Ignore storage failures and keep in-memory value.
-    }
+    setSolarInstallMonthForContract(contractId, value);
   };
 
   const renderKwhDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: KwhDataPoint }) => {
