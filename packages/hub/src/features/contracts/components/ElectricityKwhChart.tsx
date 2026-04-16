@@ -14,6 +14,7 @@ interface Transaction {
 
 interface KwhDataPoint {
   date: string;
+  monthKey: string;
   month: string;
   kwh: number | null;
 }
@@ -60,6 +61,7 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
           .filter(t => t.kwh != null)
           .map(t => ({
             date: t.date,
+            monthKey: format(parseISO(t.date), 'yyyy-MM'),
             month: format(parseISO(t.date), 'MMM yy'),
             kwh: t.kwh,
           }));
@@ -93,12 +95,57 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   const solarInstallMarker = useMemo(() => {
     if (!solarInstallMonth) return null;
 
-    const pointInMonth = data.find((point) => format(parseISO(point.date), 'yyyy-MM') === solarInstallMonth);
+    const pointInMonth = data.find((point) => point.monthKey === solarInstallMonth);
     if (!pointInMonth) return null;
 
     return {
       month: pointInMonth.month,
       label: format(parseISO(`${solarInstallMonth}-01`), 'MMM yyyy'),
+    };
+  }, [data, solarInstallMonth]);
+
+  const solarInstallMonthOptions = useMemo(() => {
+    const unique = new Map<string, string>();
+    data.forEach((point) => {
+      if (!unique.has(point.monthKey)) {
+        unique.set(point.monthKey, format(parseISO(point.date), 'MMM yyyy'));
+      }
+    });
+
+    return Array.from(unique.entries()).map(([value, label]) => ({ value, label }));
+  }, [data]);
+
+  const solarComparison = useMemo(() => {
+    if (!solarInstallMonth) return null;
+
+    const before = data
+      .filter((point) => point.monthKey < solarInstallMonth && point.kwh != null)
+      .map((point) => point.kwh as number);
+    const after = data
+      .filter((point) => point.monthKey >= solarInstallMonth && point.kwh != null)
+      .map((point) => point.kwh as number);
+
+    if (before.length === 0 || after.length === 0) {
+      return {
+        hasData: false,
+        beforeAverage: 0,
+        afterAverage: 0,
+        delta: 0,
+        deltaPercent: null as number | null,
+      };
+    }
+
+    const beforeAverage = before.reduce((sum, value) => sum + value, 0) / before.length;
+    const afterAverage = after.reduce((sum, value) => sum + value, 0) / after.length;
+    const delta = afterAverage - beforeAverage;
+    const deltaPercent = beforeAverage > 0 ? (delta / beforeAverage) * 100 : null;
+
+    return {
+      hasData: true,
+      beforeAverage,
+      afterAverage,
+      delta,
+      deltaPercent,
     };
   }, [data, solarInstallMonth]);
 
@@ -137,15 +184,22 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
     <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold text-foreground">{t('contracts.kwh.title')}</h2>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{t('contracts.kwh.solarInstallMonthLabel')}</span>
-          <input
-            type="month"
-            value={solarInstallMonth}
-            onChange={(event) => handleSolarInstallMonthChange(event.target.value)}
-            className="h-8 rounded-md border bg-background px-2 text-xs text-foreground"
-          />
-        </label>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{t('contracts.kwh.solarInstallMonthLabel')}</span>
+            <select
+              value={solarInstallMonth}
+              onChange={(event) => handleSolarInstallMonthChange(event.target.value)}
+              className="h-8 min-w-44 rounded-md border bg-background px-2 text-xs text-foreground"
+            >
+              <option value="">{t('contracts.kwh.solarInstallMonthPlaceholder')}</option>
+              {solarInstallMonthOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.solarInstallMonthHelp')}</p>
+        </div>
       </div>
 
       {/* Stats */}
@@ -214,6 +268,32 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
             <p className="mt-2 text-xs text-muted-foreground">
               {t('contracts.kwh.solarInstallMonthNoData')}
             </p>
+          )}
+        </div>
+      )}
+
+      {solarInstallMonth && solarComparison && (
+        <div className="mt-4 rounded-lg border bg-muted/20 p-3">
+          {solarComparison.hasData ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div>
+                <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.solarComparisonBeforeAvg')}</p>
+                <p className="text-sm font-semibold tabular-nums text-foreground">{solarComparison.beforeAverage.toFixed(1)} kWh</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.solarComparisonAfterAvg')}</p>
+                <p className="text-sm font-semibold tabular-nums text-foreground">{solarComparison.afterAverage.toFixed(1)} kWh</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.solarComparisonDelta')}</p>
+                <p className={`text-sm font-semibold tabular-nums ${solarComparison.delta <= 0 ? 'text-success' : 'text-warning'}`}>
+                  {solarComparison.delta > 0 ? '+' : ''}{solarComparison.delta.toFixed(1)} kWh
+                  {solarComparison.deltaPercent != null ? ` (${solarComparison.deltaPercent > 0 ? '+' : ''}${solarComparison.deltaPercent.toFixed(1)}%)` : ''}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t('contracts.kwh.solarComparisonInsufficientData')}</p>
           )}
         </div>
       )}
