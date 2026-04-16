@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nProvider';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
 interface Transaction {
@@ -163,6 +163,22 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
     }
   };
 
+  const renderKwhDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: KwhDataPoint }) => {
+    if (cx == null || cy == null) return null;
+
+    const isInstallMonth = payload?.monthKey === solarInstallMonth;
+    if (isInstallMonth) {
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={8} fill="hsl(var(--background))" stroke="hsl(var(--warning))" strokeWidth={2.5} />
+          <circle cx={cx} cy={cy} r={4.5} fill="hsl(var(--warning))" />
+        </g>
+      );
+    }
+
+    return <circle cx={cx} cy={cy} r={3.5} fill="hsl(var(--primary))" />;
+  };
+
   if (loading) {
     return (
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '130ms' }}>
@@ -241,29 +257,46 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 {solarInstallMarker && (
-                  <ReferenceLine
-                    x={solarInstallMarker.month}
-                    stroke="hsl(var(--warning))"
-                    strokeWidth={2}
-                    strokeDasharray="5 4"
-                    label={{
-                      value: t('contracts.kwh.solarInstallMarkerLabel'),
-                      position: 'top',
-                      fill: 'hsl(var(--warning))',
-                      fontSize: 11,
-                    }}
-                  />
+                  <>
+                    <ReferenceArea
+                      x1={solarInstallMarker.month}
+                      x2={solarInstallMarker.month}
+                      fill="hsl(var(--warning))"
+                      fillOpacity={0.14}
+                    />
+                    <ReferenceLine
+                      x={solarInstallMarker.month}
+                      stroke="hsl(var(--warning))"
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                      label={{
+                        value: t('contracts.kwh.solarInstallMarkerLabel'),
+                        position: 'insideTopRight',
+                        fill: 'hsl(var(--warning))',
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                    />
+                  </>
                 )}
                 <Line
                   type="monotone"
                   dataKey="kwh"
                   stroke="hsl(var(--primary))"
-                  dot={{ fill: 'hsl(var(--primary))' }}
+                  dot={renderKwhDot}
                   strokeWidth={2}
                 />
               </LineChart>
             </ResponsiveContainer>
           </ChartContainer>
+          {solarInstallMarker && (
+            <div className="mt-2 inline-flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
+              <span className="h-2 w-2 rounded-full bg-warning" />
+              <span className="text-xs font-medium text-warning">
+                {t('contracts.kwh.solarInstallMarkerLabel')}: {solarInstallMarker.label}
+              </span>
+            </div>
+          )}
           {solarInstallMonth && !solarInstallMarker && (
             <p className="mt-2 text-xs text-muted-foreground">
               {t('contracts.kwh.solarInstallMonthNoData')}
