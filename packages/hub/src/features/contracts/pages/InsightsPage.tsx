@@ -253,6 +253,30 @@ export default function InsightsPage() {
     return t('contracts.kwh.milestoneTypeOther');
   };
 
+  const milestoneLineMarkers = useMemo(() => {
+    const byMonth = new Map<string, { month: string; monthKey: string; labels: string[] }>();
+
+    milestoneMarkers.forEach((milestone) => {
+      const existing = byMonth.get(milestone.monthKey);
+      const typeLabel = milestoneTypeLabel(milestone.type);
+
+      if (!existing) {
+        byMonth.set(milestone.monthKey, {
+          month: milestone.month,
+          monthKey: milestone.monthKey,
+          labels: [typeLabel],
+        });
+        return;
+      }
+
+      if (!existing.labels.includes(typeLabel)) {
+        existing.labels.push(typeLabel);
+      }
+    });
+
+    return Array.from(byMonth.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  }, [milestoneMarkers]);
+
   const startEditingMilestones = () => {
     setDraftMilestones(storedEnergyMilestones);
     setIsEditingMilestones(true);
@@ -471,15 +495,15 @@ export default function InsightsPage() {
                   formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
                   labelFormatter={(label) => String(label)}
                 />
-                {isElectricityScope && milestoneMarkers.map((marker) => (
+                {isElectricityScope && milestoneLineMarkers.map((marker) => (
                   <ReferenceLine
-                    key={marker.id}
+                    key={marker.monthKey}
                     x={marker.month}
                     stroke="hsl(var(--warning))"
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
                     label={{
-                      value: milestoneTypeLabel(marker.type),
+                      value: marker.labels.join(' + '),
                       position: 'insideTopRight',
                       fill: 'hsl(var(--warning))',
                       fontSize: 11,

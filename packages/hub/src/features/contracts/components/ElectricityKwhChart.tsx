@@ -155,6 +155,30 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
     return t('contracts.kwh.milestoneTypeOther');
   };
 
+  const milestoneLineMarkers = useMemo(() => {
+    const byMonth = new Map<string, { month: string; monthKey: string; labels: string[] }>();
+
+    milestoneMarkers.forEach((milestone) => {
+      const existing = byMonth.get(milestone.monthKey);
+      const typeLabel = milestoneTypeLabel(milestone.type);
+
+      if (!existing) {
+        byMonth.set(milestone.monthKey, {
+          month: milestone.month,
+          monthKey: milestone.monthKey,
+          labels: [typeLabel],
+        });
+        return;
+      }
+
+      if (!existing.labels.includes(typeLabel)) {
+        existing.labels.push(typeLabel);
+      }
+    });
+
+    return Array.from(byMonth.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  }, [milestoneMarkers]);
+
   const renderKwhDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: KwhDataPoint }) => {
     if (cx == null || cy == null) return null;
 
@@ -247,15 +271,15 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
                   label={{ value: 'kWh', angle: -90, position: 'insideLeft' }}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                {milestoneMarkers.map((milestone) => (
+                {milestoneLineMarkers.map((milestone) => (
                   <ReferenceLine
-                    key={milestone.id}
+                    key={milestone.monthKey}
                     x={milestone.month}
                     stroke="hsl(var(--warning))"
                     strokeWidth={2.5}
                     strokeDasharray="6 4"
                     label={{
-                      value: milestoneTypeLabel(milestone.type),
+                      value: milestone.labels.join(' + '),
                       position: 'insideTopRight',
                       fill: 'hsl(var(--warning))',
                       fontSize: 11,
@@ -263,10 +287,10 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
                     }}
                   />
                 ))}
-                {milestoneMarkers[0] && (
+                {milestoneLineMarkers[0] && (
                   <ReferenceArea
-                    x1={milestoneMarkers[0].month}
-                    x2={milestoneMarkers[0].month}
+                    x1={milestoneLineMarkers[0].month}
+                    x2={milestoneLineMarkers[0].month}
                     fill="hsl(var(--warning))"
                     fillOpacity={0.14}
                   />
