@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { CashbackEntry, CashbackPurchase } from '@/features/cashback-hero/types';
+import type { CetelemCardRules, UnibancoCardRules } from '@/features/cashback-hero/lib/cardRulesSettings';
 
 type CashbackPurchaseRow = {
   id: string;
@@ -36,6 +37,8 @@ const UNIBANCO_SOURCE = 'Unibanco';
 const UNIBANCO_CAMPAIGN_START = '2026-04-01';
 const UNIBANCO_CAMPAIGN_MONTHS = 12;
 const UNIBANCO_CAMPAIGN_CAP = 200;
+const DEFAULT_UNIBANCO_TOP_TIER_SPEND_CAP = 500;
+const DEFAULT_CETELEM_RATE = 0.03;
 
 function getMonthDateRange(monthKey: string): { start: string; endExclusive: string; monthEnd: string } {
   const [yearRaw, monthRaw] = monthKey.split('-');
@@ -55,11 +58,11 @@ function monthKeyFromDate(raw: string): string {
   return raw.slice(0, 7);
 }
 
-function isMonthWithinCampaign(monthKey: string): boolean {
+function isMonthWithinCampaign(monthKey: string, campaignStart: string, campaignMonths: number): boolean {
   const [y, m] = monthKey.split('-').map(Number);
-  const [startY, startM] = UNIBANCO_CAMPAIGN_START.slice(0, 7).split('-').map(Number);
+  const [startY, startM] = campaignStart.slice(0, 7).split('-').map(Number);
   const diff = (y - startY) * 12 + (m - startM);
-  return diff >= 0 && diff < UNIBANCO_CAMPAIGN_MONTHS;
+  return diff >= 0 && diff < campaignMonths;
 }
 
 export type UnibancoTier = { minSpend: number; cashback: number };
@@ -73,6 +76,29 @@ export const UNIBANCO_TIERS: UnibancoTier[] = [
 export const UNIBANCO_CAMPAIGN_MAX = UNIBANCO_CAMPAIGN_CAP;
 export const UNIBANCO_CAMPAIGN_START_DATE = UNIBANCO_CAMPAIGN_START;
 export const UNIBANCO_CAMPAIGN_TOTAL_MONTHS = UNIBANCO_CAMPAIGN_MONTHS;
+
+function normalizeUnibancoRules(rules?: Partial<UnibancoCardRules>) {
+  const campaignStart = /^\d{4}-\d{2}-\d{2}$/.test(rules?.campaignStart ?? '')
+    ? rules!.campaignStart
+    : UNIBANCO_CAMPAIGN_START;
+  const campaignMonths = Math.max(1, Math.round(rules?.campaignMonths ?? UNIBANCO_CAMPAIGN_MONTHS));
+  const annualCashbackCap = Math.max(0, rules?.annualCashbackCap ?? UNIBANCO_CAMPAIGN_CAP);
+  const topTierSpendCap = Math.max(0, rules?.topTierSpendCap ?? DEFAULT_UNIBANCO_TOP_TIER_SPEND_CAP);
+
+  return {
+    campaignStart,
+    campaignMonths,
+    annualCashbackCap,
+    topTierSpendCap,
+  };
+}
+
+function normalizeCetelemRules(rules?: Partial<CetelemCardRules>) {
+  const cashbackRate = Math.max(0, Math.min(1, rules?.cashbackRate ?? DEFAULT_CETELEM_RATE));
+  return {
+    cashbackRate,
+  };
+}
 
 export function getActiveTier(spent: number): UnibancoTier | null {
   return UNIBANCO_TIERS.find((t) => spent >= t.minSpend) ?? null;
@@ -366,12 +392,14 @@ export async function updateCashbackPurchase(
   }
 }
 
-export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<UnibancoSyncResult> {
+export async function syncUnibancoMonthlyCashback(monthKey: string, rules?: Partial<UnibancoCardRules>): Promise<UnibancoSyncResult> {
   if (!/^\d{4}-\d{2}$/.test(monthKey)) {
     throw new Error('Invalid month format. Expected YYYY-MM.');
   }
 
-  if (!isMonthWithinCampaign(monthKey)) {
+  const normalizedRules = normalizeUnibancoRules(rules);
+
+  if (!isMonthWithinCampaign(monthKey, normalizedRules.campaignStart, normalizedRules.campaignMonths)) {
     return {
       status: 'out-of-campaign',
       month: monthKey,
@@ -410,7 +438,7 @@ export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<Uni
     .from('cashback_entries')
     .select('amount, date_received')
     .eq('source', UNIBANCO_SOURCE)
-    .gte('date_received', UNIBANCO_CAMPAIGN_START)
+    .gte('date_received', normalizedRules.campaignStart)
     .lt('date_received', start);
 
   if (usedError) {
@@ -418,10 +446,10 @@ export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<Uni
   }
 
   const usedTotal = ((usedRows ?? []) as Array<{ amount: number | null; date_received: string }>)
-    .filter((row) => isMonthWithinCampaign(monthKeyFromDate(row.date_received)))
+    .filter((row) => isMonthWithinCampaign(monthKeyFromDate(row.date_received), normalizedRules.campaignStart, normalizedRules.campaignMonths))
     .reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
 
-  const remainingCap = Math.max(0, UNIBANCO_CAMPAIGN_CAP - usedTotal);
+  const remainingCap = Math.max(0, normalizedRules.annualCashbackCap - usedTotal);
   const finalCashback = Math.min(tierCashback, remainingCap);
 
   // Fetch all existing auto Unibanco entries for this month (any format/version).
@@ -467,9 +495,12 @@ export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<Uni
 
   // For the top tier (≥€500): cap cashback-earning spend at €500 — purchases beyond earn 0%.
   // For lower tiers: all spend qualifies, so cap = actual spent → effectively proportional.
-  const TOP_TIER_THRESHOLD = UNIBANCO_TIERS[0].minSpend; // 500
-  const distributionCap = activeTier!.minSpend === TOP_TIER_THRESHOLD && spent > TOP_TIER_THRESHOLD
-    ? TOP_TIER_THRESHOLD
+  const topTierThreshold = UNIBANCO_TIERS[0].minSpend;
+  const effectiveTopTierSpendCap = normalizedRules.topTierSpendCap > 0
+    ? normalizedRules.topTierSpendCap
+    : topTierThreshold;
+  const distributionCap = activeTier!.minSpend === topTierThreshold && spent > effectiveTopTierSpendCap
+    ? effectiveTopTierSpendCap
     : spent;
 
   const distributed = distributeWithTierCap(eligiblePurchases, distributionCap, finalCashback);
@@ -505,12 +536,17 @@ export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<Uni
   };
 }
 
-export async function syncCetelemCashback(purchaseId: string, purchase: CashbackPurchase): Promise<void> {
+export async function syncCetelemCashback(
+  purchaseId: string,
+  purchase: CashbackPurchase,
+  rules?: Partial<CetelemCardRules>,
+): Promise<void> {
   if (!purchase.isCetelem) {
     return;
   }
 
-  const cetelemCashback = purchase.amount * 0.03; // 3% cashback
+  const normalizedRules = normalizeCetelemRules(rules);
+  const cetelemCashback = purchase.amount * normalizedRules.cashbackRate;
   const now = new Date().toISOString();
   const entryId = `cetelem-cashback-${purchaseId}`;
 

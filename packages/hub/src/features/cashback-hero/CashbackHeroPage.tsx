@@ -66,6 +66,11 @@ import {
   loadCashbackChartMonths,
   persistCashbackChartMonths,
 } from '@/features/cashback-hero/lib/cashbackSettings';
+import {
+  DEFAULT_CASHBACK_CARD_RULES,
+  loadCashbackCardRulesSettings,
+  type CashbackCardRulesSettings,
+} from '@/features/cashback-hero/lib/cardRulesSettings';
 import { useCashbackStore } from '@/features/cashback-hero/use-cashback-store';
 import {
   createCashbackHomeExpenseLink,
@@ -121,12 +126,14 @@ function buildNotesWithCard(notes: string, cardUsed: string): string | undefined
   return combined || undefined;
 }
 
-function isUnibancoCard(cardUsed: string): boolean {
-  return /unibanco/i.test(cardUsed.trim());
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function isCetelemCard(cardUsed: string): boolean {
-  return /cetelem/i.test(cardUsed.trim());
+function isCardMatch(cardUsed: string, cardName: string): boolean {
+  if (!cardName.trim()) return false;
+  const pattern = new RegExp(escapeRegex(cardName.trim()), 'i');
+  return pattern.test(cardUsed.trim());
 }
 
 const CONTRACT_CATEGORY_ORDER: Record<Contract['category'], number> = {
@@ -173,16 +180,8 @@ function getEntryAmountForDisplay(entry: CashbackEntry): number {
   return entry.amount;
 }
 
-const UNIVERSO_SOURCE_REGEX = /universo/i;
-const UNIVERSO_CYCLE_CAP_EUR = 10;
-const UNIVERSO_DEFAULT_RATE = 0.05;
-const UNIBANCO_ANNUAL_CAP_EUR = 200;
 const UNIBANCO_ANNUAL_BASELINE_EUR = 50;
-const CETELEM_RATE = 0.03;
-const CETELEM_MONTHLY_CAP_EUR = 15;
-const CETELEM_ANNUAL_CAP_EUR = 120;
-
-function getUniversoCycleKey(dateRaw: string): string {
+function getUniversoCycleKey(dateRaw: string, statementDay: number): string {
   const parsed = parseISO(dateRaw);
   if (Number.isNaN(parsed.getTime())) {
     return dateRaw.slice(0, 7);
@@ -191,22 +190,22 @@ function getUniversoCycleKey(dateRaw: string): string {
   const year = parsed.getFullYear();
   const month = parsed.getMonth();
   const day = parsed.getDate();
-  const cycleAnchor = day >= 15
-    ? new Date(year, month, 15)
-    : new Date(year, month - 1, 15);
+  const normalizedStatementDay = Math.min(31, Math.max(1, statementDay));
+  const cycleAnchor = day >= normalizedStatementDay
+    ? new Date(year, month, normalizedStatementDay)
+    : new Date(year, month - 1, normalizedStatementDay);
 
   return format(cycleAnchor, 'yyyy-MM');
 }
 
-function getUniversoCycleRangeFromMonthKey(monthKey: string): { start: string; endExclusive: string } {
+function getUniversoCycleRangeFromMonthKey(monthKey: string, statementDay: number): { start: string; endExclusive: string } {
   const [yearRaw, monthRaw] = monthKey.split('-');
   const year = Number(yearRaw);
   const month = Number(monthRaw);
+  const normalizedStatementDay = Math.min(31, Math.max(1, statementDay));
 
-  // Cycle key '2026-03' means the cycle that starts on Mar 15 and ends on Apr 15,
-  // matching getUniversoCycleKey which anchors on the 15th of the same month for day >= 15.
-  const start = new Date(year, month - 1, 15);
-  const end = new Date(year, month, 15);
+  const start = new Date(year, month - 1, normalizedStatementDay);
+  const end = new Date(year, month, normalizedStatementDay);
 
   return {
     start: format(start, 'yyyy-MM-dd'),
@@ -214,18 +213,29 @@ function getUniversoCycleRangeFromMonthKey(monthKey: string): { start: string; e
   };
 }
 
-function getUniversoExpectedAmountForPurchase(purchase: CashbackPurchase): number {
+function getUniversoExpectedAmountForPurchase(purchase: CashbackPurchase, defaultRate: number): number {
   if (!Number.isFinite(purchase.amount) || purchase.amount <= 0) return 0;
-  return Math.round(purchase.amount * UNIVERSO_DEFAULT_RATE * 100) / 100;
+  return Math.round(purchase.amount * defaultRate * 100) / 100;
 }
 
-function getUniversoPotentialAmount(purchase: CashbackPurchase, entry: CashbackEntry): number {
+function getUniversoPotentialAmount(
+  purchase: CashbackPurchase,
+  entry: CashbackEntry,
+  defaultRate: number,
+): number {
   const raw = getEntryAmountForDisplay(entry);
-  const expected = getUniversoExpectedAmountForPurchase(purchase);
+  const expected = getUniversoExpectedAmountForPurchase(purchase, defaultRate);
   return Math.max(raw, expected);
 }
 
-function computeUniversoEntryCapMap(purchases: CashbackPurchase[]): Map<string, number> {
+function computeUniversoEntryCapMap(
+  purchases: CashbackPurchase[],
+  options: {
+    sourceRegex: RegExp;
+    cycleCapEur: number;
+    statementDay: number;
+  },
+): Map<string, number> {
   const universoEntries = purchases
     .flatMap((purchase) => purchase.cashbackEntries.map((entry) => ({
       entryId: entry.id,
@@ -235,9 +245,9 @@ function computeUniversoEntryCapMap(purchases: CashbackPurchase[]): Map<string, 
       purchaseDate: purchase.date,
       purchaseCreatedAt: purchase.createdAt ?? '',
       purchaseId: purchase.id,
-      cycleKey: getUniversoCycleKey(entry.dateReceived),
+      cycleKey: getUniversoCycleKey(entry.dateReceived, options.statementDay),
     })))
-    .filter((entry) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+    .filter((entry) => options.sourceRegex.test(entry.source))
     .sort((a, b) => (
       a.entryDate.localeCompare(b.entryDate)
       || a.purchaseDate.localeCompare(b.purchaseDate)
@@ -251,7 +261,7 @@ function computeUniversoEntryCapMap(purchases: CashbackPurchase[]): Map<string, 
 
   universoEntries.forEach((entry) => {
     const used = cycleUsage.get(entry.cycleKey) ?? 0;
-    const remaining = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - used);
+    const remaining = Math.max(0, options.cycleCapEur - used);
     const effectiveAmount = Math.max(0, Math.min(entry.rawAmount, remaining));
 
     capByEntryId.set(entry.entryId, effectiveAmount);
@@ -404,6 +414,32 @@ function CashbackHeroPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => monthKeyFromDate(new Date()));
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(5);
+  const [cashbackRules, setCashbackRules] = useState<CashbackCardRulesSettings>(DEFAULT_CASHBACK_CARD_RULES);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadCashbackCardRulesSettings().then((loaded) => {
+      if (!cancelled) {
+        setCashbackRules(loaded);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const universoSourceRegex = useMemo(
+    () => new RegExp(escapeRegex(cashbackRules.universo.sourceName), 'i'),
+    [cashbackRules.universo.sourceName],
+  );
+  const universoCycleCapEur = cashbackRules.universo.cycleCashbackCap;
+  const universoRate = cashbackRules.universo.cashbackRate;
+  const universoStatementDay = cashbackRules.universo.statementDay;
+  const unibancoAnnualCapEur = cashbackRules.unibanco.annualCashbackCap;
+  const unibancoTopTierSpendCap = cashbackRules.unibanco.topTierSpendCap;
+  const cetelemRate = cashbackRules.cetelem.cashbackRate;
+  const cetelemMonthlyCapEur = cashbackRules.cetelem.monthlyCashbackCap;
+  const cetelemAnnualCapEur = cashbackRules.cetelem.annualCashbackCap;
 
   const activeContracts = useMemo(
     () => contracts
@@ -458,7 +494,14 @@ function CashbackHeroPage() {
     [merchantCategoryHints],
   );
 
-  const cappedEntryAmounts = useMemo(() => computeUniversoEntryCapMap(purchases), [purchases]);
+  const cappedEntryAmounts = useMemo(
+    () => computeUniversoEntryCapMap(purchases, {
+      sourceRegex: universoSourceRegex,
+      cycleCapEur: universoCycleCapEur,
+      statementDay: universoStatementDay,
+    }),
+    [purchases, universoSourceRegex, universoCycleCapEur, universoStatementDay],
+  );
 
   const [chartMonths, setChartMonths] = useState<CashbackChartMonths>(12);
 
@@ -511,28 +554,28 @@ function CashbackHeroPage() {
     const today = format(new Date(), 'yyyy-MM-dd');
 
     const buildCycle = (cycleKey: string) => {
-      const cycleRange = getUniversoCycleRangeFromMonthKey(cycleKey);
+      const cycleRange = getUniversoCycleRangeFromMonthKey(cycleKey, universoStatementDay);
       // Skip future cycles that haven't started yet
       if (cycleRange.start > today) return null;
 
       const allInCycle = purchases
         .flatMap((p) => p.cashbackEntries.map((e) => ({ entry: e })))
-        .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+        .filter(({ entry }) => universoSourceRegex.test(entry.source))
         .filter(({ entry }) => entry.dateReceived >= cycleRange.start && entry.dateReceived < cycleRange.endExclusive);
 
       const effectiveTotal = allInCycle.reduce(
         (sum, { entry }) => sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry)), 0,
       );
-      const capReached = effectiveTotal + 0.0001 >= UNIVERSO_CYCLE_CAP_EUR;
-      const remaining = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - effectiveTotal);
-      const pct = Math.min(100, (effectiveTotal / UNIVERSO_CYCLE_CAP_EUR) * 100);
+      const capReached = effectiveTotal + 0.0001 >= universoCycleCapEur;
+      const remaining = Math.max(0, universoCycleCapEur - effectiveTotal);
+      const pct = universoCycleCapEur > 0 ? Math.min(100, (effectiveTotal / universoCycleCapEur) * 100) : 100;
       const cycleLabel = `${format(parseISO(cycleRange.start), 'dd/MM')}–${format(parseISO(cycleRange.endExclusive), 'dd/MM')}`;
       const isActive = today >= cycleRange.start && today < cycleRange.endExclusive;
       return { cycleKey, effectiveTotal, capReached, remaining, pct, cycleLabel, isActive };
     };
 
     return [buildCycle(cycleAKey), buildCycle(cycleBKey)].filter(Boolean) as NonNullable<ReturnType<typeof buildCycle>>[];
-  }, [selectedMonth, purchases, cappedEntryAmounts]);
+  }, [selectedMonth, purchases, cappedEntryAmounts, universoCycleCapEur, universoSourceRegex, universoStatementDay]);
 
   const unibancoStatus = useMemo(() => {
     if (selectedMonth === 'all') return null;
@@ -567,10 +610,10 @@ function CashbackHeroPage() {
       return sum + (tier?.cashback ?? 0);
     }, 0);
     const annualCashbackUsed = Math.min(
-      UNIBANCO_ANNUAL_CAP_EUR,
+      unibancoAnnualCapEur,
       UNIBANCO_ANNUAL_BASELINE_EUR + annualCashbackTracked + currentCashback,
     );
-    const annualCashbackRemaining = Math.max(0, UNIBANCO_ANNUAL_CAP_EUR - annualCashbackUsed);
+    const annualCashbackRemaining = Math.max(0, unibancoAnnualCapEur - annualCashbackUsed);
     
     // Calculate Unibanco cycle (1st to last day of month) and days remaining
     const [yearStr, monthStr] = selectedMonth.split('-');
@@ -599,7 +642,7 @@ function CashbackHeroPage() {
       annualCashbackUsed,
       annualCashbackRemaining,
     };
-  }, [selectedMonth, monthPurchases, purchases]);
+  }, [selectedMonth, monthPurchases, purchases, unibancoAnnualCapEur]);
 
   const cetelemStatus = useMemo(() => {
     if (selectedMonth === 'all') return null;
@@ -608,7 +651,7 @@ function CashbackHeroPage() {
     const yearlyCetelemPurchases = purchases
       .filter((p) => !(p.isReferral ?? false))
       .filter((p) => p.date.startsWith(`${yearStr}-`))
-      .filter((p) => isCetelemCard(extractCardFromNotes(p.notes)));
+      .filter((p) => isCardMatch(extractCardFromNotes(p.notes), cashbackRules.cetelem.cardName));
 
     if (yearlyCetelemPurchases.length === 0) return null;
 
@@ -627,15 +670,15 @@ function CashbackHeroPage() {
     let annualUsedToDate = 0;
     let currentMonthSpent = 0;
     let currentMonthCashback = 0;
-    let currentMonthCap = CETELEM_MONTHLY_CAP_EUR;
+    let currentMonthCap = cetelemMonthlyCapEur;
 
     sortedMonthKeys.forEach((monthKey) => {
       if (monthKey > selectedMonth) return;
 
       const spend = monthlySpend.get(monthKey) ?? 0;
-      const rawMonthCashback = Math.min(CETELEM_MONTHLY_CAP_EUR, spend * CETELEM_RATE);
-      const monthCapFromAnnual = Math.max(0, CETELEM_ANNUAL_CAP_EUR - annualUsedToDate);
-      const effectiveMonthCap = Math.min(CETELEM_MONTHLY_CAP_EUR, monthCapFromAnnual);
+      const rawMonthCashback = Math.min(cetelemMonthlyCapEur, spend * cetelemRate);
+      const monthCapFromAnnual = Math.max(0, cetelemAnnualCapEur - annualUsedToDate);
+      const effectiveMonthCap = Math.min(cetelemMonthlyCapEur, monthCapFromAnnual);
       const effectiveMonthCashback = Math.min(rawMonthCashback, effectiveMonthCap);
 
       if (monthKey === selectedMonth) {
@@ -648,11 +691,11 @@ function CashbackHeroPage() {
       annualUsedToDate += effectiveMonthCashback;
     });
 
-    const annualRemaining = Math.max(0, CETELEM_ANNUAL_CAP_EUR - annualUsedToDate);
+    const annualRemaining = Math.max(0, cetelemAnnualCapEur - annualUsedToDate);
     const monthlyPct = currentMonthCap > 0 ? Math.min(100, (currentMonthCashback / currentMonthCap) * 100) : 100;
     const monthlyRemainingCashback = Math.max(0, currentMonthCap - currentMonthCashback);
     const monthlyRemainingSpend = monthlyRemainingCashback > 0
-      ? monthlyRemainingCashback / CETELEM_RATE
+      ? monthlyRemainingCashback / cetelemRate
       : 0;
 
     return {
@@ -664,9 +707,9 @@ function CashbackHeroPage() {
       annualUsedBeforeCurrent,
       annualUsedToDate,
       annualRemaining,
-      annualPct: Math.min(100, (annualUsedToDate / CETELEM_ANNUAL_CAP_EUR) * 100),
+      annualPct: cetelemAnnualCapEur > 0 ? Math.min(100, (annualUsedToDate / cetelemAnnualCapEur) * 100) : 100,
     };
-  }, [selectedMonth, purchases]);
+  }, [selectedMonth, purchases, cashbackRules.cetelem.cardName, cetelemAnnualCapEur, cetelemMonthlyCapEur, cetelemRate]);
 
   const filteredPurchases = useMemo(() => {
     let result = [...monthPurchases];
@@ -753,7 +796,7 @@ function CashbackHeroPage() {
       const unibancoSpent = unibancoEligible.reduce((sum, p) => sum + p.amount, 0);
       const activeTier = getActiveTier(unibancoSpent);
       const nextTier = getNextTier(unibancoSpent);
-      const topTierThreshold = UNIBANCO_TIERS[0].minSpend; // 500
+      const topTierThreshold = unibancoTopTierSpendCap > 0 ? unibancoTopTierSpendCap : UNIBANCO_TIERS[0].minSpend;
 
       if (unibancoEligible.length === 0) {
         list.push(t('cashbackHero.insights.unibancoNoSpend', { min: String(UNIBANCO_TIERS[UNIBANCO_TIERS.length - 1].minSpend) }));
@@ -794,28 +837,28 @@ function CashbackHeroPage() {
       }
 
       // --- Universo cap insight (cycle 15 -> 15, cap €10) ---
-      const universoCycleRange = getUniversoCycleRangeFromMonthKey(selectedMonth);
+      const universoCycleRange = getUniversoCycleRangeFromMonthKey(selectedMonth, universoStatementDay);
       const universoEntriesInCycle = purchases
         .flatMap((purchase) => purchase.cashbackEntries.map((entry) => ({ purchase, entry })))
-        .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+        .filter(({ entry }) => universoSourceRegex.test(entry.source))
         .filter(({ entry }) => entry.dateReceived >= universoCycleRange.start && entry.dateReceived < universoCycleRange.endExclusive);
 
       const universoEffectiveTotal = universoEntriesInCycle.reduce((sum, { entry }) => {
         return sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry));
       }, 0);
-      const capReached = universoEffectiveTotal + 0.0001 >= UNIVERSO_CYCLE_CAP_EUR;
-      const remainingToCap = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - universoEffectiveTotal);
+      const capReached = universoEffectiveTotal + 0.0001 >= universoCycleCapEur;
+      const remainingToCap = Math.max(0, universoCycleCapEur - universoEffectiveTotal);
       const cycleLabel = `${format(parseISO(universoCycleRange.start), 'dd/MM')}–${format(parseISO(universoCycleRange.endExclusive), 'dd/MM')}`;
 
       if (capReached) {
         list.push(t('cashbackHero.insights.universoCapReached', {
           cycle: cycleLabel,
-          cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR'),
+          cap: formatCurrency(universoCycleCapEur, 'EUR'),
         }));
       } else {
         list.push(t('cashbackHero.insights.universoNoCapHit', {
           cycle: cycleLabel,
-          cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR'),
+          cap: formatCurrency(universoCycleCapEur, 'EUR'),
           used: formatCurrency(universoEffectiveTotal, 'EUR'),
           remaining: formatCurrency(remainingToCap, 'EUR'),
         }));
@@ -872,7 +915,19 @@ function CashbackHeroPage() {
     }
 
     return list;
-  }, [monthPurchases, selectedMonth, stats, formatCurrency, t, cappedEntryAmounts, purchases]);
+  }, [
+    monthPurchases,
+    selectedMonth,
+    stats,
+    formatCurrency,
+    t,
+    cappedEntryAmounts,
+    purchases,
+    universoCycleCapEur,
+    universoSourceRegex,
+    universoStatementDay,
+    unibancoTopTierSpendCap,
+  ]);
 
   const visibleInsights = useMemo(() => {
     return insights.slice(0, 5).map((line) => {
@@ -916,13 +971,13 @@ function CashbackHeroPage() {
     const uniqueMonths = [...new Set(monthKeys.filter((value) => /^\d{4}-\d{2}$/.test(value)))];
     for (const month of uniqueMonths) {
       try {
-        await syncUnibancoMonth(month);
+        await syncUnibancoMonth(month, cashbackRules.unibanco);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         toast.error(message);
       }
     }
-  }, [syncUnibancoMonth]);
+  }, [syncUnibancoMonth, cashbackRules.unibanco]);
 
   useEffect(() => {
     if (loading) return;
@@ -1153,7 +1208,7 @@ function CashbackHeroPage() {
                 <div className="mb-1 flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-foreground">Unibanco</span>
+                    <span className="text-xs font-medium text-foreground">{cashbackRules.unibanco.cardName}</span>
                   </div>
                   <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-1">
                     {unibancoStatus.daysRemaining > 0 && (
@@ -1180,7 +1235,7 @@ function CashbackHeroPage() {
                   <span className={cn('whitespace-nowrap font-medium text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
                     {t('cashbackHero.cardWidget.unibancoAnnualCapCompact', {
                       used: formatCurrency(unibancoStatus.annualCashbackUsed, 'EUR'),
-                      cap: formatCurrency(UNIBANCO_ANNUAL_CAP_EUR, 'EUR'),
+                      cap: formatCurrency(unibancoAnnualCapEur, 'EUR'),
                     })}
                   </span>
                 </div>
@@ -1212,11 +1267,11 @@ function CashbackHeroPage() {
                 <div className="mb-1 flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium text-foreground">Cetelem</span>
+                    <span className="text-xs font-medium text-foreground">{cashbackRules.cetelem.cardName}</span>
                   </div>
                   <div className="flex items-center justify-end">
                     <span className="whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                      3%
+                      {(cetelemRate * 100).toFixed(2).replace(/\.00$/, '')}%
                     </span>
                   </div>
                 </div>
@@ -1228,7 +1283,7 @@ function CashbackHeroPage() {
                   <span className={cn('whitespace-nowrap font-medium text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
                     {t('cashbackHero.cardWidget.cetelemAnnualCapCompact', {
                       used: formatCurrency(cetelemStatus.annualUsedToDate, 'EUR'),
-                      cap: formatCurrency(CETELEM_ANNUAL_CAP_EUR, 'EUR'),
+                      cap: formatCurrency(cetelemAnnualCapEur, 'EUR'),
                     })}
                   </span>
                 </div>
@@ -1260,7 +1315,7 @@ function CashbackHeroPage() {
               )}>
                 <div className="mb-2 flex items-center gap-1.5">
                   <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">Universo</span>
+                  <span className="text-xs font-medium text-foreground">{cashbackRules.universo.sourceName}</span>
                 </div>
                 <div className={cn(
                   compactProgressCards ? 'grid gap-2.5' : 'grid gap-3',
@@ -1297,7 +1352,7 @@ function CashbackHeroPage() {
                       <p className={cn('mb-1 tabular-nums font-bold text-foreground', compactProgressCards ? 'text-sm' : 'text-base')}>
                         {formatCurrency(cycle.effectiveTotal, 'EUR')}
                         <span className={cn('ml-1 font-normal text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
-                          / {formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR')}
+                          / {formatCurrency(universoCycleCapEur, 'EUR')}
                         </span>
                       </p>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -1308,7 +1363,7 @@ function CashbackHeroPage() {
                       </div>
                       <p className={cn('mt-1 text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
                         {cycle.capReached
-                          ? t('cashbackHero.cardWidget.universoCapReachedFull', { cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR') })
+                          ? t('cashbackHero.cardWidget.universoCapReachedFull', { cap: formatCurrency(universoCycleCapEur, 'EUR') })
                           : t('cashbackHero.cardWidget.universoRemaining', { remaining: formatCurrency(cycle.remaining, 'EUR') })}
                       </p>
                     </div>
@@ -1553,11 +1608,11 @@ function CashbackHeroPage() {
                           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('cashbackHero.cashback.purchaseCashbackTitle')}</p>
                           {purchase.cashbackEntries.map((entry) => {
                             const rawEntryAmount = getEntryAmountForDisplay(entry);
-                            const universoPotentialAmount = UNIVERSO_SOURCE_REGEX.test(entry.source)
-                              ? getUniversoPotentialAmount(purchase, entry)
+                            const universoPotentialAmount = universoSourceRegex.test(entry.source)
+                              ? getUniversoPotentialAmount(purchase, entry, universoRate)
                               : rawEntryAmount;
                             const effectiveEntryAmount = effectiveEntries.get(entry.id) ?? entry.amount;
-                            const isUniversoCapped = UNIVERSO_SOURCE_REGEX.test(entry.source)
+                            const isUniversoCapped = universoSourceRegex.test(entry.source)
                               && effectiveEntryAmount + 0.0001 < universoPotentialAmount;
 
                             return (
@@ -1638,6 +1693,8 @@ function CashbackHeroPage() {
       <AddPurchaseDialog
         open={showAddPurchase}
         cardOptions={cards}
+        unibancoCardName={cashbackRules.unibanco.cardName}
+        cetelemCardName={cashbackRules.cetelem.cardName}
         activeContracts={activeContracts}
         merchantCategoryHints={merchantCategoryHints}
         merchantSuggestions={merchantSuggestions}
@@ -1682,7 +1739,7 @@ function CashbackHeroPage() {
           }
 
           if (purchasePayload.isCetelem) {
-            await syncCetelemPurchase(savedPurchase.id, savedPurchase);
+            await syncCetelemPurchase(savedPurchase.id, savedPurchase, cashbackRules.cetelem);
           }
 
           toast.success(t('cashbackHero.addPurchase'));
@@ -1692,6 +1749,8 @@ function CashbackHeroPage() {
       <EditPurchaseDialog
         purchase={editingPurchase}
         cardOptions={cards}
+        unibancoCardName={cashbackRules.unibanco.cardName}
+        cetelemCardName={cashbackRules.cetelem.cardName}
         merchantCategoryHints={merchantCategoryHints}
         merchantSuggestions={merchantSuggestions}
         onOpenChange={(open) => { if (!open) setEditingPurchase(null); }}
@@ -1715,7 +1774,7 @@ function CashbackHeroPage() {
           if (editingPurchase.isCetelem || payload.isCetelem) {
             const updatedPurchase = purchases.find((p) => p.id === editingPurchase.id);
             if (updatedPurchase) {
-              await syncCetelemPurchase(editingPurchase.id, updatedPurchase);
+              await syncCetelemPurchase(editingPurchase.id, updatedPurchase, cashbackRules.cetelem);
             }
           }
 
@@ -1756,6 +1815,8 @@ function CashbackHeroPage() {
 function AddPurchaseDialog({
   open,
   cardOptions,
+  unibancoCardName,
+  cetelemCardName,
   activeContracts,
   merchantCategoryHints,
   merchantSuggestions,
@@ -1764,6 +1825,8 @@ function AddPurchaseDialog({
 }: {
   open: boolean;
   cardOptions: string[];
+  unibancoCardName: string;
+  cetelemCardName: string;
   activeContracts: Contract[];
   merchantCategoryHints: MerchantCategoryHint[];
   merchantSuggestions: string[];
@@ -1875,8 +1938,8 @@ function AddPurchaseDialog({
         amount: Math.max(parsedAmount, 0),
         notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
-        isUnibanco: !isReferral && isUnibancoCard(cardUsed),
-        isCetelem: !isReferral && isCetelemCard(cardUsed),
+        isUnibanco: !isReferral && isCardMatch(cardUsed, unibancoCardName),
+        isCetelem: !isReferral && isCardMatch(cardUsed, cetelemCardName),
         linkedHomeExpenseContractId: linkToHomeExpense ? linkedContractId : undefined,
       });
     } catch (error) {
@@ -2408,6 +2471,8 @@ function AddCashbackDialog({
 function EditPurchaseDialog({
   purchase,
   cardOptions,
+  unibancoCardName,
+  cetelemCardName,
   merchantCategoryHints,
   merchantSuggestions,
   onOpenChange,
@@ -2415,6 +2480,8 @@ function EditPurchaseDialog({
 }: {
   purchase: CashbackPurchase | null;
   cardOptions: string[];
+  unibancoCardName: string;
+  cetelemCardName: string;
   merchantCategoryHints: MerchantCategoryHint[];
   merchantSuggestions: string[];
   onOpenChange: (open: boolean) => void;
@@ -2486,8 +2553,8 @@ function EditPurchaseDialog({
         amount: Math.max(parsedAmount, 0),
         notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
-        isUnibanco: !isReferral && isUnibancoCard(cardUsed),
-        isCetelem: !isReferral && isCetelemCard(cardUsed),
+        isUnibanco: !isReferral && isCardMatch(cardUsed, unibancoCardName),
+        isCetelem: !isReferral && isCardMatch(cardUsed, cetelemCardName),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

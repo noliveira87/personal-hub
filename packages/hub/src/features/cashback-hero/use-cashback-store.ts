@@ -12,6 +12,7 @@ import {
   updateCashbackEntry,
   updateCashbackPurchase,
 } from '@/features/cashback-hero/lib/cashback';
+import type { CetelemCardRules, UnibancoCardRules } from '@/features/cashback-hero/lib/cardRulesSettings';
 
 export function useCashbackStore() {
   const [purchases, setPurchases] = useState<CashbackPurchase[]>([]);
@@ -99,14 +100,21 @@ export function useCashbackStore() {
     }));
   }, []);
 
-  const syncUnibancoMonth = useCallback(async (monthKey: string): Promise<UnibancoSyncResult> => {
-    const result = await syncUnibancoMonthlyCashback(monthKey);
+  const syncUnibancoMonth = useCallback(async (
+    monthKey: string,
+    rules?: Partial<UnibancoCardRules>,
+  ): Promise<UnibancoSyncResult> => {
+    const result = await syncUnibancoMonthlyCashback(monthKey, rules);
     await reload();
     return result;
   }, [reload]);
 
-  const syncCetelemPurchase = useCallback(async (purchaseId: string, purchase: CashbackPurchase) => {
-    await syncCetelemCashback(purchaseId, purchase);
+  const syncCetelemPurchase = useCallback(async (
+    purchaseId: string,
+    purchase: CashbackPurchase,
+    rules?: Partial<CetelemCardRules>,
+  ) => {
+    await syncCetelemCashback(purchaseId, purchase, rules);
     await reload();
   }, [reload]);
 
