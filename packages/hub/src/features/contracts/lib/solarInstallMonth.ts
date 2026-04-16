@@ -11,6 +11,11 @@ export interface EnergyMilestone {
   type: EnergyMilestoneType;
 }
 
+const DEFAULT_ENERGY_MILESTONES: EnergyMilestone[] = [
+  { id: 'default-solar-2025-06', monthKey: '2025-06', type: 'solar' },
+  { id: 'default-solar-expansion-2026-03', monthKey: '2026-03', type: 'solar-expansion' },
+];
+
 function safeGet(key: string): string {
   try {
     return localStorage.getItem(key) ?? '';
@@ -96,7 +101,10 @@ export function setEnergyMilestonesForContract(contractId: string, milestones: E
 }
 
 export function getGlobalEnergyMilestones(): EnergyMilestone[] {
-  return safeGetMilestones(GLOBAL_ENERGY_MILESTONES_KEY);
+  const stored = safeGetMilestones(GLOBAL_ENERGY_MILESTONES_KEY);
+  if (stored.length > 0) return stored;
+
+  return DEFAULT_ENERGY_MILESTONES.slice();
 }
 
 export function setGlobalEnergyMilestones(milestones: EnergyMilestone[]): void {
