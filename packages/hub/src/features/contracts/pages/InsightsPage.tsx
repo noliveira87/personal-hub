@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
@@ -15,8 +15,7 @@ import {
   type EnergyMilestone,
   type EnergyMilestoneType,
 } from '@/features/contracts/lib/solarInstallMonth';
-
-const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
+import InsightsCategoryChart from '@/features/contracts/pages/InsightsCategoryChart';
 
 export default function InsightsPage() {
   const { contracts, allPriceHistory } = useContracts();
@@ -360,9 +359,7 @@ export default function InsightsPage() {
       {/* By category chart */}
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '160ms' }}>
         <h2 className="text-sm font-semibold text-foreground mb-4">{t('contracts.insights.monthlyByCategory')}</h2>
-        <Suspense fallback={<div className="h-64 rounded-lg bg-muted/30 animate-pulse" />}>
-          <InsightsCategoryChart data={byCategory} />
-        </Suspense>
+        <InsightsCategoryChart data={byCategory} />
       </div>
 
       <div className="bg-card rounded-xl p-6 border animate-fade-up" style={{ animationDelay: '200ms' }}>
