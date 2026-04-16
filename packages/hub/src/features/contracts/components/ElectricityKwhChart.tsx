@@ -32,9 +32,13 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   const [data, setData] = useState<KwhDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [solarInstallMonth, setSolarInstallMonth] = useState('');
+  const [draftSolarInstallMonth, setDraftSolarInstallMonth] = useState('');
+  const [isEditingSolarInstallMonth, setIsEditingSolarInstallMonth] = useState(false);
 
   useEffect(() => {
-    setSolarInstallMonth(getSolarInstallMonthForContract(contractId));
+    const saved = getSolarInstallMonthForContract(contractId);
+    setSolarInstallMonth(saved);
+    setDraftSolarInstallMonth(saved);
   }, [contractId]);
 
   useEffect(() => {
@@ -140,9 +144,20 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
     };
   }, [data, solarInstallMonth]);
 
-  const handleSolarInstallMonthChange = (value: string) => {
-    setSolarInstallMonth(value);
-    setSolarInstallMonthForContract(contractId, value);
+  const startEditingSolarInstallMonth = () => {
+    setDraftSolarInstallMonth(solarInstallMonth);
+    setIsEditingSolarInstallMonth(true);
+  };
+
+  const cancelEditingSolarInstallMonth = () => {
+    setDraftSolarInstallMonth(solarInstallMonth);
+    setIsEditingSolarInstallMonth(false);
+  };
+
+  const saveSolarInstallMonth = () => {
+    setSolarInstallMonth(draftSolarInstallMonth);
+    setSolarInstallMonthForContract(contractId, draftSolarInstallMonth);
+    setIsEditingSolarInstallMonth(false);
   };
 
   const renderKwhDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: KwhDataPoint }) => {
@@ -183,19 +198,51 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold text-foreground">{t('contracts.kwh.title')}</h2>
         <div className="flex flex-col gap-1.5">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{t('contracts.kwh.solarInstallMonthLabel')}</span>
-            <select
-              value={solarInstallMonth}
-              onChange={(event) => handleSolarInstallMonthChange(event.target.value)}
-              className="h-8 min-w-44 rounded-md border bg-background px-2 text-xs text-foreground"
-            >
-              <option value="">{t('contracts.kwh.solarInstallMonthPlaceholder')}</option>
-              {solarInstallMonthOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
+          {isEditingSolarInstallMonth ? (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{t('contracts.kwh.solarInstallMonthLabel')}</span>
+                <select
+                  value={draftSolarInstallMonth}
+                  onChange={(event) => setDraftSolarInstallMonth(event.target.value)}
+                  className="h-8 min-w-44 rounded-md border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="">{t('contracts.kwh.solarInstallMonthPlaceholder')}</option>
+                  {solarInstallMonthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={saveSolarInstallMonth}
+                className="h-8 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary"
+              >
+                {t('common.save')}
+              </button>
+              <button
+                type="button"
+                onClick={cancelEditingSolarInstallMonth}
+                className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t('contracts.kwh.solarInstallMonthLabel')}:</span>
+              <span className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
+                {solarInstallMarker?.label ?? t('contracts.kwh.solarInstallMonthNotSet')}
+              </span>
+              <button
+                type="button"
+                onClick={startEditingSolarInstallMonth}
+                className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
+              >
+                {solarInstallMonth ? t('contracts.kwh.solarInstallMonthEdit') : t('contracts.kwh.solarInstallMonthSet')}
+              </button>
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.solarInstallMonthHelp')}</p>
         </div>
       </div>
