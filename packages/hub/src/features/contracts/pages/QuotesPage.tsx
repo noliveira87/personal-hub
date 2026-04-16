@@ -338,7 +338,7 @@ export default function QuotesPage() {
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-base font-semibold text-foreground leading-snug">{q.title}</p>
                     <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getQuoteStatusBadgeClasses(q.approvalStatus)}`}>
-                      {getQuoteApprovalSimpleLabel(q.approvalStatus)}
+                      {t('contracts.quotes.approvedSimpleLabel')}: {getQuoteApprovalSimpleLabel(q.approvalStatus)}
                     </span>
                   </div>
 
