@@ -8,7 +8,11 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle } from '@/lib/chartTheme';
-import { getGlobalSolarInstallMonth, getSolarInstallMonthForContract } from '@/features/contracts/lib/solarInstallMonth';
+import {
+  getGlobalEnergyMilestones,
+  getEnergyMilestonesForContract,
+  type EnergyMilestoneType,
+} from '@/features/contracts/lib/solarInstallMonth';
 
 const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
 
@@ -104,16 +108,16 @@ export default function InsightsPage() {
       .map((contract) => contract.id);
   }, [contracts]);
 
-  const storedSolarInstallMonth = useMemo(() => {
-    const global = getGlobalSolarInstallMonth();
-    if (global) return global;
+  const storedEnergyMilestones = useMemo(() => {
+    const global = getGlobalEnergyMilestones();
+    if (global.length > 0) return global;
 
     for (const contractId of electricityContractIds) {
-      const perContract = getSolarInstallMonthForContract(contractId);
-      if (perContract) return perContract;
+      const perContract = getEnergyMilestonesForContract(contractId);
+      if (perContract.length > 0) return perContract;
     }
 
-    return '';
+    return [];
   }, [electricityContractIds]);
 
   const monthlyEvolutionData = useMemo(() => {
@@ -183,16 +187,34 @@ export default function InsightsPage() {
   const chartCurrency = selectedContract?.currency ?? 'EUR';
   const isElectricityScope = selectedScope === 'category:electricity';
 
-  const solarMarkerMonthLabel = useMemo(() => {
-    if (!isElectricityScope || storedSolarInstallMonth === '') return null;
+  const milestoneMarkers = useMemo(() => {
+    if (!isElectricityScope) return [] as Array<{ id: string; month: string; monthKey: string; type: EnergyMilestoneType }>;
 
-    return monthlyEvolutionData.find((point) => point.monthKey === storedSolarInstallMonth)?.month ?? null;
-  }, [isElectricityScope, monthlyEvolutionData, storedSolarInstallMonth, effectiveYear]);
+    return storedEnergyMilestones
+      .map((milestone) => {
+        const point = monthlyEvolutionData.find((entry) => entry.monthKey === milestone.monthKey);
+        if (!point) return null;
+        return {
+          id: milestone.id,
+          month: point.month,
+          monthKey: milestone.monthKey,
+          type: milestone.type,
+        };
+      })
+      .filter((item): item is { id: string; month: string; monthKey: string; type: EnergyMilestoneType } => item != null);
+  }, [isElectricityScope, monthlyEvolutionData, storedEnergyMilestones]);
+
+  const milestoneTypeLabel = (type: EnergyMilestoneType) => {
+    if (type === 'solar') return t('contracts.kwh.milestoneTypeSolar');
+    if (type === 'solar-expansion') return t('contracts.kwh.milestoneTypeSolarExpansion');
+    if (type === 'battery') return t('contracts.kwh.milestoneTypeBattery');
+    return t('contracts.kwh.milestoneTypeOther');
+  };
 
   const renderEvolutionDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { monthKey: string } }) => {
     if (cx == null || cy == null) return null;
 
-    const isMarkerMonth = payload?.monthKey === storedSolarInstallMonth;
+    const isMarkerMonth = milestoneMarkers.some((milestone) => milestone.monthKey === payload?.monthKey);
     if (isMarkerMonth) {
       return (
         <g>
@@ -263,10 +285,10 @@ export default function InsightsPage() {
           </div>
         </div>
 
-        {isElectricityScope && storedSolarInstallMonth && (
+        {isElectricityScope && storedEnergyMilestones.length > 0 && (
           <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthAutoLabel')}</p>
         )}
-        {isElectricityScope && !storedSolarInstallMonth && (
+        {isElectricityScope && storedEnergyMilestones.length === 0 && (
           <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthMissingLabel')}</p>
         )}
 
@@ -290,21 +312,22 @@ export default function InsightsPage() {
                   formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
                   labelFormatter={(label) => String(label)}
                 />
-                {isElectricityScope && solarMarkerMonthLabel && (
+                {isElectricityScope && milestoneMarkers.map((marker, index) => (
                   <ReferenceLine
-                    x={solarMarkerMonthLabel}
+                    key={marker.id}
+                    x={marker.month}
                     stroke="hsl(var(--warning))"
-                    strokeWidth={3}
+                    strokeWidth={2.5}
                     strokeDasharray="6 4"
-                    label={{
+                    label={index === milestoneMarkers.length - 1 ? {
                       value: t('contracts.insights.solarInstallMarkerLabel'),
                       position: 'insideTopRight',
                       fill: 'hsl(var(--warning))',
                       fontSize: 11,
                       fontWeight: 700,
-                    }}
+                    } : undefined}
                   />
-                )}
+                ))}
                 <Line
                   type="monotone"
                   dataKey="value"
@@ -325,12 +348,16 @@ export default function InsightsPage() {
           </div>
         )}
 
-        {isElectricityScope && solarMarkerMonthLabel && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
-            <span className="h-2 w-2 rounded-full bg-warning" />
-            <span className="text-xs font-medium text-warning">
-              {t('contracts.insights.solarInstallMarkerLabel')}: {solarMarkerMonthLabel}
-            </span>
+        {isElectricityScope && milestoneMarkers.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {milestoneMarkers.map((marker) => (
+              <div key={marker.id} className="inline-flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
+                <span className="h-2 w-2 rounded-full bg-warning" />
+                <span className="text-xs font-medium text-warning">
+                  {milestoneTypeLabel(marker.type)}: {marker.month}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
