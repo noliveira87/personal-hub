@@ -32,15 +32,12 @@ drop policy if exists "Authenticated users can delete receipts" on storage.objec
 
 -- Allow upload/update/delete for anon + authenticated users.
 -- This project runs without per-user auth, so policies are bucket-scoped.
+-- No SELECT policy: filenames include a timestamp so upsert is never needed,
+-- and files are accessible by direct public URL without listing permissions.
 create policy "Anyone can upload receipts"
 on storage.objects for insert
 to anon, authenticated
 with check (bucket_id = 'receipts');
-
-create policy "Anyone can read receipts"
-on storage.objects for select
-to anon, authenticated
-using (bucket_id = 'receipts');
 
 create policy "Anyone can update receipts"
 on storage.objects for update

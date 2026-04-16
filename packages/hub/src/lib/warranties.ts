@@ -154,13 +154,13 @@ export async function uploadReceipt(
   const extension = fileToUpload.name.includes(".")
     ? fileToUpload.name.split(".").pop()?.toLowerCase()
     : undefined;
-  const fileName = `${baseName}-${warrantyId}${extension ? `.${extension}` : ""}`;
+  const timestamp = Date.now();
+  const fileName = `${baseName}-${warrantyId}-${timestamp}${extension ? `.${extension}` : ""}`;
 
   const { error } = await supabase.storage
     .from("receipts")
     .upload(fileName, fileToUpload, {
       contentType: fileToUpload.type || undefined,
-      upsert: true,
     });
 
   if (error) {
