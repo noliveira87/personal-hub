@@ -6,6 +6,7 @@ import {
   loadCashbackPurchases,
   removeCashbackEntry,
   removeCashbackPurchase,
+  syncCetelemCashback,
   syncUnibancoMonthlyCashback,
   UnibancoSyncResult,
   updateCashbackEntry,
@@ -104,6 +105,11 @@ export function useCashbackStore() {
     return result;
   }, [reload]);
 
+  const syncCetelemPurchase = useCallback(async (purchaseId: string, purchase: CashbackPurchase) => {
+    await syncCetelemCashback(purchaseId, purchase);
+    await reload();
+  }, [reload]);
+
   return {
     purchases,
     loading,
@@ -113,6 +119,7 @@ export function useCashbackStore() {
     addCashbackEntry,
     editCashbackEntry,
     syncUnibancoMonth,
+    syncCetelemPurchase,
     deletePurchase,
     deleteCashbackEntry,
     updatePurchase,

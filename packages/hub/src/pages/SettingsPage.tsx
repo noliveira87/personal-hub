@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Coins, Send, Settings, Bell, Moon, Sun, Eye, EyeOff, Plus, X } from 'lucide-react';
+import { Coins, Send, Settings, Bell, Moon, Sun, Eye, EyeOff, Plus, X, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -414,46 +414,110 @@ function CashbackSourcesCard({
   onRemove: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [newSource, setNewSource] = useState('');
+  const [draftSources, setDraftSources] = useState<string[]>(sources);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraftSources(sources);
+  }, [sources]);
+
+  const dirty = useMemo(() => {
+    if (draftSources.length !== sources.length) return true;
+    return draftSources.some((source, index) => source !== sources[index]);
+  }, [draftSources, sources]);
 
   const handleAdd = () => {
-    const value = inputRef.current?.value.trim() ?? '';
+    const value = newSource.trim();
     if (!value) return;
-    void onAdd(value);
-    if (inputRef.current) inputRef.current.value = '';
+    if (draftSources.some((source) => source.toLowerCase() === value.toLowerCase())) {
+      setNewSource('');
+      return;
+    }
+    setDraftSources((prev) => [...prev, value]);
+    setNewSource('');
+  };
+
+  const handleSave = async () => {
+    if (!dirty) return;
+    setSaving(true);
+    try {
+      const toRemove = sources.filter((source) => !draftSources.includes(source));
+      const toAdd = draftSources.filter((source) => !sources.includes(source));
+
+      for (const source of toRemove) {
+        await onRemove(source);
+      }
+      for (const source of toAdd) {
+        await onAdd(source);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReject = () => {
+    setDraftSources(sources);
+    setNewSource('');
   };
 
   return (
-    <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '200ms' }}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <Coins className="h-4 w-4 text-primary" />
+    <div className="animate-fade-up space-y-3 rounded-xl border bg-card p-4" style={{ animationDelay: '200ms' }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <Coins className="h-3.5 w-3.5 text-primary" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.rewardWalletSourcesTitle')}</h2>
           <p className="text-xs text-muted-foreground">{t('settingsPage.rewardWalletSourcesDescription')}</p>
         </div>
       </div>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={handleReject}
+            disabled={!dirty || saving}
+            aria-label={t('common.cancel')}
+            title={t('common.cancel')}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => { void handleSave(); }}
+            disabled={!dirty || saving}
+            aria-label={saving ? t('common.saving') : t('common.save')}
+            title={saving ? t('common.saving') : t('common.save')}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
 
       <div className="flex gap-2">
         <Input
-          ref={inputRef}
+          value={newSource}
+          onChange={(e) => setNewSource(e.target.value)}
           placeholder={t('settingsPage.rewardWalletSourcesPlaceholder')}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
-          className="flex-1"
+          className="h-9 flex-1"
         />
-        <Button onClick={handleAdd} size="sm" variant="outline">
+        <Button onClick={handleAdd} size="sm" variant="outline" className="h-9 px-3">
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
-      <ul className="space-y-1.5">
-        {sources.map((source) => (
-          <li key={source} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5">
-            <span className="text-sm">{source}</span>
+      <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+        {draftSources.map((source) => (
+          <li key={source} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2">
+            <span className="text-[15px] leading-5">{source}</span>
             <button
               type="button"
-              onClick={() => { void onRemove(source); }}
+              onClick={() => setDraftSources((prev) => prev.filter((item) => item !== source))}
               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               aria-label={t('settingsPage.rewardWalletSourcesRemoveAria', { source })}
             >
@@ -461,8 +525,8 @@ function CashbackSourcesCard({
             </button>
           </li>
         ))}
-        {sources.length === 0 ? (
-          <li className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+        {draftSources.length === 0 ? (
+          <li className="rounded-lg border border-dashed px-3 py-3 text-center text-sm text-muted-foreground">
             {t('settingsPage.rewardWalletSourcesEmpty')}
           </li>
         ) : null}
@@ -481,46 +545,110 @@ function CashbackCardsCard({
   onRemove: (name: string) => Promise<void>;
 }) {
   const { t } = useI18n();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [newCard, setNewCard] = useState('');
+  const [draftCards, setDraftCards] = useState<string[]>(cards);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setDraftCards(cards);
+  }, [cards]);
+
+  const dirty = useMemo(() => {
+    if (draftCards.length !== cards.length) return true;
+    return draftCards.some((card, index) => card !== cards[index]);
+  }, [draftCards, cards]);
 
   const handleAdd = () => {
-    const value = inputRef.current?.value.trim() ?? '';
+    const value = newCard.trim();
     if (!value) return;
-    void onAdd(value);
-    if (inputRef.current) inputRef.current.value = '';
+    if (draftCards.some((card) => card.toLowerCase() === value.toLowerCase())) {
+      setNewCard('');
+      return;
+    }
+    setDraftCards((prev) => [...prev, value]);
+    setNewCard('');
+  };
+
+  const handleSave = async () => {
+    if (!dirty) return;
+    setSaving(true);
+    try {
+      const toRemove = cards.filter((card) => !draftCards.includes(card));
+      const toAdd = draftCards.filter((card) => !cards.includes(card));
+
+      for (const card of toRemove) {
+        await onRemove(card);
+      }
+      for (const card of toAdd) {
+        await onAdd(card);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReject = () => {
+    setDraftCards(cards);
+    setNewCard('');
   };
 
   return (
-    <div className="animate-fade-up space-y-4 rounded-xl border bg-card p-6" style={{ animationDelay: '220ms' }}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <Coins className="h-4 w-4 text-primary" />
+    <div className="animate-fade-up space-y-3 rounded-xl border bg-card p-4" style={{ animationDelay: '220ms' }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <Coins className="h-3.5 w-3.5 text-primary" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-foreground">{t('settingsPage.rewardWalletCardsTitle')}</h2>
           <p className="text-xs text-muted-foreground">{t('settingsPage.rewardWalletCardsDescription')}</p>
         </div>
       </div>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={handleReject}
+            disabled={!dirty || saving}
+            aria-label={t('common.cancel')}
+            title={t('common.cancel')}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => { void handleSave(); }}
+            disabled={!dirty || saving}
+            aria-label={saving ? t('common.saving') : t('common.save')}
+            title={saving ? t('common.saving') : t('common.save')}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
 
       <div className="flex gap-2">
         <Input
-          ref={inputRef}
+          value={newCard}
+          onChange={(e) => setNewCard(e.target.value)}
           placeholder={t('settingsPage.rewardWalletCardsPlaceholder')}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
-          className="flex-1"
+          className="h-9 flex-1"
         />
-        <Button onClick={handleAdd} size="sm" variant="outline">
+        <Button onClick={handleAdd} size="sm" variant="outline" className="h-9 px-3">
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
-      <ul className="space-y-1.5">
-        {cards.map((card) => (
-          <li key={card} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5">
-            <span className="text-sm">{card}</span>
+      <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+        {draftCards.map((card) => (
+          <li key={card} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2">
+            <span className="text-[15px] leading-5">{card}</span>
             <button
               type="button"
-              onClick={() => { void onRemove(card); }}
+              onClick={() => setDraftCards((prev) => prev.filter((item) => item !== card))}
               className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               aria-label={t('settingsPage.rewardWalletCardsRemoveAria', { card })}
             >
@@ -528,8 +656,8 @@ function CashbackCardsCard({
             </button>
           </li>
         ))}
-        {cards.length === 0 ? (
-          <li className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
+        {draftCards.length === 0 ? (
+          <li className="rounded-lg border border-dashed px-3 py-3 text-center text-sm text-muted-foreground">
             {t('settingsPage.rewardWalletCardsEmpty')}
           </li>
         ) : null}

@@ -169,6 +169,7 @@ function mapPurchaseRow(row: CashbackPurchaseRow, entries: CashbackEntryRow[]): 
     notes: row.notes ?? undefined,
     isReferral: row.is_referral ?? false,
     isUnibanco: row.is_unibanco ?? false,
+    isCetelem: row.is_cetelem ?? false,
     createdAt: row.created_at,
     cashbackEntries: entries.map(mapEntryRow),
   };
@@ -205,6 +206,7 @@ export async function createCashbackPurchase(
       notes: purchase.notes ?? null,
       is_referral: purchase.isReferral ?? false,
       is_unibanco: purchase.isUnibanco ?? false,
+      is_cetelem: purchase.isCetelem ?? false,
       created_at: now,
       updated_at: now,
     }])
@@ -347,6 +349,8 @@ export async function updateCashbackPurchase(
       dbFields.is_referral = value;
     } else if (key === 'isUnibanco') {
       dbFields.is_unibanco = value;
+    } else if (key === 'isCetelem') {
+      dbFields.is_cetelem = value;
     } else {
       dbFields[key] = value;
     }
@@ -499,6 +503,44 @@ export async function syncUnibancoMonthlyCashback(monthKey: string): Promise<Uni
     spent,
     amount: finalCashback,
   };
+}
+
+export async function syncCetelemCashback(purchaseId: string, purchase: CashbackPurchase): Promise<void> {
+  if (!purchase.isCetelem) {
+    return;
+  }
+
+  const cetelemCashback = purchase.amount * 0.03; // 3% cashback
+  const now = new Date().toISOString();
+  const entryId = `cetelem-cashback-${purchaseId}`;
+
+  // Delete existing Cetelem entry for this purchase
+  const { error: deleteError } = await supabase
+    .from('cashback_entries')
+    .delete()
+    .eq('purchase_id', purchaseId)
+    .eq('source', 'Cetelem');
+
+  if (deleteError) {
+    throw new Error(formatSupabaseError('Failed to delete existing Cetelem entry', deleteError));
+  }
+
+  // Create new Cetelem entry with 3% cashback
+  const { error: insertError } = await supabase
+    .from('cashback_entries')
+    .insert([{
+      id: entryId,
+      purchase_id: purchaseId,
+      source: 'Cetelem',
+      amount: Math.round(cetelemCashback * 100) / 100, // Round to 2 decimals
+      date_received: purchase.date,
+      created_at: now,
+      updated_at: now,
+    }]);
+
+  if (insertError) {
+    throw new Error(formatSupabaseError('Failed to create Cetelem cashback entry', insertError));
+  }
 }
 
 // --- Sources ---

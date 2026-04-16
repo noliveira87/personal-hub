@@ -123,6 +123,10 @@ function isUnibancoCard(cardUsed: string): boolean {
   return /unibanco/i.test(cardUsed.trim());
 }
 
+function isCetelemCard(cardUsed: string): boolean {
+  return /cetelem/i.test(cardUsed.trim());
+}
+
 const CONTRACT_CATEGORY_ORDER: Record<Contract['category'], number> = {
   'mortgage': 0,
   'home-insurance': 1,
@@ -170,6 +174,11 @@ function getEntryAmountForDisplay(entry: CashbackEntry): number {
 const UNIVERSO_SOURCE_REGEX = /universo/i;
 const UNIVERSO_CYCLE_CAP_EUR = 10;
 const UNIVERSO_DEFAULT_RATE = 0.05;
+const UNIBANCO_ANNUAL_CAP_EUR = 200;
+const UNIBANCO_ANNUAL_BASELINE_EUR = 50;
+const CETELEM_RATE = 0.03;
+const CETELEM_MONTHLY_CAP_EUR = 15;
+const CETELEM_ANNUAL_CAP_EUR = 120;
 
 function getUniversoCycleKey(dateRaw: string): string {
   const parsed = parseISO(dateRaw);
@@ -375,7 +384,7 @@ function getCashbackComponentSources(purchase: CashbackPurchase): string[] {
 
 function CashbackHeroPage() {
   const { formatCurrency, t } = useI18n();
-  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
+  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, syncCetelemPurchase, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const contractsContext = useOptionalContracts();
   const contracts = contractsContext?.contracts ?? [];
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
@@ -483,35 +492,44 @@ function CashbackHeroPage() {
   const universoCycles = useMemo(() => {
     if (selectedMonth === 'all') return [];
 
-    // Collect all Universo entries from purchases in the selected month
-    const universoEntries = monthPurchases
-      .flatMap((p) => p.cashbackEntries.map((e) => ({ entry: e })))
-      .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source));
+    // A calendar month always overlaps with exactly 2 Universo cycles:
+    // - Cycle A: starts on 15th of the PREVIOUS month (covers days 1–14 of selected month)
+    // - Cycle B: starts on 15th of the CURRENT month (covers days 15–end of selected month)
+    // We always show both, even if a cycle has no entries yet.
+    const [yearStr, monthStr] = selectedMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10); // 1-based
 
-    if (universoEntries.length === 0) return [];
+    // Cycle A key: previous month in yyyy-MM format
+    const cycleAKey = format(new Date(year, month - 2, 1), 'yyyy-MM');
+    // Cycle B key: current month
+    const cycleBKey = selectedMonth;
 
-    // Find the unique cycle keys these entries belong to
-    const cycleKeys = Array.from(new Set(universoEntries.map(({ entry }) => getUniversoCycleKey(entry.dateReceived))));
+    const today = format(new Date(), 'yyyy-MM-dd');
 
-    // For each cycle key, compute full cycle metrics using ALL purchases (cycle spans months)
-    return cycleKeys
-      .map((cycleKey) => {
-        const cycleRange = getUniversoCycleRangeFromMonthKey(cycleKey);
-        const allInCycle = purchases
-          .flatMap((p) => p.cashbackEntries.map((e) => ({ entry: e })))
-          .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source))
-          .filter(({ entry }) => entry.dateReceived >= cycleRange.start && entry.dateReceived < cycleRange.endExclusive);
-        const effectiveTotal = allInCycle.reduce(
-          (sum, { entry }) => sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry)), 0,
-        );
-        const capReached = effectiveTotal + 0.0001 >= UNIVERSO_CYCLE_CAP_EUR;
-        const remaining = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - effectiveTotal);
-        const pct = Math.min(100, (effectiveTotal / UNIVERSO_CYCLE_CAP_EUR) * 100);
-        const cycleLabel = `${format(parseISO(cycleRange.start), 'dd/MM')}\u2013${format(parseISO(cycleRange.endExclusive), 'dd/MM')}`;
-        return { cycleKey, effectiveTotal, capReached, remaining, pct, cycleLabel };
-      })
-      .sort((a, b) => a.cycleKey.localeCompare(b.cycleKey));
-  }, [selectedMonth, monthPurchases, purchases, cappedEntryAmounts]);
+    const buildCycle = (cycleKey: string) => {
+      const cycleRange = getUniversoCycleRangeFromMonthKey(cycleKey);
+      // Skip future cycles that haven't started yet
+      if (cycleRange.start > today) return null;
+
+      const allInCycle = purchases
+        .flatMap((p) => p.cashbackEntries.map((e) => ({ entry: e })))
+        .filter(({ entry }) => UNIVERSO_SOURCE_REGEX.test(entry.source))
+        .filter(({ entry }) => entry.dateReceived >= cycleRange.start && entry.dateReceived < cycleRange.endExclusive);
+
+      const effectiveTotal = allInCycle.reduce(
+        (sum, { entry }) => sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry)), 0,
+      );
+      const capReached = effectiveTotal + 0.0001 >= UNIVERSO_CYCLE_CAP_EUR;
+      const remaining = Math.max(0, UNIVERSO_CYCLE_CAP_EUR - effectiveTotal);
+      const pct = Math.min(100, (effectiveTotal / UNIVERSO_CYCLE_CAP_EUR) * 100);
+      const cycleLabel = `${format(parseISO(cycleRange.start), 'dd/MM')}–${format(parseISO(cycleRange.endExclusive), 'dd/MM')}`;
+      const isActive = today >= cycleRange.start && today < cycleRange.endExclusive;
+      return { cycleKey, effectiveTotal, capReached, remaining, pct, cycleLabel, isActive };
+    };
+
+    return [buildCycle(cycleAKey), buildCycle(cycleBKey)].filter(Boolean) as NonNullable<ReturnType<typeof buildCycle>>[];
+  }, [selectedMonth, purchases, cappedEntryAmounts]);
 
   const unibancoStatus = useMemo(() => {
     if (selectedMonth === 'all') return null;
@@ -528,6 +546,28 @@ function CashbackHeroPage() {
     const currentCashback = activeTier?.cashback ?? 0;
     const targetCashback = isTopTier ? topTier.cashback : (nextTier?.cashback ?? topTier.cashback);
     const cashbackPct = isTopTier ? 100 : targetCashback > 0 ? Math.min(100, (currentCashback / targetCashback) * 100) : 0;
+
+    // Annual cap context (excluding currently selected month)
+    const selectedYear = selectedMonth.slice(0, 4);
+    const monthlySpendMap = new Map<string, number>();
+    purchases
+      .filter((p) => (p.isUnibanco ?? false) && !(p.isReferral ?? false))
+      .filter((p) => p.date.startsWith(`${selectedYear}-`))
+      .filter((p) => p.date.slice(0, 7) !== selectedMonth)
+      .forEach((p) => {
+        const key = p.date.slice(0, 7);
+        monthlySpendMap.set(key, (monthlySpendMap.get(key) ?? 0) + p.amount);
+      });
+
+    const annualCashbackTracked = Array.from(monthlySpendMap.values()).reduce((sum, monthSpend) => {
+      const tier = getActiveTier(monthSpend);
+      return sum + (tier?.cashback ?? 0);
+    }, 0);
+    const annualCashbackUsed = Math.min(
+      UNIBANCO_ANNUAL_CAP_EUR,
+      UNIBANCO_ANNUAL_BASELINE_EUR + annualCashbackTracked + currentCashback,
+    );
+    const annualCashbackRemaining = Math.max(0, UNIBANCO_ANNUAL_CAP_EUR - annualCashbackUsed);
     
     // Calculate Unibanco cycle (1st to last day of month) and days remaining
     const [yearStr, monthStr] = selectedMonth.split('-');
@@ -540,8 +580,90 @@ function CashbackHeroPage() {
     const daysRemaining = today.getTime() <= monthEnd.getTime() ? Math.ceil((monthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
     const cycleLabel = `1–${getDaysInMonth(monthDate)} ${format(monthDate, 'MMM', { locale: pt })}`;
     
-    return { spent, activeTier, nextTier, isTopTier, target, pct, remaining, currentCashback, targetCashback, cashbackPct, daysRemaining, cycleLabel };
-  }, [selectedMonth, monthPurchases]);
+    return {
+      spent,
+      activeTier,
+      nextTier,
+      isTopTier,
+      target,
+      pct,
+      remaining,
+      currentCashback,
+      targetCashback,
+      cashbackPct,
+      daysRemaining,
+      cycleLabel,
+      annualCashbackUsed,
+      annualCashbackRemaining,
+    };
+  }, [selectedMonth, monthPurchases, purchases]);
+
+  const cetelemStatus = useMemo(() => {
+    if (selectedMonth === 'all') return null;
+
+    const [yearStr] = selectedMonth.split('-');
+    const yearlyCetelemPurchases = purchases
+      .filter((p) => !(p.isReferral ?? false))
+      .filter((p) => p.date.startsWith(`${yearStr}-`))
+      .filter((p) => isCetelemCard(extractCardFromNotes(p.notes)));
+
+    if (yearlyCetelemPurchases.length === 0) return null;
+
+    const selectedMonthPurchases = yearlyCetelemPurchases
+      .filter((p) => p.date.slice(0, 7) === selectedMonth);
+    if (selectedMonthPurchases.length === 0) return null;
+
+    const monthlySpend = new Map<string, number>();
+    yearlyCetelemPurchases.forEach((p) => {
+      const key = p.date.slice(0, 7);
+      monthlySpend.set(key, (monthlySpend.get(key) ?? 0) + p.amount);
+    });
+
+    const sortedMonthKeys = Array.from(monthlySpend.keys()).sort();
+    let annualUsedBeforeCurrent = 0;
+    let annualUsedToDate = 0;
+    let currentMonthSpent = 0;
+    let currentMonthCashback = 0;
+    let currentMonthCap = CETELEM_MONTHLY_CAP_EUR;
+
+    sortedMonthKeys.forEach((monthKey) => {
+      if (monthKey > selectedMonth) return;
+
+      const spend = monthlySpend.get(monthKey) ?? 0;
+      const rawMonthCashback = Math.min(CETELEM_MONTHLY_CAP_EUR, spend * CETELEM_RATE);
+      const monthCapFromAnnual = Math.max(0, CETELEM_ANNUAL_CAP_EUR - annualUsedToDate);
+      const effectiveMonthCap = Math.min(CETELEM_MONTHLY_CAP_EUR, monthCapFromAnnual);
+      const effectiveMonthCashback = Math.min(rawMonthCashback, effectiveMonthCap);
+
+      if (monthKey === selectedMonth) {
+        annualUsedBeforeCurrent = annualUsedToDate;
+        currentMonthSpent = spend;
+        currentMonthCap = effectiveMonthCap;
+        currentMonthCashback = effectiveMonthCashback;
+      }
+
+      annualUsedToDate += effectiveMonthCashback;
+    });
+
+    const annualRemaining = Math.max(0, CETELEM_ANNUAL_CAP_EUR - annualUsedToDate);
+    const monthlyPct = currentMonthCap > 0 ? Math.min(100, (currentMonthCashback / currentMonthCap) * 100) : 100;
+    const monthlyRemainingCashback = Math.max(0, currentMonthCap - currentMonthCashback);
+    const monthlyRemainingSpend = monthlyRemainingCashback > 0
+      ? monthlyRemainingCashback / CETELEM_RATE
+      : 0;
+
+    return {
+      currentMonthSpent,
+      currentMonthCashback,
+      currentMonthCap,
+      monthlyPct,
+      monthlyRemainingSpend,
+      annualUsedBeforeCurrent,
+      annualUsedToDate,
+      annualRemaining,
+      annualPct: Math.min(100, (annualUsedToDate / CETELEM_ANNUAL_CAP_EUR) * 100),
+    };
+  }, [selectedMonth, purchases]);
 
   const filteredPurchases = useMemo(() => {
     let result = [...monthPurchases];
@@ -766,7 +888,8 @@ function CashbackHeroPage() {
     : format(parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date()), 'MMMM yyyy', { locale: pt });
 
   const currentMonthKey = monthKeyFromDate(new Date());
-  const canNavigateForward = selectedMonth !== 'all' && selectedMonth < currentMonthKey;
+  const nextMonthKey = monthKeyFromDate(addMonths(new Date(), 1));
+  const canNavigateForward = selectedMonth !== 'all' && selectedMonth < nextMonthKey;
 
   const navigateMonth = (direction: -1 | 1) => {
     if (selectedMonth === 'all') {
@@ -776,7 +899,7 @@ function CashbackHeroPage() {
 
     const current = parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date());
     const next = direction < 0 ? subMonths(current, 1) : addMonths(current, 1);
-    if (direction > 0 && monthKeyFromDate(next) > currentMonthKey) {
+    if (direction > 0 && monthKeyFromDate(next) > nextMonthKey) {
       return;
     }
     setSelectedMonth(monthKeyFromDate(next));
@@ -832,6 +955,9 @@ function CashbackHeroPage() {
       if (purchase?.isUnibanco) {
         await syncUnibancoForMonths([purchase.date.slice(0, 7)]);
       }
+      if (purchase?.isCetelem) {
+        await reload();
+      }
       toast.success(t('cashbackHero.deletePurchase'));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -849,6 +975,10 @@ function CashbackHeroPage() {
       toast.error(message);
     }
   };
+
+  const hasThreeProgressCards = Boolean(unibancoStatus && cetelemStatus && universoCycles.length > 0);
+  const compactProgressCards = hasThreeProgressCards;
+  const showProgressWidgets = monthPurchases.length > 0 && Boolean(unibancoStatus || cetelemStatus || universoCycles.length > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -986,13 +1116,23 @@ function CashbackHeroPage() {
         ) : null}
 
         {/* Card progress widgets: Unibanco tier + Universo cap(s) */}
-        {(unibancoStatus ?? universoCycles.length > 0) ? (
-          <div className={cn('mt-4 grid gap-3', unibancoStatus && universoCycles.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1')}>
+        {showProgressWidgets ? (
+          <div
+            className={cn(
+              'mt-4 grid gap-3',
+              hasThreeProgressCards
+                ? 'grid-cols-1 lg:grid-cols-3'
+                : (unibancoStatus && cetelemStatus) || (unibancoStatus && universoCycles.length > 0) || (cetelemStatus && universoCycles.length > 0)
+                  ? 'grid-cols-1 lg:grid-cols-2'
+                  : 'grid-cols-1',
+            )}
+          >
 
             {/* Unibanco tier */}
             {unibancoStatus ? (
               <div className={cn(
-                'h-full rounded-xl border p-4 lg:min-h-[142px]',
+                'h-full rounded-xl border',
+                compactProgressCards ? 'p-3.5 lg:min-h-[132px]' : 'p-4 lg:min-h-[142px]',
                 unibancoStatus.isTopTier
                   ? 'border-primary/40 bg-primary/5'
                   : 'border-border bg-card',
@@ -1019,17 +1159,25 @@ function CashbackHeroPage() {
                     )}
                   </div>
                 </div>
-                <p className="mb-2 tabular-nums text-lg font-bold text-foreground">
-                  {formatCurrency(unibancoStatus.currentCashback, 'EUR')}
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">/ {formatCurrency(unibancoStatus.targetCashback, 'EUR')}</span>
-                </p>
+                <div className="mb-2 flex items-end justify-between gap-2">
+                  <p className={cn('tabular-nums font-bold text-foreground', compactProgressCards ? 'text-base' : 'text-lg')}>
+                    {formatCurrency(unibancoStatus.currentCashback, 'EUR')}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {formatCurrency(unibancoStatus.targetCashback, 'EUR')}</span>
+                  </p>
+                  <span className={cn('whitespace-nowrap font-medium text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                    {t('cashbackHero.cardWidget.unibancoAnnualCapCompact', {
+                      used: formatCurrency(unibancoStatus.annualCashbackUsed, 'EUR'),
+                      cap: formatCurrency(UNIBANCO_ANNUAL_CAP_EUR, 'EUR'),
+                    })}
+                  </span>
+                </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className={cn('h-full rounded-full transition-all', unibancoStatus.isTopTier ? 'bg-primary' : 'bg-primary/60')}
                     style={{ width: `${unibancoStatus.cashbackPct}%` }}
                   />
                 </div>
-                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                <p className={cn('mt-1.5 text-muted-foreground', compactProgressCards ? 'text-[10px]' : 'text-[11px]')}>
                   {unibancoStatus.isTopTier
                     ? t('cashbackHero.cardWidget.unibancoTopTier', { cashback: formatCurrency(unibancoStatus.activeTier!.cashback, 'EUR') })
                     : unibancoStatus.nextTier
@@ -1039,52 +1187,120 @@ function CashbackHeroPage() {
               </div>
             ) : null}
 
-            {/* Universo cap cycles */}
-            {universoCycles.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {universoCycles.map((cycle) => (
+            {/* Cetelem monthly + annual cap */}
+            {cetelemStatus ? (
+              <div className={cn(
+                'h-full rounded-xl border',
+                compactProgressCards ? 'p-3.5 lg:min-h-[132px]' : 'p-4 lg:min-h-[142px]',
+                cetelemStatus.currentMonthCap > 0 && cetelemStatus.currentMonthCashback + 0.0001 >= cetelemStatus.currentMonthCap
+                  ? 'border-primary/40 bg-primary/5'
+                  : 'border-border bg-card',
+              )}>
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">Cetelem</span>
+                  </div>
+                  <div className="flex items-center justify-end">
+                    <span className="whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      3%
+                    </span>
+                  </div>
+                </div>
+                <div className="mb-2 flex items-end justify-between gap-2">
+                  <p className={cn('tabular-nums font-bold text-foreground', compactProgressCards ? 'text-base' : 'text-lg')}>
+                    {formatCurrency(cetelemStatus.currentMonthCashback, 'EUR')}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {formatCurrency(cetelemStatus.currentMonthCap, 'EUR')}</span>
+                  </p>
+                  <span className={cn('whitespace-nowrap font-medium text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                    {t('cashbackHero.cardWidget.cetelemAnnualCapCompact', {
+                      used: formatCurrency(cetelemStatus.annualUsedToDate, 'EUR'),
+                      cap: formatCurrency(CETELEM_ANNUAL_CAP_EUR, 'EUR'),
+                    })}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    key={cycle.cycleKey}
-                    className={cn(
-                      'h-full rounded-xl border p-4 lg:min-h-[142px]',
-                      cycle.capReached
-                        ? 'border-amber-500/40 bg-amber-500/5'
-                        : 'border-border bg-card',
-                    )}
-                  >
-                    <div className="mb-1 flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium text-foreground">Universo</span>
-                      </div>
-                      <div className="flex max-w-[70%] flex-wrap items-center justify-end gap-1">
-                        <span className="whitespace-nowrap rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          {t('cashbackHero.cardWidget.universoCycleLabel', { cycle: cycle.cycleLabel })}
+                    className={cn('h-full rounded-full transition-all', cetelemStatus.monthlyPct >= 100 ? 'bg-primary' : 'bg-primary/60')}
+                    style={{ width: `${cetelemStatus.monthlyPct}%` }}
+                  />
+                </div>
+                <p className={cn('mt-1.5 text-muted-foreground', compactProgressCards ? 'text-[10px]' : 'text-[11px]')}>
+                  {cetelemStatus.monthlyRemainingSpend <= 0
+                    ? t('cashbackHero.cardWidget.cetelemMonthlyTop', { cashback: formatCurrency(cetelemStatus.currentMonthCap, 'EUR') })
+                    : t('cashbackHero.cardWidget.cetelemMonthlyRemaining', {
+                      remaining: formatCurrency(cetelemStatus.monthlyRemainingSpend, 'EUR'),
+                      cashback: formatCurrency(cetelemStatus.currentMonthCap, 'EUR'),
+                    })}
+                </p>
+              </div>
+            ) : null}
+
+            {/* Universo cap cycles — single card, cycles side by side */}
+            {universoCycles.length > 0 ? (
+              <div className={cn(
+                'h-full rounded-xl border',
+                compactProgressCards ? 'p-3.5 lg:min-h-[132px]' : 'p-4 lg:min-h-[142px]',
+                universoCycles.some((c) => c.isActive && c.capReached)
+                  ? 'border-amber-500/40 bg-amber-500/5'
+                  : 'border-border bg-card',
+              )}>
+                <div className="mb-2 flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-foreground">Universo</span>
+                </div>
+                <div className={cn(
+                  compactProgressCards ? 'grid gap-2.5' : 'grid gap-3',
+                  universoCycles.length > 1
+                    ? 'grid-cols-2'
+                    : 'grid-cols-1',
+                )}>
+                  {universoCycles.map((cycle) => (
+                    <div key={cycle.cycleKey}>
+                      <div className="mb-1 flex flex-wrap items-center gap-1">
+                        <span className={cn(
+                          'whitespace-nowrap rounded-full border border-border bg-muted/60 py-0.5 font-medium text-muted-foreground',
+                          compactProgressCards ? 'px-1 text-[8px]' : 'px-1.5 text-[9px]',
+                        )}>
+                          {cycle.cycleLabel}
                         </span>
+                        {cycle.isActive && !cycle.capReached ? (
+                          <span className={cn(
+                            'whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 py-0.5 font-medium text-primary',
+                            compactProgressCards ? 'px-1 text-[8px]' : 'px-1.5 text-[9px]',
+                          )}>
+                            {t('cashbackHero.cardWidget.universoActiveBadge')}
+                          </span>
+                        ) : null}
                         {cycle.capReached ? (
-                          <span className="whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                          <span className={cn(
+                            'whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/10 py-0.5 font-bold text-amber-600 dark:text-amber-400',
+                            compactProgressCards ? 'px-1 text-[7px]' : 'px-1.5 text-[8px]',
+                          )}>
                             {t('cashbackHero.cardWidget.universoCapReachedBadge')}
                           </span>
                         ) : null}
                       </div>
+                      <p className={cn('mb-1 tabular-nums font-bold text-foreground', compactProgressCards ? 'text-sm' : 'text-base')}>
+                        {formatCurrency(cycle.effectiveTotal, 'EUR')}
+                        <span className={cn('ml-1 font-normal text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                          / {formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR')}
+                        </span>
+                      </p>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn('h-full rounded-full transition-all', cycle.capReached ? 'bg-amber-500' : 'bg-primary/60')}
+                          style={{ width: `${cycle.pct}%` }}
+                        />
+                      </div>
+                      <p className={cn('mt-1 text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                        {cycle.capReached
+                          ? t('cashbackHero.cardWidget.universoCapReachedFull', { cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR') })
+                          : t('cashbackHero.cardWidget.universoRemaining', { remaining: formatCurrency(cycle.remaining, 'EUR') })}
+                      </p>
                     </div>
-                    <p className="mb-2 tabular-nums text-lg font-bold text-foreground">
-                      {formatCurrency(cycle.effectiveTotal, 'EUR')}
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">/ {formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR')}</span>
-                    </p>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={cn('h-full rounded-full transition-all', cycle.capReached ? 'bg-amber-500' : 'bg-primary/60')}
-                        style={{ width: `${cycle.pct}%` }}
-                      />
-                    </div>
-                    <p className="mt-1.5 text-[11px] text-muted-foreground">
-                      {cycle.capReached
-                        ? t('cashbackHero.cardWidget.universoCapReachedFull', { cap: formatCurrency(UNIVERSO_CYCLE_CAP_EUR, 'EUR') })
-                        : t('cashbackHero.cardWidget.universoRemaining', { remaining: formatCurrency(cycle.remaining, 'EUR') })}
-                    </p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : null}
 
@@ -1092,7 +1308,7 @@ function CashbackHeroPage() {
         ) : null}
 
         {insights.length > 0 ? (
-          <div className="mt-4 flex justify-end">
+          <div className="fixed bottom-4 right-4 z-40 sm:bottom-6 sm:right-6">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -1451,6 +1667,11 @@ function CashbackHeroPage() {
           if (purchasePayload.isUnibanco) {
             await syncUnibancoForMonths([purchasePayload.date.slice(0, 7)]);
           }
+
+          if (purchasePayload.isCetelem) {
+            await syncCetelemPurchase(savedPurchase.id, savedPurchase);
+          }
+
           toast.success(t('cashbackHero.addPurchase'));
         }}
       />
@@ -1473,9 +1694,18 @@ function CashbackHeroPage() {
           }
 
           await updatePurchase(editingPurchase.id, payload);
+          
           if (monthsToSync.length > 0) {
             await syncUnibancoForMonths(monthsToSync);
           }
+
+          if (editingPurchase.isCetelem || payload.isCetelem) {
+            const updatedPurchase = purchases.find((p) => p.id === editingPurchase.id);
+            if (updatedPurchase) {
+              await syncCetelemPurchase(editingPurchase.id, updatedPurchase);
+            }
+          }
+
           toast.success(t('cashbackHero.editPurchase'));
           setEditingPurchase(null);
         }}
@@ -1531,6 +1761,7 @@ function AddPurchaseDialog({
     notes?: string;
     isReferral?: boolean;
     isUnibanco?: boolean;
+    isCetelem?: boolean;
     linkedHomeExpenseContractId?: string;
   }) => Promise<void>;
 }) {
@@ -1630,6 +1861,7 @@ function AddPurchaseDialog({
         notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
         isUnibanco: !isReferral && isUnibancoCard(cardUsed),
+        isCetelem: !isReferral && isCetelemCard(cardUsed),
         linkedHomeExpenseContractId: linkToHomeExpense ? linkedContractId : undefined,
       });
     } catch (error) {
@@ -1826,7 +2058,7 @@ function AddCashbackDialog({
 }) {
   const { t } = useI18n();
   const BYBIT_EUR_PER_POINT = 0.002455;
-  const CURVE_CASH_DEFAULT_GBP_RATE = 1.17;
+  const CURVE_CASH_DEFAULT_GBP_RATE = 0;
   const availableSources = useMemo(() => {
     const hasBybit = sources.some((value) => /bybit/i.test(value));
     return hasBybit ? sources : [...sources, 'Bybit'];
@@ -1895,27 +2127,55 @@ function AddCashbackDialog({
     setAmount(Math.min(converted, maxAmount).toFixed(2));
   }, [isBybitSource, points, targetPurchase]);
 
-  // Fetch live GBP/EUR rate when Curve Cash is selected
+  // Fetch GBP/EUR rate for selected date using a CORS-enabled endpoint.
   useEffect(() => {
     if (!isCurveCashSource || !open) return;
     let cancelled = false;
-    fetch('https://api.frankfurter.app/latest?from=GBP&to=EUR')
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(dateReceived) ? dateReceived : today;
+    const endpointTag = normalizedDate <= today ? normalizedDate : 'latest';
+    const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${endpointTag}/v1/currencies/gbp.json`;
+
+    fetch(url)
       .then((res) => res.json())
       .then((data: unknown) => {
-        if (!cancelled && typeof data === 'object' && data !== null && 'rates' in data) {
-          const rates = (data as { rates: Record<string, number> }).rates;
-          if (typeof rates.EUR === 'number') setGbpEurRate(rates.EUR);
+        if (!cancelled && typeof data === 'object' && data !== null && 'gbp' in data) {
+          const gbp = (data as { gbp?: Record<string, number> }).gbp;
+          const eur = gbp?.eur;
+          if (typeof eur === 'number' && Number.isFinite(eur) && eur > 0) {
+            setGbpEurRate(eur);
+            return;
+          }
         }
+        setGbpEurRate(0);
       })
-      .catch(() => { /* keep default */ });
+      .catch((err) => {
+        console.warn('Failed to fetch GBP/EUR rate:', err);
+        fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/gbp.json')
+          .then((res) => res.json())
+          .then((data: unknown) => {
+            if (!cancelled && typeof data === 'object' && data !== null && 'gbp' in data) {
+              const gbp = (data as { gbp?: Record<string, number> }).gbp;
+              const eur = gbp?.eur;
+              if (typeof eur === 'number' && Number.isFinite(eur) && eur > 0) {
+                setGbpEurRate(eur);
+                return;
+              }
+            }
+            setGbpEurRate(0);
+          })
+          .catch(() => { setGbpEurRate(0); });
+      });
+
     return () => { cancelled = true; };
-  }, [isCurveCashSource, open]);
+  }, [isCurveCashSource, open, dateReceived]);
 
   // Convert GBP → EUR automatically for Curve Cash
   useEffect(() => {
     if (!isCurveCashSource) return;
     const parsed = Number(gbpAmount.replace(',', '.'));
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    if (!Number.isFinite(parsed) || parsed <= 0 || gbpEurRate <= 0) {
       if (gbpAmount.trim() !== '') setAmount('');
       return;
     }
@@ -2064,7 +2324,7 @@ function EditPurchaseDialog({
   merchantCategoryHints: MerchantCategoryHint[];
   merchantSuggestions: string[];
   onOpenChange: (open: boolean) => void;
-  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean }) => Promise<void>;
+  onSubmit: (value: { merchant: string; category: CashbackCategory; date: string; amount: number; notes?: string; isReferral?: boolean; isUnibanco?: boolean; isCetelem?: boolean }) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [merchant, setMerchant] = useState('');
@@ -2133,6 +2393,7 @@ function EditPurchaseDialog({
         notes: buildNotesWithCard(notes, cardUsed),
         isReferral: isReferral || undefined,
         isUnibanco: !isReferral && isUnibancoCard(cardUsed),
+        isCetelem: !isReferral && isCetelemCard(cardUsed),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -10,6 +10,7 @@ create table if not exists public.cashback_purchases (
   notes text,
   is_referral boolean not null default false,
   is_unibanco boolean not null default false,
+  is_cetelem boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -22,6 +23,7 @@ alter table public.cashback_purchases
   add column if not exists notes text,
   add column if not exists is_referral boolean default false,
   add column if not exists is_unibanco boolean default false,
+  add column if not exists is_cetelem boolean default false,
   add column if not exists created_at timestamptz default now(),
   add column if not exists updated_at timestamptz default now();
 
@@ -60,6 +62,9 @@ create unique index if not exists cashback_entries_legacy_portfolio_earning_id_i
 
 create index if not exists cashback_purchases_date_idx
   on public.cashback_purchases (date desc);
+
+create index if not exists cashback_purchases_is_cetelem_idx
+  on public.cashback_purchases (is_cetelem);
 
 create index if not exists cashback_entries_purchase_id_idx
   on public.cashback_entries (purchase_id);

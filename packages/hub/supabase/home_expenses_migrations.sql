@@ -1,3 +1,6 @@
+-- Home expenses incremental migrations (consolidated)
+-- Safe to run multiple times.
+
 create extension if not exists pgcrypto;
 
 alter table public.home_expenses_transactions
@@ -5,6 +8,18 @@ alter table public.home_expenses_transactions
 
 alter table public.home_expenses_transactions
   add column if not exists notes text;
+
+alter table public.home_expenses_transactions
+  add column if not exists billing_period_start date;
+
+alter table public.home_expenses_transactions
+  add column if not exists billing_period_end date;
+
+alter table public.home_expenses_transactions
+  add column if not exists cubic_meters numeric(10,2);
+
+alter table public.home_expenses_transactions
+  add column if not exists reading_date date;
 
 create index if not exists home_expenses_transactions_contract_id_date_idx
   on public.home_expenses_transactions (contract_id, date desc)

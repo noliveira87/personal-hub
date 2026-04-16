@@ -27,6 +27,7 @@ export interface CashbackPurchase {
   notes?: string;
   isReferral?: boolean;
   isUnibanco?: boolean;
+  isCetelem?: boolean;
   createdAt?: string;
   cashbackEntries: CashbackEntry[];
 }
