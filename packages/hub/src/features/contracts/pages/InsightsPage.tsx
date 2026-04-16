@@ -11,6 +11,8 @@ import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, ch
 import {
   getGlobalEnergyMilestones,
   getEnergyMilestonesForContract,
+  setGlobalEnergyMilestones,
+  type EnergyMilestone,
   type EnergyMilestoneType,
 } from '@/features/contracts/lib/solarInstallMonth';
 
@@ -25,6 +27,9 @@ export default function InsightsPage() {
   const { priceMap } = usePriceHistoryMap(contractIds);
   const [selectedScope, setSelectedScope] = useState<string>('category:electricity');
   const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+  const [isEditingMilestones, setIsEditingMilestones] = useState(false);
+  const [draftMilestones, setDraftMilestones] = useState<EnergyMilestone[]>([]);
+  const [milestonesVersion, setMilestonesVersion] = useState(0);
 
   const activeWithResolvedPrices = useMemo(() => {
     return active.map((contract) => {
@@ -109,6 +114,11 @@ export default function InsightsPage() {
   }, [contracts]);
 
   const storedEnergyMilestones = useMemo(() => {
+    const globalMilestones = getGlobalEnergyMilestones();
+    if (globalMilestones.length > 0) {
+      return globalMilestones.slice().sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+    }
+
     const merged = electricityContractIds.flatMap((contractId) => getEnergyMilestonesForContract(contractId));
 
     if (merged.length > 0) {
@@ -123,9 +133,34 @@ export default function InsightsPage() {
       return Array.from(byKey.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
     }
 
-    // Legacy fallback for older data where only the global value existed.
-    return getGlobalEnergyMilestones();
-  }, [electricityContractIds]);
+    return [];
+  }, [electricityContractIds, milestonesVersion]);
+
+  const milestoneMonthOptions = useMemo(() => {
+    const scopedContractIds = selectedScope === 'category:electricity'
+      ? new Set(electricityContractIds)
+      : new Set([selectedScope]);
+
+    const unique = new Map<string, string>();
+    allPriceHistory.forEach((entry) => {
+      if (!scopedContractIds.has(entry.contractId)) return;
+      const date = new Date(entry.date);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!unique.has(key)) {
+        unique.set(
+          key,
+          new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString(locale, {
+            month: 'short',
+            year: 'numeric',
+          }),
+        );
+      }
+    });
+
+    return Array.from(unique.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([value, label]) => ({ value, label }));
+  }, [allPriceHistory, selectedScope, electricityContractIds, locale]);
 
   const monthlyEvolutionData = useMemo(() => {
     const byMonth = new Map<string, number>();
@@ -218,6 +253,46 @@ export default function InsightsPage() {
     return t('contracts.kwh.milestoneTypeOther');
   };
 
+  const startEditingMilestones = () => {
+    setDraftMilestones(storedEnergyMilestones);
+    setIsEditingMilestones(true);
+  };
+
+  const cancelEditingMilestones = () => {
+    setDraftMilestones(storedEnergyMilestones);
+    setIsEditingMilestones(false);
+  };
+
+  const saveMilestones = () => {
+    const normalized = draftMilestones
+      .filter((item) => /^\d{4}-\d{2}$/.test(item.monthKey))
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+    setGlobalEnergyMilestones(normalized);
+    setMilestonesVersion((prev) => prev + 1);
+    setIsEditingMilestones(false);
+  };
+
+  const addDraftMilestone = () => {
+    const fallbackMonth = milestoneMonthOptions[0]?.value ?? '';
+    setDraftMilestones((prev) => [
+      ...prev,
+      {
+        id: `milestone-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        monthKey: fallbackMonth,
+        type: 'solar',
+      },
+    ]);
+  };
+
+  const updateDraftMilestone = (id: string, updates: Partial<EnergyMilestone>) => {
+    setDraftMilestones((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
+  };
+
+  const removeDraftMilestone = (id: string) => {
+    setDraftMilestones((prev) => prev.filter((item) => item.id !== id));
+  };
+
   const renderEvolutionDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { monthKey: string } }) => {
     if (cx == null || cy == null) return null;
 
@@ -293,10 +368,87 @@ export default function InsightsPage() {
         </div>
 
         {isElectricityScope && storedEnergyMilestones.length > 0 && (
-          <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthAutoLabel')}</p>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthAutoLabel')}</p>
+            <button
+              type="button"
+              onClick={startEditingMilestones}
+              className="h-7 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
+            >
+              {t('contracts.kwh.solarInstallMonthEdit')}
+            </button>
+          </div>
         )}
         {isElectricityScope && storedEnergyMilestones.length === 0 && (
-          <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthMissingLabel')}</p>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthMissingLabel')}</p>
+            <button
+              type="button"
+              onClick={startEditingMilestones}
+              className="h-7 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
+            >
+              {t('contracts.kwh.solarInstallMonthSet')}
+            </button>
+          </div>
+        )}
+
+        {isElectricityScope && isEditingMilestones && (
+          <div className="mb-3 space-y-2 rounded-lg border bg-muted/20 p-3">
+            {draftMilestones.map((milestone) => (
+              <div key={milestone.id} className="flex flex-wrap items-center gap-2">
+                <select
+                  value={milestone.monthKey}
+                  onChange={(event) => updateDraftMilestone(milestone.id, { monthKey: event.target.value })}
+                  className="h-8 min-w-36 rounded-md border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="">{t('contracts.kwh.solarInstallMonthPlaceholder')}</option>
+                  {milestoneMonthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={milestone.type}
+                  onChange={(event) => updateDraftMilestone(milestone.id, { type: event.target.value as EnergyMilestoneType })}
+                  className="h-8 min-w-36 rounded-md border bg-background px-2 text-xs text-foreground"
+                >
+                  <option value="solar">{t('contracts.kwh.milestoneTypeSolar')}</option>
+                  <option value="solar-expansion">{t('contracts.kwh.milestoneTypeSolarExpansion')}</option>
+                  <option value="battery">{t('contracts.kwh.milestoneTypeBattery')}</option>
+                  <option value="other">{t('contracts.kwh.milestoneTypeOther')}</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeDraftMilestone(milestone.id)}
+                  className="h-8 rounded-md border border-destructive/30 px-2.5 text-xs font-medium text-destructive"
+                >
+                  {t('contracts.kwh.milestoneRemove')}
+                </button>
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={addDraftMilestone}
+                className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
+              >
+                {t('contracts.kwh.milestoneAdd')}
+              </button>
+              <button
+                type="button"
+                onClick={saveMilestones}
+                className="h-8 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary"
+              >
+                {t('common.save')}
+              </button>
+              <button
+                type="button"
+                onClick={cancelEditingMilestones}
+                className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
         )}
 
         {monthlyEvolutionData.some((point) => point.value != null) ? (
