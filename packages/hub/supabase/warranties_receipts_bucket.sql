@@ -32,12 +32,15 @@ drop policy if exists "Authenticated users can delete receipts" on storage.objec
 
 -- Allow upload/update/delete for anon + authenticated users.
 -- This project runs without per-user auth, so policies are bucket-scoped.
--- Note: No SELECT policy needed — the bucket is public, so files are accessible
--- by direct URL without a listing policy (avoids "broad SELECT" Supabase warning).
 create policy "Anyone can upload receipts"
 on storage.objects for insert
 to anon, authenticated
 with check (bucket_id = 'receipts');
+
+create policy "Anyone can read receipts"
+on storage.objects for select
+to anon, authenticated
+using (bucket_id = 'receipts');
 
 create policy "Anyone can update receipts"
 on storage.objects for update
