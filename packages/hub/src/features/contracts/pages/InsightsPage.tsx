@@ -20,7 +20,7 @@ export default function InsightsPage() {
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
   const { priceMap } = usePriceHistoryMap(contractIds);
   const [selectedScope, setSelectedScope] = useState<string>('category:electricity');
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
 
   const activeWithResolvedPrices = useMemo(() => {
     return active.map((contract) => {
@@ -85,9 +85,12 @@ export default function InsightsPage() {
     return Array.from(years).sort((a, b) => b - a);
   }, [allPriceHistory]);
 
-  const effectiveYear = availableHistoryYears.includes(selectedYear)
-    ? selectedYear
-    : (availableHistoryYears[0] ?? selectedYear);
+  const effectiveYear = useMemo(() => {
+    if (selectedYear === 'all') return null;
+    const parsed = Number(selectedYear);
+    if (Number.isNaN(parsed)) return availableHistoryYears[0] ?? null;
+    return availableHistoryYears.includes(parsed) ? parsed : (availableHistoryYears[0] ?? parsed);
+  }, [selectedYear, availableHistoryYears]);
 
   const chartContractOptions = useMemo(() => {
     return active
@@ -114,26 +117,28 @@ export default function InsightsPage() {
   }, [electricityContractIds]);
 
   const monthlyEvolutionData = useMemo(() => {
-    const byMonth = new Map<number, number>();
+    const byMonth = new Map<string, number>();
 
     const scopedContractIds = selectedScope === 'category:electricity'
       ? new Set(electricityContractIds)
       : new Set([selectedScope]);
 
-    for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
-      const monthEntries = allPriceHistory.filter((entry) => {
-        const date = new Date(entry.date);
-        if (date.getFullYear() !== effectiveYear || date.getMonth() !== monthIndex) {
-          return false;
-        }
+    const groupedByMonth = new Map<string, Array<{ contractId: string; date: string; price: number }>>();
+    allPriceHistory.forEach((entry) => {
+      if (!scopedContractIds.has(entry.contractId)) return;
 
-        return scopedContractIds.has(entry.contractId);
-      });
+      const date = new Date(entry.date);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      if (effectiveYear != null && year !== effectiveYear) return;
 
-      if (monthEntries.length === 0) {
-        continue;
-      }
+      const monthKey = `${year}-${month}`;
+      const list = groupedByMonth.get(monthKey) ?? [];
+      list.push({ contractId: entry.contractId, date: entry.date, price: entry.price });
+      groupedByMonth.set(monthKey, list);
+    });
 
+    groupedByMonth.forEach((monthEntries, monthKey) => {
       const latestByContract = new Map<string, { date: string; price: number }>();
       monthEntries.forEach((entry) => {
         const current = latestByContract.get(entry.contractId);
@@ -143,14 +148,35 @@ export default function InsightsPage() {
       });
 
       const monthTotal = Array.from(latestByContract.values()).reduce((sum, value) => sum + value.price, 0);
-      byMonth.set(monthIndex, monthTotal);
+      byMonth.set(monthKey, monthTotal);
+    });
+
+    if (effectiveYear == null) {
+      return Array.from(byMonth.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([monthKey, value]) => {
+          const [yearRaw, monthRaw] = monthKey.split('-');
+          const label = new Date(Number(yearRaw), Number(monthRaw) - 1, 1).toLocaleDateString(locale, {
+            month: 'short',
+            year: '2-digit',
+          });
+
+          return {
+            month: label,
+            monthKey,
+            value,
+          };
+        });
     }
 
-    return Array.from({ length: 12 }, (_, monthIndex) => ({
-      monthIndex,
-      month: new Date(effectiveYear, monthIndex, 1).toLocaleDateString(locale, { month: 'short' }),
-      value: byMonth.get(monthIndex) ?? null,
-    }));
+    return Array.from({ length: 12 }, (_, monthIndex) => {
+      const monthKey = `${effectiveYear}-${String(monthIndex + 1).padStart(2, '0')}`;
+      return {
+        month: new Date(effectiveYear, monthIndex, 1).toLocaleDateString(locale, { month: 'short' }),
+        monthKey,
+        value: byMonth.get(monthKey) ?? null,
+      };
+    });
   }, [allPriceHistory, effectiveYear, selectedScope, electricityContractIds, locale]);
 
   const selectedContract = contracts.find((contract) => contract.id === selectedScope);
@@ -160,28 +186,13 @@ export default function InsightsPage() {
   const solarMarkerMonthLabel = useMemo(() => {
     if (!isElectricityScope || storedSolarInstallMonth === '') return null;
 
-    const [yearRaw, monthRaw] = storedSolarInstallMonth.split('-');
-    const markerYear = Number(yearRaw);
-    const markerMonth = Number(monthRaw);
-    if (Number.isNaN(markerYear) || Number.isNaN(markerMonth) || markerYear !== effectiveYear) {
-      return null;
-    }
-
-    return monthlyEvolutionData.find((point) => point.monthIndex === markerMonth - 1)?.month ?? null;
+    return monthlyEvolutionData.find((point) => point.monthKey === storedSolarInstallMonth)?.month ?? null;
   }, [isElectricityScope, monthlyEvolutionData, storedSolarInstallMonth, effectiveYear]);
 
-  const renderEvolutionDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { monthIndex: number } }) => {
+  const renderEvolutionDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { monthKey: string } }) => {
     if (cx == null || cy == null) return null;
 
-    const markerMonthIndex = (() => {
-      const [yearRaw, monthRaw] = storedSolarInstallMonth.split('-');
-      const markerYear = Number(yearRaw);
-      const markerMonth = Number(monthRaw);
-      if (Number.isNaN(markerYear) || Number.isNaN(markerMonth) || markerYear !== effectiveYear) return null;
-      return markerMonth - 1;
-    })();
-
-    const isMarkerMonth = markerMonthIndex != null && markerMonthIndex === payload?.monthIndex;
+    const isMarkerMonth = payload?.monthKey === storedSolarInstallMonth;
     if (isMarkerMonth) {
       return (
         <g>
@@ -240,10 +251,11 @@ export default function InsightsPage() {
               ))}
             </select>
             <select
-              value={effectiveYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              value={effectiveYear == null ? 'all' : String(effectiveYear)}
+              onChange={(e) => setSelectedYear(e.target.value)}
               className="h-9 rounded-md border bg-background px-3 text-sm"
             >
+              <option value="all">{t('contracts.insights.allYearsLabel')}</option>
               {availableHistoryYears.map((year) => (
                 <option key={year} value={year}>{year}</option>
               ))}
@@ -276,7 +288,7 @@ export default function InsightsPage() {
                   labelStyle={chartTooltipLabelStyle}
                   itemStyle={chartTooltipItemStyle}
                   formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
-                  labelFormatter={(label) => `${label} ${effectiveYear}`}
+                  labelFormatter={(label) => String(label)}
                 />
                 {isElectricityScope && solarMarkerMonthLabel && (
                   <ReferenceLine
@@ -307,7 +319,9 @@ export default function InsightsPage() {
           </div>
         ) : (
           <div className="text-center py-4 text-sm text-muted-foreground rounded-lg border bg-muted/20">
-            {t('contracts.insights.noDataForYear', { year: effectiveYear })}
+            {effectiveYear == null
+              ? t('contracts.insights.noDataAllYears')
+              : t('contracts.insights.noDataForYear', { year: effectiveYear })}
           </div>
         )}
 
@@ -315,7 +329,7 @@ export default function InsightsPage() {
           <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
             <span className="h-2 w-2 rounded-full bg-warning" />
             <span className="text-xs font-medium text-warning">
-              {t('contracts.insights.solarInstallMarkerLabel')}: {solarMarkerMonthLabel} {effectiveYear}
+              {t('contracts.insights.solarInstallMarkerLabel')}: {solarMarkerMonthLabel}
             </span>
           </div>
         )}
