@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { getAnnualEquivalent, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
@@ -6,7 +6,7 @@ import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { FileText } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle } from '@/lib/chartTheme';
 
 const InsightsCategoryChart = lazy(() => import('@/features/contracts/pages/InsightsCategoryChart'));
@@ -20,6 +20,18 @@ export default function InsightsPage() {
   const { priceMap } = usePriceHistoryMap(contractIds);
   const [selectedScope, setSelectedScope] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [solarInstallMonth, setSolarInstallMonth] = useState<string>('');
+
+  const solarMarkerStorageKey = 'contracts:insights:electricity:solar-install-month';
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(solarMarkerStorageKey);
+      setSolarInstallMonth(saved ?? '');
+    } catch {
+      setSolarInstallMonth('');
+    }
+  }, []);
 
   const activeWithResolvedPrices = useMemo(() => {
     return active.map((contract) => {
@@ -140,6 +152,7 @@ export default function InsightsPage() {
     }
 
     return Array.from({ length: 12 }, (_, monthIndex) => ({
+      monthIndex,
       month: new Date(effectiveYear, monthIndex, 1).toLocaleDateString(locale, { month: 'short' }),
       value: byMonth.get(monthIndex) ?? null,
     }));
@@ -147,6 +160,44 @@ export default function InsightsPage() {
 
   const selectedContract = contracts.find((contract) => contract.id === selectedScope);
   const chartCurrency = selectedContract?.currency ?? 'EUR';
+  const isElectricityScope = selectedScope === 'category:electricity';
+
+  const solarMarkerMonthLabel = useMemo(() => {
+    if (!isElectricityScope || solarInstallMonth === '') return null;
+    const markerIndex = Number(solarInstallMonth);
+    if (Number.isNaN(markerIndex)) return null;
+    return monthlyEvolutionData.find((point) => point.monthIndex === markerIndex)?.month ?? null;
+  }, [isElectricityScope, monthlyEvolutionData, solarInstallMonth]);
+
+  const handleSolarInstallMonthChange = (nextValue: string) => {
+    setSolarInstallMonth(nextValue);
+
+    try {
+      if (nextValue) {
+        localStorage.setItem(solarMarkerStorageKey, nextValue);
+      } else {
+        localStorage.removeItem(solarMarkerStorageKey);
+      }
+    } catch {
+      // Ignore localStorage failures.
+    }
+  };
+
+  const renderEvolutionDot = ({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { monthIndex: number } }) => {
+    if (cx == null || cy == null) return null;
+
+    const isMarkerMonth = solarInstallMonth !== '' && Number(solarInstallMonth) === payload?.monthIndex;
+    if (isMarkerMonth) {
+      return (
+        <g>
+          <circle cx={cx} cy={cy} r={7} fill="hsl(var(--background))" stroke="hsl(var(--warning))" strokeWidth={2.5} />
+          <circle cx={cx} cy={cy} r={4} fill="hsl(var(--warning))" />
+        </g>
+      );
+    }
+
+    return <circle cx={cx} cy={cy} r={3} fill="hsl(var(--primary))" />;
+  };
 
   return (
     <div className="space-y-8">
@@ -203,8 +254,26 @@ export default function InsightsPage() {
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
+            {isElectricityScope && (
+              <select
+                value={solarInstallMonth}
+                onChange={(e) => handleSolarInstallMonthChange(e.target.value)}
+                className="h-9 rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="">{t('contracts.insights.solarInstallMonthPlaceholder')}</option>
+                {monthlyEvolutionData.map((point) => (
+                  <option key={point.monthIndex} value={String(point.monthIndex)}>
+                    {point.month}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
+
+        {isElectricityScope && (
+          <p className="mb-3 text-xs text-muted-foreground">{t('contracts.insights.solarInstallMonthLabel')}</p>
+        )}
 
         {monthlyEvolutionData.some((point) => point.value != null) ? (
           <div className="h-64 rounded-lg border bg-background p-3">
@@ -226,12 +295,27 @@ export default function InsightsPage() {
                   formatter={(value: number) => formatCurrency(Number(value), chartCurrency)}
                   labelFormatter={(label) => `${label} ${effectiveYear}`}
                 />
+                {isElectricityScope && solarMarkerMonthLabel && (
+                  <ReferenceLine
+                    x={solarMarkerMonthLabel}
+                    stroke="hsl(var(--warning))"
+                    strokeWidth={3}
+                    strokeDasharray="6 4"
+                    label={{
+                      value: t('contracts.insights.solarInstallMarkerLabel'),
+                      position: 'insideTopRight',
+                      fill: 'hsl(var(--warning))',
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  />
+                )}
                 <Line
                   type="monotone"
                   dataKey="value"
                   stroke="hsl(var(--primary))"
                   strokeWidth={2.5}
-                  dot={{ r: 3 }}
+                  dot={renderEvolutionDot}
                   activeDot={{ r: 5 }}
                   connectNulls={false}
                 />
@@ -241,6 +325,15 @@ export default function InsightsPage() {
         ) : (
           <div className="text-center py-4 text-sm text-muted-foreground rounded-lg border bg-muted/20">
             {t('contracts.insights.noDataForYear', { year: effectiveYear })}
+          </div>
+        )}
+
+        {isElectricityScope && solarMarkerMonthLabel && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1">
+            <span className="h-2 w-2 rounded-full bg-warning" />
+            <span className="text-xs font-medium text-warning">
+              {t('contracts.insights.solarInstallMarkerLabel')}: {solarMarkerMonthLabel} {effectiveYear}
+            </span>
           </div>
         )}
       </div>
