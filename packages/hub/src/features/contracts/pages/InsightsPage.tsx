@@ -19,7 +19,7 @@ export default function InsightsPage() {
   const active = contracts.filter(c => c.status === 'active');
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
   const { priceMap } = usePriceHistoryMap(contractIds);
-  const [selectedScope, setSelectedScope] = useState<string>('all');
+  const [selectedScope, setSelectedScope] = useState<string>('category:electricity');
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const activeWithResolvedPrices = useMemo(() => {
@@ -116,21 +116,15 @@ export default function InsightsPage() {
   const monthlyEvolutionData = useMemo(() => {
     const byMonth = new Map<number, number>();
 
-    const scopedContractIds = selectedScope === 'all'
-      ? null
-      : selectedScope === 'category:electricity'
-        ? new Set(electricityContractIds)
-        : new Set([selectedScope]);
+    const scopedContractIds = selectedScope === 'category:electricity'
+      ? new Set(electricityContractIds)
+      : new Set([selectedScope]);
 
     for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
       const monthEntries = allPriceHistory.filter((entry) => {
         const date = new Date(entry.date);
         if (date.getFullYear() !== effectiveYear || date.getMonth() !== monthIndex) {
           return false;
-        }
-
-        if (!scopedContractIds) {
-          return true;
         }
 
         return scopedContractIds.has(entry.contractId);
@@ -240,7 +234,6 @@ export default function InsightsPage() {
               onChange={(e) => setSelectedScope(e.target.value)}
               className="h-9 rounded-md border bg-background px-3 text-sm"
             >
-              <option value="all">{t('contracts.insights.scopeAllContracts')}</option>
               <option value="category:electricity">{t('contracts.insights.scopeElectricity')}</option>
               {chartContractOptions.map((option) => (
                 <option key={option.id} value={option.id}>{option.label}</option>
