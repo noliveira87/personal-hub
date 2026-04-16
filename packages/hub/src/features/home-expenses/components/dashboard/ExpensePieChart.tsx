@@ -58,35 +58,23 @@ export default function ExpensePieChart() {
       .sort((a, b) => b.value - a.value);
   }, [allTransactions, selectedYear, selectedMonth, t, hideAmounts]);
 
-  const chartHeight = useMemo(() => {
-    if (data.length <= 2) return 180;
-    if (data.length <= 4) return 220;
-    if (data.length <= 6) return 250;
-    return 280;
-  }, [data.length]);
-
-  const chartKey = useMemo(() => {
-    const total = data.reduce((sum, item) => sum + item.value, 0);
-    return `${selectedYear}-${selectedMonth}-${data.length}-${Math.round(total)}`;
-  }, [data, selectedMonth, selectedYear]);
-
-  const outerRadius = data.length <= 2 ? '74%' : data.length <= 4 ? '78%' : '82%';
+  const outerRadius = 108;
 
   if (data.length === 0) {
     return (
-      <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
+      <div className="h-full min-h-96 rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
         <p className="text-sm text-muted-foreground">{t('homeExpenses.charts.noExpensesThisMonth')}</p>
       </div>
     );
   }
 
   return (
-    <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
+    <div className="h-full min-h-96 rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
-      <div key={chartKey} className="flex-1 min-h-[16rem] w-full flex" style={{ height: Math.max(chartHeight, 200) }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="w-full" style={{ height: 260 }}>
+        <ResponsiveContainer width="100%" height={260}>
           <PieChart>
-            <Pie data={data} cx="50%" cy="50%" innerRadius="50%" outerRadius={outerRadius} paddingAngle={2} dataKey="value">
+            <Pie data={data} cx="50%" cy="50%" innerRadius={62} outerRadius={outerRadius} paddingAngle={2} dataKey="value">
               {data.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
@@ -95,9 +83,9 @@ export default function ExpensePieChart() {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-1 gap-2.5 mt-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 mt-3 sm:grid-cols-2">
         {data.map((d, i) => (
-          <div key={d.name} className="rounded-xl border border-border bg-background/80 px-3 py-2 text-xs shadow-sm">
+          <div key={d.name} className="rounded-lg border border-border bg-background/80 px-2.5 py-1.5 text-[11px] shadow-sm">
             <p className="flex items-center gap-2 text-foreground/90">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
               <span className="truncate font-medium">{d.name}</span>

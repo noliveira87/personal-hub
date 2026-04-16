@@ -56,7 +56,7 @@ export default function HighlightsPanel() {
   }, [allTransactions, selectedYear, selectedMonth, hideAmounts, t, formatCurrency]);
 
   return (
-    <div className="rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
+    <div className="h-full rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6">
       <h3 className="text-sm font-semibold text-foreground mb-4">{t('homeExpenses.charts.highlights')}</h3>
       <div className="space-y-4">
         {items.length === 0 && <p className="text-sm text-muted-foreground">{t('homeExpenses.charts.addTransactionsToSeeHighlights')}</p>}
