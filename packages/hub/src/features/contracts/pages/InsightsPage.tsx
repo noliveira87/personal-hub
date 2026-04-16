@@ -26,7 +26,7 @@ export default function InsightsPage() {
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
   const { priceMap } = usePriceHistoryMap(contractIds);
   const [selectedScope, setSelectedScope] = useState<string>('category:electricity');
-  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()));
+  const [selectedYear, setSelectedYear] = useState<string>('all');
   const [isEditingMilestones, setIsEditingMilestones] = useState(false);
   const [draftMilestones, setDraftMilestones] = useState<EnergyMilestone[]>([]);
   const [milestonesVersion, setMilestonesVersion] = useState(0);
