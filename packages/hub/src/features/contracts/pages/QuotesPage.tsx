@@ -384,18 +384,18 @@ export default function QuotesPage() {
                   </div>
                 </div>
                 {q.price != null && (
-                  <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-3">
                     <p className="text-base font-bold tabular-nums text-primary sm:text-lg">
                       {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(q.price, q.currency)}
                     </p>
                     {remainingToPay != null && (
                       remainingToPay > 0 ? (
-                        <div className="inline-flex w-fit items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
+                        <div className="inline-flex shrink-0 items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
                           <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
                           <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, q.currency)}</span>
                         </div>
                       ) : (
-                        <div className="inline-flex w-fit items-center gap-2 rounded-md border border-positive/30 bg-positive/10 px-2.5 py-1">
+                        <div className="inline-flex shrink-0 items-center gap-2 rounded-md border border-positive/30 bg-positive/10 px-2.5 py-1">
                           <span className="text-[11px] font-medium text-positive">{t('contracts.quotes.fullyPaidLabel')}</span>
                         </div>
                       )
