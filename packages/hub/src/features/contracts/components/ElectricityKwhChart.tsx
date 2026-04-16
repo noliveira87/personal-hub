@@ -5,8 +5,8 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import {
+  getGlobalEnergyMilestones,
   getEnergyMilestonesForContract,
-  setEnergyMilestonesForContract,
   type EnergyMilestone,
   type EnergyMilestoneType,
 } from '@/features/contracts/lib/solarInstallMonth';
@@ -37,13 +37,15 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
   const [data, setData] = useState<KwhDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [milestones, setMilestones] = useState<EnergyMilestone[]>([]);
-  const [draftMilestones, setDraftMilestones] = useState<EnergyMilestone[]>([]);
-  const [isEditingMilestones, setIsEditingMilestones] = useState(false);
 
   useEffect(() => {
-    const saved = getEnergyMilestonesForContract(contractId);
-    setMilestones(saved);
-    setDraftMilestones(saved);
+    const globalMilestones = getGlobalEnergyMilestones();
+    if (globalMilestones.length > 0) {
+      setMilestones(globalMilestones);
+      return;
+    }
+
+    setMilestones(getEnergyMilestonesForContract(contractId));
   }, [contractId]);
 
   useEffect(() => {
@@ -107,17 +109,6 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
       .filter((item): item is EnergyMilestone & { month: string; label: string } => item != null);
   }, [data, milestones]);
 
-  const solarInstallMonthOptions = useMemo(() => {
-    const unique = new Map<string, string>();
-    data.forEach((point) => {
-      if (!unique.has(point.monthKey)) {
-        unique.set(point.monthKey, format(parseISO(point.date), 'MMM yyyy'));
-      }
-    });
-
-    return Array.from(unique.entries()).map(([value, label]) => ({ value, label }));
-  }, [data]);
-
   const comparisonBaselineMonth = useMemo(() => {
     const primary = milestones.find((item) => item.type === 'solar' || item.type === 'solar-expansion');
     return primary?.monthKey ?? milestones[0]?.monthKey ?? '';
@@ -156,46 +147,6 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
       deltaPercent,
     };
   }, [data, comparisonBaselineMonth]);
-
-  const startEditingMilestones = () => {
-    setDraftMilestones(milestones);
-    setIsEditingMilestones(true);
-  };
-
-  const cancelEditingMilestones = () => {
-    setDraftMilestones(milestones);
-    setIsEditingMilestones(false);
-  };
-
-  const saveMilestones = () => {
-    const normalized = draftMilestones
-      .filter((item) => /^\d{4}-\d{2}$/.test(item.monthKey))
-      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-
-    setMilestones(normalized);
-    setEnergyMilestonesForContract(contractId, normalized);
-    setIsEditingMilestones(false);
-  };
-
-  const addDraftMilestone = () => {
-    const fallbackMonth = solarInstallMonthOptions[0]?.value ?? '';
-    setDraftMilestones((prev) => [
-      ...prev,
-      {
-        id: `milestone-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        monthKey: fallbackMonth,
-        type: 'solar',
-      },
-    ]);
-  };
-
-  const updateDraftMilestone = (id: string, updates: Partial<EnergyMilestone>) => {
-    setDraftMilestones((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
-  };
-
-  const removeDraftMilestone = (id: string) => {
-    setDraftMilestones((prev) => prev.filter((item) => item.id !== id));
-  };
 
   const milestoneTypeLabel = (type: EnergyMilestoneType) => {
     if (type === 'solar') return t('contracts.kwh.milestoneTypeSolar');
@@ -242,85 +193,19 @@ export default function ElectricityKwhChart({ contractId }: { contractId: string
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-sm font-semibold text-foreground">{t('contracts.kwh.title')}</h2>
         <div className="flex flex-col gap-1.5">
-          {isEditingMilestones ? (
-            <div className="space-y-2">
-              {draftMilestones.map((milestone) => (
-                <div key={milestone.id} className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={milestone.monthKey}
-                    onChange={(event) => updateDraftMilestone(milestone.id, { monthKey: event.target.value })}
-                    className="h-8 min-w-36 rounded-md border bg-background px-2 text-xs text-foreground"
-                  >
-                    <option value="">{t('contracts.kwh.solarInstallMonthPlaceholder')}</option>
-                    {solarInstallMonthOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={milestone.type}
-                    onChange={(event) => updateDraftMilestone(milestone.id, { type: event.target.value as EnergyMilestoneType })}
-                    className="h-8 min-w-36 rounded-md border bg-background px-2 text-xs text-foreground"
-                  >
-                    <option value="solar">{t('contracts.kwh.milestoneTypeSolar')}</option>
-                    <option value="solar-expansion">{t('contracts.kwh.milestoneTypeSolarExpansion')}</option>
-                    <option value="battery">{t('contracts.kwh.milestoneTypeBattery')}</option>
-                    <option value="other">{t('contracts.kwh.milestoneTypeOther')}</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => removeDraftMilestone(milestone.id)}
-                    className="h-8 rounded-md border border-destructive/30 px-2.5 text-xs font-medium text-destructive"
-                  >
-                    {t('contracts.kwh.milestoneRemove')}
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={addDraftMilestone}
-                  className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
-                >
-                  {t('contracts.kwh.milestoneAdd')}
-                </button>
-                <button
-                  type="button"
-                  onClick={saveMilestones}
-                  className="h-8 rounded-md border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary"
-                >
-                  {t('common.save')}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEditingMilestones}
-                  className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">{t('contracts.kwh.energyMilestonesLabel')}:</span>
-              {milestoneMarkers.length > 0 ? milestoneMarkers.map((milestone) => (
-                <span key={milestone.id} className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
-                  {milestoneTypeLabel(milestone.type)} · {milestone.label}
-                </span>
-              )) : (
-                <span className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
-                  {t('contracts.kwh.solarInstallMonthNotSet')}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={startEditingMilestones}
-                className="h-8 rounded-md border px-2.5 text-xs font-medium text-muted-foreground"
-              >
-                {milestones.length > 0 ? t('contracts.kwh.solarInstallMonthEdit') : t('contracts.kwh.solarInstallMonthSet')}
-              </button>
-            </div>
-          )}
-          <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.solarInstallMonthHelp')}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">{t('contracts.kwh.energyMilestonesLabel')}:</span>
+            {milestoneMarkers.length > 0 ? milestoneMarkers.map((milestone) => (
+              <span key={milestone.id} className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
+                {milestoneTypeLabel(milestone.type)} · {milestone.label}
+              </span>
+            )) : (
+              <span className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
+                {t('contracts.kwh.solarInstallMonthNotSet')}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">{t('contracts.kwh.milestonesManagedInInsights')}</p>
         </div>
       </div>
 
