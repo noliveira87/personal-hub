@@ -313,11 +313,13 @@ export default function QuotesPage() {
         <div className="space-y-3">
           {filteredQuotes.map(q => {
             const remainingToPay = computeRemainingToPay(q);
+            const isApproved = q.approvalStatus === 'approved';
+            const isRejected = q.approvalStatus === 'rejected';
 
             return (
               <div
                 key={q.id}
-                className="bg-card rounded-xl border p-5 flex flex-col gap-2 animate-fade-up cursor-pointer transition-colors hover:bg-muted/20"
+                className="bg-card rounded-xl border overflow-hidden animate-fade-up cursor-pointer transition-colors hover:bg-muted/20"
                 onClick={() => navigate(`/contracts/quotes/${q.id}`)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
@@ -328,27 +330,58 @@ export default function QuotesPage() {
                 role="button"
                 tabIndex={0}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-lg font-semibold text-foreground leading-tight sm:text-xl">{q.title}</p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {/* coloured top bar by status */}
+                <div className={`h-0.5 w-full ${isApproved ? 'bg-success' : isRejected ? 'bg-destructive' : 'bg-border'}`} />
+
+                <div className="p-4 space-y-3">
+                  {/* row 1: title + status badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-base font-semibold text-foreground leading-snug">{q.title}</p>
+                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${getQuoteStatusBadgeClasses(q.approvalStatus)}`}>
+                      {getQuoteApprovalSimpleLabel(q.approvalStatus)}
+                    </span>
+                  </div>
+
+                  {/* row 2: provider + date pills */}
+                  {(q.provider || q.date) && (
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {q.provider && (
-                        <span className="inline-flex w-fit items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                           <Building2 className="h-3 w-3" />
                           {q.provider}
                         </span>
                       )}
                       {q.date && (
-                        <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                        <span className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                           {format(parseISO(q.date), 'd MMM yyyy')}
                         </span>
                       )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${getQuoteStatusBadgeClasses(q.approvalStatus)}`}>
-                      {t('contracts.quotes.approvedSimpleLabel')}: {getQuoteApprovalSimpleLabel(q.approvalStatus)}
-                    </span>
+                  )}
+
+                  {/* row 3: price + remaining */}
+                  {q.price != null && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-lg font-bold tabular-nums text-primary">
+                        {formatCurrency(q.price, q.currency)}
+                      </span>
+                      {remainingToPay != null && (
+                        remainingToPay > 0 ? (
+                          <div className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5">
+                            <span className="text-[11px] text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
+                            <span className="text-[11px] font-bold tabular-nums text-warning">{formatCurrency(remainingToPay, q.currency)}</span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-success/30 bg-success/10 px-2 py-0.5">
+                            <span className="text-[11px] font-medium text-success">{t('contracts.quotes.fullyPaidLabel')}</span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {/* row 4: actions */}
+                  <div className="flex items-center justify-end gap-0.5 pt-1 border-t border-border/50">
                     {q.pdfUrl && (
                       <a
                         href={q.pdfUrl}
@@ -362,20 +395,14 @@ export default function QuotesPage() {
                       </a>
                     )}
                     <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleEdit(q);
-                      }}
+                      onClick={(event) => { event.stopPropagation(); handleEdit(q); }}
                       className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
                       title={t('contracts.quotes.edit')}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleDelete(q);
-                      }}
+                      onClick={(event) => { event.stopPropagation(); void handleDelete(q); }}
                       className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
                       title={t('contracts.quotes.delete')}
                     >
@@ -383,25 +410,6 @@ export default function QuotesPage() {
                     </button>
                   </div>
                 </div>
-                {q.price != null && (
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-base font-bold tabular-nums text-primary sm:text-lg">
-                      {t('contracts.quotes.priceTotalLabel')}: {formatCurrency(q.price, q.currency)}
-                    </p>
-                    {remainingToPay != null && (
-                      remainingToPay > 0 ? (
-                        <div className="inline-flex shrink-0 items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1">
-                          <span className="text-[11px] font-medium text-warning">{t('contracts.quotes.remainingToPayLabel')}:</span>
-                          <span className="text-sm font-semibold tabular-nums text-warning">{formatCurrency(remainingToPay, q.currency)}</span>
-                        </div>
-                      ) : (
-                        <div className="inline-flex shrink-0 items-center gap-2 rounded-md border border-positive/30 bg-positive/10 px-2.5 py-1">
-                          <span className="text-[11px] font-medium text-positive">{t('contracts.quotes.fullyPaidLabel')}</span>
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}
