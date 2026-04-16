@@ -79,6 +79,7 @@ export default function InsightsPage() {
         icon: CATEGORY_ICONS[cat],
         amount: Math.round(amount * 100) / 100,
       }))
+      .filter((item) => item.amount > 0)
       .sort((a, b) => b.amount - a.amount);
   }, [activeWithResolvedPrices, categoryNames]);
 
