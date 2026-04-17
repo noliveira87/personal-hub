@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Home, Loader, Pencil, Trash2, TrendingUp, X } from 'lucide-react';
+import { Building2, Home, Loader, Pencil, Trash2, X } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -112,7 +112,12 @@ function buildLegacyPurchaseCostEntries(deal: PropertyDeal) {
 }
 
 function normalizeCostLabel(value: string) {
-  return value.trim().toLowerCase();
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isDeedPurchaseCostLabel(value: string) {
+  const label = normalizeCostLabel(value);
+  return label === 'imt' || label === 'casa pronta' || label === 'imposto de selo' || label === 'imposto selo';
 }
 
 function isDefaultZeroPlaceholderEntry(entry: PropertyDeal['payload']['purchaseExtraEntries'][number]) {
@@ -325,6 +330,16 @@ export default function PropertyDealManager({
     [currentDeal.payload.purchaseExtraEntries],
   );
 
+  const deedPurchaseExtraEntries = useMemo(
+    () => (currentDeal.payload.purchaseExtraEntries ?? []).filter((entry) => isDeedPurchaseCostLabel(entry.label)),
+    [currentDeal.payload.purchaseExtraEntries],
+  );
+
+  const otherPurchaseExtraEntries = useMemo(
+    () => (currentDeal.payload.purchaseExtraEntries ?? []).filter((entry) => !isDeedPurchaseCostLabel(entry.label)),
+    [currentDeal.payload.purchaseExtraEntries],
+  );
+
   const effectiveSalePrice = useMemo(
     () => getEffectiveSalePrice(currentDeal.payload),
     [currentDeal.payload],
@@ -359,14 +374,9 @@ export default function PropertyDealManager({
   const isDetailOpen = selectedDealId != null && selectedDealId === currentDeal.id;
   const shouldShowDetail = !showCatalog || (!onOpenDeal && isDetailOpen);
   const totalDeals = deals.length;
-  const profitableDeals = deals.filter((deal) => getDealMetrics(deal).profit > 0).length;
   const avgProfit = deals.length > 0
     ? deals.reduce((sum, deal) => sum + getDealMetrics(deal).profit, 0) / deals.length
     : 0;
-  const portfolioTotalProfit = deals.reduce((sum, deal) => sum + getDealMetrics(deal).profit, 0);
-  const selectedDeal = deals.find((deal) => deal.id === selectedDealId) ?? null;
-  const selectedDealProfit = selectedDeal ? getDealMetrics(selectedDeal).profit : null;
-  const selectedDeltaVsAverage = selectedDealProfit == null ? null : selectedDealProfit - avgProfit;
 
   const formatDateValue = (value: string) => {
     if (!value) return '—';
@@ -550,45 +560,19 @@ export default function PropertyDealManager({
         : 'bg-transparent px-2 py-0 sm:px-0',
     )}>
       {showCatalog ? (
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground sm:text-lg">{t('propertyDeals.managerTitle')}</h3>
           <p className="text-xs text-muted-foreground sm:text-sm">{t('propertyDeals.managerSubtitle')}</p>
         </div>
-        {deals.length > 0 ? (
-          <div className="rounded-xl border border-border/70 bg-background/65 px-3 py-2">
-            <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5" />
-              {selectedDeal ? t('propertyDeals.comparison') : t('propertyDeals.portfolio')}
-            </div>
-            <p className={cn(
-              'mt-1 text-sm font-semibold tabular-nums',
-              (selectedDealProfit ?? portfolioTotalProfit) >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
-            )}>
-              {selectedDeal ? formatCurrency(selectedDealProfit ?? 0) : formatCurrency(portfolioTotalProfit)}
-            </p>
-            {selectedDeal && selectedDeltaVsAverage != null ? (
-              <p className={cn(
-                'text-xs',
-                selectedDeltaVsAverage >= 0 ? 'text-emerald-700/80 dark:text-emerald-300/80' : 'text-red-700/80 dark:text-red-300/80',
-              )}>
-                {selectedDeltaVsAverage >= 0 ? '+' : ''}{formatCurrency(selectedDeltaVsAverage)} {t('propertyDeals.vsMean')}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
       </div>
       ) : null}
 
       {showCatalog ? (
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="rounded-xl border border-border/70 bg-background/65 px-3 py-2.5">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('propertyDeals.properties')}</p>
           <p className="mt-1 text-lg font-semibold text-foreground">{totalDeals}</p>
-        </div>
-        <div className="rounded-xl border border-border/70 bg-background/65 px-3 py-2.5">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profitable')}</p>
-          <p className="mt-1 text-lg font-semibold text-foreground">{profitableDeals}</p>
         </div>
         <div className="rounded-xl border border-border/70 bg-background/65 px-3 py-2.5">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('propertyDeals.avgProfit')}</p>
@@ -599,7 +583,7 @@ export default function PropertyDealManager({
 
       {showCatalog ? (
       <div className="mb-4 space-y-3">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:[grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
           {!currentDealExistsInList ? (
             <button
               type="button"
@@ -645,16 +629,25 @@ export default function PropertyDealManager({
                     : 'border border-border bg-background/60',
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="space-y-2">
                   <div>
                     <p className="text-base font-bold leading-tight text-foreground">{deal.title}</p>
                   </div>
-                  <span className={metrics.profit >= 0
-                    ? 'rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300'
-                    : 'rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:text-red-300'}
-                  >
-                    {formatCurrency(metrics.profit)}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {deal.payload.saleStatus === 'sold' ? (
+                      <div className="inline-flex items-center rounded-full border border-success/20 bg-success/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-success">
+                        {t('propertyDeals.saleStatusSold')}
+                      </div>
+                    ) : null}
+                    <span className={cn(
+                      'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tabular-nums',
+                      metrics.profit >= 0
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        : 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+                    )}>
+                      {formatCurrency(metrics.profit)}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
@@ -822,18 +815,20 @@ export default function PropertyDealManager({
                 <div className="space-y-4">
                   {/* Total aquisição */}
                   <div className="rounded-lg border border-border/60 px-3 py-3">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalAcquisition')}</label>
-                    <div className="mt-2 flex items-center justify-end gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground">EUR</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        step="0.01"
-                        value={Number.isFinite(currentDeal.payload.purchasePrice) ? currentDeal.payload.purchasePrice : 0}
-                        onChange={(event) => updatePayload({ purchasePrice: Number(event.target.value) || 0 })}
-                        className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-semibold tabular-nums text-foreground"
-                      />
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalAcquisition')}</label>
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="0.01"
+                          value={Number.isFinite(currentDeal.payload.purchasePrice) ? currentDeal.payload.purchasePrice : 0}
+                          onChange={(event) => updatePayload({ purchasePrice: Number(event.target.value) || 0 })}
+                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-semibold tabular-nums text-foreground"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -943,6 +938,34 @@ export default function PropertyDealManager({
                           />
                         </div>
                       </div>
+
+                      {deedPurchaseExtraEntries.length > 0 ? (
+                        <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
+                          {deedPurchaseExtraEntries.map((entry) => (
+                            <div key={entry.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{entry.label}</span>
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                                  <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    min={0}
+                                    step="0.01"
+                                    value={entry.amount || 0}
+                                    onChange={(next) => updatePurchaseExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
+                                    className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                                  />
+                                </div>
+                                <DateInput value={entry.date} onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next })} />
+                                <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -950,8 +973,8 @@ export default function PropertyDealManager({
                   <div className="space-y-2 rounded-lg border border-border/60 px-3 py-3">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.otherPurchaseCosts')}</label>
                     <div className="space-y-2">
-                      {(currentDeal.payload.purchaseExtraEntries ?? []).map((entry) => (
-                        <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
+                      {otherPurchaseExtraEntries.map((entry) => (
+                        <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md bg-muted/30 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
                           <input
                             className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-foreground"
                             value={entry.label}
@@ -970,7 +993,7 @@ export default function PropertyDealManager({
                               className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
                             />
                           </div>
-                          <DateInput value={entry.date} onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next.target.value })} />
+                          <DateInput value={entry.date} onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next })} />
                           <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -1118,7 +1141,7 @@ export default function PropertyDealManager({
                                     className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
                                   />
                                 </div>
-                                <DateInput value={entry.date} onChange={(next) => updateSaleExtraEntry(entry.id, { date: next.target.value })} />
+                                <DateInput value={entry.date} onChange={(next) => updateSaleExtraEntry(entry.id, { date: next })} />
                                 <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removeSaleExtraEntry(entry.id)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
