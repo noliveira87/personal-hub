@@ -96,8 +96,59 @@ function createDefaultPurchaseCostEntries() {
   ];
 }
 
-function withDefaultPurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
-  if ((deal.payload.purchaseExtraEntries ?? []).length > 0) return deal;
+function buildLegacyPurchaseCostEntries(deal: PropertyDeal) {
+  const costs = deal.payload.costs;
+  const legacyRows = [
+    ['Cheque bancario', costs.bankCheque],
+    ['IMT + imposto selo', costs.taxesAndStamp],
+    ['Casa pronta', costs.houseReady],
+    ['Leroy Merlin', costs.leroyMerlin],
+    ['IKEA', costs.ikea],
+  ] as const;
+
+  return legacyRows
+    .filter(([, amount]) => amount > 0)
+    .map(([label, amount]) => ({ id: crypto.randomUUID(), label, amount, date: '' }));
+}
+
+function normalizeCostLabel(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isDefaultZeroPlaceholderEntry(entry: PropertyDeal['payload']['purchaseExtraEntries'][number]) {
+  const label = normalizeCostLabel(entry.label);
+  return (label === 'imt' || label === 'imposto de selo') && (entry.amount || 0) === 0 && (entry.date || '') === '';
+}
+
+function normalizePurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
+  const entries = deal.payload.purchaseExtraEntries ?? [];
+  const legacyEntries = buildLegacyPurchaseCostEntries(deal);
+
+  if (legacyEntries.length > 0) {
+    const cleanedEntries = entries.filter((entry) => !isDefaultZeroPlaceholderEntry(entry));
+    const existingLabels = new Set(cleanedEntries.map((entry) => normalizeCostLabel(entry.label)));
+
+    const missingLegacyEntries = legacyEntries.filter((entry) => !existingLabels.has(normalizeCostLabel(entry.label)));
+
+    // Move legacy fixed costs into the editable extra list and zero old slots to avoid double counting.
+    return {
+      ...deal,
+      payload: {
+        ...deal.payload,
+        purchaseExtraEntries: [...cleanedEntries, ...missingLegacyEntries],
+        costs: {
+          ...deal.payload.costs,
+          bankCheque: 0,
+          taxesAndStamp: 0,
+          houseReady: 0,
+          leroyMerlin: 0,
+          ikea: 0,
+        },
+      },
+    };
+  }
+
+  if (entries.length > 0) return deal;
 
   return {
     ...deal,
@@ -176,7 +227,7 @@ export default function PropertyDealManager({
       setLoading(true);
       try {
         const fetchedRows = await fetchPropertyDeals();
-        const rows = fetchedRows.map(withDefaultPurchaseCostEntries);
+        const rows = fetchedRows.map(normalizePurchaseCostEntries);
         if (!mounted) return;
 
         if (rows.length === 0) {
@@ -641,7 +692,12 @@ export default function PropertyDealManager({
                 <p className="mt-1 truncate text-xs text-muted-foreground">{formatDealAddress(currentDeal.payload.address) || t('propertyDeals.noAddress')}</p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="inline-flex items-center rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className={cn(
+                  'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                  currentDeal.payload.saleStatus === 'sold'
+                    ? 'bg-success/10 text-success border-success/20'
+                    : 'border-border/70 bg-background/70 text-muted-foreground',
+                )}>
                   {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.saleStatusSold') : t('propertyDeals.saleStatusNotSold')}
                 </div>
                 {isEditing ? (
@@ -692,25 +748,13 @@ export default function PropertyDealManager({
               {/* COMPRA */}
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalAcquisition')}</p>
-                <p className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatCurrency(purchaseTotalIncluded)}</p>
+                <p className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.purchasePrice)}</p>
               </div>
 
               {/* VENDA */}
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalSaleValue')}</p>
                 <p className="mt-2 text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</p>
-                <div className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1.5">
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>{t('propertyDeals.saleValue')}:</span>
-                    <span>{formatCurrency(effectiveSalePrice)}</span>
-                  </div>
-                  {saleExtraTotal > 0 && (
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>{t('propertyDeals.extraValuesSection')}:</span>
-                      <span>{formatCurrency(saleExtraTotal)}</span>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -1132,9 +1176,14 @@ export default function PropertyDealManager({
               {/* PREVIEW MODE - Purchase Board */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
-                  <div className="mb-4 flex items-center gap-2">
-                    <Home className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold text-foreground">{t('propertyDeals.purchaseBoard')}</h3>
+                  <div className="mb-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.purchase')}</h3>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      escritura: {formatDateValue(currentDeal.payload.purchaseDates.escritura)}
+                    </span>
                   </div>
                   <div className="space-y-3">
                     <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
@@ -1179,15 +1228,16 @@ export default function PropertyDealManager({
                 {/* PREVIEW MODE - Sale Board */}
                 {showSaleBoard && (
                   <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
-                    <div className="mb-4 flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="text-sm font-semibold text-foreground">{t('propertyDeals.saleBoard')}</h3>
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.sale')}</h3>
+                      </div>
+                      <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        escritura: {formatDateValue(currentDeal.payload.saleDates.escrituraDate)}
+                      </span>
                     </div>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                        <span className="text-xs text-muted-foreground">{t('propertyDeals.saleStatus')}</span>
-                        <span className="text-sm font-medium text-foreground">{currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.saleStatusSold') : t('propertyDeals.saleStatusNotSold')}</span>
-                      </div>
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                         <span className="text-xs text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
                         <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
@@ -1197,11 +1247,7 @@ export default function PropertyDealManager({
                           <span className="text-xs font-semibold text-muted-foreground">{t('propertyDeals.totalSaleValue')}</span>
                           <span className="text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</span>
                         </div>
-                        <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span>{t('propertyDeals.saleValue')}:</span>
-                            <span>{formatCurrency(effectiveSalePrice)}</span>
-                          </div>
+                        <div className="mt-2 space-y-1 pt-2">
                           {saleExtraTotal > 0 && (
                             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                               <span>{t('propertyDeals.otherSaleValues')}:</span>
