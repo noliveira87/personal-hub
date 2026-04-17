@@ -3,7 +3,7 @@ import { Building2, Home, Pencil, Trash2, TrendingUp } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   DEFAULT_PROPERTY_DEAL_PAYLOAD,
   PropertyAddress,
@@ -469,6 +469,8 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
+          <DialogTitle className="sr-only">Detalhes do imóvel</DialogTitle>
+          <DialogDescription className="sr-only">Editar informações do imóvel incluindo endereço, custos de compra e venda, e cálculos de lucro.</DialogDescription>
           <div className="mb-6 flex items-start justify-between gap-6 pr-6">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-foreground">{currentDeal.title || 'Novo imovel'}</h2>
