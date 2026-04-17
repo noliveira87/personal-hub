@@ -38,6 +38,7 @@ const HomeExpensesTransactionsPage = lazy(() => import("@/features/home-expenses
 const HomeExpensesMonthlyPage = lazy(() => import("@/features/home-expenses/pages/Monthly"));
 const HomeExpensesInsightsPage = lazy(() => import("@/features/home-expenses/pages/Insights"));
 const HomeExpensesChecklistPage = lazy(() => import("@/features/home-expenses/pages/Checklist"));
+const PropertyDealsPage = lazy(() => import("@/features/property-deals/pages/PropertyDealsPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -116,6 +117,9 @@ const AppRoutes = () => {
 
             {/* Warranties */}
             <Route path="/warranties" element={<WarrantiesPage />} />
+
+            {/* Property deals */}
+            <Route path="/property-deals" element={<PropertyDealsPage />} />
 
             {/* Settings */}
             <Route path="/settings" element={<SettingsPage />} />

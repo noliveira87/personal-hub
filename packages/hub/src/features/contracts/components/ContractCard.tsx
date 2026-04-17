@@ -20,6 +20,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   const [, setReadStateVersion] = useState(0);
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
+  const derivedStatus = daysLeft <= 0 && contract.status === 'active' ? 'expired' : contract.status;
   const hasAlerts = contract.alerts.length > 0;
   const hasUnreadAlerts = hasUnreadContractAlerts(contract);
 
@@ -73,7 +74,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
               {hasUnreadAlerts ? <BellDot className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
             </span>
           )}
-          <StatusBadge status={contract.status} />
+          <StatusBadge status={derivedStatus} />
         </div>
       </div>
 
@@ -96,7 +97,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
             <CalendarDays className="w-3 h-3" />
             <span className="truncate">{contractDateLabel}</span>
           </div>
-          {contract.status !== 'archived' && contract.status !== 'expired' && (
+          {contract.status !== 'archived' && contract.status !== 'expired' && daysLeft > 0 && (
             <p className={cn(
               'text-xs font-medium mt-0.5',
               urgency === 'critical' && 'text-urgent',

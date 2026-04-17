@@ -641,13 +641,21 @@ export const translations = {
       projects: {
         homeExpenses: { title: "Finanças da Casa", subtitle: "Salários e despesas" },
         portfolio: { title: "Rumo Financeiro", subtitle: "Investimentos" },
-    cashbackHero: { title: "Carteira de Cashback", subtitle: "Compras e cashback" },
+        cashbackHero: { title: "Carteira de Cashback", subtitle: "Compras e cashback" },
+        propertyDeals: { title: "Imóveis", subtitle: "Compra e venda" },
         trips: { title: "Livro de Memórias", subtitle: "Viagens" },
         journeyBites: { title: "Dentadas pelo Mundo", subtitle: "Comidas e memórias" },
         health: { title: "Saúde", subtitle: "Histórico de exames" },
-        contracts: { title: "Contratos e Orçamentos", subtitle: "Prazos, renovações e propostas" },
+        contracts: { title: "Contratos e Orçamentos", subtitle: "Prazos · Renovações" },
         warranties: { title: "Garantias", subtitle: "Garantias de Equipamentos" },
       },
+    },
+    propertyDeals: {
+      managerTitle: "Gestão de imóveis",
+      managerSubtitle: "Seleciona um card para abrir os detalhes e editar o negócio.",
+      dialogTitle: "Detalhes do imóvel",
+      dialogSummaryTitle: "Resumo do imóvel",
+      confirmDelete: "Remover {{name}}?",
     },
     health: {
       title: "Saúde",
@@ -981,6 +989,7 @@ export const translations = {
       badges: {
         referral: "Referral",
         unibanco: "Unibanco",
+        stacked: "Stacked x{{count}}",
       },
       insights: {
         title: "Insights",
@@ -1001,6 +1010,9 @@ export const translations = {
         universoCapReachedNoCuts: "Universo ({{cycle}}): cap de {{cap}} — atingido (usado {{used}})",
         universoNoCapHit: "Universo {{cycle}}: usado {{used}} de {{cap}} (faltam {{remaining}})",
         coverage: "Cobertura de cashback: {{covered}}/{{total}} compras elegíveis ({{rate}}%)",
+        stackRate: "Stack em {{stacked}}/{{total}} compras com cashback ({{rate}}%)",
+        stackLift: "Stacking acrescentou {{amount}} de cashback este mês",
+        topStackCombo: "Melhor combinação de stack: {{combo}} ({{amount}})",
         topSource: "Fonte com maior retorno no mês: {{source}} ({{amount}})",
         cardRulePill: "Cartão",
         generalPill: "Geral",
@@ -1989,13 +2001,21 @@ export const translations = {
       projects: {
         homeExpenses: { title: "Home Finances", subtitle: "Income and expenses" },
         portfolio: { title: "Portfolio Journey", subtitle: "Investments" },
-    cashbackHero: { title: "Reward Wallet", subtitle: "Purchases and cashback" },
+        cashbackHero: { title: "Reward Wallet", subtitle: "Purchases and cashback" },
+        propertyDeals: { title: "Property Deals", subtitle: "Buy and sell" },
         trips: { title: "Book of Memories", subtitle: "Lifetime trips and memories!" },
         journeyBites: { title: "Journey Bites", subtitle: "Food moments from your trips" },
         health: { title: "Health", subtitle: "Medical timeline" },
-        contracts: { title: "Contracts and Quotes", subtitle: "Due dates, renewals, and proposals" },
+        contracts: { title: "Contracts and Quotes", subtitle: "Deadlines · Renewals" },
         warranties: { title: "Warranties", subtitle: "Equipment Warranties" },
       },
+    },
+    propertyDeals: {
+      managerTitle: "Property deals management",
+      managerSubtitle: "Select a card to open details and edit the deal.",
+      dialogTitle: "Property details",
+      dialogSummaryTitle: "Property summary",
+      confirmDelete: "Delete {{name}}?",
     },
     health: {
       title: "Health",
@@ -2326,6 +2346,7 @@ export const translations = {
       badges: {
         referral: "Referral",
         unibanco: "Unibanco",
+        stacked: "Stacked x{{count}}",
       },
       insights: {
         title: "Insights",
@@ -2346,6 +2367,9 @@ export const translations = {
         universoCapReachedNoCuts: "Universo ({{cycle}}): {{cap}} cap — reached (used {{used}})",
         universoNoCapHit: "Universo {{cycle}}: used {{used}} of {{cap}} ({{remaining}} left)",
         coverage: "Cashback coverage: {{covered}}/{{total}} eligible purchases ({{rate}}%)",
+        stackRate: "Stack on {{stacked}}/{{total}} cashback purchases ({{rate}}%)",
+        stackLift: "Stacking added {{amount}} cashback this month",
+        topStackCombo: "Top stack combo: {{combo}} ({{amount}})",
         topSource: "Top cashback source this month: {{source}} ({{amount}})",
         cardRulePill: "Card",
         generalPill: "General",

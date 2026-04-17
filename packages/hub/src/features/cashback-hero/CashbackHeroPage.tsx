@@ -903,6 +903,58 @@ function CashbackHeroPage() {
         total: String(eligibleForCoverage.length),
         rate: coverageRate.toFixed(0),
       }), 'medium');
+
+      const purchasesWithCashback = eligibleForCoverage.filter((purchase) => getEffectiveTotalCashback(purchase, cappedEntryAmounts) > 0);
+      const stackedPurchases = purchasesWithCashback.filter((purchase) => purchase.cashbackEntries.length > 1);
+      if (purchasesWithCashback.length > 0 && stackedPurchases.length > 0) {
+        const stackRate = (stackedPurchases.length / purchasesWithCashback.length) * 100;
+        pushGeneralInsight(t('cashbackHero.insights.stackRate', {
+          stacked: String(stackedPurchases.length),
+          total: String(purchasesWithCashback.length),
+          rate: stackRate.toFixed(0),
+        }), 'low');
+
+        const stackLift = stackedPurchases.reduce((sum, purchase) => {
+          const effectiveAmounts = getEffectiveEntryAmounts(purchase, cappedEntryAmounts)
+            .map((item) => item.amount)
+            .filter((amount) => amount > 0)
+            .sort((a, b) => b - a);
+
+          if (effectiveAmounts.length <= 1) return sum;
+          const incremental = effectiveAmounts.slice(1).reduce((carry, amount) => carry + amount, 0);
+          return sum + incremental;
+        }, 0);
+
+        if (stackLift > 0.0001) {
+          pushGeneralInsight(t('cashbackHero.insights.stackLift', {
+            amount: formatCurrency(stackLift, 'EUR'),
+          }), 'medium', stackLift);
+        }
+
+        const stackComboTotals = stackedPurchases.reduce<Record<string, number>>((acc, purchase) => {
+          const effectiveByEntryId = new Map(getEffectiveEntryAmounts(purchase, cappedEntryAmounts).map((item) => [item.id, item.amount]));
+          const combo = Array.from(new Set(purchase.cashbackEntries.map((entry) => entry.source)))
+            .sort((a, b) => a.localeCompare(b))
+            .join(' + ');
+          const comboTotal = purchase.cashbackEntries.reduce((sum, entry) => {
+            return sum + (effectiveByEntryId.get(entry.id) ?? 0);
+          }, 0);
+
+          if (!combo) return acc;
+          acc[combo] = (acc[combo] ?? 0) + comboTotal;
+          return acc;
+        }, {});
+
+        const topStackCombo = Object.entries(stackComboTotals)
+          .sort((a, b) => b[1] - a[1])[0];
+
+        if (topStackCombo && topStackCombo[1] > 0.0001) {
+          pushGeneralInsight(t('cashbackHero.insights.topStackCombo', {
+            combo: topStackCombo[0],
+            amount: formatCurrency(topStackCombo[1], 'EUR'),
+          }), 'low', topStackCombo[1]);
+        }
+      }
     }
 
     const sourceTotals = monthPurchases.reduce<Record<string, number>>((acc, purchase) => {
@@ -925,12 +977,6 @@ function CashbackHeroPage() {
     }
 
     // --- General insights ---
-    if (stats.bestPurchase) {
-      pushGeneralInsight(t('cashbackHero.insights.bestDeal', {
-        merchant: stats.bestPurchase.merchant,
-        percent: getDisplayPercentFromPurchase(stats.bestPurchase, cappedEntryAmounts).toFixed(2).replace(/\.?0+$/, ''),
-      }), 'low');
-    }
 
     if (noCashbackPurchases.length > 0) {
       pushGeneralInsight(t('cashbackHero.insights.noCashback', {
@@ -960,7 +1006,6 @@ function CashbackHeroPage() {
   ]);
 
   const visibleInsights = useMemo(() => {
-    const seenCardInsights = new Set<CardInsightKey>();
     const priorityWeight: Record<InsightPriority, number> = {
       high: 3,
       medium: 2,
@@ -968,17 +1013,12 @@ function CashbackHeroPage() {
     };
 
     return [...insights]
+      .filter((item) => !item.isCardSpecific)
       .sort((a, b) => {
         const byPriority = priorityWeight[b.priority] - priorityWeight[a.priority];
         if (byPriority !== 0) return byPriority;
         return (b.impactEur ?? 0) - (a.impactEur ?? 0);
-      })
-      .filter((item) => {
-      if (!item.isCardSpecific || !item.cardKey) return true;
-      if (seenCardInsights.has(item.cardKey)) return false;
-      seenCardInsights.add(item.cardKey);
-      return true;
-    });
+      });
   }, [insights]);
 
   const monthLabel = selectedMonth === 'all'
@@ -1588,6 +1628,7 @@ function CashbackHeroPage() {
               const componentSources = getCashbackComponentSources(purchase);
               const visibleComponentSources = componentSources.slice(0, 3);
               const hiddenComponentCount = Math.max(0, componentSources.length - visibleComponentSources.length);
+              const hasStackedCashback = purchase.cashbackEntries.length > 1;
 
               return (
                 <div key={purchase.id} className="overflow-hidden rounded-xl border bg-card">
@@ -1607,6 +1648,11 @@ function CashbackHeroPage() {
                           {purchase.isUnibanco && componentSources.length === 0 ? (
                             <span className="rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                               {t('cashbackHero.badges.unibanco')}
+                            </span>
+                          ) : null}
+                          {hasStackedCashback ? (
+                            <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                              {t('cashbackHero.badges.stacked', { count: String(purchase.cashbackEntries.length) })}
                             </span>
                           ) : null}
                         </div>

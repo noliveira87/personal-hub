@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ArrowUpRight, ChartLine, Coins, Eye, EyeOff, FileCheck2, HeartPulse, House, Map, Moon, Settings, ShieldCheck, Sun, UtensilsCrossed } from "lucide-react";
+import { ArrowUpRight, Building2, ChartLine, Coins, Eye, EyeOff, FileCheck2, HeartPulse, House, Map, Moon, Settings, ShieldCheck, Sun, UtensilsCrossed } from "lucide-react";
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ const projectDefinitions = [
   { key: "homeExpenses", to: "/home-expenses", icon: House },
   { key: "portfolio", to: "/portfolio", icon: ChartLine },
 	{ key: "cashbackHero", to: "/cashback-hero", icon: Coins },
+	{ key: "propertyDeals", to: "/property-deals", icon: Building2 },
   { key: "trips", to: "/trips", icon: Map },
 	{ key: "journeyBites", to: "/journey-bites", icon: UtensilsCrossed },
 	{ key: "health", to: "/health", icon: HeartPulse },
@@ -28,6 +29,7 @@ const managementCardStyles = {
 	homeExpenses: "border-emerald-500/35 bg-[radial-gradient(circle_at_15%_15%,hsl(160_84%_39%/0.18),transparent_45%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))]",
 	portfolio: "border-sky-500/35 bg-[radial-gradient(circle_at_18%_20%,hsl(200_98%_39%/0.2),transparent_46%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))]",
 	cashbackHero: "border-lime-500/35 bg-[radial-gradient(circle_at_18%_20%,hsl(88_65%_52%/0.2),transparent_46%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))]",
+	propertyDeals: "border-indigo-500/35 bg-[radial-gradient(circle_at_18%_20%,hsl(231_84%_60%/0.18),transparent_46%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))]",
 	contracts: "border-amber-500/35 bg-[radial-gradient(circle_at_15%_15%,hsl(35_92%_50%/0.2),transparent_45%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))]",
 	warranties: "border-rose-500/35 bg-[radial-gradient(circle_at_18%_20%,hsl(352_83%_58%/0.18),transparent_46%),linear-gradient(150deg,hsl(var(--card)),hsl(var(--background)))]",
 } as const;
