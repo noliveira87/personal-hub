@@ -758,11 +758,7 @@ export default function PropertyDealManager({
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.ownInvestment')}</p>
-                <p className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatCurrency(ownInvestment)}</p>
-              </div>
+            <div className="mt-3 grid grid-cols-1 gap-3">
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
                 <p className={cn(
@@ -1174,9 +1170,9 @@ export default function PropertyDealManager({
           {!isEditing && (
             <>
               {/* PREVIEW MODE - Purchase Board */}
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
-                  <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-border/60 bg-card p-3 sm:p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Home className="h-4 w-4 text-muted-foreground" />
                       <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.purchase')}</h3>
@@ -1185,10 +1181,10 @@ export default function PropertyDealManager({
                       escritura: {formatDateValue(currentDeal.payload.purchaseDates.escritura)}
                     </span>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground">{t('propertyDeals.totalAcquisition')}</span>
+                        <span className="text-xs font-semibold text-muted-foreground">Valor investido na compra</span>
                         <span className="text-sm font-bold tabular-nums text-foreground">{formatCurrency(purchaseTotalIncluded)}</span>
                       </div>
                       <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
@@ -1218,17 +1214,13 @@ export default function PropertyDealManager({
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                      <span className="text-xs text-muted-foreground">{t('propertyDeals.purchaseDeedDate')}</span>
-                      <span className="text-sm font-medium text-foreground">{formatDateValue(currentDeal.payload.purchaseDates.escritura)}</span>
-                    </div>
                   </div>
                 </div>
 
                 {/* PREVIEW MODE - Sale Board */}
                 {showSaleBoard && (
-                  <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
-                    <div className="mb-4 flex items-center justify-between gap-2">
+                  <div className="rounded-xl border border-border/60 bg-card p-3 sm:p-4">
+                    <div className="mb-3 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
                         <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.sale')}</h3>
@@ -1237,7 +1229,7 @@ export default function PropertyDealManager({
                         escritura: {formatDateValue(currentDeal.payload.saleDates.escrituraDate)}
                       </span>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                         <span className="text-xs text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
                         <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
@@ -1247,14 +1239,14 @@ export default function PropertyDealManager({
                           <span className="text-xs font-semibold text-muted-foreground">{t('propertyDeals.totalSaleValue')}</span>
                           <span className="text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</span>
                         </div>
-                        <div className="mt-2 space-y-1 pt-2">
-                          {saleExtraTotal > 0 && (
+                        {saleExtraTotal > 0 && (
+                          <div className="mt-2 space-y-1 pt-2">
                             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                               <span>{t('propertyDeals.otherSaleValues')}:</span>
                               <span>{formatCurrency(saleExtraTotal)}</span>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                         <span className="text-xs text-muted-foreground">{t('propertyDeals.valueOnDeeds')}</span>
