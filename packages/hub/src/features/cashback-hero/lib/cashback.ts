@@ -11,6 +11,7 @@ type CashbackPurchaseRow = {
   notes: string | null;
   is_referral: boolean | null;
   is_unibanco: boolean | null;
+  is_cetelem: boolean | null;
   created_at: string;
   updated_at: string;
 };

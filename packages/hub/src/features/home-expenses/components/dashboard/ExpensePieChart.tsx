@@ -58,8 +58,6 @@ export default function ExpensePieChart() {
       .sort((a, b) => b.value - a.value);
   }, [allTransactions, selectedYear, selectedMonth, t, hideAmounts]);
 
-  const outerRadius = 108;
-
   if (data.length === 0) {
     return (
       <div className="h-full min-h-96 rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex items-center justify-center">
@@ -71,10 +69,18 @@ export default function ExpensePieChart() {
   return (
     <div className="h-full min-h-96 rounded-3xl border border-border/80 bg-card p-5 shadow-sm sm:p-6 flex flex-col">
       <h3 className="text-sm font-semibold text-foreground mb-3">{t('homeExpenses.charts.expenseDistribution')}</h3>
-      <div className="w-full" style={{ height: 260 }}>
-        <ResponsiveContainer width="100%" height={260}>
+      <div className="w-full min-h-[240px] flex-1">
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} cx="50%" cy="50%" innerRadius={62} outerRadius={outerRadius} paddingAngle={2} dataKey="value">
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="54%"
+              outerRadius="82%"
+              paddingAngle={2}
+              dataKey="value"
+            >
               {data.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
@@ -83,7 +89,7 @@ export default function ExpensePieChart() {
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-1 gap-2 mt-3 sm:grid-cols-2">
+      <div className="mt-3 grid max-h-44 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
         {data.map((d, i) => (
           <div key={d.name} className="rounded-lg border border-border bg-background/80 px-2.5 py-1.5 text-[11px] shadow-sm">
             <p className="flex items-center gap-2 text-foreground/90">

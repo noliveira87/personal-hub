@@ -1,8 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { format, parse, addMonths, subMonths, parseISO, getDaysInMonth, endOfMonth } from 'date-fns';
+import { format, parse, addMonths, subMonths, subDays, parseISO, getDaysInMonth, endOfMonth } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { chartAxisTickStyle, chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipLabelStyle, chartTooltipItemStyle } from '@/lib/chartTheme';
-import { pt } from 'date-fns/locale';
+import { enUS, pt } from 'date-fns/locale';
 import {
   ArrowUpDown,
   Calendar,
@@ -84,6 +84,17 @@ import { mapContractCategoryToExpenseCategory } from '@/features/home-expenses/l
 import { insertTransaction } from '@/features/home-expenses/lib/store';
 import { getContractCategoryIcon, type Contract } from '@/features/contracts/types/contract';
 import type { ExpenseCategory } from '@/features/home-expenses/lib/types';
+
+type CardInsightKey = 'unibanco' | 'cetelem' | 'universo';
+type InsightPriority = 'high' | 'medium' | 'low';
+
+type InsightItem = {
+  line: string;
+  isCardSpecific: boolean;
+  cardKey?: CardInsightKey;
+  priority: InsightPriority;
+  impactEur?: number;
+};
 
 function formatDateLabel(raw: string): string {
   try {
@@ -395,7 +406,7 @@ function getCashbackComponentSources(purchase: CashbackPurchase): string[] {
 }
 
 function CashbackHeroPage() {
-  const { formatCurrency, t } = useI18n();
+  const { formatCurrency, t, language } = useI18n();
   const { confirm, confirmDialog } = useConfirmDialog();
   const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, syncCetelemPurchase, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
   const contractsContext = useOptionalContracts();
@@ -503,6 +514,8 @@ function CashbackHeroPage() {
     [purchases, universoSourceRegex, universoCycleCapEur, universoStatementDay],
   );
 
+  const dateFnsLocale = useMemo(() => (language === 'pt' ? pt : enUS), [language]);
+
   const [chartMonths, setChartMonths] = useState<CashbackChartMonths>(12);
 
   useEffect(() => {
@@ -530,10 +543,10 @@ function CashbackHeroPage() {
     });
     return Array.from(monthMap.entries()).map(([month, cashback]) => ({
       month,
-      label: format(parse(`${month}-01`, 'yyyy-MM-dd', new Date()), 'MMM yy', { locale: pt }),
+      label: format(parse(`${month}-01`, 'yyyy-MM-dd', new Date()), 'MMM yy', { locale: dateFnsLocale }),
       cashback: Math.round(cashback * 100) / 100,
     }));
-  }, [purchases, cappedEntryAmounts]);
+  }, [purchases, cappedEntryAmounts, dateFnsLocale]);
 
   const universoCycles = useMemo(() => {
     if (selectedMonth === 'all') return [];
@@ -624,7 +637,7 @@ function CashbackHeroPage() {
     const currentDate = new Date();
     const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
     const daysRemaining = today.getTime() <= monthEnd.getTime() ? Math.ceil((monthEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
-    const cycleLabel = `1–${getDaysInMonth(monthDate)} ${format(monthDate, 'MMM', { locale: pt })}`;
+    const cycleLabel = `1–${getDaysInMonth(monthDate)} ${format(monthDate, 'MMM', { locale: dateFnsLocale })}`;
     
     return {
       spent,
@@ -642,7 +655,36 @@ function CashbackHeroPage() {
       annualCashbackUsed,
       annualCashbackRemaining,
     };
-  }, [selectedMonth, monthPurchases, purchases, unibancoAnnualCapEur]);
+  }, [selectedMonth, monthPurchases, purchases, unibancoAnnualCapEur, dateFnsLocale]);
+
+  const purchaseSearchIndex = useMemo(() => {
+    const byId = new Map<string, string>();
+
+    monthPurchases.forEach((purchase) => {
+      const categoryLabel = getCategoryLabel(purchase.category).toLowerCase();
+      const sourceLabels = purchase.cashbackEntries.map((entry) => entry.source.toLowerCase());
+      const stateLabels = [
+        purchase.isReferral ? 'referral' : '',
+        purchase.isUnibanco ? 'unibanco' : '',
+        purchase.isCetelem ? 'cetelem' : '',
+      ].filter(Boolean);
+
+      const searchable = [
+        purchase.merchant,
+        purchase.category,
+        categoryLabel,
+        purchase.notes ?? '',
+        ...sourceLabels,
+        ...stateLabels,
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      byId.set(purchase.id, searchable);
+    });
+
+    return byId;
+  }, [monthPurchases]);
 
   const cetelemStatus = useMemo(() => {
     if (selectedMonth === 'all') return null;
@@ -716,27 +758,7 @@ function CashbackHeroPage() {
 
     if (search.trim()) {
       const term = search.trim().toLowerCase();
-      result = result.filter((purchase) => {
-        const categoryLabel = getCategoryLabel(purchase.category).toLowerCase();
-        const sourceLabels = purchase.cashbackEntries.map((entry) => entry.source.toLowerCase());
-        const stateLabels = [
-          purchase.isReferral ? 'referral' : '',
-          purchase.isUnibanco ? 'unibanco' : '',
-        ].filter(Boolean);
-
-        const searchable = [
-          purchase.merchant,
-          purchase.category,
-          categoryLabel,
-          purchase.notes ?? '',
-          ...sourceLabels,
-          ...stateLabels,
-        ]
-          .join(' ')
-          .toLowerCase();
-
-        return searchable.includes(term);
-      });
+      result = result.filter((purchase) => (purchaseSearchIndex.get(purchase.id) ?? '').includes(term));
     }
 
     if (categoryFilter !== 'all') {
@@ -754,7 +776,7 @@ function CashbackHeroPage() {
     }
 
     return result;
-  }, [monthPurchases, search, categoryFilter, sourceFilter, sortByPercent, cappedEntryAmounts]);
+  }, [monthPurchases, search, categoryFilter, sourceFilter, sortByPercent, cappedEntryAmounts, purchaseSearchIndex]);
 
   const stats = useMemo(() => {
     const monthSpent = monthPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
@@ -783,57 +805,62 @@ function CashbackHeroPage() {
   }, [monthPurchases, purchases, cappedEntryAmounts]);
 
   const insights = useMemo(() => {
-    if (monthPurchases.length === 0) return [] as string[];
+    if (monthPurchases.length === 0) return [] as InsightItem[];
 
     const noCashbackPurchases = monthPurchases.filter((purchase) => !purchase.isReferral && purchase.cashbackEntries.length === 0);
     const totalWithoutCashback = noCashbackPurchases.reduce((sum, purchase) => sum + purchase.amount, 0);
 
-    const list: string[] = [];
+    const list: InsightItem[] = [];
+    const pushGeneralInsight = (line: string, priority: InsightPriority = 'low', impactEur?: number) => list.push({ line, isCardSpecific: false, priority, impactEur });
+    const pushCardInsight = (cardKey: CardInsightKey, line: string, priority: InsightPriority = 'medium', impactEur?: number) => list.push({ line, isCardSpecific: true, cardKey, priority, impactEur });
 
     // --- Unibanco tier insight ---
     if (selectedMonth !== 'all') {
       const unibancoEligible = monthPurchases.filter((p) => (p.isUnibanco ?? false) && !(p.isReferral ?? false));
       const unibancoSpent = unibancoEligible.reduce((sum, p) => sum + p.amount, 0);
-      const activeTier = getActiveTier(unibancoSpent);
-      const nextTier = getNextTier(unibancoSpent);
+      const maxTier = UNIBANCO_TIERS.reduce((best, tier) => (tier.cashback > best.cashback ? tier : best), UNIBANCO_TIERS[0]);
+      const tier20 = UNIBANCO_TIERS.find((tier) => tier.cashback === 20) ?? maxTier;
       const topTierThreshold = unibancoTopTierSpendCap > 0 ? unibancoTopTierSpendCap : UNIBANCO_TIERS[0].minSpend;
+      const targetSpendFor20 = Math.max(topTierThreshold, tier20.minSpend);
 
       if (unibancoEligible.length === 0) {
-        list.push(t('cashbackHero.insights.unibancoNoSpend', { min: String(UNIBANCO_TIERS[UNIBANCO_TIERS.length - 1].minSpend) }));
-      } else if (activeTier) {
-        if (activeTier.minSpend === topTierThreshold) {
-          list.push(t('cashbackHero.insights.unibancoTopTier', { cashback: String(activeTier.cashback) }));
-          if (unibancoSpent > topTierThreshold) {
-            list.push(t('cashbackHero.insights.unibancoOverCap', {
-              over: (unibancoSpent - topTierThreshold).toFixed(2),
-              cap: String(topTierThreshold),
-            }));
-          }
-        } else {
-          list.push(t('cashbackHero.insights.unibancoTierActive', {
-            cashback: String(activeTier.cashback),
-            spent: unibancoSpent.toFixed(2),
-            minSpend: String(activeTier.minSpend),
-          }));
-          if (nextTier) {
-            list.push(t('cashbackHero.insights.unibancoTierNext', {
-              remaining: (nextTier.minSpend - unibancoSpent).toFixed(2),
-              cashback: String(nextTier.cashback),
-            }));
-          }
+        pushCardInsight('unibanco', t('cashbackHero.insights.unibancoNoSpend', { min: String(targetSpendFor20) }), 'medium', tier20.cashback);
+      } else if (unibancoSpent + 0.0001 >= targetSpendFor20) {
+        pushCardInsight('unibanco', t('cashbackHero.insights.unibancoTopTier', { cashback: String(tier20.cashback) }), 'low');
+        if (unibancoSpent > targetSpendFor20) {
+          pushCardInsight('unibanco', t('cashbackHero.insights.unibancoOverCap', {
+            over: (unibancoSpent - topTierThreshold).toFixed(2),
+            cap: String(topTierThreshold),
+          }), 'medium', unibancoSpent - topTierThreshold);
         }
-      } else if (nextTier) {
-        list.push(t('cashbackHero.insights.unibancoTierNext', {
-          remaining: (nextTier.minSpend - unibancoSpent).toFixed(2),
-          cashback: String(nextTier.cashback),
-        }));
+      } else {
+        const unibancoPotential = Math.max(0, ((tier20.cashback / Math.max(1, targetSpendFor20)) * (targetSpendFor20 - unibancoSpent)));
+        pushCardInsight('unibanco', t('cashbackHero.insights.unibancoTo20Goal', {
+          remaining: (targetSpendFor20 - unibancoSpent).toFixed(2),
+          cashback: String(tier20.cashback),
+        }), 'high', unibancoPotential);
+      }
+
+      if (cetelemStatus) {
+        if (cetelemStatus.currentMonthCap <= 0 || cetelemStatus.annualRemaining <= 0) {
+          pushCardInsight('cetelem', t('cashbackHero.insights.cetelemAnnualCapReached'), 'medium');
+        } else if (cetelemStatus.monthlyRemainingSpend > 0.01) {
+          pushCardInsight('cetelem', t('cashbackHero.insights.cetelemToMonthlyGoal', {
+            remainingSpend: formatCurrency(cetelemStatus.monthlyRemainingSpend, 'EUR'),
+            cashback: formatCurrency(cetelemStatus.currentMonthCap, 'EUR'),
+          }), 'high', Math.max(0, cetelemStatus.currentMonthCap - cetelemStatus.currentMonthCashback));
+        } else {
+          pushCardInsight('cetelem', t('cashbackHero.insights.cetelemMonthlyGoalReached', {
+            cashback: formatCurrency(cetelemStatus.currentMonthCashback, 'EUR'),
+          }), 'low');
+        }
       }
 
       const unibancoNoCashbackCount = unibancoEligible.filter((p) => getEffectiveTotalCashback(p, cappedEntryAmounts) <= 0).length;
       if (unibancoNoCashbackCount > 0) {
-        list.push(t('cashbackHero.insights.unibancoNoCashbackDueToCap', {
+        pushCardInsight('unibanco', t('cashbackHero.insights.unibancoNoCashbackDueToCap', {
           count: String(unibancoNoCashbackCount),
-        }));
+        }), 'high', unibancoNoCashbackCount * 1.5);
       }
 
       // --- Universo cap insight (cycle 15 -> 15, cap €10) ---
@@ -848,20 +875,22 @@ function CashbackHeroPage() {
       }, 0);
       const capReached = universoEffectiveTotal + 0.0001 >= universoCycleCapEur;
       const remainingToCap = Math.max(0, universoCycleCapEur - universoEffectiveTotal);
-      const cycleLabel = `${format(parseISO(universoCycleRange.start), 'dd/MM')}–${format(parseISO(universoCycleRange.endExclusive), 'dd/MM')}`;
+      const cycleEndInclusive = subDays(parseISO(universoCycleRange.endExclusive), 1);
+      const cycleLabel = `${format(parseISO(universoCycleRange.start), 'dd/MM')}–${format(cycleEndInclusive, 'dd/MM')}`;
 
       if (capReached) {
-        list.push(t('cashbackHero.insights.universoCapReached', {
+        pushCardInsight('universo', t('cashbackHero.insights.universoCapReached', {
           cycle: cycleLabel,
           cap: formatCurrency(universoCycleCapEur, 'EUR'),
-        }));
+          used: formatCurrency(universoEffectiveTotal, 'EUR'),
+        }), 'low');
       } else {
-        list.push(t('cashbackHero.insights.universoNoCapHit', {
+        pushCardInsight('universo', t('cashbackHero.insights.universoNoCapHit', {
           cycle: cycleLabel,
           cap: formatCurrency(universoCycleCapEur, 'EUR'),
           used: formatCurrency(universoEffectiveTotal, 'EUR'),
           remaining: formatCurrency(remainingToCap, 'EUR'),
-        }));
+        }), 'medium', remainingToCap);
       }
     }
 
@@ -869,11 +898,11 @@ function CashbackHeroPage() {
     if (eligibleForCoverage.length > 0) {
       const withCashbackCount = eligibleForCoverage.filter((p) => getEffectiveTotalCashback(p, cappedEntryAmounts) > 0).length;
       const coverageRate = (withCashbackCount / eligibleForCoverage.length) * 100;
-      list.push(t('cashbackHero.insights.coverage', {
+      pushGeneralInsight(t('cashbackHero.insights.coverage', {
         covered: String(withCashbackCount),
         total: String(eligibleForCoverage.length),
         rate: coverageRate.toFixed(0),
-      }));
+      }), 'medium');
     }
 
     const sourceTotals = monthPurchases.reduce<Record<string, number>>((acc, purchase) => {
@@ -889,29 +918,29 @@ function CashbackHeroPage() {
       .sort((a, b) => b[1] - a[1])[0];
 
     if (topSource && topSource[1] > 0) {
-      list.push(t('cashbackHero.insights.topSource', {
+      pushGeneralInsight(t('cashbackHero.insights.topSource', {
         source: topSource[0],
         amount: formatCurrency(topSource[1], 'EUR'),
-      }));
+      }), 'low');
     }
 
     // --- General insights ---
     if (stats.bestPurchase) {
-      list.push(t('cashbackHero.insights.bestDeal', {
+      pushGeneralInsight(t('cashbackHero.insights.bestDeal', {
         merchant: stats.bestPurchase.merchant,
         percent: getDisplayPercentFromPurchase(stats.bestPurchase, cappedEntryAmounts).toFixed(2).replace(/\.?0+$/, ''),
-      }));
+      }), 'low');
     }
 
     if (noCashbackPurchases.length > 0) {
-      list.push(t('cashbackHero.insights.noCashback', {
+      pushGeneralInsight(t('cashbackHero.insights.noCashback', {
         count: String(noCashbackPurchases.length),
         total: formatCurrency(totalWithoutCashback, 'EUR'),
-      }));
+      }), 'high', stats.potentialLost);
     }
 
     if (stats.avgPercent < 2 && stats.eligibleAveragePurchasesCount >= 3) {
-      list.push(t('cashbackHero.insights.lowAverage'));
+      pushGeneralInsight(t('cashbackHero.insights.lowAverage'), 'medium');
     }
 
     return list;
@@ -923,6 +952,7 @@ function CashbackHeroPage() {
     t,
     cappedEntryAmounts,
     purchases,
+    cetelemStatus,
     universoCycleCapEur,
     universoSourceRegex,
     universoStatementDay,
@@ -930,20 +960,30 @@ function CashbackHeroPage() {
   ]);
 
   const visibleInsights = useMemo(() => {
-    return insights.slice(0, 5).map((line) => {
-      const normalized = line.toLowerCase();
-      const isCardSpecific = normalized.includes('unibanco')
-        || normalized.includes('universo')
-        || normalized.includes('cartão universo')
-        || normalized.includes('universo card');
+    const seenCardInsights = new Set<CardInsightKey>();
+    const priorityWeight: Record<InsightPriority, number> = {
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
 
-      return { line, isCardSpecific };
+    return [...insights]
+      .sort((a, b) => {
+        const byPriority = priorityWeight[b.priority] - priorityWeight[a.priority];
+        if (byPriority !== 0) return byPriority;
+        return (b.impactEur ?? 0) - (a.impactEur ?? 0);
+      })
+      .filter((item) => {
+      if (!item.isCardSpecific || !item.cardKey) return true;
+      if (seenCardInsights.has(item.cardKey)) return false;
+      seenCardInsights.add(item.cardKey);
+      return true;
     });
   }, [insights]);
 
   const monthLabel = selectedMonth === 'all'
     ? t('cashbackHero.months.all')
-    : format(parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date()), 'MMMM yyyy', { locale: pt });
+    : format(parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date()), 'MMMM yyyy', { locale: dateFnsLocale });
 
   const currentMonthKey = monthKeyFromDate(new Date());
   const nextMonthKey = monthKeyFromDate(addMonths(new Date(), 1));
@@ -1140,6 +1180,7 @@ function CashbackHeroPage() {
               <p className="mt-1 text-xs text-muted-foreground">{getDisplayPercentFromPurchase(stats.bestPurchase, cappedEntryAmounts).toFixed(2).replace(/\.?0+$/, '')}%</p>
             ) : null}
           </div>
+
         </div>
 
         {/* Monthly cashback bar chart */}
@@ -1248,10 +1289,18 @@ function CashbackHeroPage() {
                 <p className={cn('mt-1.5 text-muted-foreground', compactProgressCards ? 'text-[10px]' : 'text-[11px]')}>
                   {unibancoStatus.isTopTier
                     ? t('cashbackHero.cardWidget.unibancoTopTier', { cashback: formatCurrency(unibancoStatus.activeTier!.cashback, 'EUR') })
-                    : unibancoStatus.nextTier
-                      ? t('cashbackHero.cardWidget.unibancoNextTier', { remaining: formatCurrency(unibancoStatus.remaining, 'EUR'), cashback: formatCurrency(unibancoStatus.nextTier.cashback, 'EUR') })
-                      : t('cashbackHero.cardWidget.unibancoFirstTier', { remaining: formatCurrency(unibancoStatus.remaining, 'EUR') })}
+                    : t('cashbackHero.cardWidget.monthlyRemainingCashback', { amount: formatCurrency(unibancoStatus.targetCashback - unibancoStatus.currentCashback, 'EUR') })}
                 </p>
+{unibancoStatus.daysRemaining > 0 && unibancoStatus.daysRemaining <= 3 && (
+                  <p className={cn('mt-2 font-semibold text-amber-600 dark:text-amber-300', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                    {t('cashbackHero.cardWidget.unibancoDaysWarning', { days: unibancoStatus.daysRemaining })}
+                  </p>
+                )}
+                {!unibancoStatus.isTopTier && unibancoStatus.remaining > 0 && (
+                  <p className={cn('mt-1.5 text-sky-600 dark:text-sky-300', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                    💡 {t('cashbackHero.cardWidget.maxiSimulator', { amount: formatCurrency(unibancoStatus.remaining, 'EUR') })}
+                  </p>
+                )}
               </div>
             ) : null}
 
@@ -1293,14 +1342,16 @@ function CashbackHeroPage() {
                     style={{ width: `${cetelemStatus.monthlyPct}%` }}
                   />
                 </div>
-                <p className={cn('mt-1.5 text-muted-foreground', compactProgressCards ? 'text-[10px]' : 'text-[11px]')}>
+<p className={cn('mt-1.5 text-muted-foreground', compactProgressCards ? 'text-[10px]' : 'text-[11px]')}>
                   {cetelemStatus.monthlyRemainingSpend <= 0
                     ? t('cashbackHero.cardWidget.cetelemMonthlyTop', { cashback: formatCurrency(cetelemStatus.currentMonthCap, 'EUR') })
-                    : t('cashbackHero.cardWidget.cetelemMonthlyRemaining', {
-                      remaining: formatCurrency(cetelemStatus.monthlyRemainingSpend, 'EUR'),
-                      cashback: formatCurrency(cetelemStatus.currentMonthCap, 'EUR'),
-                    })}
+                    : t('cashbackHero.cardWidget.monthlyRemainingCashback', { amount: formatCurrency(cetelemStatus.currentMonthCap - cetelemStatus.currentMonthCashback, 'EUR') })}
                 </p>
+                {cetelemStatus.monthlyRemainingSpend > 0 && (
+                  <p className={cn('mt-1.5 text-sky-600 dark:text-sky-300', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+                    💡 {t('cashbackHero.cardWidget.maxiSimulator', { amount: formatCurrency(cetelemStatus.monthlyRemainingSpend, 'EUR') })}
+                  </p>
+                )}
               </div>
             ) : null}
 
@@ -1361,11 +1412,16 @@ function CashbackHeroPage() {
                           style={{ width: `${cycle.pct}%` }}
                         />
                       </div>
-                      <p className={cn('mt-1 text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
+<p className={cn('mt-1 text-muted-foreground', compactProgressCards ? 'text-[9px]' : 'text-[10px]')}>
                         {cycle.capReached
                           ? t('cashbackHero.cardWidget.universoCapReachedFull', { cap: formatCurrency(universoCycleCapEur, 'EUR') })
-                          : t('cashbackHero.cardWidget.universoRemaining', { remaining: formatCurrency(cycle.remaining, 'EUR') })}
+                          : t('cashbackHero.cardWidget.monthlyRemainingCashback', { amount: formatCurrency(cycle.remaining, 'EUR') })}
                       </p>
+                      {!cycle.capReached && cycle.remaining > 0 && cycle.isActive && (
+                        <p className={cn('mt-1 text-sky-600 dark:text-sky-300', compactProgressCards ? 'text-[8px]' : 'text-[9px]')}>
+                          💡 {t('cashbackHero.cardWidget.maxiSimulator', { amount: formatCurrency(Math.ceil(universoCycleCapEur / (universoRate || 0.01) - (cycle.effectiveTotal / (universoRate || 0.01))), 'EUR') })}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1387,7 +1443,7 @@ function CashbackHeroPage() {
                 >
                   <Lightbulb className="h-4 w-4" />
                   <span className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                    {insights.length}
+                    {visibleInsights.length}
                   </span>
                 </Button>
               </PopoverTrigger>
@@ -1400,11 +1456,11 @@ function CashbackHeroPage() {
                     {t('cashbackHero.insights.title')}
                   </div>
                   <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                    {insights.length}
+                    {visibleInsights.length}
                   </span>
                 </div>
-                <div className="flex flex-col gap-2 p-3">
-                  {visibleInsights.map(({ line, isCardSpecific }, index) => (
+                <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto p-3">
+                  {visibleInsights.map(({ line, isCardSpecific, priority }, index) => (
                     <div
                       key={`${line}-${index}`}
                       className={cn(
@@ -1424,9 +1480,23 @@ function CashbackHeroPage() {
                           {isCardSpecific ? <CreditCard className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
                           {isCardSpecific ? t('cashbackHero.insights.cardRulePill') : t('cashbackHero.insights.generalPill')}
                         </span>
+                        <span className={cn(
+                          'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                          priority === 'high'
+                            ? 'border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                            : priority === 'medium'
+                              ? 'border border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                              : 'border border-border bg-muted/60 text-muted-foreground',
+                        )}>
+                          {priority === 'high'
+                            ? t('cashbackHero.insights.priorityHigh')
+                            : priority === 'medium'
+                              ? t('cashbackHero.insights.priorityMedium')
+                              : t('cashbackHero.insights.priorityLow')}
+                        </span>
                       </div>
-                      <div className="flex items-start gap-2.5">
-                        <p className="text-sm leading-5 text-foreground/90">
+                      <div className="flex items-start justify-between gap-2.5">
+                        <p className="flex-1 text-sm leading-5 text-foreground/90">
                           {line.includes(':') ? (
                             <>
                               <span className="font-semibold">{line.slice(0, line.indexOf(':'))}:</span>
@@ -1434,6 +1504,17 @@ function CashbackHeroPage() {
                             </>
                           ) : line}
                         </p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                          title={t('cashbackHero.cardWidget.auditInfo')}
+                          onClick={() => {
+                            toast.info(`${t('cashbackHero.cardWidget.auditInfo')}: ${line}`);
+                          }}
+                        >
+                          ℹ
+                        </Button>
                       </div>
                     </div>
                   ))}

@@ -470,11 +470,19 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     { label: t("portfolioInsights.labels.cryptoCashback"), amount: selectedMonthEarningsBreakdownRaw.crypto_cashback },
     { label: t("portfolioInsights.labels.socialMedia"), amount: selectedMonthEarningsBreakdownRaw.social_media },
     { label: t("portfolioInsights.labels.dividends"), amount: selectedMonthEarningsBreakdownRaw.dividend },
-  ].filter((item) => Math.abs(item.amount) > 0.000001);
+  ]
+    .filter((item) => Math.abs(item.amount) > 0.000001)
+    .sort((a, b) => b.amount - a.amount);
 
   const selectedMonthMovementSubtotal = selectedMonthMovementBreakdown.reduce((sum, item) => sum + item.amount, 0);
-  const selectedMonthEarningsSubtotal = selectedMonthEarningsBreakdown.reduce((sum, item) => sum + item.amount, 0);
   const selectedMonthLiveCryptoContribution = isCurrentMonthSelected ? liveCryptoPerformance : 0;
+  const selectedMonthEarningsSubtotal = selectedMonthEarningsBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const selectedMonthEarningsAndMarketBreakdown = [
+    ...selectedMonthEarningsBreakdown,
+    ...(Math.abs(selectedMonthLiveCryptoContribution) > 0.000001
+      ? [{ label: t("portfolioInsights.monthly.liveCryptoDelta"), amount: selectedMonthLiveCryptoContribution }]
+      : []),
+  ].sort((a, b) => b.amount - a.amount);
   const selectedMonthExplainedTotal = selectedMonthMovementSubtotal + selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution;
   const selectedMonthUnexplainedDelta = selected.monthlyPerformance - selectedMonthExplainedTotal;
 
@@ -871,11 +879,11 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.earningsAndMarket")}</p>
-                {selectedMonthEarningsBreakdown.length === 0 && Math.abs(selectedMonthLiveCryptoContribution) < 0.000001 ? (
+                {selectedMonthEarningsAndMarketBreakdown.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noEarningsAndMarket")}</p>
                 ) : (
                   <div className="space-y-2">
-                    {selectedMonthEarningsBreakdown.map((item) => (
+                    {selectedMonthEarningsAndMarketBreakdown.map((item) => (
                       <div key={`earning-${item.label}`} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
                         <span className="text-foreground">{item.label}</span>
                         <span className={item.amount >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
@@ -883,14 +891,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                         </span>
                       </div>
                     ))}
-                    {Math.abs(selectedMonthLiveCryptoContribution) > 0.000001 && (
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
-                        <span className="text-foreground">{t("portfolioInsights.monthly.liveCryptoDelta")}</span>
-                        <span className={selectedMonthLiveCryptoContribution >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
-                          {selectedMonthLiveCryptoContribution >= 0 ? "+" : ""}{formatCurrency(selectedMonthLiveCryptoContribution)}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 )}
                 <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
