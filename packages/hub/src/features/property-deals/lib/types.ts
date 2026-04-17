@@ -28,6 +28,8 @@ export type PropertyDealPayload = {
   costs: PurchaseCosts;
   purchaseExtraEntries: DealValueEntry[];
   includeReserveInOwnInvestment: boolean;
+  saleStatus: 'not-sold' | 'sold';
+  simulatedOfferPrice: number;
   salePrice: number;
   commissionRate: number;
   commissionVatRate: number;
@@ -69,6 +71,8 @@ export const DEFAULT_PROPERTY_DEAL_PAYLOAD: PropertyDealPayload = {
   },
   purchaseExtraEntries: [],
   includeReserveInOwnInvestment: false,
+  saleStatus: 'not-sold',
+  simulatedOfferPrice: 0,
   salePrice: 0,
   commissionRate: 0,
   commissionVatRate: 0,
