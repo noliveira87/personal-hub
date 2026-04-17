@@ -3,7 +3,6 @@ import { Building2, Check, Home, Pencil, Trash2, TrendingUp, X } from 'lucide-re
 import { useI18n } from '@/i18n/I18nProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   DEFAULT_PROPERTY_DEAL_PAYLOAD,
   PropertyAddress,
@@ -18,6 +17,14 @@ import {
 } from '@/features/property-deals/lib/store';
 import { cn } from '@/lib/utils';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+
+type PropertyDealManagerProps = {
+  createRequestTick?: number;
+  showCatalog?: boolean;
+  selectedDealIdFromRoute?: string | null;
+  onSavedDeal?: (dealId: string) => void;
+  onOpenDeal?: (dealId: string) => void;
+};
 
 function NumberInput({
   value,
@@ -121,7 +128,13 @@ function getEffectiveSalePrice(payload: PropertyDealPayload) {
   return payload.saleStatus === 'sold' ? payload.salePrice : payload.simulatedOfferPrice;
 }
 
-export default function PropertyDealManager({ createRequestTick = 0 }: { createRequestTick?: number }) {
+export default function PropertyDealManager({
+  createRequestTick = 0,
+  showCatalog = true,
+  selectedDealIdFromRoute = null,
+  onSavedDeal,
+  onOpenDeal,
+}: PropertyDealManagerProps) {
   const { formatCurrency, t } = useI18n();
   const { confirm, confirmDialog } = useConfirmDialog();
   const lastCreateRequestTickRef = useRef(createRequestTick);
@@ -145,14 +158,25 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
 
         if (rows.length === 0) {
           setDeals([]);
-          setCurrentDeal(buildNewDeal());
-          setSelectedDealId(null);
+          const next = buildNewDeal();
+          setCurrentDeal(next);
+          setSelectedDealId(showCatalog ? null : next.id);
+          setIsEditing(!showCatalog);
           setShowSaleBoard(false);
         } else {
           setDeals(rows);
-          setCurrentDeal(rows[0]);
-          setSelectedDealId(null);
-          setShowSaleBoard(true);
+          if (!showCatalog && selectedDealIdFromRoute && selectedDealIdFromRoute !== 'new') {
+            const selected = rows.find((item) => item.id === selectedDealIdFromRoute) ?? rows[0];
+            setCurrentDeal(selected);
+            setSelectedDealId(selected.id);
+            setIsEditing(false);
+            setShowSaleBoard(true);
+          } else {
+            setCurrentDeal(rows[0]);
+            setSelectedDealId(showCatalog ? null : rows[0].id);
+            setIsEditing(false);
+            setShowSaleBoard(true);
+          }
         }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Falha a carregar imoveis.');
@@ -166,7 +190,29 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [selectedDealIdFromRoute, showCatalog]);
+
+  useEffect(() => {
+    if (showCatalog) return;
+
+    if (selectedDealIdFromRoute === 'new') {
+      const next = buildNewDeal();
+      setCurrentDeal(next);
+      setSelectedDealId(next.id);
+      setIsEditing(true);
+      setShowSaleBoard(false);
+      return;
+    }
+
+    if (!selectedDealIdFromRoute) return;
+    const selected = deals.find((item) => item.id === selectedDealIdFromRoute);
+    if (!selected) return;
+
+    setCurrentDeal(selected);
+    setSelectedDealId(selected.id);
+    setIsEditing(false);
+    setShowSaleBoard(true);
+  }, [deals, selectedDealIdFromRoute, showCatalog]);
 
   useEffect(() => {
     if (createRequestTick === lastCreateRequestTickRef.current) return;
@@ -200,6 +246,11 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
     [currentDeal.payload.saleExtraEntries],
   );
 
+  const purchaseExtraTotal = useMemo(
+    () => (currentDeal.payload.purchaseExtraEntries ?? []).reduce((sum, entry) => sum + (entry.amount || 0), 0),
+    [currentDeal.payload.purchaseExtraEntries],
+  );
+
   const effectiveSalePrice = useMemo(
     () => getEffectiveSalePrice(currentDeal.payload),
     [currentDeal.payload],
@@ -217,6 +268,7 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
   const saleDeedAmount = Math.max(0, effectiveSalePrice - currentDeal.payload.saleSignalAmount);
   const currentDealExistsInList = deals.some((item) => item.id === currentDeal.id);
   const isDetailOpen = selectedDealId != null && selectedDealId === currentDeal.id;
+  const shouldShowDetail = !showCatalog || (!onOpenDeal && isDetailOpen);
   const totalDeals = deals.length;
   const profitableDeals = deals.filter((deal) => getDealMetrics(deal).profit > 0).length;
   const avgProfit = deals.length > 0
@@ -344,8 +396,11 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
       setDeals(refreshed);
       const selected = refreshed.find((item) => item.id === currentDeal.id);
       if (selected) setCurrentDeal(selected);
+      const savedId = selected?.id ?? currentDeal.id;
+      setSelectedDealId(savedId);
       setIsEditing(false);
       setShowSaleBoard(true);
+      onSavedDeal?.(savedId);
       toast.success(t('propertyDeals.toasts.saved'));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('propertyDeals.toasts.saveFailed'));
@@ -375,7 +430,7 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
       const refreshed = await fetchPropertyDeals();
       setDeals(refreshed);
       setCurrentDeal(refreshed[0] ?? buildNewDeal());
-      setSelectedDealId(null);
+      setSelectedDealId(showCatalog ? null : (refreshed[0]?.id ?? null));
       setIsEditing(false);
       setShowSaleBoard(refreshed.length > 0);
       toast.success(t('propertyDeals.toasts.deleted'));
@@ -400,7 +455,12 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
   };
 
   return (
-    <section className="rounded-3xl border border-border/70 bg-[linear-gradient(160deg,hsl(var(--card)),hsl(var(--background)))] p-5 shadow-sm sm:p-6">
+    <section className={cn(
+      showCatalog
+        ? 'rounded-3xl border border-border/70 bg-[linear-gradient(160deg,hsl(var(--card)),hsl(var(--background)))] p-5 shadow-sm sm:p-6'
+        : 'bg-transparent px-2 py-0 sm:px-0',
+    )}>
+      {showCatalog ? (
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground sm:text-lg">{t('propertyDeals.managerTitle')}</h3>
@@ -429,7 +489,9 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
           </div>
         ) : null}
       </div>
+      ) : null}
 
+      {showCatalog ? (
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-border/70 bg-background/65 px-3 py-2.5">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('propertyDeals.properties')}</p>
@@ -444,15 +506,21 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
           <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{formatCurrency(avgProfit)}</p>
         </div>
       </div>
+      ) : null}
 
+      {showCatalog ? (
       <div className="mb-4 space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {!currentDealExistsInList ? (
             <button
               type="button"
               onClick={() => {
-                setSelectedDealId(currentDeal.id);
-                setIsEditing(true);
+                if (onOpenDeal) {
+                  onOpenDeal('new');
+                } else {
+                  setSelectedDealId(currentDeal.id);
+                  setIsEditing(true);
+                }
               }}
               className="rounded-2xl border border-dashed border-primary/60 bg-primary/10 p-4 text-left transition-colors hover:bg-primary/15"
             >
@@ -472,10 +540,14 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
                 key={deal.id}
                 type="button"
                 onClick={() => {
-                  setCurrentDeal(deal);
-                  setSelectedDealId(deal.id);
-                  setIsEditing(false);
-                  setShowSaleBoard(true);
+                  if (onOpenDeal) {
+                    onOpenDeal(deal.id);
+                  } else {
+                    setCurrentDeal(deal);
+                    setSelectedDealId(deal.id);
+                    setIsEditing(false);
+                    setShowSaleBoard(true);
+                  }
                 }}
                 className={cn(
                   'rounded-2xl p-4 text-left shadow-sm transition-all duration-200',
@@ -515,20 +587,15 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
           })}
         </div>
       </div>
+      ) : null}
 
-      <Dialog
-        open={isDetailOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedDealId(null);
-            setIsEditing(false);
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
-          <DialogTitle className="sr-only">Detalhes do imóvel</DialogTitle>
-          <DialogDescription className="sr-only">Editar informações do imóvel incluindo endereço, custos de compra e venda, e cálculos de lucro.</DialogDescription>
-          <div className="mb-6 flex items-start justify-between gap-6 pr-6">
+      {shouldShowDetail ? (
+        <div className={cn(
+          showCatalog
+            ? 'rounded-xl border border-border/60 bg-card p-3 sm:p-4'
+            : 'mx-auto w-full max-w-5xl rounded-xl border border-border/60 bg-card p-3 sm:border-0 sm:bg-transparent sm:p-0',
+        )}>
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:gap-6 sm:pr-6">
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-semibold text-foreground">{currentDeal.title || t('propertyDeals.new')}</h2>
               <p className="mt-1 truncate text-sm text-muted-foreground">{formatDealAddress(currentDeal.payload.address)}</p>
@@ -593,428 +660,486 @@ export default function PropertyDealManager({ createRequestTick = 0 }: { createR
           </div>
 
           {isEditing ? (
-            <div className="mb-4 rounded-2xl border border-border/70 bg-background/55 p-3 sm:p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.editAddress')}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  className="h-9 min-w-[220px] rounded-md border border-border bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-80"
-                  value={currentDeal.title}
-                  onChange={(event) => setCurrentDeal((prev) => ({ ...prev, title: event.target.value }))}
-                  placeholder={t('propertyDeals.propertyName')}
-                  disabled={!isEditing}
-                />
-                <input
-                  className="h-9 min-w-[280px] rounded-md border border-border bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-80"
-                  value={currentDeal.payload.address?.street ?? ''}
-                  onChange={(event) => updatePayload({ address: { ...currentDeal.payload.address, street: event.target.value } })}
-                  placeholder={t('propertyDeals.street')}
-                  disabled={!isEditing}
-                />
-                <input
-                  className="h-9 w-36 rounded-md border border-border bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-80"
-                  value={currentDeal.payload.address?.postalCode ?? ''}
-                  onChange={(event) => updatePayload({ address: { ...currentDeal.payload.address, postalCode: event.target.value } })}
-                  placeholder={t('propertyDeals.postalCode')}
-                  disabled={!isEditing}
-                />
-                <input
-                  className="h-9 min-w-[160px] rounded-md border border-border bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-80"
-                  value={currentDeal.payload.address?.city ?? ''}
-                  onChange={(event) => updatePayload({ address: { ...currentDeal.payload.address, city: event.target.value } })}
-                  placeholder={t('propertyDeals.city')}
-                  disabled={!isEditing}
-                />
+            <div className="space-y-4">
+              {/* EDITAR ENDEREÇO */}
+              <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
+                <h3 className="mb-4 text-sm font-semibold text-foreground">{t('propertyDeals.editAddress')}</h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">{t('propertyDeals.propertyName')} *</label>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                      value={currentDeal.title}
+                      onChange={(event) => setCurrentDeal((prev) => ({ ...prev, title: event.target.value }))}
+                      placeholder="Ex: Apartamento São Martinho"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">{t('propertyDeals.street')}</label>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                      value={currentDeal.payload.address?.street ?? ''}
+                      onChange={(event) => updatePayload({ address: { ...currentDeal.payload.address, street: event.target.value } })}
+                      placeholder="Rua dos Corvões"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">{t('propertyDeals.postalCode')}</label>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                      value={currentDeal.payload.address?.postalCode ?? ''}
+                      onChange={(event) => updatePayload({ address: { ...currentDeal.payload.address, postalCode: event.target.value } })}
+                      placeholder="3045-049"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">{t('propertyDeals.city')}</label>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                      value={currentDeal.payload.address?.city ?? ''}
+                      onChange={(event) => updatePayload({ address: { ...currentDeal.payload.address, city: event.target.value } })}
+                      placeholder="São Martinho do Bispo"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          ) : null}
 
-          <div className={cn('grid grid-cols-1 gap-4', showSaleBoard ? 'xl:grid-cols-2' : 'xl:grid-cols-1')}>
-            <div className="rounded-2xl border border-sky-300/50 bg-gradient-to-br from-sky-500/5 via-background/70 to-background p-4 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-sky-300/50 bg-sky-500/10 px-3 py-1">
-                  <Home className="h-3.5 w-3.5 text-sky-700 dark:text-sky-300" />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-sky-800 dark:text-sky-200">{t('propertyDeals.purchaseBoard')}</span>
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                  <span className="text-xs font-medium text-muted-foreground">{t('propertyDeals.totalAcquisition')}</span>
-                  {isEditing ? (
-                    <CurrencyInput value={currentDeal.payload.purchasePrice} onChange={(next) => updatePayload({ purchasePrice: next })} min={0} disabled={!isEditing} />
-                  ) : (
-                    renderReadOnlyMoney(currentDeal.payload.purchasePrice)
-                  )}
+              {/* QUADRO COMPRA */}
+              <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <Home className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold text-foreground">{t('propertyDeals.purchaseBoard')}</h3>
                 </div>
 
-                <div className="rounded-xl border border-sky-200/60 bg-sky-500/5 px-3 py-2">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-sky-800/80 dark:text-sky-200/80">{t('propertyDeals.phaseReserve')}</p>
-                  <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-3 py-2">
-                    <div>
-                      <p className="text-xs font-medium text-foreground">{t('propertyDeals.reserveAmount')}</p>
-                      <p className="text-[11px] text-muted-foreground">{t('propertyDeals.reserveRefundHint')}</p>
+                <div className="space-y-4">
+                  {/* Total aquisição */}
+                  <div className="rounded-lg border border-border/60 px-3 py-3">
+                    <label className="text-xs font-medium text-muted-foreground">{t('propertyDeals.totalAcquisition')}</label>
+                    <div className="mt-2 flex items-center justify-end gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        value={Number.isFinite(currentDeal.payload.purchasePrice) ? currentDeal.payload.purchasePrice : 0}
+                        onChange={(event) => updatePayload({ purchasePrice: Number(event.target.value) || 0 })}
+                        className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-semibold tabular-nums text-foreground"
+                      />
                     </div>
-                    {isEditing ? (
-                      <div className="flex min-w-[320px] items-center justify-end gap-2">
-                        <CurrencyInput value={currentDeal.payload.costs.reserveEra} onChange={(next) => updateCosts({ reserveEra: next })} min={0} disabled={!isEditing} />
-                        <DateInput value={currentDeal.payload.purchaseDates.reserveEra} onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, reserveEra: next } })} disabled={!isEditing} />
-                      </div>
-                    ) : (
-                      <div className="text-right">
-                        {renderReadOnlyMoney(currentDeal.payload.costs.reserveEra)}
-                        <div className="mt-1">{renderReadOnlyDate(currentDeal.payload.purchaseDates.reserveEra)}</div>
-                      </div>
-                    )}
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-sky-200/60 bg-sky-500/5 px-3 py-2">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-sky-800/80 dark:text-sky-200/80">{t('propertyDeals.phaseProposal')}</p>
-                  <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-3 py-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.proposalApproval')}</span>
-                    {isEditing ? (
-                      <DateInput value={currentDeal.payload.purchaseDates.proposalApproval} onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, proposalApproval: next } })} disabled={!isEditing} />
-                    ) : (
-                      renderReadOnlyDate(currentDeal.payload.purchaseDates.proposalApproval)
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-sky-200/60 bg-sky-500/5 px-3 py-2">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-sky-800/80 dark:text-sky-200/80">{t('propertyDeals.phaseCpcv')}</p>
+                  {/* Reserva */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-3 py-2">
-                      <span className="text-xs font-medium text-foreground">{t('propertyDeals.signalCpcvAmount')}</span>
-                      {isEditing ? (
-                        <CurrencyInput value={currentDeal.payload.costs.signalCpcv} onChange={(next) => updateCosts({ signalCpcv: next })} min={0} disabled={!isEditing} />
-                      ) : (
-                        renderReadOnlyMoney(currentDeal.payload.costs.signalCpcv)
-                      )}
+                    <div className="flex items-baseline justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseReserve')}</label>
+                      <span className="text-[11px] text-muted-foreground">{t('propertyDeals.reserveRefundHint')}</span>
                     </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-3 py-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.signalCpcvDate')}</span>
-                      {isEditing ? (
-                        <DateInput value={currentDeal.payload.purchaseDates.cpcvSignature} onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, cpcvSignature: next } })} disabled={!isEditing} />
-                      ) : (
-                        renderReadOnlyDate(currentDeal.payload.purchaseDates.cpcvSignature)
-                      )}
+                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="text-xs font-medium text-foreground">{t('propertyDeals.reserveAmount')}</label>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step="0.01"
+                              value={Number.isFinite(currentDeal.payload.costs.reserveEra) ? currentDeal.payload.costs.reserveEra : 0}
+                              onChange={(next) => updateCosts({ reserveEra: Number(next.target.value) || 0 })}
+                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                            />
+                          </div>
+                          <input
+                            type="date"
+                            value={currentDeal.payload.purchaseDates.reserveEra}
+                            onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, reserveEra: next.target.value } })}
+                            className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-sky-200/60 bg-sky-500/5 px-3 py-2">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-sky-800/80 dark:text-sky-200/80">{t('propertyDeals.phaseDeed')}</p>
+                  {/* Proposta */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-3 py-2">
-                      <span className="text-xs font-medium text-foreground">{t('propertyDeals.purchaseDeedAmount')}</span>
-                      {isEditing ? (
-                        <CurrencyInput value={currentDeal.payload.costs.escrituraAmount} onChange={(next) => updateCosts({ escrituraAmount: next })} min={0} disabled={!isEditing} />
-                      ) : (
-                        renderReadOnlyMoney(currentDeal.payload.costs.escrituraAmount)
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-3 py-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.purchaseDeedDate')}</span>
-                      {isEditing ? (
-                        <DateInput value={currentDeal.payload.purchaseDates.escritura} onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, escritura: next } })} disabled={!isEditing} />
-                      ) : (
-                        renderReadOnlyDate(currentDeal.payload.purchaseDates.escritura)
-                      )}
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseProposal')}</label>
+                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="text-xs font-medium text-foreground">{t('propertyDeals.proposalApproval')}</label>
+                        <input
+                          type="date"
+                          value={currentDeal.payload.purchaseDates.proposalApproval}
+                          onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, proposalApproval: next.target.value } })}
+                          className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="rounded-lg border border-dashed border-border/70 px-3 py-2">
-                  {isEditing ? (
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.extraValuesSection')}</p>
-                  ) : null}
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">{t('propertyDeals.otherPurchaseValues')}</span>
-                    {isEditing ? (
+                  {/* CPCV */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseCpcv')}</label>
+                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="text-xs font-medium text-foreground">{t('propertyDeals.signalCpcvAmount')}</label>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step="0.01"
+                              value={Number.isFinite(currentDeal.payload.costs.signalCpcv) ? currentDeal.payload.costs.signalCpcv : 0}
+                              onChange={(next) => updateCosts({ signalCpcv: Number(next.target.value) || 0 })}
+                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                            />
+                          </div>
+                          <input
+                            type="date"
+                            value={currentDeal.payload.purchaseDates.cpcvSignature}
+                            onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, cpcvSignature: next.target.value } })}
+                            className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Escritura */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseDeed')}</label>
+                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="text-xs font-medium text-foreground">{t('propertyDeals.purchaseDeedAmount')}</label>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step="0.01"
+                              value={Number.isFinite(currentDeal.payload.costs.escrituraAmount) ? currentDeal.payload.costs.escrituraAmount : 0}
+                              onChange={(next) => updateCosts({ escrituraAmount: Number(next.target.value) || 0 })}
+                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                            />
+                          </div>
+                          <input
+                            type="date"
+                            value={currentDeal.payload.purchaseDates.escritura}
+                            onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, escritura: next.target.value } })}
+                            className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Valores Extra */}
+                  <div className="space-y-2 rounded-lg border border-dashed border-border/60 px-3 py-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.extraValuesSection')}</label>
                       <Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={addPurchaseExtraEntry}>
                         {t('propertyDeals.addValue')}
                       </Button>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-2">
-                    {(currentDeal.payload.purchaseExtraEntries ?? []).length === 0 ? (
-                      <p className="text-xs text-muted-foreground">{t('propertyDeals.noAdditionalValues')}</p>
-                    ) : (
-                      (currentDeal.payload.purchaseExtraEntries ?? []).map((entry) => (
-                        <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-2 py-2">
-                          {isEditing ? (
-                            <>
+                    </div>
+                    <div className="space-y-2">
+                      {(currentDeal.payload.purchaseExtraEntries ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t('propertyDeals.noAdditionalValues')}</p>
+                      ) : (
+                        (currentDeal.payload.purchaseExtraEntries ?? []).map((entry) => (
+                          <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-2 py-2">
+                            <input
+                              className="h-8 min-w-[120px] flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                              value={entry.label}
+                              onChange={(event) => updatePurchaseExtraEntry(entry.id, { label: event.target.value })}
+                              placeholder={t('propertyDeals.description')}
+                            />
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-semibold text-muted-foreground">EUR</span>
                               <input
-                                className="h-8 min-w-[180px] flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-80"
-                                value={entry.label}
-                                onChange={(event) => updatePurchaseExtraEntry(entry.id, { label: event.target.value })}
-                                placeholder={t('propertyDeals.description')}
-                                disabled={!isEditing}
-                              />
-                              <CurrencyInput
-                                value={entry.amount}
-                                onChange={(next) => updatePurchaseExtraEntry(entry.id, { amount: next })}
+                                type="number"
+                                inputMode="decimal"
                                 min={0}
-                                disabled={!isEditing}
+                                step="0.01"
+                                value={entry.amount || 0}
+                                onChange={(next) => updatePurchaseExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
+                                className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
                               />
-                              <DateInput
-                                value={entry.date}
-                                onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next })}
-                                disabled={!isEditing}
-                              />
-                              <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <p className="min-w-[180px] flex-1 text-xs font-medium text-foreground">{entry.label || '—'}</p>
-                              <p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(entry.amount || 0)}</p>
-                              {renderReadOnlyDate(entry.date)}
-                            </>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {[
-                  [t('propertyDeals.bankCheque'), 'bankCheque', currentDeal.payload.costs.bankCheque],
-                  [t('propertyDeals.taxesAndStamp'), 'taxesAndStamp', currentDeal.payload.costs.taxesAndStamp],
-                  [t('propertyDeals.houseReady'), 'houseReady', currentDeal.payload.costs.houseReady],
-                  [t('propertyDeals.leroyMerlin'), 'leroyMerlin', currentDeal.payload.costs.leroyMerlin],
-                  [t('propertyDeals.ikea'), 'ikea', currentDeal.payload.costs.ikea],
-                ].filter(([, , value]) => Number(value) > 0).map(([label, key, value]) => (
-                  <div key={String(key)} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                    <span className="text-xs font-medium text-foreground">{label}</span>
-                    {isEditing ? (
-                      <CurrencyInput value={Number(value)} onChange={(next) => updateCosts({ [String(key)]: next } as Partial<PurchaseCosts>)} min={0} disabled={!isEditing} />
-                    ) : (
-                      renderReadOnlyMoney(Number(value))
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('propertyDeals.ownInvestment')}</p>
-                <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(ownInvestment)}</p>
-              </div>
-            </div>
-
-            {showSaleBoard ? (
-            <div className="rounded-2xl border border-emerald-300/50 bg-gradient-to-br from-emerald-500/5 via-background/70 to-background p-4 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/50 bg-emerald-500/10 px-3 py-1">
-                  <Building2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">{t('propertyDeals.saleBoard')}</span>
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {isEditing ? (
-                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.valuesSection')}</p>
-                ) : null}
-                <div className="rounded-lg border border-border/60 px-3 py-2">
-                  <div className="mb-2 text-xs font-medium text-foreground">{t('propertyDeals.saleStatus')}</div>
-                  {isEditing ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant={currentDeal.payload.saleStatus === 'not-sold' ? 'default' : 'outline'}
-                        className="h-8 px-3 text-xs"
-                        onClick={() => updatePayload({ saleStatus: 'not-sold' })}
-                      >
-                        {t('propertyDeals.saleStatusNotSold')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={currentDeal.payload.saleStatus === 'sold' ? 'default' : 'outline'}
-                        className="h-8 px-3 text-xs"
-                        onClick={() => updatePayload({ saleStatus: 'sold' })}
-                      >
-                        {t('propertyDeals.saleStatusSold')}
-                      </Button>
-                    </div>
-                  ) : (
-                    <span className={cn(
-                      'inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                      currentDeal.payload.saleStatus === 'sold'
-                        ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                        : 'border-amber-400/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-                    )}>
-                      {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.saleStatusSold') : t('propertyDeals.saleStatusNotSold')}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.totalSaleValue') : t('propertyDeals.offerPurchaseValue')}
-                  </span>
-                  {isEditing ? (
-                    currentDeal.payload.saleStatus === 'sold' ? (
-                      <CurrencyInput value={currentDeal.payload.salePrice} onChange={(next) => updatePayload({ salePrice: next })} min={0} disabled={!isEditing} />
-                    ) : (
-                      <CurrencyInput value={currentDeal.payload.simulatedOfferPrice} onChange={(next) => updatePayload({ simulatedOfferPrice: next })} min={0} disabled={!isEditing} />
-                    )
-                  ) : (
-                    renderReadOnlyMoney(effectiveSalePrice)
-                  )}
-                </div>
-
-                <div className="rounded-lg border border-border/60 px-3 py-2">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-foreground">{t('propertyDeals.realEstateCommission')}</span>
-                    {isEditing ? (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{t('propertyDeals.baseFee')}</span>
-                        <NumberInput value={currentDeal.payload.commissionRate} onChange={(next) => updatePayload({ commissionRate: next })} min={0} step="0.1" disabled={!isEditing} />
-                        <span>{t('propertyDeals.vatPercentage')}</span>
-                        <NumberInput value={currentDeal.payload.commissionVatRate} onChange={(next) => updatePayload({ commissionVatRate: next })} min={0} step="0.1" disabled={!isEditing} />
-                      </div>
-                    ) : (
-                      <div className="text-right text-xs text-muted-foreground">
-                        <p>{t('propertyDeals.baseFee')}: {currentDeal.payload.commissionRate}%</p>
-                        <p>{t('propertyDeals.vatPercentage')}: {currentDeal.payload.commissionVatRate}%</p>
-                      </div>
-                    )}
-                  </div>
-                  <p className="mt-2 text-right text-sm font-semibold tabular-nums text-foreground">{formatCurrency(commissionTotal)}</p>
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                  <span className="text-xs font-medium text-foreground">{t('propertyDeals.ownInvestment')}</span>
-                  {renderReadOnlyMoney(ownInvestment)}
-                </div>
-
-                <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                  <span className="text-xs font-medium text-foreground">{t('propertyDeals.condoExpenses')}</span>
-                  {isEditing ? (
-                    <CurrencyInput value={currentDeal.payload.condoExpenses} onChange={(next) => updatePayload({ condoExpenses: next })} min={0} disabled={!isEditing} />
-                  ) : (
-                    renderReadOnlyMoney(currentDeal.payload.condoExpenses)
-                  )}
-                </div>
-
-                {currentDeal.payload.saleStatus === 'sold' ? (
-                  <>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                      <span className="text-xs font-medium text-foreground">{t('propertyDeals.saleSignal')}</span>
-                      {isEditing ? (
-                        <div className="flex min-w-[320px] items-center justify-end gap-2">
-                          <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} disabled={!isEditing} />
-                          <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} disabled={!isEditing} />
-                        </div>
-                      ) : (
-                        <div className="text-right">
-                          {renderReadOnlyMoney(currentDeal.payload.saleSignalAmount)}
-                          <div className="mt-1">{renderReadOnlyDate(currentDeal.payload.saleDates.signalDate)}</div>
-                        </div>
+                            </div>
+                            <input
+                              type="date"
+                              value={entry.date}
+                              onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next.target.value })}
+                              className="h-8 w-[120px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
+                            />
+                            <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))
                       )}
+                    </div>
+                  </div>
+
+                  {/* Outros custos */}
+                  <div className="space-y-2 rounded-lg border border-border/60 px-3 py-3">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.otherPurchaseCosts')}</label>
+                    <div className="space-y-2">
+                      {[
+                        [t('propertyDeals.bankCheque'), 'bankCheque', currentDeal.payload.costs.bankCheque],
+                        [t('propertyDeals.taxesAndStamp'), 'taxesAndStamp', currentDeal.payload.costs.taxesAndStamp],
+                        [t('propertyDeals.houseReady'), 'houseReady', currentDeal.payload.costs.houseReady],
+                        [t('propertyDeals.leroyMerlin'), 'leroyMerlin', currentDeal.payload.costs.leroyMerlin],
+                        [t('propertyDeals.ikea'), 'ikea', currentDeal.payload.costs.ikea],
+                      ].map(([label, key, value]) => (
+                        <div key={String(key)} className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-muted-foreground">{label}</label>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step="0.01"
+                              value={Number(value)}
+                              onChange={(next) => updateCosts({ [String(key)]: Number(next.target.value) || 0 } as Partial<PurchaseCosts>)}
+                              className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* INVESTIMENTO PRÓPRIO */}
+              <div className="rounded-lg border border-border/60 bg-background/50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.ownInvestment')}</p>
+                <p className="mt-2 text-2xl font-bold tabular-nums text-foreground">{formatCurrency(ownInvestment)}</p>
+              </div>
+
+              {showSaleBoard ? (
+                <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold text-foreground">{t('propertyDeals.saleBoard')}</h3>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                      <label className="mb-2 block text-xs font-medium text-foreground">{t('propertyDeals.saleStatus')}</label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant={currentDeal.payload.saleStatus === 'not-sold' ? 'default' : 'outline'}
+                          className="h-8 px-3 text-xs"
+                          onClick={() => updatePayload({ saleStatus: 'not-sold' })}
+                        >
+                          {t('propertyDeals.saleStatusNotSold')}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={currentDeal.payload.saleStatus === 'sold' ? 'default' : 'outline'}
+                          className="h-8 px-3 text-xs"
+                          onClick={() => updatePayload({ saleStatus: 'sold' })}
+                        >
+                          {t('propertyDeals.saleStatusSold')}
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                      <span className="text-xs font-medium text-foreground">{t('propertyDeals.valueOnDeeds')}</span>
-                      {isEditing ? (
-                        <div className="flex min-w-[320px] items-center justify-end gap-2">
-                          <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
-                          <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} disabled={!isEditing} />
-                        </div>
+                      <span className="text-xs font-medium text-foreground">
+                        {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.totalSaleValue') : t('propertyDeals.offerPurchaseValue')}
+                      </span>
+                      {currentDeal.payload.saleStatus === 'sold' ? (
+                        <CurrencyInput value={currentDeal.payload.salePrice} onChange={(next) => updatePayload({ salePrice: next })} min={0} />
                       ) : (
-                        <div className="text-right">
-                          {renderReadOnlyMoney(saleDeedAmount)}
-                          <div className="mt-1">{renderReadOnlyDate(currentDeal.payload.saleDates.escrituraDate)}</div>
-                        </div>
+                        <CurrencyInput value={currentDeal.payload.simulatedOfferPrice} onChange={(next) => updatePayload({ simulatedOfferPrice: next })} min={0} />
                       )}
                     </div>
-                  </>
-                ) : (
-                  <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                    {t('propertyDeals.simulationHint')}
-                  </p>
-                )}
 
-                <div className="rounded-lg border border-dashed border-border/70 px-3 py-2">
-                  {isEditing ? (
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.extraValuesSection')}</p>
-                  ) : null}
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">{t('propertyDeals.otherSaleValues')}</span>
-                    {isEditing ? (
-                      <Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={addSaleExtraEntry}>
-                        {t('propertyDeals.addValue')}
-                      </Button>
-                    ) : null}
-                  </div>
+                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-xs font-medium text-foreground">{t('propertyDeals.realEstateCommission')}</span>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{t('propertyDeals.baseFee')}</span>
+                          <NumberInput value={currentDeal.payload.commissionRate} onChange={(next) => updatePayload({ commissionRate: next })} min={0} step="0.1" />
+                          <span>{t('propertyDeals.vatPercentage')}</span>
+                          <NumberInput value={currentDeal.payload.commissionVatRate} onChange={(next) => updatePayload({ commissionVatRate: next })} min={0} step="0.1" />
+                        </div>
+                      </div>
+                      <p className="mt-2 text-right text-sm font-semibold tabular-nums text-foreground">{formatCurrency(commissionTotal)}</p>
+                    </div>
 
-                  <div className="space-y-2">
-                    {(currentDeal.payload.saleExtraEntries ?? []).length === 0 ? (
-                      <p className="text-xs text-muted-foreground">{t('propertyDeals.noAdditionalValues')}</p>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                      <span className="text-xs font-medium text-foreground">{t('propertyDeals.condoExpenses')}</span>
+                      <CurrencyInput value={currentDeal.payload.condoExpenses} onChange={(next) => updatePayload({ condoExpenses: next })} min={0} />
+                    </div>
+
+                    {currentDeal.payload.saleStatus === 'sold' ? (
+                      <>
+                        <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                          <span className="text-xs font-medium text-foreground">{t('propertyDeals.saleSignal')}</span>
+                          <div className="flex min-w-[320px] items-center justify-end gap-2">
+                            <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} />
+                            <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                          <span className="text-xs font-medium text-foreground">{t('propertyDeals.valueOnDeeds')}</span>
+                          <div className="flex min-w-[320px] items-center justify-end gap-2">
+                            <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
+                            <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} />
+                          </div>
+                        </div>
+                      </>
                     ) : (
-                      (currentDeal.payload.saleExtraEntries ?? []).map((entry) => (
-                        <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-2 py-2">
-                          {isEditing ? (
-                            <>
+                      <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                        {t('propertyDeals.simulationHint')}
+                      </p>
+                    )}
+
+                    <div className="space-y-2 rounded-lg border border-dashed border-border/60 px-3 py-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.extraValuesSection')}</label>
+                        <Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={addSaleExtraEntry}>
+                          {t('propertyDeals.addValue')}
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {(currentDeal.payload.saleExtraEntries ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground">{t('propertyDeals.noAdditionalValues')}</p>
+                        ) : (
+                          (currentDeal.payload.saleExtraEntries ?? []).map((entry) => (
+                            <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-2 py-2">
                               <input
-                                className="h-8 min-w-[180px] flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-80"
+                                className="h-8 min-w-[120px] flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground"
                                 value={entry.label}
                                 onChange={(event) => updateSaleExtraEntry(entry.id, { label: event.target.value })}
                                 placeholder={t('propertyDeals.description')}
-                                disabled={!isEditing}
                               />
-                              <CurrencyInput
-                                value={entry.amount}
-                                onChange={(next) => updateSaleExtraEntry(entry.id, { amount: next })}
-                                min={0}
-                                disabled={!isEditing}
-                              />
-                              <DateInput
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  step="0.01"
+                                  value={entry.amount || 0}
+                                  onChange={(next) => updateSaleExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
+                                  className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                                />
+                              </div>
+                              <input
+                                type="date"
                                 value={entry.date}
-                                onChange={(next) => updateSaleExtraEntry(entry.id, { date: next })}
-                                disabled={!isEditing}
+                                onChange={(next) => updateSaleExtraEntry(entry.id, { date: next.target.value })}
+                                className="h-8 w-[120px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
                               />
                               <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removeSaleExtraEntry(entry.id)}>
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
-                            </>
-                          ) : (
-                            <>
-                              <p className="min-w-[180px] flex-1 text-xs font-medium text-foreground">{entry.label || '—'}</p>
-                              <p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(entry.amount || 0)}</p>
-                              {renderReadOnlyDate(entry.date)}
-                            </>
-                          )}
-                        </div>
-                      ))
-                    )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{formatCurrency(profit)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
-                <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(profit)}</p>
-              </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/60 bg-background/40 p-4">
+                  <p className="text-sm font-semibold text-foreground">{t('propertyDeals.saleBoard')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('propertyDeals.saleBoardAddHint')}</p>
+                  <Button type="button" variant="outline" className="mt-3 h-8 px-3 text-xs" onClick={() => setShowSaleBoard(true)}>
+                    {t('propertyDeals.addSaleBoard')}
+                  </Button>
+                </div>
+              )}
             </div>
-            ) : isEditing ? (
-              <div className="rounded-2xl border border-dashed border-emerald-300/60 bg-emerald-500/5 p-4">
-                <p className="text-sm font-semibold text-foreground">{t('propertyDeals.saleBoardHiddenTitle')}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{t('propertyDeals.saleBoardHiddenHint')}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-3 h-8 px-3 text-xs"
-                  onClick={() => setShowSaleBoard(true)}
-                >
-                  {t('propertyDeals.showSaleBoard')}
-                </Button>
+          ) : null}
+
+          {!isEditing && (
+            <>
+              {/* PREVIEW MODE - Purchase Board */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Home className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold text-foreground">{t('propertyDeals.purchaseBoard')}</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t('propertyDeals.totalAcquisition')}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.purchasePrice)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t('propertyDeals.signalCpcvAmount')}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.costs.signalCpcv)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t('propertyDeals.purchaseDeedAmount')}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.costs.escrituraAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t('propertyDeals.otherPurchaseValues')}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(purchaseExtraTotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{t('propertyDeals.purchaseDeedDate')}</span>
+                      <span className="text-sm font-medium text-foreground">{formatDateValue(currentDeal.payload.purchaseDates.escritura)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PREVIEW MODE - Sale Board */}
+                {showSaleBoard && (
+                  <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
+                    <div className="mb-4 flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="text-sm font-semibold text-foreground">{t('propertyDeals.saleBoard')}</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">{t('propertyDeals.saleStatus')}</span>
+                        <span className="text-sm font-medium text-foreground">{currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.saleStatusSold') : t('propertyDeals.saleStatusNotSold')}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">{t('propertyDeals.totalSaleValue')}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(effectiveSalePrice)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">{t('propertyDeals.valueOnDeeds')}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">{t('propertyDeals.otherSaleValues')}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleExtraTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
+            </>
+          )}
+        </div>
+      ) : null}
       {confirmDialog}
     </section>
   );

@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import PropertyDealManager from '@/features/property-deals/components/PropertyDealManager';
 import { Building2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 export default function PropertyDealsPage() {
-  const [createRequestTick, setCreateRequestTick] = useState(0);
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6 pt-20">
@@ -17,7 +17,7 @@ export default function PropertyDealsPage() {
           <Button
             size="sm"
             className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
-            onClick={() => setCreateRequestTick((prev) => prev + 1)}
+            onClick={() => navigate('/property-deals/new')}
             aria-label="Novo imovel"
             title="Novo imovel"
           >
@@ -27,7 +27,7 @@ export default function PropertyDealsPage() {
         )}
       />
 
-      <PropertyDealManager createRequestTick={createRequestTick} />
+      <PropertyDealManager onOpenDeal={(dealId) => navigate(`/property-deals/${dealId}`)} />
     </div>
   );
 }
