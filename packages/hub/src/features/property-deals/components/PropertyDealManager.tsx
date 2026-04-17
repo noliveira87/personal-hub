@@ -622,7 +622,6 @@ export default function PropertyDealManager({
           {deals.map((deal) => {
             const metrics = getDealMetrics(deal);
             const isSelected = deal.id === currentDeal.id;
-            const addressLabel = formatDealAddress(deal.payload.address);
 
             return (
               <button
@@ -649,10 +648,6 @@ export default function PropertyDealManager({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-base font-bold leading-tight text-foreground">{deal.title}</p>
-                    <p className={cn('mt-1 text-xs', addressLabel ? 'text-muted-foreground' : 'italic text-muted-foreground/70')}>
-                      {addressLabel || t('propertyDeals.noAddress')}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{t('propertyDeals.purchase')} {formatCurrency(deal.payload.purchasePrice)}</p>
                   </div>
                   <span className={metrics.profit >= 0
                     ? 'rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300'
@@ -663,12 +658,12 @@ export default function PropertyDealManager({
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
-                    <p className="text-muted-foreground">{t('propertyDeals.sale')}</p>
-                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(getEffectiveSalePrice(deal.payload))}</p>
+                    <p className="text-muted-foreground">{t('propertyDeals.purchase')}</p>
+                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(deal.payload.purchasePrice)}</p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
-                    <p className="text-muted-foreground">{t('propertyDeals.investment')}</p>
-                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(metrics.ownInvestment)}</p>
+                    <p className="text-muted-foreground">{t('propertyDeals.sale')}</p>
+                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(getEffectiveSalePrice(deal.payload))}</p>
                   </div>
                 </div>
               </button>
