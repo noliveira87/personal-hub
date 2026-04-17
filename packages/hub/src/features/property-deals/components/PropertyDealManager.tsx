@@ -665,20 +665,54 @@ export default function PropertyDealManager({
                 )}
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* COMPRA */}
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalAcquisition')}</p>
-                <p className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatCurrency(purchaseTotalIncluded)}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">+ {t('propertyDeals.otherPurchaseValues')} + {t('propertyDeals.otherPurchaseCosts')}</p>
+                <p className="mt-2 text-sm font-bold tabular-nums text-foreground">{formatCurrency(purchaseTotalIncluded)}</p>
+                <div className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1.5">
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>{t('propertyDeals.purchasePrice')}:</span>
+                    <span>{formatCurrency(currentDeal.payload.purchasePrice)}</span>
+                  </div>
+                  {purchaseExtraTotal > 0 && (
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>{t('propertyDeals.extraValuesSection')}:</span>
+                      <span>{formatCurrency(purchaseExtraTotal)}</span>
+                    </div>
+                  )}
+                  {purchaseOtherCostsTotal > 0 && (
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>{t('propertyDeals.otherPurchaseCosts')}:</span>
+                      <span>{formatCurrency(purchaseOtherCostsTotal)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* VENDA */}
+              <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalSaleValue')}</p>
+                <p className="mt-2 text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</p>
+                <div className="mt-1.5 space-y-0.5 border-t border-border/40 pt-1.5">
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>{t('propertyDeals.saleValue')}:</span>
+                    <span>{formatCurrency(effectiveSalePrice)}</span>
+                  </div>
+                  {saleExtraTotal > 0 && (
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>{t('propertyDeals.extraValuesSection')}:</span>
+                      <span>{formatCurrency(saleExtraTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.ownInvestment')}</p>
                 <p className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatCurrency(ownInvestment)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalSaleValue')}</p>
-                <p className="mt-1 text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">+ {t('propertyDeals.otherSaleValues')}</p>
               </div>
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
