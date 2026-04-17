@@ -711,7 +711,7 @@ export const translations = {
       saleValue: "Valor venda",
       offerPurchaseValue: "Oferta de compra (simulação)",
       saleStatus: "Estado da venda",
-      saleStatusNotSold: "Sem venda ainda",
+      saleStatusNotSold: "Disponível",
       saleStatusSold: "Venda concluída",
       simulationHint: "Sem venda concluída: o lucro é estimado com base na oferta de compra simulada.",
       realEstateCommission: "Comissão imobiliária",

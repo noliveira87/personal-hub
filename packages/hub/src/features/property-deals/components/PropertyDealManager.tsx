@@ -304,6 +304,26 @@ export default function PropertyDealManager({
     setShowSaleBoard(false);
   }, [createRequestTick]);
 
+  useEffect(() => {
+    const escrituraDate = currentDeal.payload.purchaseDates.escritura || '';
+    const deedEntries = (currentDeal.payload.purchaseExtraEntries ?? []).filter((entry) => isDeedPurchaseCostLabel(entry.label));
+    const needsSync = deedEntries.some((entry) => (entry.date || '') !== escrituraDate);
+
+    if (!needsSync) return;
+
+    setCurrentDeal((prev) => ({
+      ...prev,
+      payload: {
+        ...prev.payload,
+        purchaseExtraEntries: (prev.payload.purchaseExtraEntries ?? []).map((entry) => (
+          isDeedPurchaseCostLabel(entry.label)
+            ? { ...entry, date: prev.payload.purchaseDates.escritura || '' }
+            : entry
+        )),
+      },
+    }));
+  }, [currentDeal.payload.purchaseDates.escritura, currentDeal.payload.purchaseExtraEntries]);
+
   const ownInvestment = useMemo(() => {
     const costs = currentDeal.payload.costs;
     const purchaseExtras = (currentDeal.payload.purchaseExtraEntries ?? []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
@@ -443,13 +463,20 @@ export default function PropertyDealManager({
   };
 
   const removePurchaseExtraEntry = (entryId: string) => {
-    setCurrentDeal((prev) => ({
-      ...prev,
-      payload: {
-        ...prev.payload,
-        purchaseExtraEntries: (prev.payload.purchaseExtraEntries ?? []).filter((entry) => entry.id !== entryId),
-      },
-    }));
+    setCurrentDeal((prev) => {
+      const targetEntry = (prev.payload.purchaseExtraEntries ?? []).find((entry) => entry.id === entryId);
+      if (targetEntry && isDeedPurchaseCostLabel(targetEntry.label)) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        payload: {
+          ...prev.payload,
+          purchaseExtraEntries: (prev.payload.purchaseExtraEntries ?? []).filter((entry) => entry.id !== entryId),
+        },
+      };
+    });
   };
 
   const addSaleExtraEntry = () => {
@@ -916,8 +943,18 @@ export default function PropertyDealManager({
                     <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseDeed')}</label>
                     <div className="rounded-lg border border-border/60 px-3 py-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Data da escritura</label>
+                        <input
+                          type="date"
+                          value={currentDeal.payload.purchaseDates.escritura}
+                          onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, escritura: next.target.value } })}
+                          className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
+                        />
+                      </div>
+
+                      <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
                         <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('propertyDeals.purchaseDeedAmount')}</label>
-                        <div className="flex flex-wrap items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2">
                           <div className="flex items-center gap-1">
                             <span className="text-xs font-semibold text-muted-foreground">EUR</span>
                             <input
@@ -930,12 +967,6 @@ export default function PropertyDealManager({
                               className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
                             />
                           </div>
-                          <input
-                            type="date"
-                            value={currentDeal.payload.purchaseDates.escritura}
-                            onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, escritura: next.target.value } })}
-                            className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
-                          />
                         </div>
                       </div>
 
@@ -957,10 +988,11 @@ export default function PropertyDealManager({
                                     className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
                                   />
                                 </div>
-                                <DateInput value={entry.date} onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next })} />
-                                <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                {!isDeedPurchaseCostLabel(entry.label) ? (
+                                  <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                ) : null}
                               </div>
                             </div>
                           ))}
