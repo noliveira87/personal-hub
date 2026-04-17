@@ -89,11 +89,33 @@ function DateInput({ value, onChange, disabled = false }: { value: string; onCha
   );
 }
 
+function createDefaultPurchaseCostEntries() {
+  return [
+    { id: crypto.randomUUID(), label: 'IMT', amount: 0, date: '' },
+    { id: crypto.randomUUID(), label: 'Imposto de selo', amount: 0, date: '' },
+  ];
+}
+
+function withDefaultPurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
+  if ((deal.payload.purchaseExtraEntries ?? []).length > 0) return deal;
+
+  return {
+    ...deal,
+    payload: {
+      ...deal.payload,
+      purchaseExtraEntries: createDefaultPurchaseCostEntries(),
+    },
+  };
+}
+
 function buildNewDeal(): PropertyDeal {
   return {
     id: crypto.randomUUID(),
     title: '',
-    payload: { ...DEFAULT_PROPERTY_DEAL_PAYLOAD },
+    payload: {
+      ...DEFAULT_PROPERTY_DEAL_PAYLOAD,
+      purchaseExtraEntries: createDefaultPurchaseCostEntries(),
+    },
   };
 }
 
@@ -153,7 +175,8 @@ export default function PropertyDealManager({
     const load = async () => {
       setLoading(true);
       try {
-        const rows = await fetchPropertyDeals();
+        const fetchedRows = await fetchPropertyDeals();
+        const rows = fetchedRows.map(withDefaultPurchaseCostEntries);
         if (!mounted) return;
 
         if (rows.length === 0) {
@@ -892,35 +915,6 @@ export default function PropertyDealManager({
                   <div className="space-y-2 rounded-lg border border-border/60 px-3 py-3">
                     <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.otherPurchaseCosts')}</label>
                     <div className="space-y-2">
-                      {[
-                        [t('propertyDeals.bankCheque'), 'bankCheque', currentDeal.payload.costs.bankCheque],
-                        [t('propertyDeals.taxesAndStamp'), 'taxesAndStamp', currentDeal.payload.costs.taxesAndStamp],
-                        [t('propertyDeals.houseReady'), 'houseReady', currentDeal.payload.costs.houseReady],
-                        [t('propertyDeals.leroyMerlin'), 'leroyMerlin', currentDeal.payload.costs.leroyMerlin],
-                        [t('propertyDeals.ikea'), 'ikea', currentDeal.payload.costs.ikea],
-                      ].map(([label, key, value]) => (
-                        <div key={String(key)} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-                          <input
-                            className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-                            value={String(label)}
-                            placeholder="Nome do custo"
-                            readOnly
-                          />
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step="0.01"
-                              value={Number(value)}
-                              onChange={(next) => updateCosts({ [String(key)]: Number(next.target.value) || 0 } as Partial<PurchaseCosts>)}
-                              className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
-                            />
-                          </div>
-                        </div>
-                      ))}
-
                       {(currentDeal.payload.purchaseExtraEntries ?? []).map((entry) => (
                         <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
                           <input
@@ -1136,7 +1130,7 @@ export default function PropertyDealManager({
           {!isEditing && (
             <>
               {/* PREVIEW MODE - Purchase Board */}
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
                   <div className="mb-4 flex items-center gap-2">
                     <Home className="h-4 w-4 text-muted-foreground" />
@@ -1194,6 +1188,10 @@ export default function PropertyDealManager({
                         <span className="text-xs text-muted-foreground">{t('propertyDeals.saleStatus')}</span>
                         <span className="text-sm font-medium text-foreground">{currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.saleStatusSold') : t('propertyDeals.saleStatusNotSold')}</span>
                       </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
+                      </div>
                       <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-muted-foreground">{t('propertyDeals.totalSaleValue')}</span>
@@ -1211,10 +1209,6 @@ export default function PropertyDealManager({
                             </div>
                           )}
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                        <span className="text-xs text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
                       </div>
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
                         <span className="text-xs text-muted-foreground">{t('propertyDeals.valueOnDeeds')}</span>
