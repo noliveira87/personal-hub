@@ -5,6 +5,7 @@ import AppSectionHeader from '@/components/AppSectionHeader';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { ContractPaymentType } from '@/features/contracts/types/contract';
+import { getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 
 const PAYMENT_TYPE_ORDER: ContractPaymentType[] = ['direct-debit', 'entity-reference', 'card'];
 const DIRECT_DEBIT_BANKS = ['ABanca', 'Santander', 'Crédito Agrícola'] as const;
@@ -16,7 +17,7 @@ export default function PaymentsBreakdownPage() {
   const [openPaymentType, setOpenPaymentType] = useState<ContractPaymentType | null>(null);
 
   const contractsWithPayment = useMemo(
-    () => contracts.filter((contract) => contract.status === 'active' && !!contract.paymentType),
+    () => contracts.filter((contract) => getDisplayContractStatus(contract) === 'active' && !!contract.paymentType),
     [contracts],
   );
 

@@ -1,4 +1,5 @@
 import { Contract } from '@/features/contracts/types/contract';
+import { getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { format, isValid, parseISO, subDays } from 'date-fns';
 
@@ -198,7 +199,8 @@ function normalizeDaysBefore(value: number): number {
 }
 
 function isContractEligible(contract: Contract): boolean {
-  return contract.status === 'active' || contract.status === 'pending-cancellation';
+  const status = getDisplayContractStatus(contract);
+  return status === 'active' || status === 'pending-cancellation';
 }
 
 function getTriggerDate(contract: Contract, alertIndex: number): Date | null {

@@ -17,7 +17,7 @@ import { QuotesSection } from '@/features/contracts/components/QuotesSection';
 import CarElectricityChart from '@/features/contracts/components/CarElectricityChart';
 import ElectricityKwhChart from '@/features/contracts/components/ElectricityKwhChart';
 import WaterConsumptionChart from '@/features/contracts/components/WaterConsumptionChart';
-import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
+import { getDaysUntilExpiry, getUrgencyLevel, getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { toast } from '@/components/ui/sonner';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
@@ -56,7 +56,14 @@ export default function ContractDetail() {
     );
   }
 
-  const urgency = getUrgencyLevel(getDaysUntilExpiry(contract));
+  const daysLeft = getDaysUntilExpiry(contract);
+  const urgency = getUrgencyLevel(daysLeft);
+  const displayStatus = getDisplayContractStatus(contract);
+  const expiryCountdown = !contract.endDate
+    ? t('contracts.detail.noEndDate')
+    : daysLeft <= 0
+      ? t('contracts.statusLabels.expired')
+      : t('contracts.detail.daysRemaining', { count: daysLeft });
 
   const handleDelete = async () => {
     if (!await confirm({ title: t('contracts.detail.deleteDialog'), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) return;
@@ -116,7 +123,7 @@ export default function ContractDetail() {
               <p className="text-sm text-muted-foreground">{contract.provider}</p>
               <div className="mt-2 flex items-center gap-2">
                 <CategoryBadge category={contract.category} contractType={contract.type} />
-                <StatusBadge status={contract.status} />
+                <StatusBadge status={displayStatus} />
               </div>
             </div>
           </div>
@@ -152,7 +159,7 @@ export default function ContractDetail() {
                 urgency === 'warning' && 'text-warning'
               )}
             >
-              {formatExpiryCountdown(contract)}
+              {expiryCountdown}
             </p>
           </div>
         </div>
@@ -175,7 +182,7 @@ export default function ContractDetail() {
             <div key={row.label}>
               <p className="text-xs text-muted-foreground">{row.label}</p>
               {row.isStatus ? (
-                <StatusBadge status={contract.status} />
+                <StatusBadge status={displayStatus} />
               ) : (
                 <p className="mt-0.5 text-sm font-medium text-foreground">{row.value}</p>
               )}

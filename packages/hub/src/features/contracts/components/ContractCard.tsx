@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Contract, BILLING_LABELS, getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { StatusBadge } from './StatusBadge';
-import { getDaysUntilExpiry, getUrgencyLevel, formatExpiryCountdown } from '@/features/contracts/lib/contractUtils';
+import { getDaysUntilExpiry, getUrgencyLevel, getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 import { hasUnreadContractAlerts, subscribeContractAlertReadState } from '@/features/contracts/lib/alertReadState';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +20,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
   const [, setReadStateVersion] = useState(0);
   const daysLeft = getDaysUntilExpiry(contract);
   const urgency = getUrgencyLevel(daysLeft);
-  const derivedStatus = daysLeft <= 0 && contract.status === 'active' ? 'expired' : contract.status;
+  const displayStatus = getDisplayContractStatus(contract);
   const hasAlerts = contract.alerts.length > 0;
   const hasUnreadAlerts = hasUnreadContractAlerts(contract);
 
@@ -74,7 +74,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
               {hasUnreadAlerts ? <BellDot className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
             </span>
           )}
-          <StatusBadge status={derivedStatus} />
+          <StatusBadge status={displayStatus} />
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
             <CalendarDays className="w-3 h-3" />
             <span className="truncate">{contractDateLabel}</span>
           </div>
-          {contract.status !== 'archived' && contract.status !== 'expired' && daysLeft > 0 && (
+          {displayStatus !== 'archived' && displayStatus !== 'expired' && daysLeft > 0 && (
             <p className={cn(
               'text-xs font-medium mt-0.5',
               urgency === 'critical' && 'text-urgent',
@@ -105,7 +105,7 @@ export function ContractCard({ contract, index = 0, latestPrice }: { contract: C
               urgency === 'soon' && 'text-warning',
               urgency === 'normal' && 'text-muted-foreground',
             )}>
-              {formatExpiryCountdown(contract, true)}
+              {t('contracts.detail.daysLeft', { count: daysLeft })}
             </p>
           )}
         </div>

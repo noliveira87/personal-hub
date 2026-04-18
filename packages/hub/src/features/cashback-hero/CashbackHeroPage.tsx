@@ -1136,9 +1136,9 @@ function CashbackHeroPage() {
         backTo="/"
         backLabel={t('common.back')}
         actions={(
-          <Button size="sm" className="gap-1.5" onClick={() => setShowAddPurchase(true)}>
+          <Button size="sm" className="h-9 w-9 p-0 sm:w-auto sm:px-3" onClick={() => setShowAddPurchase(true)}>
             <Plus className="h-4 w-4" />
-            {t('cashbackHero.addPurchase')}
+            <span className="hidden sm:inline">{t('cashbackHero.addPurchase')}</span>
           </Button>
         )}
       />

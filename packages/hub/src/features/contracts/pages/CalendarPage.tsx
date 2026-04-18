@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
-import { getDaysUntilExpiry } from '@/features/contracts/lib/contractUtils';
+import { getDaysUntilExpiry, getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, addMonths, differenceInCalendarDays, isValid, subDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +20,10 @@ export default function CalendarPage() {
   }, []);
 
   const calendarByMonth = useMemo(() => {
-    const active = contracts.filter(c => c.status === 'active' || c.status === 'pending-cancellation');
+    const active = contracts.filter((contract) => {
+      const status = getDisplayContractStatus(contract);
+      return status === 'active' || status === 'pending-cancellation';
+    });
     const today = new Date();
     const map = new Map<string, Array<{
       id: string;

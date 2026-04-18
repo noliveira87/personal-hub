@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import {
   Contract, ContractCategory, ContractType, RenewalType, BillingFrequency, ContractStatus, ContractPaymentType,
-  CATEGORY_LABELS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, PAYMENT_TYPE_LABELS, AlertSetting, HOUSING_USAGE_LABELS, normalizeAlertSetting,
+  CATEGORY_LABELS, CATEGORY_NAME_KEYS, TYPE_LABELS, RENEWAL_LABELS, BILLING_LABELS, PAYMENT_TYPE_LABELS, AlertSetting, HOUSING_USAGE_LABELS, normalizeAlertSetting,
 } from '@/features/contracts/types/contract';
 import { Plus, X, Loader, FileText, Send } from 'lucide-react';
 import AppSectionHeader from '@/components/AppSectionHeader';
@@ -11,6 +11,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { toast } from '@/components/ui/sonner';
 import { addTestAppAlert } from '@/features/contracts/lib/alertReadState';
+import { getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 
 const defaultAlert = (kind: AlertSetting['kind'] = 'days-before'): AlertSetting => ({
   kind,
@@ -111,6 +112,18 @@ export default function ContractForm() {
     }
   }, [form.type, form.category]);
 
+  useEffect(() => {
+    const normalizedFormEndDate = form.noEndDate ? null : form.endDate;
+    const syncedStatus = getDisplayContractStatus({
+      status: form.status,
+      endDate: normalizedFormEndDate,
+    });
+
+    if (syncedStatus !== form.status) {
+      setForm((prev) => ({ ...prev, status: syncedStatus }));
+    }
+  }, [form.status, form.endDate, form.noEndDate]);
+
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
@@ -145,6 +158,10 @@ export default function ContractForm() {
         housingUsage: form.type === 'mortgage' ? form.housingUsage : null,
         mortgageDetails: form.type === 'mortgage' ? (form.mortgageDetails ?? defaultMortgageDetails()) : null,
         endDate: normalizedEndDate,
+        status: getDisplayContractStatus({
+          status: form.status,
+          endDate: normalizedEndDate,
+        }),
         price: 0,
       };
 
@@ -324,7 +341,11 @@ export default function ContractForm() {
               <div>
                 <label className={labelClass}>{t('contracts.form.category')}</label>
                 <select className={inputClass} value={form.category} onChange={e => set('category', e.target.value as ContractCategory)} disabled={submitting}>
-                  {categoryOptions.map(category => <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>)}
+                  {categoryOptions.map(category => (
+                    <option key={category} value={category}>
+                      {t(`contracts.categoryNames.${CATEGORY_NAME_KEYS[category]}`) || CATEGORY_LABELS[category]}
+                    </option>
+                  ))}
                 </select>
                 <p className="mt-2 text-xs text-muted-foreground">{t('contracts.form.categoryDependsOnType')}</p>
               </div>

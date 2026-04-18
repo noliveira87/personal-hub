@@ -168,6 +168,26 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   'other': 'Other',
 };
 
+export const CATEGORY_NAME_KEYS: Record<ContractCategory, string> = {
+  'mortgage': 'mortgage',
+  'home-insurance': 'homeInsurance',
+  'apartment-insurance': 'apartmentInsurance',
+  'gas': 'gas',
+  'electricity': 'electricity',
+  'internet': 'internet',
+  'mobile': 'mobile',
+  'water': 'water',
+  'tv-streaming': 'tvStreaming',
+  'software': 'software',
+  'maintenance': 'maintenance',
+  'security-alarm': 'securityAlarm',
+  'car': 'car',
+  'card-credit': 'cardCredit',
+  'card-debit': 'cardDebit',
+  'gym': 'gym',
+  'other': 'other',
+};
+
 export const CATEGORY_ICONS: Record<ContractCategory, string> = {
   'mortgage': '🏦',
   'home-insurance': '🏠',

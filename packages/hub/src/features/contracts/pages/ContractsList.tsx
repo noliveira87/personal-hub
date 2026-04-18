@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useContracts } from '@/features/contracts/context/ContractContext';
 import { useI18n } from '@/i18n/I18nProvider';
 import { Contract, ContractStatus } from '@/features/contracts/types/contract';
+import { getDisplayContractStatus } from '@/features/contracts/lib/contractUtils';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { Plus, Search, SlidersHorizontal, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -109,10 +110,21 @@ export default function ContractsList() {
   const { priceMap, loading: pricesLoading } = usePriceHistoryMap(contractIds);
 
   const filtered = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
     const result = contracts.filter(c => {
-      const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.provider.toLowerCase().includes(search.toLowerCase());
+      const displayStatus = getDisplayContractStatus(c);
+      const searchableText = [
+        c.name,
+        c.provider,
+        c.notes ?? '',
+        displayStatus,
+        t(`contracts.statusLabels.${displayStatus}`),
+      ].join(' ').toLowerCase();
+
+      const matchSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
       const matchCategory = categoryFilter === 'all' || getContractViewCategory(c) === categoryFilter;
-      const matchStatus = statusFilter === 'all' || c.status === statusFilter;
+      const matchStatus = statusFilter === 'all' || displayStatus === statusFilter;
       return matchSearch && matchCategory && matchStatus;
     });
 
@@ -131,7 +143,7 @@ export default function ContractsList() {
     });
 
     return result;
-  }, [contracts, search, categoryFilter, statusFilter, sortBy, priceMap]);
+  }, [contracts, search, categoryFilter, statusFilter, sortBy, priceMap, t]);
 
   const groupedContracts = useMemo(() => {
     const grouped = new Map<ContractViewCategory, Contract[]>();

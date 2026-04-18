@@ -1,12 +1,20 @@
 import { useEffect, useState } from "react";
-import { CryptoQuoteMap, fetchCryptoEurQuotes } from "@/features/portfolio/lib/crypto";
+import { CryptoHistoricalSeriesMap, CryptoQuoteMap, fetchCryptoEurQuotes, fetchCryptoHistoricalEurPrices } from "@/features/portfolio/lib/crypto";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const QUOTE_CACHE_KEY = "portfolio.crypto-quotes.v1";
 const QUOTE_CACHE_TTL_MS = 60_000;
+const HISTORY_CACHE_KEY = "portfolio.crypto-history.v1";
+const HISTORY_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 type CachedCryptoQuote = {
   pricesEur: CryptoQuoteMap;
+  lastUpdatedAt: string | null;
+  cachedAt: number;
+};
+
+type CachedCryptoHistory = {
+  seriesEur: CryptoHistoricalSeriesMap;
   lastUpdatedAt: string | null;
   cachedAt: number;
 };
@@ -29,6 +37,29 @@ const readCachedQuote = (): CachedCryptoQuote | null => {
 const writeCachedQuote = (quote: { pricesEur: CryptoQuoteMap; lastUpdatedAt: string | null }) => {
   try {
     sessionStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify({ ...quote, cachedAt: Date.now() }));
+  } catch {
+    // no-op
+  }
+};
+
+const readCachedHistory = (): CachedCryptoHistory | null => {
+  try {
+    const raw = sessionStorage.getItem(HISTORY_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as CachedCryptoHistory;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (Date.now() - parsed.cachedAt > HISTORY_CACHE_TTL_MS) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedHistory = (history: { seriesEur: CryptoHistoricalSeriesMap; lastUpdatedAt: string | null }) => {
+  try {
+    sessionStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify({ ...history, cachedAt: Date.now() }));
   } catch {
     // no-op
   }
@@ -97,4 +128,54 @@ export function useBtcQuote() {
     loading,
     error,
   };
+}
+
+export function useCryptoHistory(enabled = true) {
+  const cachedHistory = enabled ? readCachedHistory() : null;
+  const [seriesEur, setSeriesEur] = useState<CryptoHistoricalSeriesMap>(cachedHistory?.seriesEur ?? {});
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(cachedHistory?.lastUpdatedAt ?? null);
+  const [loading, setLoading] = useState(enabled && !cachedHistory);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setSeriesEur({});
+      setLastUpdatedAt(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    let mounted = true;
+    const controller = new AbortController();
+
+    const load = async () => {
+      try {
+        setError(null);
+        const history = await fetchCryptoHistoricalEurPrices(controller.signal);
+        if (!mounted) return;
+
+        setSeriesEur(history.seriesEur);
+        setLastUpdatedAt(history.lastUpdatedAt);
+        writeCachedHistory(history);
+      } catch (err) {
+        if (!mounted) return;
+        if (err instanceof Error && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Failed to fetch crypto history");
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [enabled]);
+
+  return { seriesEur, lastUpdatedAt, loading, error };
 }

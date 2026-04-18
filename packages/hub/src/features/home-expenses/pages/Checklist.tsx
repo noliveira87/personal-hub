@@ -377,8 +377,32 @@ export default function Checklist() {
       const cat = getContractViewCategory(item.contract);
       map.get(cat)!.push(item);
     }
-    return CATEGORY_ORDER.map((cat) => ({ cat, items: sortContractItems(map.get(cat)!) })).filter((g) => g.items.length > 0);
-  }, [visibleContractItems]);
+
+    const sortedByPayment = (items: ContractItem[]) => {
+      return [...sortContractItems(items)].sort((a, b) => {
+        const paidA = isPaid(a.contract.id) ? 1 : 0;
+        const paidB = isPaid(b.contract.id) ? 1 : 0;
+        return paidA - paidB;
+      });
+    };
+
+    return CATEGORY_ORDER
+      .map((cat) => ({ cat, items: sortedByPayment(map.get(cat)!) }))
+      .filter((g) => g.items.length > 0);
+  }, [visibleContractItems, paidSet, autoCheckedIds]);
+
+  const sortedCustomItems = useMemo(
+    () => customItems
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        const paidA = isPaid(a.item.id) ? 1 : 0;
+        const paidB = isPaid(b.item.id) ? 1 : 0;
+        if (paidA !== paidB) return paidA - paidB;
+        return a.index - b.index;
+      })
+      .map(({ item }) => item),
+    [customItems, paidSet, autoCheckedIds],
+  );
 
   // Totals
   const { totalBudget, totalPaid, totalRemaining } = useMemo(() => {
@@ -609,9 +633,9 @@ export default function Checklist() {
           </div>
         )}
 
-        {customItems.length > 0 ? (
+        {sortedCustomItems.length > 0 ? (
           <div className="space-y-2">
-            {customItems.map((item) => (
+            {sortedCustomItems.map((item) => (
               <ChecklistRow
                 key={item.id}
                 id={item.id}

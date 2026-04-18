@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
-import { getDaysUntilExpiry, getUrgencyLevel } from '@/features/contracts/lib/contractUtils';
+import { getDaysUntilExpiry, getDisplayContractStatus, getUrgencyLevel } from '@/features/contracts/lib/contractUtils';
 import { getContractCategoryIcon } from '@/features/contracts/types/contract';
 import { differenceInCalendarDays, format, isValid, parseISO, subDays } from 'date-fns';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -50,6 +50,11 @@ export default function AlertsPage() {
   const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [readStateVersion, setReadStateVersion] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<{ contractId: string; alertIndex: number } | null>(null);
+
+  const isContractActionable = (contract: { status: 'active' | 'pending-cancellation' | 'expired' | 'archived'; endDate: string | null }) => {
+    const status = getDisplayContractStatus(contract);
+    return status === 'active' || status === 'pending-cancellation';
+  };
 
   useEffect(() => subscribeContractAlertReadState(() => setReadStateVersion((prev) => prev + 1)), []);
 
@@ -272,7 +277,7 @@ export default function AlertsPage() {
   };
 
   const alerts = useMemo(() => {
-    const active = contracts.filter(c => c.status === 'active' || c.status === 'pending-cancellation');
+    const active = contracts.filter((contract) => isContractActionable(contract));
     const today = new Date();
     const items: {
       contract: typeof active[0];
@@ -390,7 +395,7 @@ export default function AlertsPage() {
     const today = new Date();
     // Função auxiliar local (cópia da original do alertReadState)
     function getOccurredAppAlertsForContract(contract, today) {
-      if (!contract || !(contract.status === 'active' || contract.status === 'pending-cancellation')) return [];
+      if (!contract || !isContractActionable(contract)) return [];
       const occurred = [];
       contract.alerts.forEach((alert, index) => {
         if (!alert.enabled && !alert.telegramEnabled) return;
@@ -477,7 +482,7 @@ export default function AlertsPage() {
               >
                 <option value="">{t('contracts.alerts.form.selectContract')}</option>
                 {contracts
-                  .filter(contract => contract.status === 'active' || contract.status === 'pending-cancellation')
+                  .filter((contract) => isContractActionable(contract))
                   .map(contract => (
                     <option key={contract.id} value={contract.id}>
                       {getContractCategoryIcon(contract.category, contract.type)} {contract.name} ({contract.provider})

@@ -4,7 +4,9 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Responsive
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
-import { parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
+import { CryptoAsset, parseCryptoNotes, parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
+import { useCryptoHistory } from "@/features/portfolio/hooks/use-btc-quote";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useI18n } from "@/i18n/I18nProvider";
 import { LOCALES_BY_LANGUAGE } from "@/i18n/translations";
 import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle, renderChartLegendLabel } from "@/lib/chartTheme";
@@ -21,6 +23,8 @@ interface MonthlyInsightsProps {
 
 export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0, liveCryptoPerformance = 0 }: MonthlyInsightsProps) {
   const { t, language } = useI18n();
+  const isMobile = useIsMobile();
+  const { seriesEur: cryptoHistoryEur } = useCryptoHistory();
   const [visibleMonthsCount, setVisibleMonthsCount] = useState(3);
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [selectedAnnualYear, setSelectedAnnualYear] = useState<string | null>(null);
@@ -607,6 +611,72 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     performance: yearData.annualPerformance,
     returnPct: yearData.annualReturnPct,
   }));
+
+  const btcHistoryByMonth = new Map((cryptoHistoryEur.BTC ?? []).map((point) => [point.month, point.priceEur]));
+  const ethHistoryByMonth = new Map((cryptoHistoryEur.ETH ?? []).map((point) => [point.month, point.priceEur]));
+  const cryptoHistoryMonths = Array.from(
+    new Set<string>([
+      ...Array.from(btcHistoryByMonth.keys()),
+      ...Array.from(ethHistoryByMonth.keys()),
+    ]),
+  )
+    .filter(isValidMonthKey)
+    .sort()
+    .slice(-12);
+
+  const getCryptoUnitsForMonth = (asset: CryptoAsset, month: string) => {
+    return investments.reduce((totalUnits, investment) => {
+      if (investment.type !== "crypto") return totalUnits;
+
+      const { asset: mainAsset, units, cashbackAsset, cashbackUnits } = parseCryptoNotes(investment.notes);
+      const isCashbackOnly = investment.investedAmount === 0 && !(units && units > 0) && !!cashbackUnits;
+      const movements = parseInvestmentMovements(investment.notes)
+        .filter((movement) => movement.units != null && movement.units > 0 && movement.date.slice(0, 7) > month);
+
+      let monthMainUnits = mainAsset === asset ? (units ?? 0) : 0;
+      let monthCashbackUnits = cashbackAsset === asset ? (cashbackUnits ?? 0) : 0;
+
+      for (const movement of movements) {
+        const rawUnits = movement.units ?? 0;
+        const delta = movement.kind === "withdrawal" ? -rawUnits : rawUnits;
+        const affectsCashbackUnits = isCashbackOnly || movement.kind === "cashback";
+
+        if (affectsCashbackUnits && cashbackAsset === asset) {
+          monthCashbackUnits -= delta;
+          continue;
+        }
+
+        if (!affectsCashbackUnits && mainAsset === asset) {
+          monthMainUnits -= delta;
+        }
+      }
+
+      return totalUnits + Math.max(0, monthMainUnits) + Math.max(0, monthCashbackUnits);
+    }, 0);
+  };
+
+  const buildCryptoAssetChartData = (asset: CryptoAsset) => {
+    const historyByMonth = asset === "BTC" ? btcHistoryByMonth : ethHistoryByMonth;
+
+    return cryptoHistoryMonths
+      .map((month) => {
+        const priceEur = historyByMonth.get(month);
+        const heldUnits = getCryptoUnitsForMonth(asset, month);
+        const positionValueEur = priceEur != null ? heldUnits * priceEur : null;
+
+        return {
+          month,
+          monthLabel: formatShortMonthLabel(month),
+          priceEur: priceEur ?? null,
+          positionValueEur,
+          heldUnits,
+        };
+      })
+      .filter((item) => item.priceEur != null || (item.positionValueEur != null && item.positionValueEur > 0));
+  };
+
+  const btcAssetChartData = buildCryptoAssetChartData("BTC");
+  const ethAssetChartData = buildCryptoAssetChartData("ETH");
 
   const categoryGrowthChartData = [...reconstructedActiveSorted]
     .slice(-12)
@@ -1223,19 +1293,19 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
       </Card>
 
       {/* ── Performance charts ── */}
-      {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1) && (
+      {(monthlyChartData.length > 1 || annualChartData.length > 0 || earningsEvolutionChartData.length > 1 || btcAssetChartData.length > 1 || ethAssetChartData.length > 1) && (
         <Card className="overflow-hidden rounded-3xl border-border/80 shadow-sm">
           <CardHeader className="space-y-2 px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
             <CardTitle>{t("portfolioInsights.charts.title")}</CardTitle>
-            <CardDescription>{t("portfolioInsights.charts.description")}</CardDescription>
+            <CardDescription className="hidden sm:block">{t("portfolioInsights.charts.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {monthlyChartData.length > 1 && (
                 <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
-                  <div className="space-y-1">
+                  <div className="space-y-0 sm:space-y-1">
                     <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.monthlyTrendTitle")}</p>
-                    <p className="text-xs text-muted-foreground">{t("portfolioInsights.charts.monthlyTrendDesc")}</p>
+                    <p className="hidden text-xs text-muted-foreground sm:block">{t("portfolioInsights.charts.monthlyTrendDesc")}</p>
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1284,9 +1354,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
               {annualChartData.length > 0 && (
                 <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
-                  <div className="space-y-1">
+                  <div className="space-y-0 sm:space-y-1">
                     <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.annualComparisonTitle")}</p>
-                    <p className="text-xs text-muted-foreground">{t("portfolioInsights.charts.annualComparisonDesc")}</p>
+                    <p className="hidden text-xs text-muted-foreground sm:block">{t("portfolioInsights.charts.annualComparisonDesc")}</p>
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1322,9 +1392,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
               {earningsEvolutionChartData.length > 1 && (
                 <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
-                  <div className="space-y-1">
+                  <div className="space-y-0 sm:space-y-1">
                     <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.earningsEvolutionTitle")}</p>
-                    <p className="text-xs text-muted-foreground">{t("portfolioInsights.charts.earningsEvolutionDesc")}</p>
+                    <p className="hidden text-xs text-muted-foreground sm:block">{t("portfolioInsights.charts.earningsEvolutionDesc")}</p>
                   </div>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1361,7 +1431,78 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                   </div>
                 </div>
               )}
-            </div>
+
+            {btcAssetChartData.length > 1 && (
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+                <div className="space-y-0 sm:space-y-1">
+                  <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.cryptoAssetEvolutionTitle", { asset: "BTC" })}</p>
+                  <p className="hidden text-xs text-muted-foreground sm:block">{t("portfolioInsights.charts.cryptoAssetEvolutionDesc", { asset: "BTC" })}</p>
+                </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={btcAssetChartData} margin={{ left: 6, right: 12, top: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                      <XAxis dataKey="monthLabel" tick={chartAxisTickStyle} />
+                      <YAxis yAxisId="price" tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
+                      <YAxis yAxisId="position" orientation="right" hide={isMobile} tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
+                      <Tooltip
+                        contentStyle={chartTooltipContentStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                        formatter={(value: number, name: string, item) => {
+                          const dataKey = String(item?.dataKey ?? "");
+                          const heldUnits = Number(item?.payload?.heldUnits ?? 0);
+
+                          if (dataKey === "priceEur") return [formatCurrency(value), t("portfolioInsights.labels.marketPrice")];
+                          if (dataKey === "positionValueEur") return [`${formatCurrency(value)} (${heldUnits.toFixed(6)} BTC)`, t("portfolioInsights.labels.positionValue")];
+                          return [formatCurrency(value), name];
+                        }}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                      />
+                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} formatter={renderChartLegendLabel} />
+                      <Line yAxisId="price" type="monotone" connectNulls dataKey="priceEur" name={t("portfolioInsights.labels.marketPrice")} stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line yAxisId="position" type="monotone" connectNulls dataKey="positionValueEur" name={t("portfolioInsights.labels.positionValue")} stroke="#b45309" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {ethAssetChartData.length > 1 && (
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+                <div className="space-y-0 sm:space-y-1">
+                  <p className="text-sm font-medium text-foreground">{t("portfolioInsights.charts.cryptoAssetEvolutionTitle", { asset: "ETH" })}</p>
+                  <p className="hidden text-xs text-muted-foreground sm:block">{t("portfolioInsights.charts.cryptoAssetEvolutionDesc", { asset: "ETH" })}</p>
+                </div>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={ethAssetChartData} margin={{ left: 6, right: 12, top: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" />
+                      <XAxis dataKey="monthLabel" tick={chartAxisTickStyle} />
+                      <YAxis yAxisId="price" tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
+                      <YAxis yAxisId="position" orientation="right" hide={isMobile} tickFormatter={(value: number) => formatChartCurrency(value)} width={84} tick={chartAxisTickStyle} />
+                      <Tooltip
+                        contentStyle={chartTooltipContentStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        itemStyle={chartTooltipItemStyle}
+                        formatter={(value: number, name: string, item) => {
+                          const dataKey = String(item?.dataKey ?? "");
+                          const heldUnits = Number(item?.payload?.heldUnits ?? 0);
+
+                          if (dataKey === "priceEur") return [formatCurrency(value), t("portfolioInsights.labels.marketPrice")];
+                          if (dataKey === "positionValueEur") return [`${formatCurrency(value)} (${heldUnits.toFixed(6)} ETH)`, t("portfolioInsights.labels.positionValue")];
+                          return [formatCurrency(value), name];
+                        }}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.month ? formatMonthLabel(payload[0].payload.month) : ""}
+                      />
+                      <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: "12px" }} formatter={renderChartLegendLabel} />
+                      <Line yAxisId="price" type="monotone" connectNulls dataKey="priceEur" name={t("portfolioInsights.labels.marketPrice")} stroke="#627eea" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      <Line yAxisId="position" type="monotone" connectNulls dataKey="positionValueEur" name={t("portfolioInsights.labels.positionValue")} stroke="#312e81" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
 
             {categoryGrowthChartData.length > 1 && (
               <div className="space-y-4 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
@@ -1399,6 +1540,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                 </div>
               </div>
             )}
+            </div>
           </CardContent>
         </Card>
       )}

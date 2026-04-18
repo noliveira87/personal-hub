@@ -10,6 +10,7 @@ const MOVEMENTS_PREFIX = "PORTFOLIO_MOVEMENTS:";
 
 export type CryptoAsset = "BTC" | "ETH";
 export type CryptoQuoteMap = Partial<Record<CryptoAsset, number>>;
+export type CryptoHistoricalSeriesMap = Partial<Record<CryptoAsset, Array<{ month: string; priceEur: number }>>>;
 
 export interface CryptoNoteMeta {
   asset: CryptoAsset;
@@ -22,6 +23,11 @@ export interface CryptoNoteMeta {
 
 export interface CryptoQuotes {
   pricesEur: CryptoQuoteMap;
+  lastUpdatedAt: string;
+}
+
+export interface CryptoHistory {
+  seriesEur: CryptoHistoricalSeriesMap;
   lastUpdatedAt: string;
 }
 
@@ -365,4 +371,80 @@ export async function fetchCryptoEurQuotes(signal?: AbortSignal): Promise<Crypto
   };
 
   return { pricesEur, lastUpdatedAt };
+}
+
+async function fetchCryptoAssetMonthlyHistory(asset: CryptoAsset, signal?: AbortSignal): Promise<Array<{ month: string; priceEur: number }>> {
+  const assetId = asset === "BTC" ? "bitcoin" : "ethereum";
+  const response = await fetch(
+    `https://api.coingecko.com/api/v3/coins/${assetId}/market_chart?vs_currency=eur&days=365&interval=daily`,
+    {
+      method: "GET",
+      signal,
+      headers: {
+        Accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${asset} history (${response.status})`);
+  }
+
+  const data = await response.json() as {
+    prices?: Array<[number, number]>;
+  };
+
+  if (!Array.isArray(data.prices)) {
+    throw new Error(`Invalid ${asset} history payload`);
+  }
+
+  const latestPointByMonth = new Map<string, { timestamp: number; priceEur: number }>();
+
+  data.prices.forEach(([timestamp, priceEur]) => {
+    if (!Number.isFinite(timestamp) || !Number.isFinite(priceEur)) {
+      return;
+    }
+
+    const month = new Date(timestamp).toISOString().slice(0, 7);
+    const existing = latestPointByMonth.get(month);
+    if (!existing || timestamp > existing.timestamp) {
+      latestPointByMonth.set(month, { timestamp, priceEur });
+    }
+  });
+
+  return Array.from(latestPointByMonth.entries())
+    .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
+    .map(([month, point]) => ({
+      month,
+      priceEur: point.priceEur,
+    }));
+}
+
+export async function fetchCryptoHistoricalEurPrices(signal?: AbortSignal): Promise<CryptoHistory> {
+  const assets: CryptoAsset[] = ["BTC", "ETH"];
+  const results = await Promise.allSettled(
+    assets.map((asset) => fetchCryptoAssetMonthlyHistory(asset, signal)),
+  );
+
+  const seriesEur: CryptoHistoricalSeriesMap = {};
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled" && result.value.length > 0) {
+      seriesEur[assets[index]] = result.value;
+    }
+  });
+
+  if (!seriesEur.BTC?.length && !seriesEur.ETH?.length) {
+    const rejected = results.find((result) => result.status === "rejected");
+    throw rejected?.status === "rejected"
+      ? rejected.reason instanceof Error
+        ? rejected.reason
+        : new Error("Failed to fetch crypto history")
+      : new Error("Failed to fetch crypto history");
+  }
+
+  return {
+    seriesEur,
+    lastUpdatedAt: new Date().toISOString(),
+  };
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useContracts } from '@/features/contracts/context/ContractContext';
-import { getAnnualEquivalent, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
+import { getAnnualEquivalent, getDisplayContractStatus, getMonthlyEquivalent } from '@/features/contracts/lib/contractUtils';
 import { CATEGORY_ICONS, ContractCategory } from '@/features/contracts/types/contract';
 import { usePriceHistoryMap } from '@/hooks/use-price-history-map';
 import { FileText } from 'lucide-react';
@@ -21,7 +21,7 @@ export default function InsightsPage() {
   const { contracts, allPriceHistory } = useContracts();
   const { formatCurrency, t, locale } = useI18n();
 
-  const active = contracts.filter(c => c.status === 'active');
+  const active = contracts.filter((contract) => getDisplayContractStatus(contract) === 'active');
   const contractIds = useMemo(() => active.map((contract) => contract.id), [active]);
   const { priceMap } = usePriceHistoryMap(contractIds);
   const [selectedScope, setSelectedScope] = useState<string>('category:electricity');

@@ -1,10 +1,17 @@
-import { Contract } from '@/features/contracts/types/contract';
+import { Contract, ContractStatus } from '@/features/contracts/types/contract';
 import { formatHiddenAmount, isHideAmountsEnabled } from '@/lib/moneyPrivacy';
 import { differenceInDays, parseISO } from 'date-fns';
 
 export function getDaysUntilExpiry(contract: Contract): number {
   if (!contract.endDate) return Infinity;
   return differenceInDays(parseISO(contract.endDate), new Date());
+}
+
+export function getDisplayContractStatus(contract: Pick<Contract, 'status' | 'endDate'>): ContractStatus {
+  if (!contract.endDate) return contract.status;
+
+  const daysLeft = differenceInDays(parseISO(contract.endDate), new Date());
+  return daysLeft <= 0 && contract.status === 'active' ? 'expired' : contract.status;
 }
 
 export function getMonthlyEquivalent(contract: Contract, price?: number): number {
@@ -72,16 +79,6 @@ export function getUrgencyLevel(daysLeft: number): 'critical' | 'warning' | 'soo
   if (daysLeft <= 15) return 'warning';
   if (daysLeft <= 30) return 'soon';
   return 'normal';
-}
-
-export function formatExpiryCountdown(contract: Contract, compact: boolean = false): string {
-  if (!contract.endDate) return 'No end date';
-
-  const daysLeft = getDaysUntilExpiry(contract);
-
-  if (daysLeft <= 0) return 'Expired';
-
-  return compact ? `${daysLeft}d left` : `${daysLeft} days`;
 }
 
 export function formatCurrency(amount: number, currency: string = 'EUR'): string {
