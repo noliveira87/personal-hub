@@ -25,6 +25,7 @@ export type DealValueEntry = {
 export type PropertyDealPayload = {
   address: PropertyAddress;
   purchasePrice: number;
+  mortgageRequestedAmount: number;
   costs: PurchaseCosts;
   purchaseExtraEntries: DealValueEntry[];
   includeReserveInOwnInvestment: boolean;
@@ -59,6 +60,7 @@ export type PropertyDeal = {
 export const DEFAULT_PROPERTY_DEAL_PAYLOAD: PropertyDealPayload = {
   address: { street: '', postalCode: '', city: '' },
   purchasePrice: 0,
+  mortgageRequestedAmount: 0,
   costs: {
     reserveEra: 0,
     signalCpcv: 0,

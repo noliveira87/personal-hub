@@ -120,6 +120,22 @@ function isDeedPurchaseCostLabel(value: string) {
   return label === 'imt' || label === 'casa pronta' || label === 'imposto de selo' || label === 'imposto selo';
 }
 
+function getPurchaseExtraAmountByLabels(entries: PropertyDeal['payload']['purchaseExtraEntries'], labels: string[]) {
+  const normalized = labels.map((value) => normalizeCostLabel(value));
+  return (entries ?? []).reduce((sum, entry) => {
+    const entryLabel = normalizeCostLabel(entry.label);
+    return normalized.includes(entryLabel) ? sum + (entry.amount || 0) : sum;
+  }, 0);
+}
+
+function getPurchaseExtraAmountExcludingLabels(entries: PropertyDeal['payload']['purchaseExtraEntries'], labels: string[]) {
+  const normalized = labels.map((value) => normalizeCostLabel(value));
+  return (entries ?? []).reduce((sum, entry) => {
+    const entryLabel = normalizeCostLabel(entry.label);
+    return normalized.includes(entryLabel) ? sum : sum + (entry.amount || 0);
+  }, 0);
+}
+
 function isDefaultZeroPlaceholderEntry(entry: PropertyDeal['payload']['purchaseExtraEntries'][number]) {
   const label = normalizeCostLabel(entry.label);
   return (label === 'imt' || label === 'imposto de selo') && (entry.amount || 0) === 0 && (entry.date || '') === '';
@@ -370,9 +386,57 @@ export default function PropertyDealManager({
     return costs.bankCheque + costs.taxesAndStamp + costs.houseReady + costs.leroyMerlin + costs.ikea;
   }, [currentDeal.payload.costs]);
 
+  const purchaseImtAmount = useMemo(
+    () => getPurchaseExtraAmountByLabels(currentDeal.payload.purchaseExtraEntries ?? [], ['imt']),
+    [currentDeal.payload.purchaseExtraEntries],
+  );
+
+  const purchaseStampDutyAmount = useMemo(
+    () => getPurchaseExtraAmountByLabels(currentDeal.payload.purchaseExtraEntries ?? [], ['imposto de selo', 'imposto selo']),
+    [currentDeal.payload.purchaseExtraEntries],
+  );
+
+  const purchaseHouseReadyAmount = useMemo(
+    () => getPurchaseExtraAmountByLabels(currentDeal.payload.purchaseExtraEntries ?? [], ['casa pronta']) + (currentDeal.payload.costs.houseReady || 0),
+    [currentDeal.payload.purchaseExtraEntries, currentDeal.payload.costs.houseReady],
+  );
+
+  const purchaseOtherExpensesAmount = useMemo(() => {
+    const fromExtraEntries = getPurchaseExtraAmountExcludingLabels(
+      currentDeal.payload.purchaseExtraEntries ?? [],
+      ['imt', 'imposto de selo', 'imposto selo', 'casa pronta'],
+    );
+
+    const legacyOtherCosts =
+      (currentDeal.payload.costs.bankCheque || 0)
+      + (currentDeal.payload.costs.taxesAndStamp || 0)
+      + (currentDeal.payload.costs.leroyMerlin || 0)
+      + (currentDeal.payload.costs.ikea || 0);
+
+    return fromExtraEntries + legacyOtherCosts;
+  }, [
+    currentDeal.payload.purchaseExtraEntries,
+    currentDeal.payload.costs.bankCheque,
+    currentDeal.payload.costs.taxesAndStamp,
+    currentDeal.payload.costs.leroyMerlin,
+    currentDeal.payload.costs.ikea,
+  ]);
+
+  const mortgageCreditAmount = Math.max(0, currentDeal.payload.mortgageRequestedAmount || 0);
+
   const purchaseTotalIncluded = useMemo(
     () => currentDeal.payload.purchasePrice + purchaseExtraTotal + purchaseOtherCostsTotal,
     [currentDeal.payload.purchasePrice, purchaseExtraTotal, purchaseOtherCostsTotal],
+  );
+
+  const ownCapitalInvestedTotal = useMemo(
+    () => Math.max(0, purchaseTotalIncluded - mortgageCreditAmount),
+    [purchaseTotalIncluded, mortgageCreditAmount],
+  );
+
+  const ownCapitalOnPurchaseOffer = useMemo(
+    () => Math.max(0, (currentDeal.payload.purchasePrice || 0) - mortgageCreditAmount),
+    [currentDeal.payload.purchasePrice, mortgageCreditAmount],
   );
 
   const saleTotalIncluded = useMemo(
@@ -579,6 +643,10 @@ export default function PropertyDealManager({
     setIsEditing(false);
     setShowSaleBoard(false);
   };
+
+  const editFormLabelClass = 'text-xs font-medium text-foreground/80';
+  const editFormSectionTitleClass = 'text-[10px] font-semibold uppercase tracking-wide text-muted-foreground';
+  const editFormSubsectionTitleClass = 'inline-flex items-center rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground';
 
   return (
     <section className={cn(
@@ -791,7 +859,7 @@ export default function PropertyDealManager({
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-foreground/90">{t('propertyDeals.editAddress')}</h3>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.propertyName')} *</label>
+                    <label className={editFormLabelClass}>{t('propertyDeals.propertyName')} *</label>
                     <input
                       className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
                       value={currentDeal.title}
@@ -800,7 +868,7 @@ export default function PropertyDealManager({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.street')}</label>
+                    <label className={editFormLabelClass}>{t('propertyDeals.street')}</label>
                     <input
                       className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
                       value={currentDeal.payload.address?.street ?? ''}
@@ -809,7 +877,7 @@ export default function PropertyDealManager({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.postalCode')}</label>
+                    <label className={editFormLabelClass}>{t('propertyDeals.postalCode')}</label>
                     <input
                       className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
                       value={currentDeal.payload.address?.postalCode ?? ''}
@@ -818,7 +886,7 @@ export default function PropertyDealManager({
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.city')}</label>
+                    <label className={editFormLabelClass}>{t('propertyDeals.city')}</label>
                     <input
                       className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
                       value={currentDeal.payload.address?.city ?? ''}
@@ -839,13 +907,13 @@ export default function PropertyDealManager({
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.purchaseBoard')}</h3>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2.5">
                   {/* Total aquisição */}
-                  <div className="rounded-lg border border-border/60 px-3 py-3">
+                  <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalAcquisition')}</label>
+                      <label className="text-xs font-medium text-foreground/80">{t('propertyDeals.totalAcquisition')}</label>
                       <div className="flex items-center justify-end gap-1">
-                        <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                        <span className="text-xs font-medium text-muted-foreground">EUR</span>
                         <input
                           type="number"
                           inputMode="decimal"
@@ -853,7 +921,23 @@ export default function PropertyDealManager({
                           step="0.01"
                           value={Number.isFinite(currentDeal.payload.purchasePrice) ? currentDeal.payload.purchasePrice : 0}
                           onChange={(event) => updatePayload({ purchasePrice: Number(event.target.value) || 0 })}
-                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-semibold tabular-nums text-foreground"
+                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-medium tabular-nums text-foreground/90"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-col gap-2 border-t border-border/50 pt-2 sm:flex-row sm:items-center sm:justify-between">
+                      <label className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageRequestedAmount')}</label>
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs font-medium text-muted-foreground">EUR</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="0.01"
+                          value={Number.isFinite(currentDeal.payload.mortgageRequestedAmount) ? currentDeal.payload.mortgageRequestedAmount : 0}
+                          onChange={(event) => updatePayload({ mortgageRequestedAmount: Number(event.target.value) || 0 })}
+                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-medium tabular-nums text-foreground/90"
                         />
                       </div>
                     </div>
@@ -862,12 +946,12 @@ export default function PropertyDealManager({
                   {/* Reserva */}
                   <div className="space-y-2">
                     <div className="flex items-baseline justify-between">
-                      <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseReserve')}</label>
-                      <span className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.reserveRefundHint')}</span>
+                      <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseReserve')}</span>
+                      <span className={editFormLabelClass}>{t('propertyDeals.reserveRefundHint')}</span>
                     </div>
-                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('propertyDeals.reserveAmount')}</label>
+                        <label className={editFormLabelClass}>{t('propertyDeals.reserveAmount')}</label>
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <div className="flex items-center gap-1">
                             <span className="text-xs font-semibold text-muted-foreground">EUR</span>
@@ -894,10 +978,10 @@ export default function PropertyDealManager({
 
                   {/* Proposta */}
                   <div className="space-y-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseProposal')}</label>
-                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                    <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseProposal')}</span>
+                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('propertyDeals.proposalApproval')}</label>
+                        <label className={editFormLabelClass}>{t('propertyDeals.proposalApproval')}</label>
                         <input
                           type="date"
                           value={currentDeal.payload.purchaseDates.proposalApproval}
@@ -908,12 +992,15 @@ export default function PropertyDealManager({
                     </div>
                   </div>
 
+                  <div className="px-1 pt-1">
+                    <span className={editFormSubsectionTitleClass}>{t('propertyDeals.detailsSection')}</span>
+                  </div>
+
                   {/* CPCV */}
                   <div className="space-y-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseCpcv')}</label>
-                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('propertyDeals.signalCpcvAmount')}</label>
+                        <label className={editFormLabelClass}>{t('propertyDeals.signalCpcvAmount')}</label>
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <div className="flex items-center gap-1">
                             <span className="text-xs font-semibold text-muted-foreground">EUR</span>
@@ -940,10 +1027,9 @@ export default function PropertyDealManager({
 
                   {/* Escritura */}
                   <div className="space-y-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.phaseDeed')}</label>
-                    <div className="rounded-lg border border-border/60 px-3 py-3">
+                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Data da escritura</label>
+                        <label className={editFormLabelClass}>Data da escritura</label>
                         <input
                           type="date"
                           value={currentDeal.payload.purchaseDates.escritura}
@@ -953,7 +1039,7 @@ export default function PropertyDealManager({
                       </div>
 
                       <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('propertyDeals.purchaseDeedAmount')}</label>
+                        <label className={editFormLabelClass}>{t('propertyDeals.purchaseDeedAmount')}</label>
                         <div className="flex items-center justify-end gap-2">
                           <div className="flex items-center gap-1">
                             <span className="text-xs font-semibold text-muted-foreground">EUR</span>
@@ -974,7 +1060,7 @@ export default function PropertyDealManager({
                         <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                           {deedPurchaseExtraEntries.map((entry) => (
                             <div key={entry.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{entry.label}</span>
+                              <span className={editFormLabelClass}>{entry.label}</span>
                               <div className="flex flex-wrap items-center justify-end gap-2">
                                 <div className="flex items-center gap-1">
                                   <span className="text-xs font-semibold text-muted-foreground">EUR</span>
@@ -1001,9 +1087,13 @@ export default function PropertyDealManager({
                     </div>
                   </div>
 
+                  <div className="px-1 pt-1">
+                    <span className={editFormSubsectionTitleClass}>{t('propertyDeals.expensesSection')}</span>
+                  </div>
+
                   {/* Outros custos da compra - Consolidado */}
-                  <div className="space-y-2 rounded-lg border border-border/60 px-3 py-3">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.otherPurchaseCosts')}</label>
+                  <div className="space-y-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                    <label className={editFormLabelClass}>{t('propertyDeals.otherPurchaseCosts')}</label>
                     <div className="space-y-2">
                       {otherPurchaseExtraEntries.map((entry) => (
                         <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md bg-muted/30 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
@@ -1059,9 +1149,9 @@ export default function PropertyDealManager({
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.saleBoard')}</h3>
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-border/60 px-3 py-3">
-                      <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.saleStatus')}</label>
+                  <div className="space-y-2.5">
+                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <label className={cn('mb-2 block', editFormSectionTitleClass)}>{t('propertyDeals.saleStatus')}</label>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
@@ -1082,8 +1172,8 @@ export default function PropertyDealManager({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">
                         {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.totalSaleValue') : t('propertyDeals.offerPurchaseValue')}
                       </span>
                       {currentDeal.payload.saleStatus === 'sold' ? (
@@ -1093,36 +1183,51 @@ export default function PropertyDealManager({
                       )}
                     </div>
 
-                    <div className="rounded-lg border border-border/60 px-3 py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.realEstateCommission')}</span>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:justify-end">
-                          <span>{t('propertyDeals.baseFee')}</span>
-                          <NumberInput value={currentDeal.payload.commissionRate} onChange={(next) => updatePayload({ commissionRate: next })} min={0} step="0.1" />
-                          <span>{t('propertyDeals.vatPercentage')}</span>
-                          <NumberInput value={currentDeal.payload.commissionVatRate} onChange={(next) => updatePayload({ commissionVatRate: next })} min={0} step="0.1" />
-                        </div>
-                      </div>
-                      <p className="mt-2 text-right text-sm font-semibold tabular-nums text-foreground">{formatCurrency(commissionTotal)}</p>
+                    <div className="px-1 pt-1">
+                      <span className={editFormSubsectionTitleClass}>{t('propertyDeals.expensesSection')}</span>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.condoExpenses')}</span>
+                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className={editFormLabelClass}>{t('propertyDeals.realEstateCommission')}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(commissionTotal)}</span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="rounded-md border border-border/60 bg-background/70 px-2.5 py-2">
+                          <p className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.baseFee')}</p>
+                          <div className="mt-1 flex justify-end">
+                            <NumberInput value={currentDeal.payload.commissionRate} onChange={(next) => updatePayload({ commissionRate: next })} min={0} step="0.1" />
+                          </div>
+                        </div>
+                        <div className="rounded-md border border-border/60 bg-background/70 px-2.5 py-2">
+                          <p className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.vatPercentage')}</p>
+                          <div className="mt-1 flex justify-end">
+                            <NumberInput value={currentDeal.payload.commissionVatRate} onChange={(next) => updatePayload({ commissionVatRate: next })} min={0} step="0.1" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.condoExpenses')}</span>
                       <CurrencyInput value={currentDeal.payload.condoExpenses} onChange={(next) => updatePayload({ condoExpenses: next })} min={0} />
                     </div>
 
                     {currentDeal.payload.saleStatus === 'sold' ? (
                       <>
-                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
+                        <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.detailsSection')}</p>
+
+                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                          <span className={editFormLabelClass}>{t('propertyDeals.saleSignal')}</span>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                             <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} />
                             <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} />
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.valueOnDeeds')}</span>
+                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                          <span className={editFormLabelClass}>{t('propertyDeals.valueOnDeeds')}</span>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                             <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
                             <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} />
@@ -1140,8 +1245,8 @@ export default function PropertyDealManager({
                       <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{formatCurrency(profit)}</p>
                     </div>
 
-                    <div className="space-y-2 rounded-lg border border-dashed border-border/60 px-3 py-3">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.extraValuesSection')}</label>
+                    <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-background/60 px-3 py-2.5">
+                      <label className={editFormLabelClass}>{t('propertyDeals.extraValuesSection')}</label>
 
                       {(currentDeal.payload.saleExtraEntries ?? []).length === 0 ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1231,38 +1336,55 @@ export default function PropertyDealManager({
                       escritura: {formatDateValue(currentDeal.payload.purchaseDates.escritura)}
                     </span>
                   </div>
-                  <div className="space-y-2">
-                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground">Valor investido na compra</span>
-                        <span className="text-sm font-bold tabular-nums text-foreground">{formatCurrency(purchaseTotalIncluded)}</span>
-                      </div>
-                      <div className="mt-2 space-y-1 border-t border-border/40 pt-2">
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{t('propertyDeals.purchasePrice')}:</span>
-                          <span>{formatCurrency(currentDeal.payload.purchasePrice)}</span>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageCredit')}</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(mortgageCreditAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.ownInvestment')}</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(ownCapitalOnPurchaseOffer)}</span>
+                    </div>
+
+                        <div className="px-1 pt-1">
+                          <span className={editFormSubsectionTitleClass}>{t('propertyDeals.detailsSection')}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{t('propertyDeals.signalCpcvAmount')}:</span>
-                          <span>{formatCurrency(currentDeal.payload.costs.signalCpcv)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{t('propertyDeals.purchaseDeedAmount')}:</span>
-                          <span>{formatCurrency(currentDeal.payload.costs.escrituraAmount)}</span>
-                        </div>
-                        {purchaseExtraTotal > 0 && (
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span>{t('propertyDeals.otherPurchaseValues')}:</span>
-                            <span>{formatCurrency(purchaseExtraTotal)}</span>
-                          </div>
-                        )}
-                        {purchaseOtherCostsTotal > 0 && (
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span>{t('propertyDeals.otherPurchaseCosts')}:</span>
-                            <span>{formatCurrency(purchaseOtherCostsTotal)}</span>
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.signalCpcv')}</span>
+                      <span className="inline-flex items-baseline gap-1.5 tabular-nums">
+                        <span className="text-sm font-medium text-foreground/90">{formatCurrency(currentDeal.payload.costs.signalCpcv)}</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.purchaseDates.cpcvSignature)}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.phaseDeed')}</span>
+                      <span className="inline-flex items-baseline gap-1.5 tabular-nums">
+                        <span className="text-sm font-medium text-foreground/90">{formatCurrency(currentDeal.payload.costs.escrituraAmount)}</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.purchaseDates.escritura)}</span>
+                      </span>
+                    </div>
+
+                    <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.expensesSection')}</p>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">IMT</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(purchaseImtAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.stampDuty')}</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(purchaseStampDutyAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.houseReady')}</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(purchaseHouseReadyAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.otherExpenses')}</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(purchaseOtherExpensesAmount)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
+                      <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.totalOwnCapitalInvested')}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(ownCapitalInvestedTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -1279,28 +1401,38 @@ export default function PropertyDealManager({
                         escritura: {formatDateValue(currentDeal.payload.saleDates.escrituraDate)}
                       </span>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                        <span className="text-xs text-muted-foreground">{t('propertyDeals.saleSignal')}</span>
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.saleValue')}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(effectiveSalePrice)}</span>
                       </div>
-                      <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-muted-foreground">{t('propertyDeals.totalSaleValue')}</span>
-                          <span className="text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</span>
-                        </div>
-                        {saleExtraTotal > 0 && (
-                          <div className="mt-2 space-y-1 pt-2">
-                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                              <span>{t('propertyDeals.otherSaleValues')}:</span>
-                              <span>{formatCurrency(saleExtraTotal)}</span>
-                            </div>
-                          </div>
-                        )}
+
+                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.detailsSection')}</p>
+
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.phaseDeed')}</span>
+                        <span className="inline-flex items-baseline gap-1.5 tabular-nums">
+                          <span className="text-sm font-medium text-foreground/90">{formatCurrency(saleDeedAmount)}</span>
+                          <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.saleDates.escrituraDate)}</span>
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                        <span className="text-xs text-muted-foreground">{t('propertyDeals.valueOnDeeds')}</span>
-                        <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
+
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.phaseCpcv')}</span>
+                        <span className="inline-flex items-baseline gap-1.5 tabular-nums">
+                          <span className="text-sm font-medium text-foreground/90">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
+                          <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.saleDates.signalDate)}</span>
+                        </span>
+                      </div>
+
+                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.expensesSection')}</p>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.realEstateCommission')}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(commissionTotal)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.otherSaleValues')}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(saleExtraTotal + (currentDeal.payload.condoExpenses || 0))}</span>
                       </div>
                     </div>
                   </div>

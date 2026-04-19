@@ -30,6 +30,7 @@ import { formatCurrency } from '@/features/contracts/lib/contractUtils';
 interface CarElectricityChartProps {
   contractId: string;
   contractName: string;
+  contractStartDate?: string;
 }
 
 interface LegacyElectricityRow {
@@ -46,6 +47,7 @@ interface LegacyElectricityRow {
 interface HomeExpenseRow {
   id: string;
   contract_id: string | null;
+  category: string | null;
   name: string;
   date: string;
   amount: number;
@@ -71,10 +73,29 @@ interface MonthlyGroup {
   rows: ElectricityRow[];
 }
 
+interface RentingRow {
+  id: string;
+  year: number;
+  month: number;
+  amount: number;
+}
+
 const chartConfig = {
   value: {
     label: 'Electricity',
     color: 'hsl(var(--primary))',
+  },
+  charging: {
+    label: 'Charging',
+    color: 'hsl(var(--primary))',
+  },
+  renting: {
+    label: 'Renting',
+    color: 'hsl(var(--muted-foreground))',
+  },
+  total: {
+    label: 'Total',
+    color: 'hsl(var(--foreground))',
   },
 } satisfies ChartConfig;
 
@@ -95,12 +116,21 @@ function isChargingExpenseRow(row: HomeExpenseRow): boolean {
   return normalizedName.includes('carregamento') || normalizedName.includes('charging');
 }
 
-export default function CarElectricityChart({ contractId, contractName }: CarElectricityChartProps) {
+function isRentingExpenseRow(row: HomeExpenseRow): boolean {
+  if (row.category === 'carRenting' || row.category === 'car') return true;
+  const normalizedName = row.name.trim().toLowerCase();
+  return normalizedName.includes('renting')
+    || normalizedName.startsWith('carro -')
+    || normalizedName.startsWith('car -');
+}
+
+export default function CarElectricityChart({ contractId, contractName, contractStartDate }: CarElectricityChartProps) {
   const { t, locale } = useI18n();
   const [rows, setRows] = useState<ElectricityRow[]>([]);
+  const [rentingRows, setRentingRows] = useState<RentingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [visibleMonths, setVisibleMonths] = useState(3);
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const [source, setSource] = useState<'home-expenses' | 'legacy'>('home-expenses');
@@ -133,12 +163,35 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
   }, [rows]);
 
   const availableYears = useMemo(() => {
-    const uniqueYears = Array.from(new Set(rows.map((row) => row.year))).sort((a, b) => b - a);
-    return uniqueYears;
-  }, [rows]);
+    const datasetYears = [
+      ...rows.map((row) => row.year),
+      ...rentingRows.map((row) => row.year),
+    ].filter((value) => Number.isFinite(value));
+
+    const startYearFromContract = contractStartDate ? Number(contractStartDate.slice(0, 4)) : NaN;
+    const minYearFromData = datasetYears.length > 0 ? Math.min(...datasetYears) : NaN;
+    const maxYearFromData = datasetYears.length > 0 ? Math.max(...datasetYears) : NaN;
+    const currentYear = new Date().getFullYear();
+
+    const startYear = Number.isFinite(startYearFromContract)
+      ? startYearFromContract
+      : (Number.isFinite(minYearFromData) ? minYearFromData : currentYear);
+
+    const endYear = Math.max(
+      currentYear,
+      Number.isFinite(maxYearFromData) ? maxYearFromData : currentYear,
+    );
+
+    const years: number[] = [];
+    for (let year = endYear; year >= startYear; year -= 1) {
+      years.push(year);
+    }
+
+    return years;
+  }, [rows, rentingRows, contractStartDate]);
 
   const monthlyGroupsForYear = useMemo(
-    () => monthlyGroups.filter((group) => group.year === selectedYear),
+    () => selectedYear === 'all' ? monthlyGroups : monthlyGroups.filter((group) => group.year === selectedYear),
     [monthlyGroups, selectedYear],
   );
 
@@ -155,6 +208,86 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
       value: Number(item.total.toFixed(2)),
     }));
   }, [locale, monthlyGroupsForYear]);
+
+  const monthlyTotalCostData = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    if (selectedYear === 'all') {
+      if (availableYears.length === 0) return [];
+
+      const yearsAsc = [...availableYears].sort((a, b) => a - b);
+      const startYear = yearsAsc[0];
+      const endYear = yearsAsc[yearsAsc.length - 1];
+
+      const monthMap = new Map<string, { year: number; month: number; charging: number; renting: number }>();
+
+      for (let year = startYear; year <= endYear; year += 1) {
+        const lastMonth = year === currentYear ? currentMonth : 12;
+        for (let month = 1; month <= lastMonth; month += 1) {
+          const key = `${year}-${String(month).padStart(2, '0')}`;
+          monthMap.set(key, { year, month, charging: 0, renting: 0 });
+        }
+      }
+
+      rows.forEach((row) => {
+        const key = `${row.year}-${String(row.month).padStart(2, '0')}`;
+        const current = monthMap.get(key);
+        if (!current) return;
+        current.charging += row.value_eur;
+      });
+
+      rentingRows.forEach((row) => {
+        const key = `${row.year}-${String(row.month).padStart(2, '0')}`;
+        const current = monthMap.get(key);
+        if (!current) return;
+        current.renting += row.amount;
+      });
+
+      return Array.from(monthMap.values())
+        .sort((a, b) => (a.year - b.year) || (a.month - b.month))
+        .map((item) => ({
+          month: item.month,
+          label: `${new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(item.year, item.month - 1, 1))} ${item.year}`,
+          charging: Number(item.charging.toFixed(2)),
+          renting: Number(item.renting.toFixed(2)),
+          total: Number((item.charging + item.renting).toFixed(2)),
+        }));
+    }
+
+    const monthMap = new Map<number, { month: number; charging: number; renting: number }>();
+
+    const lastMonth = selectedYear === currentYear ? currentMonth : 12;
+    for (let month = 1; month <= lastMonth; month += 1) {
+      monthMap.set(month, { month, charging: 0, renting: 0 });
+    }
+
+    rows
+      .filter((row) => row.year === selectedYear)
+      .forEach((row) => {
+        const current = monthMap.get(row.month);
+        if (!current) return;
+        current.charging += row.value_eur;
+      });
+
+    rentingRows
+      .filter((row) => row.year === selectedYear)
+      .forEach((row) => {
+        const current = monthMap.get(row.month);
+        if (!current) return;
+        current.renting += row.amount;
+      });
+
+    return Array.from(monthMap.values())
+      .map((item) => ({
+        month: item.month,
+        label: new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(selectedYear, item.month - 1, 1)),
+        charging: Number(item.charging.toFixed(2)),
+        renting: Number(item.renting.toFixed(2)),
+        total: Number((item.charging + item.renting).toFixed(2)),
+      }));
+  }, [rows, rentingRows, selectedYear, locale, availableYears]);
 
   const chargingTransactionName = useMemo(() => getCarChargingTransactionName(contractName), [contractName]);
 
@@ -175,7 +308,7 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
       return;
     }
 
-    if (!availableYears.includes(selectedYear)) {
+    if (selectedYear !== 'all' && !availableYears.includes(selectedYear)) {
       setSelectedYear(availableYears[0]);
     }
   }, [availableYears, selectedYear]);
@@ -193,10 +326,9 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
       const [expenseResponse, legacyResponse] = await Promise.all([
         supabase
           .from('home_expenses_transactions')
-          .select('id, contract_id, name, date, amount, notes')
+          .select('id, contract_id, category, name, date, amount, notes')
           .eq('type', 'expense')
           .eq('contract_id', contractId)
-          .eq('category', 'car')
           .order('date', { ascending: true }),
         supabase
           .from('car_electricity_history')
@@ -210,6 +342,7 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
       if (legacyResponse.error) {
         setError(legacyResponse.error.message);
         setRows([]);
+        setRentingRows([]);
         setLoading(false);
         return;
       }
@@ -228,11 +361,14 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
       if (expenseResponse.error) {
         setError(expenseResponse.error.message);
         setRows([]);
+        setRentingRows([]);
         setLoading(false);
         return;
       }
 
-      const expenseRows = ((expenseResponse.data ?? []) as HomeExpenseRow[])
+      const allExpenseRows = (expenseResponse.data ?? []) as HomeExpenseRow[];
+
+      const expenseRows = allExpenseRows
         .filter(isChargingExpenseRow)
         .map((row) => {
           const parts = parseDateParts(row.date);
@@ -249,6 +385,18 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
           };
         });
 
+      const rentingExpenseRows = allExpenseRows
+        .filter((row) => !isChargingExpenseRow(row) && isRentingExpenseRow(row))
+        .map((row) => {
+          const parts = parseDateParts(row.date);
+          return {
+            id: row.id,
+            year: parts.year,
+            month: parts.month,
+            amount: Number(row.amount),
+          } satisfies RentingRow;
+        });
+
       const mergedRows = [...legacyRows, ...expenseRows].sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
         if (a.month !== b.month) return a.month - b.month;
@@ -257,6 +405,7 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
       });
 
       setRows(mergedRows);
+      setRentingRows(rentingExpenseRows);
       setSource(expenseRows.length > 0 ? 'home-expenses' : 'legacy');
       setLoading(false);
     }
@@ -294,26 +443,53 @@ export default function CarElectricityChart({ contractId, contractName }: CarEle
         </div>
       </div>
 
+      <div className="mb-4 rounded-lg border bg-muted/20 p-3">
+        <div className="max-w-[240px]">
+          <p className="text-xs text-muted-foreground">{t('contracts.electricity.viewYear')}</p>
+          <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(value === 'all' ? 'all' : Number(value))}>
+            <SelectTrigger className="mt-1 h-9">
+              <SelectValue placeholder={t('contracts.electricity.selectYear')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('contracts.electricity.allYears')}</SelectItem>
+              {(availableYears.length === 0 ? [selectedYear] : availableYears).map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {monthlyTotalCostData.length > 0 ? (
+        <div className="mb-5 rounded-2xl border border-border/60 bg-background/40 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t('contracts.electricity.monthlyCarCostTrendTitle', { year: String(selectedYear) })}
+            </h3>
+            <p className="text-xs text-muted-foreground">{t('contracts.electricity.monthlyCarCostTrendHint')}</p>
+          </div>
+
+          <ChartContainer config={chartConfig} className="h-[220px] w-full">
+            <LineChart data={monthlyTotalCostData} margin={{ left: 8, right: 8, top: 12, bottom: 8 }}>
+              <CartesianGrid vertical={false} strokeDasharray="4 4" />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
+              <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Line type="monotone" dataKey="renting" stroke="var(--color-renting)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-renting)' }} activeDot={{ r: 4, fill: 'var(--color-renting)' }} />
+              <Line type="monotone" dataKey="charging" stroke="var(--color-charging)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-charging)' }} activeDot={{ r: 4, fill: 'var(--color-charging)' }} />
+              <Line type="monotone" dataKey="total" stroke="var(--color-total)" strokeWidth={2.5} dot={{ r: 3.5, fill: 'var(--color-total)' }} activeDot={{ r: 5, fill: 'var(--color-total)' }} />
+            </LineChart>
+          </ChartContainer>
+        </div>
+      ) : null}
+
       {rows.length === 0 ? (
         <div className="py-4 text-sm text-muted-foreground">{t('contracts.electricity.noData')}</div>
       ) : (
         <>
-          <div className="mb-4 flex items-end justify-between gap-3 rounded-lg border bg-muted/20 p-3">
-            <div className="min-w-[180px]">
-              <p className="text-xs text-muted-foreground">{t('contracts.electricity.viewYear')}</p>
-              <Select value={String(selectedYear)} onValueChange={(value) => setSelectedYear(Number(value))}>
-                <SelectTrigger className="mt-1 h-9">
-                  <SelectValue placeholder={t('contracts.electricity.selectYear')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(availableYears.length === 0 ? [selectedYear] : availableYears).map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="mb-4 rounded-lg border bg-muted/20 p-3">
             <p className="text-xs text-muted-foreground">{t('contracts.electricity.yearlyHint')}</p>
           </div>
 

@@ -193,7 +193,7 @@ export default function ContractDetail() {
 
       {contract.type === 'car' ? (
         <LazySection threshold={0.05} rootMargin="200px">
-          <CarElectricityChart contractId={contract.id} contractName={contract.name} />
+          <CarElectricityChart contractId={contract.id} contractName={contract.name} contractStartDate={contract.startDate} />
         </LazySection>
       ) : null}
 

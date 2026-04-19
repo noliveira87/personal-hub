@@ -982,7 +982,7 @@ function CashbackHeroPage() {
       pushGeneralInsight(t('cashbackHero.insights.noCashback', {
         count: String(noCashbackPurchases.length),
         total: formatCurrency(totalWithoutCashback, 'EUR'),
-      }), 'high', stats.potentialLost);
+      }), 'high', totalWithoutCashback);
     }
 
     if (stats.avgPercent < 2 && stats.eligibleAveragePurchasesCount >= 3) {
@@ -1013,13 +1013,35 @@ function CashbackHeroPage() {
     };
 
     return [...insights]
-      .filter((item) => !item.isCardSpecific)
       .sort((a, b) => {
         const byPriority = priorityWeight[b.priority] - priorityWeight[a.priority];
         if (byPriority !== 0) return byPriority;
         return (b.impactEur ?? 0) - (a.impactEur ?? 0);
       });
   }, [insights]);
+
+  const insightGroups = useMemo(() => {
+    const cardLabelMap: Record<CardInsightKey, string> = {
+      unibanco: 'UNIBANCO',
+      cetelem: 'CETELEM',
+      universo: 'UNIVERSO',
+    };
+
+    const groups: Array<{ key: string; label: string; items: InsightItem[] }> = [];
+    const generalItems = visibleInsights.filter((item) => !item.isCardSpecific);
+    if (generalItems.length > 0) {
+      groups.push({ key: 'general', label: t('cashbackHero.insights.generalPill'), items: generalItems });
+    }
+
+    (['unibanco', 'cetelem', 'universo'] as CardInsightKey[]).forEach((cardKey) => {
+      const items = visibleInsights.filter((item) => item.isCardSpecific && item.cardKey === cardKey);
+      if (items.length > 0) {
+        groups.push({ key: cardKey, label: cardLabelMap[cardKey], items });
+      }
+    });
+
+    return groups;
+  }, [visibleInsights, t]);
 
   const monthLabel = selectedMonth === 'all'
     ? t('cashbackHero.months.all')
@@ -1500,62 +1522,69 @@ function CashbackHeroPage() {
                   </span>
                 </div>
                 <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto p-3">
-                  {visibleInsights.map(({ line, isCardSpecific, priority }, index) => (
-                    <div
-                      key={`${line}-${index}`}
-                      className={cn(
-                        'group rounded-xl border bg-background/80 p-3 backdrop-blur-sm transition-colors',
-                        isCardSpecific
-                          ? 'border-primary/35 ring-1 ring-primary/15'
-                          : 'border-border/70 hover:border-primary/35',
-                      )}
-                    >
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                          isCardSpecific
-                            ? 'border border-primary/30 bg-primary/10 text-primary'
-                            : 'border border-border bg-muted/60 text-muted-foreground',
-                        )}>
-                          {isCardSpecific ? <CreditCard className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
-                          {isCardSpecific ? t('cashbackHero.insights.cardRulePill') : t('cashbackHero.insights.generalPill')}
-                        </span>
-                        <span className={cn(
-                          'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                          priority === 'high'
-                            ? 'border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                            : priority === 'medium'
-                              ? 'border border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-300'
-                              : 'border border-border bg-muted/60 text-muted-foreground',
-                        )}>
-                          {priority === 'high'
-                            ? t('cashbackHero.insights.priorityHigh')
-                            : priority === 'medium'
-                              ? t('cashbackHero.insights.priorityMedium')
-                              : t('cashbackHero.insights.priorityLow')}
-                        </span>
+                  {insightGroups.map((group) => (
+                    <div key={group.key} className="space-y-2">
+                      <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {group.label} <span className="ml-1 text-[10px]">({group.items.length})</span>
                       </div>
-                      <div className="flex items-start justify-between gap-2.5">
-                        <p className="flex-1 text-sm leading-5 text-foreground/90">
-                          {line.includes(':') ? (
-                            <>
-                              <span className="font-semibold">{line.slice(0, line.indexOf(':'))}:</span>
-                              {line.slice(line.indexOf(':') + 1)}
-                            </>
-                          ) : line}
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 rounded-full p-0 text-muted-foreground hover:text-foreground"
-                          title={t('cashbackHero.cardWidget.auditInfo')}
-                          onClick={() => {
-                            toast.info(`${t('cashbackHero.cardWidget.auditInfo')}: ${line}`);
-                          }}
+                      {group.items.map(({ line, isCardSpecific, priority }, index) => (
+                        <div
+                          key={`${group.key}-${line}-${index}`}
+                          className={cn(
+                            'group rounded-xl border bg-background/80 p-3 backdrop-blur-sm transition-colors',
+                            isCardSpecific
+                              ? 'border-primary/35 ring-1 ring-primary/15'
+                              : 'border-border/70 hover:border-primary/35',
+                          )}
                         >
-                          ℹ
-                        </Button>
-                      </div>
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className={cn(
+                              'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                              isCardSpecific
+                                ? 'border border-primary/30 bg-primary/10 text-primary'
+                                : 'border border-border bg-muted/60 text-muted-foreground',
+                            )}>
+                              {isCardSpecific ? <CreditCard className="h-3 w-3" /> : <Tag className="h-3 w-3" />}
+                              {isCardSpecific ? t('cashbackHero.insights.cardRulePill') : t('cashbackHero.insights.generalPill')}
+                            </span>
+                            <span className={cn(
+                              'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                              priority === 'high'
+                                ? 'border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                                : priority === 'medium'
+                                  ? 'border border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                                  : 'border border-border bg-muted/60 text-muted-foreground',
+                            )}>
+                              {priority === 'high'
+                                ? t('cashbackHero.insights.priorityHigh')
+                                : priority === 'medium'
+                                  ? t('cashbackHero.insights.priorityMedium')
+                                  : t('cashbackHero.insights.priorityLow')}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-2.5">
+                            <p className="flex-1 text-sm leading-5 text-foreground/90">
+                              {line.includes(':') ? (
+                                <>
+                                  <span className="font-semibold">{line.slice(0, line.indexOf(':'))}:</span>
+                                  {line.slice(line.indexOf(':') + 1)}
+                                </>
+                              ) : line}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 rounded-full p-0 text-muted-foreground hover:text-foreground"
+                              title={t('cashbackHero.cardWidget.auditInfo')}
+                              onClick={() => {
+                                toast.info(`${t('cashbackHero.cardWidget.auditInfo')}: ${line}`);
+                              }}
+                            >
+                              ℹ
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -2285,6 +2314,7 @@ function AddCashbackDialog({
   const isBybitSource = /bybit/i.test(source);
   const isCurveCashSource = /curve/i.test(source);
   const isWhitebitSource = /white\s*bit/i.test(source);
+  const isAutoCalculatedAmount = isBybitSource || isCurveCashSource || isWhitebitSource;
   const { pricesEur: cryptoPricesEur } = useCryptoQuotes(isWhitebitSource && open);
   const whitebitEurRate = cryptoPricesEur[whitebitAsset] ?? 0;
 
@@ -2481,6 +2511,33 @@ function AddCashbackDialog({
     onOpenChange(false);
   };
 
+  const amountField = (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.amount')}</label>
+      <Input
+        type="text"
+        inputMode="decimal"
+        value={amount}
+        onChange={(event) => setAmount(event.target.value)}
+        placeholder="0.00"
+        disabled={isAutoCalculatedAmount}
+        aria-readonly={isAutoCalculatedAmount}
+        className={isAutoCalculatedAmount ? 'bg-muted/50 text-foreground font-semibold tabular-nums disabled:opacity-100 cursor-not-allowed' : undefined}
+      />
+      {isBybitSource ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitConvertedHint')}</p>
+      ) : null}
+      {isCurveCashSource ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashConvertedHint')} {gbpEurRate > 0 ? `• 1 £ ≈ €${gbpEurRate.toFixed(4)}` : null}</p>
+      ) : null}
+      {isWhitebitSource ? (
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {t('cashbackHero.cashback.whitebitConvertedHint')} {whitebitEurRate > 0 ? `• 1 ${whitebitAsset} ≈ €${whitebitEurRate.toFixed(2)}` : null}
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
@@ -2504,29 +2561,6 @@ function AddCashbackDialog({
             </Select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.form.amount')}</label>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              placeholder="0.00"
-              readOnly={isBybitSource || isCurveCashSource || isWhitebitSource}
-            />
-            {isBybitSource ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitConvertedHint')}</p>
-            ) : null}
-            {isCurveCashSource ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashConvertedHint')} {gbpEurRate > 0 ? `• 1 £ ≈ €${gbpEurRate.toFixed(4)}` : null}</p>
-            ) : null}
-            {isWhitebitSource ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {t('cashbackHero.cashback.whitebitConvertedHint')} {whitebitEurRate > 0 ? `• 1 ${whitebitAsset} ≈ €${whitebitEurRate.toFixed(2)}` : null}
-              </p>
-            ) : null}
-          </div>
-
           {isBybitSource ? (
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.bybitPointsLabel')}</label>
@@ -2541,47 +2575,57 @@ function AddCashbackDialog({
             </div>
           ) : null}
 
+          {isBybitSource ? amountField : null}
+
           {isCurveCashSource ? (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpLabel')}</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={gbpAmount}
-                onChange={(event) => setGbpAmount(event.target.value)}
-                placeholder="0.00"
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpHint')}</p>
-            </div>
-          ) : null}
-
-          {isWhitebitSource ? (
-            <div className="space-y-2">
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.whitebitAssetLabel')}</label>
-              <Select value={whitebitAsset} onValueChange={(value) => setWhitebitAsset(value as (typeof WHITEBIT_ASSETS)[number])}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {WHITEBIT_ASSETS.map((asset) => (
-                    <SelectItem key={asset} value={asset}>{asset}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+            <>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.whitebitCryptoAmountLabel')}</label>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpLabel')}</label>
                 <Input
                   type="text"
                   inputMode="decimal"
-                  value={whitebitAmount}
-                  onChange={(event) => setWhitebitAmount(event.target.value)}
+                  value={gbpAmount}
+                  onChange={(event) => setGbpAmount(event.target.value)}
                   placeholder="0.00"
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.whitebitCryptoAmountHint')}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.curveCashGbpHint')}</p>
               </div>
-            </div>
+              {amountField}
+            </>
           ) : null}
+
+          {isWhitebitSource ? (
+            <>
+              <div className="space-y-2">
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.whitebitAssetLabel')}</label>
+                <Select value={whitebitAsset} onValueChange={(value) => setWhitebitAsset(value as (typeof WHITEBIT_ASSETS)[number])}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WHITEBIT_ASSETS.map((asset) => (
+                      <SelectItem key={asset} value={asset}>{asset}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.whitebitCryptoAmountLabel')}</label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={whitebitAmount}
+                    onChange={(event) => setWhitebitAmount(event.target.value)}
+                    placeholder="0.00"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.whitebitCryptoAmountHint')}</p>
+                </div>
+              </div>
+              {amountField}
+            </>
+          ) : null}
+
+          {!isBybitSource && !isCurveCashSource && !isWhitebitSource ? amountField : null}
 
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">{t('cashbackHero.cashback.dateReceived')}</label>
