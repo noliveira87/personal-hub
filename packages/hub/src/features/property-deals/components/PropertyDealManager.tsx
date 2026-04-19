@@ -453,6 +453,30 @@ export default function PropertyDealManager({
     return effectiveSalePrice - commissionTotal - ownInvestment - currentDeal.payload.condoExpenses - saleExtraTotal;
   }, [currentDeal.payload, commissionTotal, ownInvestment, saleExtraTotal]);
 
+  const sortedDeals = useMemo(() => {
+    return [...deals].sort((a, b) => {
+      const dateA = a.payload.purchaseDates.reserveEra || '';
+      const dateB = b.payload.purchaseDates.reserveEra || '';
+      return dateA.localeCompare(dateB);
+    });
+  }, [deals]);
+
+  const sortedPurchaseDetails = useMemo(() => {
+    const items = [
+      { type: 'signalCpcv', date: currentDeal.payload.purchaseDates.cpcvSignature },
+      { type: 'phaseDeed', date: currentDeal.payload.purchaseDates.escritura },
+    ];
+    return items.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  }, [currentDeal.payload.purchaseDates]);
+
+  const sortedSaleDetails = useMemo(() => {
+    const items = [
+      { type: 'phaseDeed', date: currentDeal.payload.saleDates.escrituraDate },
+      { type: 'phaseCpcv', date: currentDeal.payload.saleDates.signalDate },
+    ];
+    return items.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  }, [currentDeal.payload.saleDates]);
+
   const saleDeedAmount = Math.max(0, effectiveSalePrice - currentDeal.payload.saleSignalAmount);
   const currentDealExistsInList = deals.some((item) => item.id === currentDeal.id);
   const isDetailOpen = selectedDealId != null && selectedDealId === currentDeal.id;
@@ -646,7 +670,7 @@ export default function PropertyDealManager({
 
   const editFormLabelClass = 'text-xs font-medium text-foreground/80';
   const editFormSectionTitleClass = 'text-[10px] font-semibold uppercase tracking-wide text-muted-foreground';
-  const editFormSubsectionTitleClass = 'inline-flex items-center rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground';
+  const editFormSubsectionTitleClass = 'inline-flex items-center rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400';
 
   return (
     <section className={cn(
@@ -698,7 +722,7 @@ export default function PropertyDealManager({
             </button>
           ) : null}
 
-          {deals.map((deal) => {
+          {sortedDeals.map((deal) => {
             const metrics = getDealMetrics(deal);
             const isSelected = deal.id === currentDeal.id;
 
@@ -992,10 +1016,6 @@ export default function PropertyDealManager({
                     </div>
                   </div>
 
-                  <div className="px-1 pt-1">
-                    <span className={editFormSubsectionTitleClass}>{t('propertyDeals.detailsSection')}</span>
-                  </div>
-
                   {/* CPCV */}
                   <div className="space-y-2">
                     <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
@@ -1216,8 +1236,6 @@ export default function PropertyDealManager({
 
                     {currentDeal.payload.saleStatus === 'sold' ? (
                       <>
-                        <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.detailsSection')}</p>
-
                         <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                           <span className={editFormLabelClass}>{t('propertyDeals.saleSignal')}</span>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -1330,11 +1348,8 @@ export default function PropertyDealManager({
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Home className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.purchase')}</h3>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.purchase')}</h3>
                     </div>
-                    <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      escritura: {formatDateValue(currentDeal.payload.purchaseDates.escritura)}
-                    </span>
                   </div>
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
@@ -1346,25 +1361,27 @@ export default function PropertyDealManager({
                       <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(ownCapitalOnPurchaseOffer)}</span>
                     </div>
 
-                        <div className="px-1 pt-1">
-                          <span className={editFormSubsectionTitleClass}>{t('propertyDeals.detailsSection')}</span>
-                        </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.signalCpcv')}</span>
-                      <span className="inline-flex items-baseline gap-1.5 tabular-nums">
-                        <span className="text-sm font-medium text-foreground/90">{formatCurrency(currentDeal.payload.costs.signalCpcv)}</span>
-                        <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.purchaseDates.cpcvSignature)}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.phaseDeed')}</span>
-                      <span className="inline-flex items-baseline gap-1.5 tabular-nums">
-                        <span className="text-sm font-medium text-foreground/90">{formatCurrency(currentDeal.payload.costs.escrituraAmount)}</span>
-                        <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.purchaseDates.escritura)}</span>
-                      </span>
-                    </div>
+                    <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.detailsSection')}</p>
 
-                    <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.expensesSection')}</p>
+                    {sortedPurchaseDetails.map((item) => (
+                      <div key={item.type} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                        <span className="text-xs font-medium text-foreground/80">
+                          {item.type === 'signalCpcv' ? t('propertyDeals.signalCpcv') : t('propertyDeals.phaseDeed')}
+                        </span>
+                        <div className="flex shrink-0 items-baseline gap-6 tabular-nums">
+                          <span className="w-24 text-right text-xs font-medium tracking-tight text-sky-600/80 dark:text-sky-400/80">
+                            {formatDateValue(item.date)}
+                          </span>
+                          <span className="w-32 text-right text-sm font-semibold text-foreground/95">
+                            {item.type === 'signalCpcv'
+                              ? formatCurrency(currentDeal.payload.costs.signalCpcv)
+                              : formatCurrency(currentDeal.payload.costs.escrituraAmount)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
+                    <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.expensesSection')}</p>
                     <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <span className="text-xs font-medium text-foreground/80">IMT</span>
                       <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(purchaseImtAmount)}</span>
@@ -1395,11 +1412,8 @@ export default function PropertyDealManager({
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{t('propertyDeals.sale')}</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.sale')}</h3>
                       </div>
-                      <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        escritura: {formatDateValue(currentDeal.payload.saleDates.escrituraDate)}
-                      </span>
                     </div>
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
@@ -1407,25 +1421,25 @@ export default function PropertyDealManager({
                         <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(effectiveSalePrice)}</span>
                       </div>
 
-                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.detailsSection')}</p>
+                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.detailsSection')}</p>
 
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.phaseDeed')}</span>
-                        <span className="inline-flex items-baseline gap-1.5 tabular-nums">
-                          <span className="text-sm font-medium text-foreground/90">{formatCurrency(saleDeedAmount)}</span>
-                          <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.saleDates.escrituraDate)}</span>
-                        </span>
-                      </div>
+                      {sortedSaleDetails.map((item) => (
+                        <div key={item.type} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                          <span className="text-xs font-medium text-foreground/80">
+                            {item.type === 'phaseDeed' ? t('propertyDeals.phaseDeed') : t('propertyDeals.phaseCpcv')}
+                          </span>
+                          <div className="flex shrink-0 items-baseline gap-6 tabular-nums">
+                            <span className="w-24 text-right text-xs font-medium tracking-tight text-sky-600/80 dark:text-sky-400/80">
+                              {formatDateValue(item.date)}
+                            </span>
+                            <span className="w-32 text-right text-sm font-semibold text-foreground/95">
+                              {item.type === 'phaseDeed' ? formatCurrency(saleDeedAmount) : formatCurrency(currentDeal.payload.saleSignalAmount)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
 
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.phaseCpcv')}</span>
-                        <span className="inline-flex items-baseline gap-1.5 tabular-nums">
-                          <span className="text-sm font-medium text-foreground/90">{formatCurrency(currentDeal.payload.saleSignalAmount)}</span>
-                          <span className="text-[11px] font-normal text-muted-foreground">{formatDateValue(currentDeal.payload.saleDates.signalDate)}</span>
-                        </span>
-                      </div>
-
-                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.expensesSection')}</p>
+                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.expensesSection')}</p>
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                         <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.realEstateCommission')}</span>
                         <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(commissionTotal)}</span>

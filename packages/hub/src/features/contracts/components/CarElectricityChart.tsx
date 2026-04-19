@@ -101,6 +101,17 @@ const chartConfig = {
 
 const subtleIconButtonClassName = 'h-9 w-9 rounded-xl border-border/50 bg-transparent text-muted-foreground shadow-none hover:bg-accent/50 hover:text-foreground';
 
+const yoyPalette = [
+  '#0ea5e9',
+  '#f97316',
+  '#22c55e',
+  '#eab308',
+  '#a855f7',
+  '#ef4444',
+  '#14b8a6',
+  '#64748b',
+];
+
 function parseDateParts(date: string) {
   const [year, month, day] = date.split('-').map(Number);
   return { year, month, day };
@@ -131,6 +142,8 @@ export default function CarElectricityChart({ contractId, contractName, contract
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
+  const [focusedMonth, setFocusedMonth] = useState<number | null>(null);
+  const [highlightedOverlayYear, setHighlightedOverlayYear] = useState<number | null>(null);
   const [visibleMonths, setVisibleMonths] = useState(3);
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const [source, setSource] = useState<'home-expenses' | 'legacy'>('home-expenses');
@@ -195,19 +208,62 @@ export default function CarElectricityChart({ contractId, contractName, contract
     [monthlyGroups, selectedYear],
   );
 
-  const visibleGroups = monthlyGroupsForYear.slice(0, visibleMonths);
+  const scopedMonthlyGroupsForYear = useMemo(() => {
+    if (focusedMonth === null) return monthlyGroupsForYear;
+    const startMonth = focusedMonth;
+    const endMonth = Math.min(12, focusedMonth + 2);
+    return monthlyGroupsForYear.filter((group) => group.month >= startMonth && group.month <= endMonth);
+  }, [monthlyGroupsForYear, focusedMonth]);
+
+  const visibleGroups = scopedMonthlyGroupsForYear.slice(0, visibleMonths);
 
   const chartData = useMemo(() => {
-    const sorted = [...monthlyGroupsForYear].sort((a, b) => {
+    const sorted = [...scopedMonthlyGroupsForYear].sort((a, b) => {
       if (a.year !== b.year) return a.year - b.year;
       return a.month - b.month;
     });
 
     return sorted.map((item) => ({
+      month: item.month,
       label: `${new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(item.year, item.month - 1, 1))} ${item.year}`,
       value: Number(item.total.toFixed(2)),
     }));
-  }, [locale, monthlyGroupsForYear]);
+  }, [locale, scopedMonthlyGroupsForYear]);
+
+  const electricityOverlayData = useMemo(() => {
+    if (selectedYear !== 'all' || availableYears.length === 0) return [];
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const yearsAsc = [...availableYears].sort((a, b) => a - b);
+
+    return Array.from({ length: 12 }, (_, index) => {
+      const month = index + 1;
+      const point: Record<string, number | string | null> = {
+        month,
+        label: new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(2000, month - 1, 1)),
+      };
+
+      for (const year of yearsAsc) {
+        if (year === currentYear && month > currentMonth) {
+          point[`year_${year}`] = null;
+          continue;
+        }
+
+        const total = rows
+          .filter((row) => row.year === year && row.month === month)
+          .reduce((sum, row) => sum + row.value_eur, 0);
+
+        point[`year_${year}`] = Number(total.toFixed(2));
+      }
+
+      return point;
+    }).filter((item) => {
+      if (focusedMonth === null) return true;
+      return typeof item.month === 'number' && item.month >= focusedMonth && item.month <= Math.min(12, focusedMonth + 2);
+    });
+  }, [rows, availableYears, selectedYear, locale, focusedMonth]);
 
   const monthlyTotalCostData = useMemo(() => {
     const now = new Date();
@@ -289,6 +345,80 @@ export default function CarElectricityChart({ contractId, contractName, contract
       }));
   }, [rows, rentingRows, selectedYear, locale, availableYears]);
 
+  const allYearsOverlayData = useMemo(() => {
+    if (selectedYear !== 'all' || availableYears.length === 0) return [];
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const maxMonth = 12;
+
+    const totalsByYearMonth = new Map<string, number>();
+
+    for (const row of rows) {
+      const key = `${row.year}-${row.month}`;
+      totalsByYearMonth.set(key, (totalsByYearMonth.get(key) ?? 0) + row.value_eur);
+    }
+
+    for (const row of rentingRows) {
+      const key = `${row.year}-${row.month}`;
+      totalsByYearMonth.set(key, (totalsByYearMonth.get(key) ?? 0) + row.amount);
+    }
+
+    const yearsAsc = [...availableYears].sort((a, b) => a - b);
+
+    return Array.from({ length: maxMonth }, (_, index) => {
+      const month = index + 1;
+      const monthLabel = new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(2000, month - 1, 1));
+      const point: Record<string, number | string> = {
+        month,
+        label: monthLabel,
+      };
+
+      for (const year of yearsAsc) {
+        if (year === currentYear && month > currentMonth) {
+          point[`year_${year}`] = null;
+          continue;
+        }
+
+        point[`year_${year}`] = Number((totalsByYearMonth.get(`${year}-${month}`) ?? 0).toFixed(2));
+      }
+
+      return point;
+    });
+  }, [rows, rentingRows, availableYears, selectedYear, locale]);
+
+  const trendYearLabel = selectedYear === 'all'
+    ? t('contracts.electricity.allYears')
+    : String(selectedYear);
+
+  const allYearsLineConfig = useMemo(() => {
+    const yearsAsc = [...availableYears].sort((a, b) => a - b);
+    return yearsAsc.map((year, index) => ({
+      year,
+      dataKey: `year_${year}`,
+      color: yoyPalette[index % yoyPalette.length],
+      strokeWidth: year === new Date().getFullYear() ? 2.75 : 2,
+    }));
+  }, [availableYears]);
+
+  const scopedMonthlyTotalCostData = useMemo(() => {
+    if (focusedMonth === null) return monthlyTotalCostData;
+    const startMonth = focusedMonth;
+    const endMonth = Math.min(12, focusedMonth + 2);
+    return monthlyTotalCostData.filter((item) => item.month >= startMonth && item.month <= endMonth);
+  }, [monthlyTotalCostData, focusedMonth]);
+
+  const scopedAllYearsOverlayData = useMemo(() => {
+    if (focusedMonth === null) return allYearsOverlayData;
+    const startMonth = focusedMonth;
+    const endMonth = Math.min(12, focusedMonth + 2);
+    return allYearsOverlayData.filter((item) => {
+      if (typeof item.month !== 'number') return false;
+      return item.month >= startMonth && item.month <= endMonth;
+    });
+  }, [allYearsOverlayData, focusedMonth]);
+
   const chargingTransactionName = useMemo(() => getCarChargingTransactionName(contractName), [contractName]);
 
   const homeExpensesLink = useMemo(() => {
@@ -316,7 +446,19 @@ export default function CarElectricityChart({ contractId, contractName, contract
   useEffect(() => {
     setVisibleMonths(3);
     setExpandedMonths({});
+    setFocusedMonth(null);
   }, [selectedYear]);
+
+  useEffect(() => {
+    if (selectedYear !== 'all') {
+      setHighlightedOverlayYear(null);
+      return;
+    }
+
+    if (highlightedOverlayYear !== null && !availableYears.includes(highlightedOverlayYear)) {
+      setHighlightedOverlayYear(null);
+    }
+  }, [selectedYear, availableYears, highlightedOverlayYear]);
 
   useEffect(() => {
     async function fetchData() {
@@ -466,22 +608,80 @@ export default function CarElectricityChart({ contractId, contractName, contract
         <div className="mb-5 rounded-2xl border border-border/60 bg-background/40 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t('contracts.electricity.monthlyCarCostTrendTitle', { year: String(selectedYear) })}
+              {t('contracts.electricity.monthlyCarCostTrendTitle', { year: trendYearLabel })}
             </h3>
             <p className="text-xs text-muted-foreground">{t('contracts.electricity.monthlyCarCostTrendHint')}</p>
           </div>
 
-          <ChartContainer config={chartConfig} className="h-[220px] w-full">
-            <LineChart data={monthlyTotalCostData} margin={{ left: 8, right: 8, top: 12, bottom: 8 }}>
-              <CartesianGrid vertical={false} strokeDasharray="4 4" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Line type="monotone" dataKey="renting" stroke="var(--color-renting)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-renting)' }} activeDot={{ r: 4, fill: 'var(--color-renting)' }} />
-              <Line type="monotone" dataKey="charging" stroke="var(--color-charging)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-charging)' }} activeDot={{ r: 4, fill: 'var(--color-charging)' }} />
-              <Line type="monotone" dataKey="total" stroke="var(--color-total)" strokeWidth={2.5} dot={{ r: 3.5, fill: 'var(--color-total)' }} activeDot={{ r: 5, fill: 'var(--color-total)' }} />
-            </LineChart>
-          </ChartContainer>
+          {selectedYear === 'all' ? (
+            <>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {allYearsLineConfig.map(({ year, color }) => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => setHighlightedOverlayYear((prev) => (prev === year ? null : year))}
+                    className={`inline-flex items-center gap-2 rounded-full border px-2 py-0.5 text-[11px] transition-colors ${highlightedOverlayYear === year ? 'border-foreground/50 bg-accent/70 text-foreground' : 'border-border/60 bg-background/70 text-muted-foreground hover:text-foreground'}`}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                    {year}
+                  </button>
+                ))}
+              </div>
+
+              <ChartContainer config={chartConfig} className="h-[220px] w-full">
+                <LineChart
+                  data={scopedAllYearsOverlayData}
+                  margin={{ left: 8, right: 8, top: 12, bottom: 8 }}
+                  onClick={(state: any) => {
+                    const month = state?.activePayload?.[0]?.payload?.month;
+                    if (typeof month !== 'number') return;
+                    setFocusedMonth((prev) => (prev === month ? null : month));
+                  }}
+                >
+                  <CartesianGrid vertical={false} strokeDasharray="4 4" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
+                  <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  {allYearsLineConfig.map(({ year, dataKey, color, strokeWidth }) => (
+                    <Line
+                      key={dataKey}
+                      type="monotone"
+                      name={String(year)}
+                      dataKey={dataKey}
+                      stroke={color}
+                      strokeWidth={highlightedOverlayYear === null ? strokeWidth : (highlightedOverlayYear === year ? 3.2 : 1.4)}
+                      strokeOpacity={highlightedOverlayYear === null ? 1 : (highlightedOverlayYear === year ? 1 : 0.35)}
+                      dot={{ r: 2.5, fill: color }}
+                      activeDot={{ r: 4, fill: color }}
+                      onClick={() => setHighlightedOverlayYear((prev) => (prev === year ? null : year))}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ChartContainer>
+            </>
+          ) : (
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
+              <LineChart
+                data={scopedMonthlyTotalCostData}
+                margin={{ left: 8, right: 8, top: 12, bottom: 8 }}
+                onClick={(state: any) => {
+                  const month = state?.activePayload?.[0]?.payload?.month;
+                  if (typeof month !== 'number') return;
+                  setFocusedMonth((prev) => (prev === month ? null : month));
+                }}
+              >
+                <CartesianGrid vertical={false} strokeDasharray="4 4" />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Line type="monotone" dataKey="renting" stroke="var(--color-renting)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-renting)' }} activeDot={{ r: 4, fill: 'var(--color-renting)' }} />
+                <Line type="monotone" dataKey="charging" stroke="var(--color-charging)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-charging)' }} activeDot={{ r: 4, fill: 'var(--color-charging)' }} />
+                <Line type="monotone" dataKey="total" stroke="var(--color-total)" strokeWidth={2.5} dot={{ r: 3.5, fill: 'var(--color-total)' }} activeDot={{ r: 5, fill: 'var(--color-total)' }} />
+              </LineChart>
+            </ChartContainer>
+          )}
         </div>
       ) : null}
 
@@ -489,28 +689,73 @@ export default function CarElectricityChart({ contractId, contractName, contract
         <div className="py-4 text-sm text-muted-foreground">{t('contracts.electricity.noData')}</div>
       ) : (
         <>
-          <div className="mb-4 rounded-lg border bg-muted/20 p-3">
-            <p className="text-xs text-muted-foreground">{t('contracts.electricity.yearlyHint')}</p>
-          </div>
-
           {chartData.length > 0 && (
             <div className="mb-5 rounded-2xl border border-border/60 bg-background/40 p-3">
-              <ChartContainer config={chartConfig} className="h-[220px] w-full">
-                <LineChart data={chartData} margin={{ left: 8, right: 8, top: 12, bottom: 8 }}>
-                  <CartesianGrid vertical={false} strokeDasharray="4 4" />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
-                  <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line
-                    type="linear"
-                    dataKey="value"
-                    stroke="var(--color-value)"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: 'var(--color-value)' }}
-                    activeDot={{ r: 5, fill: 'var(--color-value)' }}
-                  />
-                </LineChart>
-              </ChartContainer>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t('contracts.electricity.monthlyElectricityTrendTitle', { year: trendYearLabel })}
+                </h3>
+                <p className="text-xs text-muted-foreground">{t('contracts.electricity.monthlyElectricityTrendHint')}</p>
+              </div>
+
+              {selectedYear === 'all' ? (
+                <ChartContainer config={chartConfig} className="h-[220px] w-full">
+                  <LineChart
+                    data={electricityOverlayData}
+                    margin={{ left: 8, right: 8, top: 12, bottom: 8 }}
+                    onClick={(state: any) => {
+                      const month = state?.activePayload?.[0]?.payload?.month;
+                      if (typeof month !== 'number') return;
+                      setFocusedMonth((prev) => (prev === month ? null : month));
+                    }}
+                  >
+                    <CartesianGrid vertical={false} strokeDasharray="4 4" />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
+                    <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    {allYearsLineConfig.map(({ year, dataKey, color, strokeWidth }) => (
+                      <Line
+                        key={`electricity-${dataKey}`}
+                        type="monotone"
+                        name={String(year)}
+                        dataKey={dataKey}
+                        stroke={color}
+                        strokeWidth={highlightedOverlayYear === null ? strokeWidth : (highlightedOverlayYear === year ? 3.2 : 1.4)}
+                        strokeOpacity={highlightedOverlayYear === null ? 1 : (highlightedOverlayYear === year ? 1 : 0.35)}
+                        dot={{ r: 2.5, fill: color }}
+                        activeDot={{ r: 4, fill: color }}
+                        onClick={() => setHighlightedOverlayYear((prev) => (prev === year ? null : year))}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ChartContainer>
+              ) : (
+                <ChartContainer config={chartConfig} className="h-[220px] w-full">
+                  <LineChart
+                    data={chartData}
+                    margin={{ left: 8, right: 8, top: 12, bottom: 8 }}
+                    onClick={(state: any) => {
+                      const month = state?.activePayload?.[0]?.payload?.month;
+                      if (typeof month !== 'number') return;
+                      setFocusedMonth((prev) => (prev === month ? null : month));
+                    }}
+                  >
+                    <CartesianGrid vertical={false} strokeDasharray="4 4" />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={16} />
+                    <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => formatCurrency(value)} width={88} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line
+                      type="linear"
+                      dataKey="value"
+                      stroke="var(--color-value)"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: 'var(--color-value)' }}
+                      activeDot={{ r: 5, fill: 'var(--color-value)' }}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              )}
             </div>
           )}
 
@@ -537,7 +782,7 @@ export default function CarElectricityChart({ contractId, contractName, contract
                     </Button>
                   </div>
 
-                  <div className="border-t border-border/60 px-4 py-3">
+                  <div className="border-t border-border/60 px-4 py-3 text-right">
                     <p className="text-xs text-muted-foreground">{t('contracts.electricity.totalValue')}</p>
                     <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
                       {Number(group.total.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -551,8 +796,7 @@ export default function CarElectricityChart({ contractId, contractName, contract
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-foreground">
-                                {t('contracts.electricity.dayLabel', { day: row.day })}
-                                {row.note ? ` · ${row.note}` : ''}
+                                {row.note ?? t('contracts.electricity.dayLabel', { day: row.day })}
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {row.charging_location === 'home' && t('contracts.electricity.home')}
@@ -560,9 +804,14 @@ export default function CarElectricityChart({ contractId, contractName, contract
                                 {row.source === 'home-expenses' && !row.charging_location && t('contracts.electricity.loggedInExpenses')}
                               </p>
                             </div>
-                            <p className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                              {Number(row.value_eur.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
+                            <div className="shrink-0 text-right">
+                              <p className="text-[11px] text-muted-foreground">
+                                {t('contracts.electricity.dayLabel', { day: row.day })}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold tabular-nums text-foreground">
+                                {Number(row.value_eur.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -602,7 +851,7 @@ export default function CarElectricityChart({ contractId, contractName, contract
                             {source === 'legacy' && <Badge variant="outline">{t('contracts.electricity.outside')} {outsideCount}</Badge>}
                           </div>
                         </TableCell>
-                        <TableCell>{Number(group.total.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="text-right tabular-nums">{Number(group.total.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                         <TableCell className="text-right">
                           <Button type="button" size="icon" variant="outline" className={subtleIconButtonClassName} onClick={() => toggleMonthDetails(group.key)}>
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -612,16 +861,19 @@ export default function CarElectricityChart({ contractId, contractName, contract
                       {isExpanded && group.rows.map((row) => (
                         <TableRow key={row.id} className="bg-muted/10">
                           <TableCell className="pl-8 text-xs text-muted-foreground">
-                            {t('contracts.electricity.dayLabel', { day: row.day })}
-                            {row.note ? ` · ${row.note}` : ''}
+                            {row.note ?? '—'}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {row.charging_location === 'home' && t('contracts.electricity.home')}
                             {row.charging_location === 'outside' && t('contracts.electricity.outside')}
                             {row.source === 'home-expenses' && !row.charging_location && t('contracts.electricity.loggedInExpenses')}
                           </TableCell>
-                          <TableCell>{Number(row.value_eur.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                          <TableCell />
+                          <TableCell className="text-right text-xs text-muted-foreground">
+                            {t('contracts.electricity.dayLabel', { day: row.day })}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums">
+                            {Number(row.value_eur.toFixed(2)).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </React.Fragment>
