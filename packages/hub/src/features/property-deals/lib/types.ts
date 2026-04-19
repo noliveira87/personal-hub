@@ -47,6 +47,7 @@ export type PropertyDealPayload = {
     escrituraDate: string;
   };
   saleSignalAmount: number;
+  mortgageOutstandingAmount: number;
 };
 
 export type PropertyDeal = {
@@ -91,4 +92,5 @@ export const DEFAULT_PROPERTY_DEAL_PAYLOAD: PropertyDealPayload = {
     escrituraDate: '',
   },
   saleSignalAmount: 0,
+  mortgageOutstandingAmount: 0,
 };

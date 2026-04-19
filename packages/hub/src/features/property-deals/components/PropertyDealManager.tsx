@@ -51,7 +51,7 @@ function NumberInput({
         const parsed = Number(event.target.value);
         onChange(Number.isFinite(parsed) ? parsed : 0);
       }}
-      className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground disabled:cursor-not-allowed disabled:opacity-70 sm:w-28"
+      className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground disabled:cursor-not-allowed disabled:opacity-70 sm:w-28 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
     />
   );
 }
@@ -93,6 +93,7 @@ function createDefaultPurchaseCostEntries() {
   return [
     { id: crypto.randomUUID(), label: 'IMT', amount: 0, date: '' },
     { id: crypto.randomUUID(), label: 'Imposto de selo', amount: 0, date: '' },
+    { id: crypto.randomUUID(), label: 'Casa pronta', amount: 0, date: '' },
   ];
 }
 
@@ -209,8 +210,9 @@ function getDealMetrics(deal: PropertyDeal) {
   const grossCommission = effectiveSalePrice * (deal.payload.commissionRate / 100);
   const commissionTotal = grossCommission * (1 + deal.payload.commissionVatRate / 100);
   const profit = effectiveSalePrice - commissionTotal - ownInvestment - deal.payload.condoExpenses - saleExtras;
+  const netProfit = profit - (deal.payload.mortgageOutstandingAmount || 0);
 
-  return { ownInvestment, commissionTotal, profit };
+  return { ownInvestment, commissionTotal, profit, netProfit };
 }
 
 function formatDealAddress(address: PropertyAddress) {
@@ -452,6 +454,10 @@ export default function PropertyDealManager({
   const profit = useMemo(() => {
     return effectiveSalePrice - commissionTotal - ownInvestment - currentDeal.payload.condoExpenses - saleExtraTotal;
   }, [currentDeal.payload, commissionTotal, ownInvestment, saleExtraTotal]);
+
+  const profitAfterMortgage = useMemo(() => {
+    return profit - (currentDeal.payload.mortgageOutstandingAmount || 0);
+  }, [profit, currentDeal.payload.mortgageOutstandingAmount]);
 
   const sortedDeals = useMemo(() => {
     return [...deals].sort((a, b) => {
@@ -760,11 +766,11 @@ export default function PropertyDealManager({
                     ) : null}
                     <span className={cn(
                       'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tabular-nums',
-                      metrics.profit >= 0
+                      ((deal.payload.mortgageOutstandingAmount || 0) > 0 ? metrics.netProfit : metrics.profit) >= 0
                         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                         : 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
                     )}>
-                      {formatCurrency(metrics.profit)}
+                      {formatCurrency((deal.payload.mortgageOutstandingAmount || 0) > 0 ? metrics.netProfit : metrics.profit)}
                     </span>
                   </div>
                 </div>
@@ -872,6 +878,15 @@ export default function PropertyDealManager({
                   'mt-1 text-sm font-bold tabular-nums',
                   profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
                 )}>{formatCurrency(profit)}</p>
+                {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
+                  <div className="mt-2 border-t border-border/50 pt-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.netProfit')}</p>
+                    <p className={cn(
+                      'mt-1 text-sm font-bold tabular-nums',
+                      profitAfterMortgage >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
+                    )}>{formatCurrency(profitAfterMortgage)}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -945,7 +960,7 @@ export default function PropertyDealManager({
                           step="0.01"
                           value={Number.isFinite(currentDeal.payload.purchasePrice) ? currentDeal.payload.purchasePrice : 0}
                           onChange={(event) => updatePayload({ purchasePrice: Number(event.target.value) || 0 })}
-                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-medium tabular-nums text-foreground/90"
+                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-medium tabular-nums text-foreground/90 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </div>
                     </div>
@@ -961,7 +976,7 @@ export default function PropertyDealManager({
                           step="0.01"
                           value={Number.isFinite(currentDeal.payload.mortgageRequestedAmount) ? currentDeal.payload.mortgageRequestedAmount : 0}
                           onChange={(event) => updatePayload({ mortgageRequestedAmount: Number(event.target.value) || 0 })}
-                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-medium tabular-nums text-foreground/90"
+                          className="h-8 w-32 rounded-md border border-border bg-background px-2 text-right text-sm font-medium tabular-nums text-foreground/90 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </div>
                     </div>
@@ -986,7 +1001,7 @@ export default function PropertyDealManager({
                               step="0.01"
                               value={Number.isFinite(currentDeal.payload.costs.reserveEra) ? currentDeal.payload.costs.reserveEra : 0}
                               onChange={(next) => updateCosts({ reserveEra: Number(next.target.value) || 0 })}
-                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </div>
                           <input
@@ -1031,7 +1046,7 @@ export default function PropertyDealManager({
                               step="0.01"
                               value={Number.isFinite(currentDeal.payload.costs.signalCpcv) ? currentDeal.payload.costs.signalCpcv : 0}
                               onChange={(next) => updateCosts({ signalCpcv: Number(next.target.value) || 0 })}
-                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </div>
                           <input
@@ -1046,6 +1061,9 @@ export default function PropertyDealManager({
                   </div>
 
                   {/* Escritura */}
+                  <div className="px-1 pt-1">
+                    <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseDeed')}</span>
+                  </div>
                   <div className="space-y-2">
                     <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1056,24 +1074,6 @@ export default function PropertyDealManager({
                           onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, escritura: next.target.value } })}
                           className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
                         />
-                      </div>
-
-                      <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                        <label className={editFormLabelClass}>{t('propertyDeals.purchaseDeedAmount')}</label>
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step="0.01"
-                              value={Number.isFinite(currentDeal.payload.costs.escrituraAmount) ? currentDeal.payload.costs.escrituraAmount : 0}
-                              onChange={(next) => updateCosts({ escrituraAmount: Number(next.target.value) || 0 })}
-                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
-                            />
-                          </div>
-                        </div>
                       </div>
 
                       {deedPurchaseExtraEntries.length > 0 ? (
@@ -1091,7 +1091,7 @@ export default function PropertyDealManager({
                                     step="0.01"
                                     value={entry.amount || 0}
                                     onChange={(next) => updatePurchaseExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
-                                    className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                                    className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                   />
                                 </div>
                                 {!isDeedPurchaseCostLabel(entry.label) ? (
@@ -1132,7 +1132,7 @@ export default function PropertyDealManager({
                               step="0.01"
                               value={entry.amount || 0}
                               onChange={(next) => updatePurchaseExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
-                              className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                              className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </div>
                           <DateInput value={entry.date} onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next })} />
@@ -1203,6 +1203,11 @@ export default function PropertyDealManager({
                       )}
                     </div>
 
+                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
+                      <CurrencyInput value={currentDeal.payload.mortgageOutstandingAmount ?? 0} onChange={(next) => updatePayload({ mortgageOutstandingAmount: next })} min={0} />
+                    </div>
+
                     <div className="px-1 pt-1">
                       <span className={editFormSubsectionTitleClass}>{t('propertyDeals.expensesSection')}</span>
                     </div>
@@ -1259,8 +1264,16 @@ export default function PropertyDealManager({
                     )}
 
                     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
-                      <p className="mt-1 text-lg font-bold tabular-nums text-foreground">{formatCurrency(profit)}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
+                        <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(profit)}</p>
+                      </div>
+                      {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
+                        <div className={`mt-2 flex items-center justify-between border-t pt-2 ${profitAfterMortgage >= 0 ? 'border-emerald-500/30' : 'border-red-500/30'}`}>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.netProfit')}</p>
+                          <p className={`text-base font-bold tabular-nums ${profitAfterMortgage >= 0 ? 'text-foreground' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgage)}</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-background/60 px-3 py-2.5">
@@ -1293,7 +1306,7 @@ export default function PropertyDealManager({
                                     step="0.01"
                                     value={entry.amount || 0}
                                     onChange={(next) => updateSaleExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
-                                    className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground"
+                                    className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                   />
                                 </div>
                                 <DateInput value={entry.date} onChange={(next) => updateSaleExtraEntry(entry.id, { date: next })} />
@@ -1448,6 +1461,18 @@ export default function PropertyDealManager({
                         <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.otherSaleValues')}</span>
                         <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(saleExtraTotal + (currentDeal.payload.condoExpenses || 0))}</span>
                       </div>
+                      {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
+                        <>
+                          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                            <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
+                            <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(currentDeal.payload.mortgageOutstandingAmount)}</span>
+                          </div>
+                          <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${profitAfterMortgage >= 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
+                            <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.netProfit')}</span>
+                            <span className={`text-sm font-semibold tabular-nums ${profitAfterMortgage >= 0 ? 'text-foreground/95' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgage)}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
