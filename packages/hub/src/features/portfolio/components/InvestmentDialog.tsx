@@ -45,6 +45,8 @@ export function InvestmentDialog({
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const roundToTwoDecimals = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
   const formatUnitInput = (value: number | null) => {
     if (!value || !Number.isFinite(value)) return "";
     return value.toFixed(8).replace(/\.?0+$/, "");
@@ -208,7 +210,7 @@ export function InvestmentDialog({
     setEditingMovementId(movement.id);
     setEditingMovementDate(movement.date);
     setEditingMovementKind(movement.kind);
-    setEditingMovementAmount(String(movement.amount));
+    setEditingMovementAmount(roundToTwoDecimals(movement.amount).toFixed(2));
     setEditingMovementUnits(movement.units != null ? String(movement.units) : "");
     setEditingMovementNote(movement.note ?? "");
   };
@@ -236,7 +238,7 @@ export function InvestmentDialog({
       ...current,
       date: editingMovementDate,
       kind: editingMovementKind,
-      amount: nextAmount,
+      amount: roundToTwoDecimals(nextAmount),
       units: parsedUnits,
       note: editingMovementNote.trim() ? editingMovementNote.trim() : undefined,
     };
@@ -314,11 +316,11 @@ export function InvestmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-1rem)] max-h-[92vh] overflow-y-auto p-4 sm:max-w-2xl sm:p-6">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] max-h-[92vh] overflow-x-hidden overflow-y-auto p-4 sm:max-w-2xl sm:p-6">
         <DialogHeader>
           <DialogTitle>{investment ? "Edit Investment" : "Add Investment"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="min-w-0 space-y-5">
           <div className="space-y-3 rounded-lg border border-border/70 p-3">
             <p className="text-sm font-medium text-foreground">Investment details</p>
             <div>
@@ -511,7 +513,7 @@ export function InvestmentDialog({
             {movements.length ? (
               <div className="space-y-2">
                 {/* Month navigator */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Button
                     type="button" variant="ghost" size="icon"
                     disabled={historyMonthIdx <= 0}
@@ -519,12 +521,12 @@ export function InvestmentDialog({
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-foreground">
+                  <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
+                    <span className="truncate text-xs font-medium text-foreground">
                       {activeHistoryMonth ? formatMonthNav(activeHistoryMonth) : "—"}
                     </span>
                     {historyMonthIdx >= 0 && historyMonthIdx < historyMonths.length - 1 ? (
-                      <Button type="button" variant="outline" size="sm" onClick={() => setHistoryMonth(historyMonths[historyMonths.length - 1])}>
+                      <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setHistoryMonth(historyMonths[historyMonths.length - 1])}>
                         Latest
                       </Button>
                     ) : null}
@@ -539,7 +541,7 @@ export function InvestmentDialog({
                 </div>
 
                 {visibleMovements.length ? (
-                  <div className="space-y-2 rounded-lg bg-muted/30 p-3">
+                  <div className="min-w-0 space-y-2 rounded-lg bg-muted/30 p-3">
                     {visibleMovements.map((movement) => {
                       const isLinkedCashbackMovement = movement.id.startsWith("linked-cashback-entry:");
                       const kindLabel: Record<string, string> = {
@@ -556,8 +558,8 @@ export function InvestmentDialog({
                       };
                       return (
                         <div key={movement.id} className="space-y-2 rounded-md border border-border/60 px-3 py-2 text-sm">
-                          <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 flex-1">
                             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-foreground">
                               <span className="whitespace-nowrap">{movement.date}</span>
                               <span className={`whitespace-nowrap text-xs font-semibold ${kindColor[movement.kind] ?? "text-muted-foreground"}`}>
@@ -570,9 +572,9 @@ export function InvestmentDialog({
                                 </span>
                               ) : null}
                             </p>
-                            {movement.note ? <p className="text-xs text-muted-foreground truncate">{movement.note}</p> : null}
+                            {movement.note ? <p className="break-words text-xs text-muted-foreground">{movement.note}</p> : null}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex shrink-0 items-center justify-end gap-1">
                             {isLinkedCashbackMovement ? null : (
                               <Button type="button" variant="ghost" size="sm" onClick={() => startEditMovement(movement)}>Edit</Button>
                             )}

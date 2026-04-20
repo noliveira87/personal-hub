@@ -896,14 +896,6 @@ function CashbackHeroPage() {
 
     const eligibleForCoverage = monthPurchases.filter((p) => !(p.isReferral ?? false));
     if (eligibleForCoverage.length > 0) {
-      const withCashbackCount = eligibleForCoverage.filter((p) => getEffectiveTotalCashback(p, cappedEntryAmounts) > 0).length;
-      const coverageRate = (withCashbackCount / eligibleForCoverage.length) * 100;
-      pushGeneralInsight(t('cashbackHero.insights.coverage', {
-        covered: String(withCashbackCount),
-        total: String(eligibleForCoverage.length),
-        rate: coverageRate.toFixed(0),
-      }), 'medium');
-
       const purchasesWithCashback = eligibleForCoverage.filter((purchase) => getEffectiveTotalCashback(purchase, cappedEntryAmounts) > 0);
       const stackedPurchases = purchasesWithCashback.filter((purchase) => purchase.cashbackEntries.length > 1);
       if (purchasesWithCashback.length > 0 && stackedPurchases.length > 0) {

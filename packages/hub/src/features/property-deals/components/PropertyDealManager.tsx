@@ -89,11 +89,19 @@ function DateInput({ value, onChange, disabled = false }: { value: string; onCha
   );
 }
 
+function createId() {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `deal-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 function createDefaultPurchaseCostEntries() {
   return [
-    { id: crypto.randomUUID(), label: 'IMT', amount: 0, date: '' },
-    { id: crypto.randomUUID(), label: 'Imposto de selo', amount: 0, date: '' },
-    { id: crypto.randomUUID(), label: 'Casa pronta', amount: 0, date: '' },
+    { id: createId(), label: 'IMT', amount: 0, date: '' },
+    { id: createId(), label: 'Imposto de selo', amount: 0, date: '' },
+    { id: createId(), label: 'Casa pronta', amount: 0, date: '' },
   ];
 }
 
@@ -109,7 +117,7 @@ function buildLegacyPurchaseCostEntries(deal: PropertyDeal) {
 
   return legacyRows
     .filter(([, amount]) => amount > 0)
-    .map(([label, amount]) => ({ id: crypto.randomUUID(), label, amount, date: '' }));
+    .map(([label, amount]) => ({ id: createId(), label, amount, date: '' }));
 }
 
 function normalizeCostLabel(value: string) {
@@ -183,7 +191,7 @@ function normalizePurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
 
 function buildNewDeal(): PropertyDeal {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     title: '',
     payload: {
       ...DEFAULT_PROPERTY_DEAL_PAYLOAD,
@@ -197,19 +205,27 @@ function getDealMetrics(deal: PropertyDeal) {
   const purchaseExtras = (deal.payload.purchaseExtraEntries ?? []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
   const saleExtras = (deal.payload.saleExtraEntries ?? []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
   const effectiveSalePrice = getEffectiveSalePrice(deal.payload);
-  const ownInvestmentBase =
-    costs.signalCpcv +
-    costs.escrituraAmount +
+  const purchaseOtherCostsTotal =
     costs.bankCheque +
     costs.taxesAndStamp +
     costs.houseReady +
     costs.leroyMerlin +
-    costs.ikea +
+    costs.ikea;
+  const ownInvestmentBase =
+    costs.signalCpcv +
+    costs.escrituraAmount +
+    purchaseOtherCostsTotal +
     purchaseExtras;
   const ownInvestment = ownInvestmentBase;
+  const purchaseTotalIncluded = deal.payload.purchasePrice + purchaseExtras + purchaseOtherCostsTotal;
+  const effectiveMortgageCreditAmount = (deal.payload.mortgageRequestedAmount || 0) > 0
+    ? (deal.payload.mortgageRequestedAmount || 0)
+    : (deal.payload.mortgageOutstandingAmount || 0);
+  const ownCapitalInvestedTotal = Math.max(0, purchaseTotalIncluded - effectiveMortgageCreditAmount);
   const grossCommission = effectiveSalePrice * (deal.payload.commissionRate / 100);
   const commissionTotal = grossCommission * (1 + deal.payload.commissionVatRate / 100);
-  const profit = effectiveSalePrice - commissionTotal - ownInvestment - deal.payload.condoExpenses - saleExtras;
+  const saleCostsTotal = commissionTotal + (deal.payload.condoExpenses || 0) + saleExtras;
+  const profit = effectiveSalePrice - saleCostsTotal - ownInvestmentBase;
   const netProfit = profit - (deal.payload.mortgageOutstandingAmount || 0);
 
   return { ownInvestment, commissionTotal, profit, netProfit };
@@ -221,7 +237,7 @@ function formatDealAddress(address: PropertyAddress) {
 }
 
 function getEffectiveSalePrice(payload: PropertyDealPayload) {
-  return payload.saleStatus === 'sold' ? payload.salePrice : payload.simulatedOfferPrice;
+  return payload.salePrice;
 }
 
 export default function PropertyDealManager({
@@ -424,7 +440,28 @@ export default function PropertyDealManager({
     currentDeal.payload.costs.ikea,
   ]);
 
-  const mortgageCreditAmount = Math.max(0, currentDeal.payload.mortgageRequestedAmount || 0);
+  const purchaseListedOwnCapitalTotal = useMemo(() => {
+    return (currentDeal.payload.costs.signalCpcv || 0)
+      + (currentDeal.payload.costs.escrituraAmount || 0)
+      + purchaseImtAmount
+      + purchaseStampDutyAmount
+      + purchaseHouseReadyAmount
+      + purchaseOtherExpensesAmount;
+  }, [
+    currentDeal.payload.costs.signalCpcv,
+    currentDeal.payload.costs.escrituraAmount,
+    purchaseImtAmount,
+    purchaseStampDutyAmount,
+    purchaseHouseReadyAmount,
+    purchaseOtherExpensesAmount,
+  ]);
+
+  const mortgageCreditAmount = Math.max(
+    0,
+    (currentDeal.payload.mortgageRequestedAmount || 0) > 0
+      ? (currentDeal.payload.mortgageRequestedAmount || 0)
+      : (currentDeal.payload.mortgageOutstandingAmount || 0),
+  );
 
   const purchaseTotalIncluded = useMemo(
     () => currentDeal.payload.purchasePrice + purchaseExtraTotal + purchaseOtherCostsTotal,
@@ -436,14 +473,9 @@ export default function PropertyDealManager({
     [purchaseTotalIncluded, mortgageCreditAmount],
   );
 
-  const ownCapitalOnPurchaseOffer = useMemo(
-    () => Math.max(0, (currentDeal.payload.purchasePrice || 0) - mortgageCreditAmount),
-    [currentDeal.payload.purchasePrice, mortgageCreditAmount],
-  );
-
   const saleTotalIncluded = useMemo(
-    () => effectiveSalePrice + saleExtraTotal,
-    [effectiveSalePrice, saleExtraTotal],
+    () => effectiveSalePrice,
+    [effectiveSalePrice],
   );
 
   const commissionTotal = useMemo(() => {
@@ -451,13 +483,25 @@ export default function PropertyDealManager({
     return grossCommission * (1 + currentDeal.payload.commissionVatRate / 100);
   }, [currentDeal.payload, effectiveSalePrice]);
 
-  const profit = useMemo(() => {
-    return effectiveSalePrice - commissionTotal - ownInvestment - currentDeal.payload.condoExpenses - saleExtraTotal;
-  }, [currentDeal.payload, commissionTotal, ownInvestment, saleExtraTotal]);
+  const saleCostsTotal = useMemo(() => {
+    return commissionTotal + (currentDeal.payload.condoExpenses || 0) + saleExtraTotal;
+  }, [commissionTotal, currentDeal.payload.condoExpenses, saleExtraTotal]);
 
-  const profitAfterMortgage = useMemo(() => {
+  const profit = useMemo(() => {
+    return effectiveSalePrice - saleCostsTotal - purchaseListedOwnCapitalTotal;
+  }, [effectiveSalePrice, saleCostsTotal, purchaseListedOwnCapitalTotal]);
+
+  const profitAfterMortgageSettlement = useMemo(() => {
     return profit - (currentDeal.payload.mortgageOutstandingAmount || 0);
   }, [profit, currentDeal.payload.mortgageOutstandingAmount]);
+
+  const summaryProfitLabel = (currentDeal.payload.mortgageOutstandingAmount || 0) > 0
+    ? t('propertyDeals.profitAfterMortgageSettlement')
+    : t('propertyDeals.netProfit');
+
+  const summaryProfitValue = (currentDeal.payload.mortgageOutstandingAmount || 0) > 0
+    ? profitAfterMortgageSettlement
+    : profit;
 
   const sortedDeals = useMemo(() => {
     return [...deals].sort((a, b) => {
@@ -489,7 +533,7 @@ export default function PropertyDealManager({
   const shouldShowDetail = !showCatalog || (!onOpenDeal && isDetailOpen);
   const totalDeals = deals.length;
   const avgProfit = deals.length > 0
-    ? deals.reduce((sum, deal) => sum + getDealMetrics(deal).profit, 0) / deals.length
+    ? deals.reduce((sum, deal) => sum + getDealMetrics(deal).netProfit, 0) / deals.length
     : 0;
 
   const formatDateValue = (value: string) => {
@@ -538,7 +582,7 @@ export default function PropertyDealManager({
         ...prev.payload,
         purchaseExtraEntries: [
           ...(prev.payload.purchaseExtraEntries ?? []),
-          { id: crypto.randomUUID(), label: '', amount: 0, date: '' },
+          { id: createId(), label: '', amount: 0, date: '' },
         ],
       },
     }));
@@ -580,7 +624,7 @@ export default function PropertyDealManager({
         ...prev.payload,
         saleExtraEntries: [
           ...(prev.payload.saleExtraEntries ?? []),
-          { id: crypto.randomUUID(), label: '', amount: 0, date: '' },
+          { id: createId(), label: '', amount: 0, date: '' },
         ],
       },
     }));
@@ -612,7 +656,7 @@ export default function PropertyDealManager({
     setSaving(true);
     try {
       await upsertPropertyDeal(currentDeal);
-      const refreshed = await fetchPropertyDeals();
+      const refreshed = (await fetchPropertyDeals()).map(normalizePurchaseCostEntries);
       setDeals(refreshed);
       const selected = refreshed.find((item) => item.id === currentDeal.id);
       if (selected) setCurrentDeal(selected);
@@ -647,7 +691,7 @@ export default function PropertyDealManager({
       if (!accepted) return;
 
       await deletePropertyDeal(currentDeal.id);
-      const refreshed = await fetchPropertyDeals();
+      const refreshed = (await fetchPropertyDeals()).map(normalizePurchaseCostEntries);
       setDeals(refreshed);
       setCurrentDeal(refreshed[0] ?? buildNewDeal());
       setSelectedDealId(showCatalog ? null : (refreshed[0]?.id ?? null));
@@ -729,7 +773,8 @@ export default function PropertyDealManager({
           ) : null}
 
           {sortedDeals.map((deal) => {
-            const metrics = getDealMetrics(deal);
+            const displayDeal = deal.id === currentDeal.id ? currentDeal : deal;
+            const metrics = getDealMetrics(displayDeal);
             const isSelected = deal.id === currentDeal.id;
 
             return (
@@ -756,32 +801,32 @@ export default function PropertyDealManager({
               >
                 <div className="space-y-2">
                   <div>
-                    <p className="text-base font-bold leading-tight text-foreground">{deal.title}</p>
+                    <p className="text-base font-bold leading-tight text-foreground">{displayDeal.title}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {deal.payload.saleStatus === 'sold' ? (
+                    {displayDeal.payload.saleStatus === 'sold' ? (
                       <div className="inline-flex items-center rounded-full border border-success/20 bg-success/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-success">
                         {t('propertyDeals.saleStatusSold')}
                       </div>
                     ) : null}
                     <span className={cn(
                       'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tabular-nums',
-                      ((deal.payload.mortgageOutstandingAmount || 0) > 0 ? metrics.netProfit : metrics.profit) >= 0
+                      metrics.netProfit >= 0
                         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
                         : 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
                     )}>
-                      {formatCurrency((deal.payload.mortgageOutstandingAmount || 0) > 0 ? metrics.netProfit : metrics.profit)}
+                      {formatCurrency(metrics.netProfit)}
                     </span>
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
                     <p className="text-muted-foreground">{t('propertyDeals.purchase')}</p>
-                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(deal.payload.purchasePrice)}</p>
+                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(displayDeal.payload.purchasePrice)}</p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
                     <p className="text-muted-foreground">{t('propertyDeals.sale')}</p>
-                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(getEffectiveSalePrice(deal.payload))}</p>
+                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(getEffectiveSalePrice(displayDeal.payload))}</p>
                   </div>
                 </div>
               </button>
@@ -873,20 +918,11 @@ export default function PropertyDealManager({
 
             <div className="mt-3 grid grid-cols-1 gap-3">
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{summaryProfitLabel}</p>
                 <p className={cn(
                   'mt-1 text-sm font-bold tabular-nums',
-                  profit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
-                )}>{formatCurrency(profit)}</p>
-                {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
-                  <div className="mt-2 border-t border-border/50 pt-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.netProfit')}</p>
-                    <p className={cn(
-                      'mt-1 text-sm font-bold tabular-nums',
-                      profitAfterMortgage >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
-                    )}>{formatCurrency(profitAfterMortgage)}</p>
-                  </div>
-                )}
+                  summaryProfitValue >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
+                )}>{formatCurrency(summaryProfitValue)}</p>
               </div>
             </div>
           </div>
@@ -982,39 +1018,6 @@ export default function PropertyDealManager({
                     </div>
                   </div>
 
-                  {/* Reserva */}
-                  <div className="space-y-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseReserve')}</span>
-                      <span className={editFormLabelClass}>{t('propertyDeals.reserveRefundHint')}</span>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <label className={editFormLabelClass}>{t('propertyDeals.reserveAmount')}</label>
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-muted-foreground">EUR</span>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step="0.01"
-                              value={Number.isFinite(currentDeal.payload.costs.reserveEra) ? currentDeal.payload.costs.reserveEra : 0}
-                              onChange={(next) => updateCosts({ reserveEra: Number(next.target.value) || 0 })}
-                              className="h-8 w-28 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                          </div>
-                          <input
-                            type="date"
-                            value={currentDeal.payload.purchaseDates.reserveEra}
-                            onChange={(next) => updatePayload({ purchaseDates: { ...currentDeal.payload.purchaseDates, reserveEra: next.target.value } })}
-                            className="h-8 w-[132px] rounded-md border border-border bg-background px-2 text-xs font-medium text-foreground"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Proposta */}
                   <div className="space-y-2">
                     <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseProposal')}</span>
@@ -1076,6 +1079,15 @@ export default function PropertyDealManager({
                         />
                       </div>
 
+                      <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                        <label className={editFormLabelClass}>{t('propertyDeals.ownCapitalAtDeed')}</label>
+                        <CurrencyInput
+                          value={Number.isFinite(currentDeal.payload.costs.escrituraAmount) ? currentDeal.payload.costs.escrituraAmount : 0}
+                          onChange={(next) => updateCosts({ escrituraAmount: next })}
+                          min={0}
+                        />
+                      </div>
+
                       {deedPurchaseExtraEntries.length > 0 ? (
                         <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
                           {deedPurchaseExtraEntries.map((entry) => (
@@ -1116,7 +1128,7 @@ export default function PropertyDealManager({
                     <label className={editFormLabelClass}>{t('propertyDeals.otherPurchaseCosts')}</label>
                     <div className="space-y-2">
                       {otherPurchaseExtraEntries.map((entry) => (
-                        <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md bg-muted/30 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
+                        <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md bg-muted/30 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
                           <input
                             className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-foreground"
                             value={entry.label}
@@ -1135,7 +1147,6 @@ export default function PropertyDealManager({
                               className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </div>
-                          <DateInput value={entry.date} onChange={(next) => updatePurchaseExtraEntry(entry.id, { date: next })} />
                           <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removePurchaseExtraEntry(entry.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -1194,19 +1205,43 @@ export default function PropertyDealManager({
 
                     <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <span className="text-xs font-medium text-foreground/80">
-                        {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.totalSaleValue') : t('propertyDeals.offerPurchaseValue')}
+                        {t('propertyDeals.totalSaleValue')}
                       </span>
-                      {currentDeal.payload.saleStatus === 'sold' ? (
-                        <CurrencyInput value={currentDeal.payload.salePrice} onChange={(next) => updatePayload({ salePrice: next })} min={0} />
-                      ) : (
-                        <CurrencyInput value={currentDeal.payload.simulatedOfferPrice} onChange={(next) => updatePayload({ simulatedOfferPrice: next })} min={0} />
-                      )}
+                      <CurrencyInput value={currentDeal.payload.salePrice} onChange={(next) => updatePayload({ salePrice: next })} min={0} />
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
                       <CurrencyInput value={currentDeal.payload.mortgageOutstandingAmount ?? 0} onChange={(next) => updatePayload({ mortgageOutstandingAmount: next })} min={0} />
                     </div>
+
+                    <div className="px-1 pt-1">
+                      <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseDeed')}</span>
+                    </div>
+
+                    {currentDeal.payload.saleStatus === 'sold' ? (
+                      <>
+                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                          <span className={editFormLabelClass}>{t('propertyDeals.signalCpcvAmount')}</span>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} />
+                            <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                          <span className={editFormLabelClass}>{t('propertyDeals.valueOnDeeds')}</span>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
+                            <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                        {t('propertyDeals.simulationHint')}
+                      </p>
+                    )}
 
                     <div className="px-1 pt-1">
                       <span className={editFormSubsectionTitleClass}>{t('propertyDeals.expensesSection')}</span>
@@ -1234,46 +1269,11 @@ export default function PropertyDealManager({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.condoExpenses')}</span>
-                      <CurrencyInput value={currentDeal.payload.condoExpenses} onChange={(next) => updatePayload({ condoExpenses: next })} min={0} />
-                    </div>
-
-                    {currentDeal.payload.saleStatus === 'sold' ? (
-                      <>
-                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                          <span className={editFormLabelClass}>{t('propertyDeals.saleSignal')}</span>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                            <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} />
-                            <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} />
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                          <span className={editFormLabelClass}>{t('propertyDeals.valueOnDeeds')}</span>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                            <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
-                            <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} />
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                        {t('propertyDeals.simulationHint')}
-                      </p>
-                    )}
-
                     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.profit')}</p>
-                        <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(profit)}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{summaryProfitLabel}</p>
+                        <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(summaryProfitValue)}</p>
                       </div>
-                      {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
-                        <div className={`mt-2 flex items-center justify-between border-t pt-2 ${profitAfterMortgage >= 0 ? 'border-emerald-500/30' : 'border-red-500/30'}`}>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.netProfit')}</p>
-                          <p className={`text-base font-bold tabular-nums ${profitAfterMortgage >= 0 ? 'text-foreground' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgage)}</p>
-                        </div>
-                      )}
                     </div>
 
                     <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-background/60 px-3 py-2.5">
@@ -1290,7 +1290,7 @@ export default function PropertyDealManager({
                         <>
                           <div className="space-y-2">
                             {(currentDeal.payload.saleExtraEntries ?? []).map((entry) => (
-                              <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
+                              <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
                                 <input
                                   className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-foreground"
                                   value={entry.label}
@@ -1309,7 +1309,6 @@ export default function PropertyDealManager({
                                     className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                   />
                                 </div>
-                                <DateInput value={entry.date} onChange={(next) => updateSaleExtraEntry(entry.id, { date: next })} />
                                 <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removeSaleExtraEntry(entry.id)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -1363,15 +1362,14 @@ export default function PropertyDealManager({
                       <Home className="h-4 w-4 text-muted-foreground" />
                       <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.purchase')}</h3>
                     </div>
+                    <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-semibold tabular-nums text-sky-700 dark:text-sky-300">
+                      Escritura: {formatDateValue(currentDeal.payload.purchaseDates.escritura)}
+                    </span>
                   </div>
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                       <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageCredit')}</span>
                       <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(mortgageCreditAmount)}</span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.ownInvestment')}</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(ownCapitalOnPurchaseOffer)}</span>
                     </div>
 
                     <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.detailsSection')}</p>
@@ -1381,16 +1379,11 @@ export default function PropertyDealManager({
                         <span className="text-xs font-medium text-foreground/80">
                           {item.type === 'signalCpcv' ? t('propertyDeals.signalCpcv') : t('propertyDeals.phaseDeed')}
                         </span>
-                        <div className="flex shrink-0 items-baseline gap-6 tabular-nums">
-                          <span className="w-24 text-right text-xs font-medium tracking-tight text-sky-600/80 dark:text-sky-400/80">
-                            {formatDateValue(item.date)}
-                          </span>
-                          <span className="w-32 text-right text-sm font-semibold text-foreground/95">
-                            {item.type === 'signalCpcv'
-                              ? formatCurrency(currentDeal.payload.costs.signalCpcv)
-                              : formatCurrency(currentDeal.payload.costs.escrituraAmount)}
-                          </span>
-                        </div>
+                        <span className="text-right text-sm font-semibold tabular-nums text-foreground/95">
+                          {item.type === 'signalCpcv'
+                            ? formatCurrency(currentDeal.payload.costs.signalCpcv)
+                            : formatCurrency(currentDeal.payload.costs.escrituraAmount)}
+                        </span>
                       </div>
                     ))}
 
@@ -1414,7 +1407,7 @@ export default function PropertyDealManager({
 
                     <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
                       <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.totalOwnCapitalInvested')}</span>
-                      <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(ownCapitalInvestedTotal)}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(purchaseListedOwnCapitalTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -1425,8 +1418,11 @@ export default function PropertyDealManager({
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.sale')}</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.sale')}</h3>
                       </div>
+                      <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                        Escritura: {formatDateValue(currentDeal.payload.saleDates.escrituraDate)}
+                      </span>
                     </div>
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
@@ -1434,25 +1430,20 @@ export default function PropertyDealManager({
                         <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(effectiveSalePrice)}</span>
                       </div>
 
-                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.detailsSection')}</p>
+                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.detailsSection')}</p>
 
                       {sortedSaleDetails.map((item) => (
                         <div key={item.type} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                           <span className="text-xs font-medium text-foreground/80">
-                            {item.type === 'phaseDeed' ? t('propertyDeals.phaseDeed') : t('propertyDeals.phaseCpcv')}
+                            {item.type === 'phaseDeed' ? t('propertyDeals.saleDeed') : t('propertyDeals.phaseCpcv')}
                           </span>
-                          <div className="flex shrink-0 items-baseline gap-6 tabular-nums">
-                            <span className="w-24 text-right text-xs font-medium tracking-tight text-sky-600/80 dark:text-sky-400/80">
-                              {formatDateValue(item.date)}
-                            </span>
-                            <span className="w-32 text-right text-sm font-semibold text-foreground/95">
-                              {item.type === 'phaseDeed' ? formatCurrency(saleDeedAmount) : formatCurrency(currentDeal.payload.saleSignalAmount)}
-                            </span>
-                          </div>
+                          <span className="text-right text-sm font-semibold tabular-nums text-foreground/95">
+                            {item.type === 'phaseDeed' ? formatCurrency(saleDeedAmount) : formatCurrency(currentDeal.payload.saleSignalAmount)}
+                          </span>
                         </div>
                       ))}
 
-                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">{t('propertyDeals.expensesSection')}</p>
+                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.expensesSection')}</p>
                       <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
                         <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.realEstateCommission')}</span>
                         <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(commissionTotal)}</span>
@@ -1467,9 +1458,9 @@ export default function PropertyDealManager({
                             <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
                             <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(currentDeal.payload.mortgageOutstandingAmount)}</span>
                           </div>
-                          <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${profitAfterMortgage >= 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
-                            <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.netProfit')}</span>
-                            <span className={`text-sm font-semibold tabular-nums ${profitAfterMortgage >= 0 ? 'text-foreground/95' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgage)}</span>
+                          <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${profitAfterMortgageSettlement >= 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
+                            <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.profitAfterMortgageSettlement')}</span>
+                            <span className={`text-sm font-semibold tabular-nums ${profitAfterMortgageSettlement >= 0 ? 'text-foreground/95' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgageSettlement)}</span>
                           </div>
                         </>
                       )}
