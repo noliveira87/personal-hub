@@ -8,6 +8,7 @@ import {
   PropertyAddress,
   PropertyDeal,
   PropertyDealPayload,
+  PropertySaleStatus,
   PurchaseCosts,
 } from '@/features/property-deals/lib/types';
 import {
@@ -153,6 +154,7 @@ function isDefaultZeroPlaceholderEntry(entry: PropertyDeal['payload']['purchaseE
 function normalizePurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
   const entries = deal.payload.purchaseExtraEntries ?? [];
   const legacyEntries = buildLegacyPurchaseCostEntries(deal);
+  const normalizedSaleStatus = normalizeSaleStatus(deal.payload.saleStatus as string | undefined);
 
   if (legacyEntries.length > 0) {
     const cleanedEntries = entries.filter((entry) => !isDefaultZeroPlaceholderEntry(entry));
@@ -165,6 +167,7 @@ function normalizePurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
       ...deal,
       payload: {
         ...deal.payload,
+        saleStatus: normalizedSaleStatus,
         purchaseExtraEntries: [...cleanedEntries, ...missingLegacyEntries],
         costs: {
           ...deal.payload.costs,
@@ -178,12 +181,23 @@ function normalizePurchaseCostEntries(deal: PropertyDeal): PropertyDeal {
     };
   }
 
-  if (entries.length > 0) return deal;
+  if (entries.length > 0) {
+    if (deal.payload.saleStatus === normalizedSaleStatus) return deal;
+
+    return {
+      ...deal,
+      payload: {
+        ...deal.payload,
+        saleStatus: normalizedSaleStatus,
+      },
+    };
+  }
 
   return {
     ...deal,
     payload: {
       ...deal.payload,
+      saleStatus: normalizedSaleStatus,
       purchaseExtraEntries: createDefaultPurchaseCostEntries(),
     },
   };
@@ -200,7 +214,16 @@ function buildNewDeal(): PropertyDeal {
   };
 }
 
+function normalizeSaleStatus(status: string | undefined): PropertySaleStatus {
+  if (status === 'sold' || status === 'hpp') {
+    return status;
+  }
+
+  return 'on-market';
+}
+
 function getDealMetrics(deal: PropertyDeal) {
+  const saleStatus = normalizeSaleStatus(deal.payload.saleStatus as string | undefined);
   const costs = deal.payload.costs;
   const purchaseExtras = (deal.payload.purchaseExtraEntries ?? []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
   const saleExtras = (deal.payload.saleExtraEntries ?? []).reduce((sum, entry) => sum + (entry.amount || 0), 0);
@@ -225,10 +248,14 @@ function getDealMetrics(deal: PropertyDeal) {
   const grossCommission = effectiveSalePrice * (deal.payload.commissionRate / 100);
   const commissionTotal = grossCommission * (1 + deal.payload.commissionVatRate / 100);
   const saleCostsTotal = commissionTotal + (deal.payload.condoExpenses || 0) + saleExtras;
-  const profit = effectiveSalePrice - saleCostsTotal - ownInvestmentBase;
+  if (saleStatus === 'hpp') {
+    return { ownInvestment, commissionTotal, profit: null, netProfit: null, canCalculateProfit: false, saleStatus };
+  }
+
+  const profit = effectiveSalePrice - saleCostsTotal - ownCapitalInvestedTotal;
   const netProfit = profit - (deal.payload.mortgageOutstandingAmount || 0);
 
-  return { ownInvestment, commissionTotal, profit, netProfit };
+  return { ownInvestment, commissionTotal, profit, netProfit, canCalculateProfit: true, saleStatus };
 }
 
 function formatDealAddress(address: PropertyAddress) {
@@ -258,6 +285,7 @@ export default function PropertyDealManager({
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showSaleBoard, setShowSaleBoard] = useState(false);
+  const [showProfitCalculation, setShowProfitCalculation] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -304,6 +332,10 @@ export default function PropertyDealManager({
       mounted = false;
     };
   }, [selectedDealIdFromRoute, showCatalog]);
+
+  useEffect(() => {
+    setShowProfitCalculation(false);
+  }, [currentDeal.id]);
 
   useEffect(() => {
     if (showCatalog) return;
@@ -488,8 +520,8 @@ export default function PropertyDealManager({
   }, [commissionTotal, currentDeal.payload.condoExpenses, saleExtraTotal]);
 
   const profit = useMemo(() => {
-    return effectiveSalePrice - saleCostsTotal - purchaseListedOwnCapitalTotal;
-  }, [effectiveSalePrice, saleCostsTotal, purchaseListedOwnCapitalTotal]);
+    return effectiveSalePrice - saleCostsTotal - ownCapitalInvestedTotal;
+  }, [effectiveSalePrice, saleCostsTotal, ownCapitalInvestedTotal]);
 
   const profitAfterMortgageSettlement = useMemo(() => {
     return profit - (currentDeal.payload.mortgageOutstandingAmount || 0);
@@ -502,6 +534,28 @@ export default function PropertyDealManager({
   const summaryProfitValue = (currentDeal.payload.mortgageOutstandingAmount || 0) > 0
     ? profitAfterMortgageSettlement
     : profit;
+
+  const otherSaleValuesTotal = saleExtraTotal + (currentDeal.payload.condoExpenses || 0);
+
+  const profitLabelParts = [
+    t('propertyDeals.realEstateCommission'),
+    t('propertyDeals.otherSaleValues'),
+    t('propertyDeals.totalOwnCapitalInvested'),
+  ];
+
+  const profitValueParts = [
+    formatCurrency(commissionTotal),
+    formatCurrency(otherSaleValuesTotal),
+    formatCurrency(ownCapitalInvestedTotal),
+  ];
+
+  if ((currentDeal.payload.mortgageOutstandingAmount || 0) > 0) {
+    profitLabelParts.unshift(t('propertyDeals.mortgageOutstanding'));
+    profitValueParts.unshift(formatCurrency(currentDeal.payload.mortgageOutstandingAmount));
+  }
+
+  const profitLabelFormula = `${t('propertyDeals.saleValue')} - (${profitLabelParts.join(' + ')}) = ${summaryProfitLabel}`;
+  const profitValueFormula = `${formatCurrency(effectiveSalePrice)} - (${profitValueParts.join(' + ')}) = ${formatCurrency(summaryProfitValue)}`;
 
   const sortedDeals = useMemo(() => {
     return [...deals].sort((a, b) => {
@@ -531,10 +585,25 @@ export default function PropertyDealManager({
   const currentDealExistsInList = deals.some((item) => item.id === currentDeal.id);
   const isDetailOpen = selectedDealId != null && selectedDealId === currentDeal.id;
   const shouldShowDetail = !showCatalog || (!onOpenDeal && isDetailOpen);
+  const currentSaleStatus = normalizeSaleStatus(currentDeal.payload.saleStatus as string | undefined);
+  const currentDealCanCalculateProfit = currentSaleStatus !== 'hpp';
   const totalDeals = deals.length;
-  const avgProfit = deals.length > 0
-    ? deals.reduce((sum, deal) => sum + getDealMetrics(deal).netProfit, 0) / deals.length
+  const profitDeals = deals.filter((deal) => getDealMetrics(deal).canCalculateProfit);
+  const avgProfit = profitDeals.length > 0
+    ? profitDeals.reduce((sum, deal) => sum + (getDealMetrics(deal).netProfit ?? 0), 0) / profitDeals.length
     : 0;
+
+  const getSaleStatusLabel = (status: PropertySaleStatus) => {
+    if (status === 'sold') return t('propertyDeals.saleStatusSold');
+    if (status === 'hpp') return t('propertyDeals.saleStatusHpp');
+    return t('propertyDeals.saleStatusOnMarket');
+  };
+
+  const getSaleStatusBadgeClass = (status: PropertySaleStatus) => {
+    if (status === 'sold') return 'bg-success/10 text-success border-success/20';
+    if (status === 'hpp') return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300';
+    return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+  };
 
   const formatDateValue = (value: string) => {
     if (!value) return '—';
@@ -776,6 +845,7 @@ export default function PropertyDealManager({
             const displayDeal = deal.id === currentDeal.id ? currentDeal : deal;
             const metrics = getDealMetrics(displayDeal);
             const isSelected = deal.id === currentDeal.id;
+            const displaySaleStatus = normalizeSaleStatus(displayDeal.payload.saleStatus as string | undefined);
 
             return (
               <button
@@ -804,19 +874,22 @@ export default function PropertyDealManager({
                     <p className="text-base font-bold leading-tight text-foreground">{displayDeal.title}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {displayDeal.payload.saleStatus === 'sold' ? (
-                      <div className="inline-flex items-center rounded-full border border-success/20 bg-success/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-success">
-                        {t('propertyDeals.saleStatusSold')}
-                      </div>
-                    ) : null}
-                    <span className={cn(
-                      'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tabular-nums',
-                      metrics.netProfit >= 0
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                        : 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+                    <div className={cn(
+                      'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                      getSaleStatusBadgeClass(displaySaleStatus),
                     )}>
-                      {formatCurrency(metrics.netProfit)}
-                    </span>
+                      {getSaleStatusLabel(displaySaleStatus)}
+                    </div>
+                    {metrics.canCalculateProfit ? (
+                      <span className={cn(
+                        'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tabular-nums',
+                        (metrics.netProfit ?? 0) >= 0
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                          : 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+                      )}>
+                        {formatCurrency(metrics.netProfit ?? 0)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -825,8 +898,8 @@ export default function PropertyDealManager({
                     <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(displayDeal.payload.purchasePrice)}</p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
-                    <p className="text-muted-foreground">{t('propertyDeals.sale')}</p>
-                    <p className="mt-1 font-semibold tabular-nums text-foreground">{formatCurrency(getEffectiveSalePrice(displayDeal.payload))}</p>
+                    <p className="text-muted-foreground">{displaySaleStatus === 'hpp' ? t('propertyDeals.saleStatus') : t('propertyDeals.sale')}</p>
+                    <p className="mt-1 font-semibold tabular-nums text-foreground">{displaySaleStatus === 'hpp' ? getSaleStatusLabel(displaySaleStatus) : formatCurrency(getEffectiveSalePrice(displayDeal.payload))}</p>
                   </div>
                 </div>
               </button>
@@ -852,11 +925,9 @@ export default function PropertyDealManager({
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <div className={cn(
                   'inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide',
-                  currentDeal.payload.saleStatus === 'sold'
-                    ? 'bg-success/10 text-success border-success/20'
-                    : 'border-border/70 bg-background/70 text-muted-foreground',
+                  getSaleStatusBadgeClass(currentSaleStatus),
                 )}>
-                  {currentDeal.payload.saleStatus === 'sold' ? t('propertyDeals.saleStatusSold') : t('propertyDeals.saleStatusNotSold')}
+                  {getSaleStatusLabel(currentSaleStatus)}
                 </div>
                 {isEditing ? (
                   <Button
@@ -911,20 +982,39 @@ export default function PropertyDealManager({
 
               {/* VENDA */}
               <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('propertyDeals.totalSaleValue')}</p>
-                <p className="mt-2 text-sm font-bold tabular-nums text-foreground">{formatCurrency(saleTotalIncluded)}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{currentDealCanCalculateProfit ? t('propertyDeals.totalSaleValue') : t('propertyDeals.saleStatus')}</p>
+                <p className="mt-2 text-sm font-bold tabular-nums text-foreground">{currentDealCanCalculateProfit ? formatCurrency(saleTotalIncluded) : getSaleStatusLabel(currentSaleStatus)}</p>
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3">
-              <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{summaryProfitLabel}</p>
-                <p className={cn(
-                  'mt-1 text-sm font-bold tabular-nums',
-                  summaryProfitValue >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
-                )}>{formatCurrency(summaryProfitValue)}</p>
+            {currentDealCanCalculateProfit ? (
+              <div className="mt-3 grid grid-cols-1 gap-3">
+                <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{summaryProfitLabel}</p>
+                  <p className={cn(
+                    'mt-1 text-sm font-bold tabular-nums',
+                    summaryProfitValue >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300',
+                  )}>{formatCurrency(summaryProfitValue)}</p>
+                  <button
+                    type="button"
+                    className="mt-3 text-xs font-semibold text-primary hover:underline"
+                    onClick={() => setShowProfitCalculation((prev) => !prev)}
+                  >
+                    {showProfitCalculation ? t('propertyDeals.hideCalculation') : t('propertyDeals.showCalculation')}
+                  </button>
+                  {showProfitCalculation && (
+                    <div className="mt-3 rounded-lg border border-border/50 bg-muted/30 px-2.5 py-2">
+                      <p className="text-[10px] font-semibold leading-relaxed text-muted-foreground">{profitLabelFormula}</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-foreground/80">{profitValueFormula}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-300">
+                {t('propertyDeals.hppNoProfitHint')}
+              </div>
+            )}
           </div>
 
           {isEditing ? (
@@ -1186,15 +1276,23 @@ export default function PropertyDealManager({
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
-                          variant={currentDeal.payload.saleStatus === 'not-sold' ? 'default' : 'outline'}
+                          variant={currentSaleStatus === 'on-market' ? 'default' : 'outline'}
                           className="h-8 px-3 text-xs"
-                          onClick={() => updatePayload({ saleStatus: 'not-sold' })}
+                          onClick={() => updatePayload({ saleStatus: 'on-market' })}
                         >
-                          {t('propertyDeals.saleStatusNotSold')}
+                          {t('propertyDeals.saleStatusOnMarket')}
                         </Button>
                         <Button
                           type="button"
-                          variant={currentDeal.payload.saleStatus === 'sold' ? 'default' : 'outline'}
+                          variant={currentSaleStatus === 'hpp' ? 'default' : 'outline'}
+                          className="h-8 px-3 text-xs"
+                          onClick={() => updatePayload({ saleStatus: 'hpp' })}
+                        >
+                          {t('propertyDeals.saleStatusHpp')}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={currentSaleStatus === 'sold' ? 'default' : 'outline'}
                           className="h-8 px-3 text-xs"
                           onClick={() => updatePayload({ saleStatus: 'sold' })}
                         >
@@ -1203,126 +1301,147 @@ export default function PropertyDealManager({
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <span className="text-xs font-medium text-foreground/80">
-                        {t('propertyDeals.totalSaleValue')}
-                      </span>
-                      <CurrencyInput value={currentDeal.payload.salePrice} onChange={(next) => updatePayload({ salePrice: next })} min={0} />
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                      <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
-                      <CurrencyInput value={currentDeal.payload.mortgageOutstandingAmount ?? 0} onChange={(next) => updatePayload({ mortgageOutstandingAmount: next })} min={0} />
-                    </div>
-
-                    <div className="px-1 pt-1">
-                      <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseDeed')}</span>
-                    </div>
-
-                    {currentDeal.payload.saleStatus === 'sold' ? (
+                    {currentDealCanCalculateProfit ? (
                       <>
-                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                          <span className={editFormLabelClass}>{t('propertyDeals.signalCpcvAmount')}</span>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                            <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} />
-                            <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} />
+                        <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                          <span className="text-xs font-medium text-foreground/80">
+                            {t('propertyDeals.totalSaleValue')}
+                          </span>
+                          <CurrencyInput value={currentDeal.payload.salePrice} onChange={(next) => updatePayload({ salePrice: next })} min={0} />
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                          <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
+                          <CurrencyInput value={currentDeal.payload.mortgageOutstandingAmount ?? 0} onChange={(next) => updatePayload({ mortgageOutstandingAmount: next })} min={0} />
+                        </div>
+
+                        <div className="px-1 pt-1">
+                          <span className={editFormSubsectionTitleClass}>{t('propertyDeals.phaseDeed')}</span>
+                        </div>
+
+                        {currentSaleStatus === 'sold' ? (
+                          <>
+                            <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                              <span className={editFormLabelClass}>{t('propertyDeals.signalCpcvAmount')}</span>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                                <CurrencyInput value={currentDeal.payload.saleSignalAmount} onChange={(next) => updatePayload({ saleSignalAmount: next })} min={0} />
+                                <DateInput value={currentDeal.payload.saleDates.signalDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, signalDate: next } })} />
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                              <span className={editFormLabelClass}>{t('propertyDeals.valueOnDeeds')}</span>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                                <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
+                                <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                            {t('propertyDeals.simulationHint')}
+                          </p>
+                        )}
+
+                        <div className="px-1 pt-1">
+                          <span className={editFormSubsectionTitleClass}>{t('propertyDeals.expensesSection')}</span>
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className={editFormLabelClass}>{t('propertyDeals.realEstateCommission')}</span>
+                            <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(commissionTotal)}</span>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="rounded-md border border-border/60 bg-background/70 px-2.5 py-2">
+                              <p className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.baseFee')}</p>
+                              <div className="mt-1 flex justify-end">
+                                <NumberInput value={currentDeal.payload.commissionRate} onChange={(next) => updatePayload({ commissionRate: next })} min={0} step="0.1" />
+                              </div>
+                            </div>
+                            <div className="rounded-md border border-border/60 bg-background/70 px-2.5 py-2">
+                              <p className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.vatPercentage')}</p>
+                              <div className="mt-1 flex justify-end">
+                                <NumberInput value={currentDeal.payload.commissionVatRate} onChange={(next) => updatePayload({ commissionVatRate: next })} min={0} step="0.1" />
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                          <span className={editFormLabelClass}>{t('propertyDeals.valueOnDeeds')}</span>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                            <span className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(saleDeedAmount)}</span>
-                            <DateInput value={currentDeal.payload.saleDates.escrituraDate} onChange={(next) => updatePayload({ saleDates: { ...currentDeal.payload.saleDates, escrituraDate: next } })} />
+                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{summaryProfitLabel}</p>
+                            <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(summaryProfitValue)}</p>
                           </div>
+                          <button
+                            type="button"
+                            className="mt-3 text-xs font-semibold text-primary hover:underline"
+                            onClick={() => setShowProfitCalculation((prev) => !prev)}
+                          >
+                            {showProfitCalculation ? t('propertyDeals.hideCalculation') : t('propertyDeals.showCalculation')}
+                          </button>
+                          {showProfitCalculation && (
+                            <div className="mt-3 rounded-lg border border-emerald-500/20 bg-background/50 px-2.5 py-2">
+                              <p className="text-[10px] font-semibold leading-relaxed text-muted-foreground">{profitLabelFormula}</p>
+                              <p className="mt-1 text-[11px] leading-relaxed text-foreground/80">{profitValueFormula}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-background/60 px-3 py-2.5">
+                          <label className={editFormLabelClass}>{t('propertyDeals.extraValuesSection')}</label>
+
+                          {(currentDeal.payload.saleExtraEntries ?? []).length === 0 ? (
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="text-xs text-muted-foreground">{t('propertyDeals.noAdditionalValues')}</p>
+                              <Button type="button" variant="outline" className="h-7 w-fit px-2 text-xs" onClick={addSaleExtraEntry}>
+                                {t('propertyDeals.addValue')}
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="space-y-2">
+                                {(currentDeal.payload.saleExtraEntries ?? []).map((entry) => (
+                                  <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                                    <input
+                                      className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                                      value={entry.label}
+                                      onChange={(event) => updateSaleExtraEntry(entry.id, { label: event.target.value })}
+                                      placeholder={t('propertyDeals.description')}
+                                    />
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-xs font-semibold text-muted-foreground">EUR</span>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min={0}
+                                        step="0.01"
+                                        value={entry.amount || 0}
+                                        onChange={(next) => updateSaleExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
+                                        className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                      />
+                                    </div>
+                                    <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removeSaleExtraEntry(entry.id)}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="pt-1 text-right">
+                                <Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={addSaleExtraEntry}>
+                                  {t('propertyDeals.addValue')}
+                                </Button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </>
                     ) : (
-                      <p className="rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-                        {t('propertyDeals.simulationHint')}
+                      <p className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
+                        {t('propertyDeals.hppNoProfitHint')}
                       </p>
                     )}
-
-                    <div className="px-1 pt-1">
-                      <span className={editFormSubsectionTitleClass}>{t('propertyDeals.expensesSection')}</span>
-                    </div>
-
-                    <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className={editFormLabelClass}>{t('propertyDeals.realEstateCommission')}</span>
-                        <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(commissionTotal)}</span>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div className="rounded-md border border-border/60 bg-background/70 px-2.5 py-2">
-                          <p className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.baseFee')}</p>
-                          <div className="mt-1 flex justify-end">
-                            <NumberInput value={currentDeal.payload.commissionRate} onChange={(next) => updatePayload({ commissionRate: next })} min={0} step="0.1" />
-                          </div>
-                        </div>
-                        <div className="rounded-md border border-border/60 bg-background/70 px-2.5 py-2">
-                          <p className="text-[11px] font-medium text-muted-foreground">{t('propertyDeals.vatPercentage')}</p>
-                          <div className="mt-1 flex justify-end">
-                            <NumberInput value={currentDeal.payload.commissionVatRate} onChange={(next) => updatePayload({ commissionVatRate: next })} min={0} step="0.1" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{summaryProfitLabel}</p>
-                        <p className="text-lg font-bold tabular-nums text-foreground">{formatCurrency(summaryProfitValue)}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 rounded-lg border border-dashed border-border/60 bg-background/60 px-3 py-2.5">
-                      <label className={editFormLabelClass}>{t('propertyDeals.extraValuesSection')}</label>
-
-                      {(currentDeal.payload.saleExtraEntries ?? []).length === 0 ? (
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <p className="text-xs text-muted-foreground">{t('propertyDeals.noAdditionalValues')}</p>
-                          <Button type="button" variant="outline" className="h-7 w-fit px-2 text-xs" onClick={addSaleExtraEntry}>
-                            {t('propertyDeals.addValue')}
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="space-y-2">
-                            {(currentDeal.payload.saleExtraEntries ?? []).map((entry) => (
-                              <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-md border border-border/60 px-2 py-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
-                                <input
-                                  className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-                                  value={entry.label}
-                                  onChange={(event) => updateSaleExtraEntry(entry.id, { label: event.target.value })}
-                                  placeholder={t('propertyDeals.description')}
-                                />
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs font-semibold text-muted-foreground">EUR</span>
-                                  <input
-                                    type="number"
-                                    inputMode="decimal"
-                                    min={0}
-                                    step="0.01"
-                                    value={entry.amount || 0}
-                                    onChange={(next) => updateSaleExtraEntry(entry.id, { amount: Number(next.target.value) || 0 })}
-                                    className="h-8 w-24 rounded-md border border-border bg-background px-2 text-right text-xs font-medium tabular-nums text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                  />
-                                </div>
-                                <Button type="button" variant="outline" className="h-8 px-2" onClick={() => removeSaleExtraEntry(entry.id)}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="pt-1 text-right">
-                            <Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={addSaleExtraEntry}>
-                              {t('propertyDeals.addValue')}
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </div>
                   </div>
                 </div>
               ) : (
@@ -1407,7 +1526,7 @@ export default function PropertyDealManager({
 
                     <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
                       <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.totalOwnCapitalInvested')}</span>
-                      <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(purchaseListedOwnCapitalTotal)}</span>
+                      <span className="text-sm font-semibold tabular-nums text-foreground/95">{formatCurrency(ownCapitalInvestedTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -1425,44 +1544,52 @@ export default function PropertyDealManager({
                       </span>
                     </div>
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.saleValue')}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(effectiveSalePrice)}</span>
-                      </div>
-
-                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.detailsSection')}</p>
-
-                      {sortedSaleDetails.map((item) => (
-                        <div key={item.type} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                          <span className="text-xs font-medium text-foreground/80">
-                            {item.type === 'phaseDeed' ? t('propertyDeals.saleDeed') : t('propertyDeals.phaseCpcv')}
-                          </span>
-                          <span className="text-right text-sm font-semibold tabular-nums text-foreground/95">
-                            {item.type === 'phaseDeed' ? formatCurrency(saleDeedAmount) : formatCurrency(currentDeal.payload.saleSignalAmount)}
-                          </span>
-                        </div>
-                      ))}
-
-                      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.expensesSection')}</p>
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.realEstateCommission')}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(commissionTotal)}</span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                        <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.otherSaleValues')}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(saleExtraTotal + (currentDeal.payload.condoExpenses || 0))}</span>
-                      </div>
-                      {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
+                      {currentDealCanCalculateProfit ? (
                         <>
                           <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
-                            <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
-                            <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(currentDeal.payload.mortgageOutstandingAmount)}</span>
+                            <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.saleValue')}</span>
+                            <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(effectiveSalePrice)}</span>
                           </div>
-                          <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${profitAfterMortgageSettlement >= 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
-                            <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.profitAfterMortgageSettlement')}</span>
-                            <span className={`text-sm font-semibold tabular-nums ${profitAfterMortgageSettlement >= 0 ? 'text-foreground/95' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgageSettlement)}</span>
+
+                          <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.detailsSection')}</p>
+
+                          {sortedSaleDetails.map((item) => (
+                            <div key={item.type} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                              <span className="text-xs font-medium text-foreground/80">
+                                {item.type === 'phaseDeed' ? t('propertyDeals.saleDeed') : t('propertyDeals.phaseCpcv')}
+                              </span>
+                              <span className="text-right text-sm font-semibold tabular-nums text-foreground/95">
+                                {item.type === 'phaseDeed' ? formatCurrency(saleDeedAmount) : formatCurrency(currentDeal.payload.saleSignalAmount)}
+                              </span>
+                            </div>
+                          ))}
+
+                          <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{t('propertyDeals.expensesSection')}</p>
+                          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                            <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.realEstateCommission')}</span>
+                            <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(commissionTotal)}</span>
                           </div>
+                          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                            <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.otherSaleValues')}</span>
+                            <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(saleExtraTotal + (currentDeal.payload.condoExpenses || 0))}</span>
+                          </div>
+                          {(currentDeal.payload.mortgageOutstandingAmount || 0) > 0 && (
+                            <>
+                              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2.5">
+                                <span className="text-xs font-medium text-foreground/80">{t('propertyDeals.mortgageOutstanding')}</span>
+                                <span className="text-sm font-medium tabular-nums text-foreground/90">{formatCurrency(currentDeal.payload.mortgageOutstandingAmount)}</span>
+                              </div>
+                              <div className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${profitAfterMortgageSettlement >= 0 ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
+                                <span className="text-xs font-semibold text-foreground/85">{t('propertyDeals.profitAfterMortgageSettlement')}</span>
+                                <span className={`text-sm font-semibold tabular-nums ${profitAfterMortgageSettlement >= 0 ? 'text-foreground/95' : 'text-red-700 dark:text-red-300'}`}>{formatCurrency(profitAfterMortgageSettlement)}</span>
+                              </div>
+                            </>
+                          )}
                         </>
+                      ) : (
+                        <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2.5 text-xs text-sky-800 dark:text-sky-300">
+                          {t('propertyDeals.hppNoProfitHint')}
+                        </div>
                       )}
                     </div>
                   </div>

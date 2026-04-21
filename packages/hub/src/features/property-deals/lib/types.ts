@@ -22,6 +22,8 @@ export type DealValueEntry = {
   date: string;
 };
 
+export type PropertySaleStatus = 'on-market' | 'sold' | 'hpp';
+
 export type PropertyDealPayload = {
   address: PropertyAddress;
   purchasePrice: number;
@@ -29,7 +31,7 @@ export type PropertyDealPayload = {
   costs: PurchaseCosts;
   purchaseExtraEntries: DealValueEntry[];
   includeReserveInOwnInvestment: boolean;
-  saleStatus: 'not-sold' | 'sold';
+  saleStatus: PropertySaleStatus;
   simulatedOfferPrice: number;
   salePrice: number;
   commissionRate: number;
@@ -74,7 +76,7 @@ export const DEFAULT_PROPERTY_DEAL_PAYLOAD: PropertyDealPayload = {
   },
   purchaseExtraEntries: [],
   includeReserveInOwnInvestment: false,
-  saleStatus: 'not-sold',
+  saleStatus: 'on-market',
   simulatedOfferPrice: 0,
   salePrice: 0,
   commissionRate: 0,
