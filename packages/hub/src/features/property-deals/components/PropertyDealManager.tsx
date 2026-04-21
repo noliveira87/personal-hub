@@ -558,9 +558,35 @@ export default function PropertyDealManager({
   const profitValueFormula = `${formatCurrency(effectiveSalePrice)} - (${profitValueParts.join(' + ')}) = ${formatCurrency(summaryProfitValue)}`;
 
   const sortedDeals = useMemo(() => {
+    const saleStatusOrder: Record<PropertySaleStatus, number> = {
+      hpp: 0,
+      'on-market': 1,
+      sold: 2,
+    };
+
+    const getSortDate = (deal: PropertyDeal) => {
+      const status = normalizeSaleStatus(deal.payload.saleStatus as string | undefined);
+      if (status === 'sold') {
+        return deal.payload.saleDates.escrituraDate || deal.updatedAt || deal.createdAt || deal.payload.purchaseDates.reserveEra || '';
+      }
+
+      return deal.payload.purchaseDates.reserveEra || deal.createdAt || '';
+    };
+
     return [...deals].sort((a, b) => {
-      const dateA = a.payload.purchaseDates.reserveEra || '';
-      const dateB = b.payload.purchaseDates.reserveEra || '';
+      const statusA = normalizeSaleStatus(a.payload.saleStatus as string | undefined);
+      const statusB = normalizeSaleStatus(b.payload.saleStatus as string | undefined);
+
+      const statusDiff = saleStatusOrder[statusA] - saleStatusOrder[statusB];
+      if (statusDiff !== 0) return statusDiff;
+
+      const dateA = getSortDate(a);
+      const dateB = getSortDate(b);
+
+      if (statusA === 'sold') {
+        return dateB.localeCompare(dateA);
+      }
+
       return dateA.localeCompare(dateB);
     });
   }, [deals]);
