@@ -49,8 +49,8 @@ const WARRANTY_CATEGORY_OPTIONS: Array<{ value: WarrantyCategory; label: string 
 export default function SettingsPage() {
   const { hideAmounts, language, setLanguage, t, toggleHideAmounts } = useI18n();
   const { isDark, toggleDark } = useDarkMode();
-  const { sources, addSource, removeSource } = useCashbackSources();
-  const { cards, addCard, removeCard } = useCashbackCards();
+  const { sources, reorderSources } = useCashbackSources();
+  const { cards, reorderCards } = useCashbackCards();
   const location = useLocation();
   const locationState = (location.state as { from?: string; fromPath?: string } | null) ?? null;
   const backToPath: string | number = locationState?.fromPath ?? (window.history.length > 1 ? -1 : '/');
@@ -454,8 +454,8 @@ export default function SettingsPage() {
             {showCashbackSourcesSettings && (
               <div className="space-y-4">
                 <CashbackRulesCard />
-                <CashbackSourcesCard sources={sources} onAdd={addSource} onRemove={removeSource} />
-                <CashbackCardsCard cards={cards} onAdd={addCard} onRemove={removeCard} />
+                <CashbackSourcesCard sources={sources} onReorder={reorderSources} />
+                <CashbackCardsCard cards={cards} onReorder={reorderCards} />
               </div>
             )}
           </section>
@@ -760,12 +760,10 @@ function CashbackRulesCard() {
 
 function CashbackSourcesCard({
   sources,
-  onAdd,
-  onRemove,
+  onReorder,
 }: {
   sources: string[];
-  onAdd: (name: string) => Promise<void>;
-  onRemove: (name: string) => Promise<void>;
+  onReorder: (names: string[]) => Promise<void>;
 }) {
   const { t } = useI18n();
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -798,18 +796,20 @@ function CashbackSourcesCard({
     if (!dirty) return;
     setSaving(true);
     try {
-      const toRemove = sources.filter((source) => !draftSources.includes(source));
-      const toAdd = draftSources.filter((source) => !sources.includes(source));
-
-      for (const source of toRemove) {
-        await onRemove(source);
-      }
-      for (const source of toAdd) {
-        await onAdd(source);
-      }
+      await onReorder(draftSources);
     } finally {
       setSaving(false);
     }
+  };
+
+  const moveSource = (fromIndex: number, toIndex: number) => {
+    setDraftSources((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
   };
 
   const handleReject = () => {
@@ -880,22 +880,42 @@ function CashbackSourcesCard({
       </div>
 
       <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-        {draftSources.map((source) => (
+        {draftSources.map((source, index) => (
           <li key={source} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2">
             <span className="text-[15px] leading-5">{source}</span>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!await confirm({ title: t('settingsPage.rewardWalletSourcesConfirmRemove', { source }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
-                  return;
-                }
-                setDraftSources((prev) => prev.filter((item) => item !== source));
-              }}
-              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              aria-label={t('settingsPage.rewardWalletSourcesRemoveAria', { source })}
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => moveSource(index, index - 1)}
+                disabled={index === 0}
+                className="rounded p-1 text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={t('settingsPage.rewardWalletSourcesMoveUpAria', { source })}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveSource(index, index + 1)}
+                disabled={index === draftSources.length - 1}
+                className="rounded p-1 text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={t('settingsPage.rewardWalletSourcesMoveDownAria', { source })}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!await confirm({ title: t('settingsPage.rewardWalletSourcesConfirmRemove', { source }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
+                    return;
+                  }
+                  setDraftSources((prev) => prev.filter((item) => item !== source));
+                }}
+                className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                aria-label={t('settingsPage.rewardWalletSourcesRemoveAria', { source })}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </li>
         ))}
         {draftSources.length === 0 ? (
@@ -913,12 +933,10 @@ function CashbackSourcesCard({
 
 function CashbackCardsCard({
   cards,
-  onAdd,
-  onRemove,
+  onReorder,
 }: {
   cards: string[];
-  onAdd: (name: string) => Promise<void>;
-  onRemove: (name: string) => Promise<void>;
+  onReorder: (names: string[]) => Promise<void>;
 }) {
   const { t } = useI18n();
   const { confirm, confirmDialog } = useConfirmDialog();
@@ -951,18 +969,20 @@ function CashbackCardsCard({
     if (!dirty) return;
     setSaving(true);
     try {
-      const toRemove = cards.filter((card) => !draftCards.includes(card));
-      const toAdd = draftCards.filter((card) => !cards.includes(card));
-
-      for (const card of toRemove) {
-        await onRemove(card);
-      }
-      for (const card of toAdd) {
-        await onAdd(card);
-      }
+      await onReorder(draftCards);
     } finally {
       setSaving(false);
     }
+  };
+
+  const moveCard = (fromIndex: number, toIndex: number) => {
+    setDraftCards((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
   };
 
   const handleReject = () => {
@@ -1033,22 +1053,42 @@ function CashbackCardsCard({
       </div>
 
       <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-        {draftCards.map((card) => (
+        {draftCards.map((card, index) => (
           <li key={card} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2">
             <span className="text-[15px] leading-5">{card}</span>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!await confirm({ title: t('settingsPage.rewardWalletCardsConfirmRemove', { card }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
-                  return;
-                }
-                setDraftCards((prev) => prev.filter((item) => item !== card));
-              }}
-              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              aria-label={t('settingsPage.rewardWalletCardsRemoveAria', { card })}
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => moveCard(index, index - 1)}
+                disabled={index === 0}
+                className="rounded p-1 text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={t('settingsPage.rewardWalletCardsMoveUpAria', { card })}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveCard(index, index + 1)}
+                disabled={index === draftCards.length - 1}
+                className="rounded p-1 text-muted-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={t('settingsPage.rewardWalletCardsMoveDownAria', { card })}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!await confirm({ title: t('settingsPage.rewardWalletCardsConfirmRemove', { card }), confirmLabel: t('common.delete'), cancelLabel: t('common.cancel') })) {
+                    return;
+                  }
+                  setDraftCards((prev) => prev.filter((item) => item !== card));
+                }}
+                className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                aria-label={t('settingsPage.rewardWalletCardsRemoveAria', { card })}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </li>
         ))}
         {draftCards.length === 0 ? (

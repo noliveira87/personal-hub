@@ -79,10 +79,15 @@ export function useCashbackCards() {
     setCards((prev) => prev.filter((card) => card !== name));
   }, []);
 
+  const reorderCards = useCallback(async (orderedCards: string[]) => {
+    await replaceAllCashbackCards(orderedCards);
+    setCards([...orderedCards]);
+  }, []);
+
   const resetCards = useCallback(async () => {
     await replaceAllCashbackCards(DEFAULT_CARDS);
     setCards([...DEFAULT_CARDS]);
   }, []);
 
-  return { cards, loading, addCard, removeCard, resetCards };
+  return { cards, loading, addCard, removeCard, reorderCards, resetCards };
 }

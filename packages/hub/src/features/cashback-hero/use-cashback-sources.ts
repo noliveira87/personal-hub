@@ -47,10 +47,15 @@ export function useCashbackSources() {
     setSources((prev) => prev.filter((s) => s !== name));
   }, []);
 
+  const reorderSources = useCallback(async (orderedSources: string[]) => {
+    await replaceAllCashbackSources(orderedSources);
+    setSources([...orderedSources]);
+  }, []);
+
   const resetSources = useCallback(async () => {
     await replaceAllCashbackSources(CASHBACK_SOURCES);
     setSources([...CASHBACK_SOURCES]);
   }, []);
 
-  return { sources, loading, addSource, removeSource, resetSources };
+  return { sources, loading, addSource, removeSource, reorderSources, resetSources };
 }
