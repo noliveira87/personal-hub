@@ -489,14 +489,17 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     }
   }, [propOpenNewCategory, newCategory, displayRows]);
 
-  function openEdit(row: DisplayRow) {
+  function openEdit(row: DisplayRow, selectedYear?: string) {
     // Only show years with actual appointments
     const allYears = Object.keys(row.byYear)
       .filter((y) => (row.byYear[y] ?? []).length > 0)
       .sort((a, b) => Number(b) - Number(a));
+    const years = selectedYear && allYears.includes(selectedYear)
+      ? [selectedYear]
+      : allYears;
 
     const yearData: Record<string, DraftAppt[]> = {};
-    allYears.forEach((year) => {
+    years.forEach((year) => {
       yearData[year] = (row.byYear[year] ?? []).map((a) => ({
         key: a.id,
         id: a.id,
@@ -507,7 +510,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
         note: a.note,
       }));
     });
-    setEditing({ label: row.label, years: allYears, yearData });
+    setEditing({ label: row.label, years, yearData });
   }
 
   function openEntryDetails(item: TimelineItem & { year: string }) {
@@ -521,7 +524,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     if (!row) return;
 
     setViewingEntry(null);
-    openEdit(row);
+    openEdit(row, viewingEntry.year);
   }
 
   function addDate(year: string, isoDate: string) {
@@ -572,6 +575,18 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
     setEditing((prev) => {
       if (!prev) return prev;
       const updated = prev.yearData[year].map((d) => (d.key === key ? { ...d, doctor } : d));
+      return { ...prev, yearData: { ...prev.yearData, [year]: updated } };
+    });
+  }
+
+  function updateDate(year: string, key: string, fullDate: string) {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const updated = prev.yearData[year].map((draft) => (
+        draft.key === key
+          ? { ...draft, fullDate, date: isoToDisplay(fullDate) }
+          : draft
+      ));
       return { ...prev, yearData: { ...prev.yearData, [year]: updated } };
     });
   }
@@ -1004,7 +1019,7 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
 
                                             {categoryRow && (
                                               <button
-                                                onClick={() => openEdit(categoryRow)}
+                                                onClick={() => openEdit(categoryRow, year)}
                                                 className="opacity-60 hover:opacity-100 shrink-0 p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                                                 title="Editar categoria"
                                               >
@@ -1641,9 +1656,14 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                     {/* Existing appointments */}
                     {visible.map((draft) => (
                       <div key={draft.key} className="rounded-lg border bg-background/60 p-2 space-y-2">
-                        <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${accent.badge}`}>
-                          {draft.date}
-                        </span>
+                        <input
+                          type="date"
+                          min={`${year}-01-01`}
+                          max={`${year}-12-31`}
+                          value={draft.fullDate}
+                          onChange={(e) => updateDate(year, draft.key, e.target.value)}
+                          className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <input
                             type="text"
@@ -1679,20 +1699,6 @@ export default function HealthTimelineTable({ person: propPerson, openNewCategor
                       </div>
                     ))}
 
-                    {/* Date picker to add */}
-                    <input
-                      type="date"
-                      min={`${year}-01-01`}
-                      max={`${year}-12-31`}
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addDate(year, e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="w-full rounded-lg border bg-background px-3 py-1.5 text-sm text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
                   </div>
                 );
               })}
