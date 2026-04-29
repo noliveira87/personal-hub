@@ -41,10 +41,34 @@ export interface SerializeInvestmentNotesInput {
   userNotes?: string;
 }
 
+const QUOTE_MEMORY_TTL_MS = 45_000;
+
+let quoteMemoryCache: { quote: CryptoQuotes; cachedAt: number } | null = null;
+let quoteInFlight: Promise<CryptoQuotes> | null = null;
+
 const parseLooseNumber = (value: string) => {
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const normalizeMovementDate = (value: string) => {
+  const raw = value.trim();
+  if (!raw) return "";
+
+  const isoLike = raw.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (isoLike) {
+    const [, year, month, day] = isoLike;
+    return `${year}-${month}-${day}`;
+  }
+
+  const ptLike = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ptLike) {
+    const [, day, month, year] = ptLike;
+    return `${year}-${month}-${day}`;
+  }
+
+  return raw;
 };
 
 export function parseCryptoNotes(notes?: string): CryptoNoteMeta {
@@ -167,7 +191,7 @@ export function parseInvestmentMovements(notes?: string): InvestmentMovement[] {
       .filter((item) => item && typeof item === "object")
       .map((item) => ({
         id: String(item.id),
-        date: String(item.date),
+        date: normalizeMovementDate(String(item.date)),
         kind: item.kind,
         amount: typeof item.amount === "string"
           ? Number(item.amount.replace(/\s/g, "").replace(",", ".")) || 0
@@ -328,49 +352,112 @@ export function buildSyntheticCryptoCashbackEarnings(
 }
 
 export async function fetchCryptoEurQuotes(signal?: AbortSignal): Promise<CryptoQuotes> {
-  const response = await fetch(
-    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=eur&include_last_updated_at=true",
-    {
-      method: "GET",
-      signal,
-      headers: {
-        Accept: "application/json",
+  const cached = quoteMemoryCache;
+  if (cached && Date.now() - cached.cachedAt <= QUOTE_MEMORY_TTL_MS) {
+    return cached.quote;
+  }
+
+  if (quoteInFlight) {
+    return quoteInFlight;
+  }
+
+  const fetchFromCoinbase = async (): Promise<CryptoQuotes> => {
+    const response = await fetch(
+      "https://api.coinbase.com/v2/exchange-rates?currency=EUR",
+      {
+        method: "GET",
+        signal,
+        headers: {
+          Accept: "application/json",
+        },
       },
-    },
-  );
+    );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch crypto quotes (${response.status})`);
-  }
+    if (!response.ok) {
+      throw new Error(`Coinbase quotes failed (${response.status})`);
+    }
 
-  const data = await response.json() as {
-    bitcoin?: { eur?: number; last_updated_at?: number };
-    ethereum?: { eur?: number; last_updated_at?: number };
+    const data = await response.json() as {
+      data?: {
+        rates?: Record<string, string>;
+      };
+    };
+
+    const btcRateRaw = data.data?.rates?.BTC;
+    const ethRateRaw = data.data?.rates?.ETH;
+    const btcPerEur = btcRateRaw ? Number(btcRateRaw) : NaN;
+    const ethPerEur = ethRateRaw ? Number(ethRateRaw) : NaN;
+
+    const btcEur = Number.isFinite(btcPerEur) && btcPerEur > 0 ? 1 / btcPerEur : undefined;
+    const ethEur = Number.isFinite(ethPerEur) && ethPerEur > 0 ? 1 / ethPerEur : undefined;
+
+    if ((!btcEur || !Number.isFinite(btcEur)) && (!ethEur || !Number.isFinite(ethEur))) {
+      throw new Error("Invalid Coinbase quote payload");
+    }
+
+    return {
+      pricesEur: {
+        ...(btcEur && Number.isFinite(btcEur) ? { BTC: btcEur } : {}),
+        ...(ethEur && Number.isFinite(ethEur) ? { ETH: ethEur } : {}),
+      },
+      lastUpdatedAt: new Date().toISOString(),
+    };
   };
 
-  const btcEur = data.bitcoin?.eur;
-  const ethEur = data.ethereum?.eur;
+  const fetchFromBinance = async (): Promise<CryptoQuotes> => {
+    const response = await fetch(
+      "https://api.binance.com/api/v3/ticker/price?symbols=%5B%22BTCEUR%22,%22ETHEUR%22%5D",
+      {
+        method: "GET",
+        signal,
+        headers: {
+          Accept: "application/json",
+        },
+      },
+    );
 
-  if ((!btcEur || !Number.isFinite(btcEur)) && (!ethEur || !Number.isFinite(ethEur))) {
-    throw new Error("Invalid crypto quote payload");
-  }
+    if (!response.ok) {
+      throw new Error(`Binance quotes failed (${response.status})`);
+    }
 
-  const lastUpdatedAtUnix = Math.max(
-    data.bitcoin?.last_updated_at ?? 0,
-    data.ethereum?.last_updated_at ?? 0,
-  );
+    const data = await response.json() as Array<{ symbol?: string; price?: string }>;
+    if (!Array.isArray(data)) {
+      throw new Error("Invalid Binance quote payload");
+    }
 
-  const lastUpdatedAt =
-    typeof lastUpdatedAtUnix === "number" && Number.isFinite(lastUpdatedAtUnix)
-      ? new Date(lastUpdatedAtUnix * 1000).toISOString()
-      : new Date().toISOString();
+    const btcRaw = data.find((item) => item.symbol === "BTCEUR")?.price;
+    const ethRaw = data.find((item) => item.symbol === "ETHEUR")?.price;
+    const btcEur = btcRaw ? Number(btcRaw) : undefined;
+    const ethEur = ethRaw ? Number(ethRaw) : undefined;
 
-  const pricesEur: CryptoQuoteMap = {
-    ...(btcEur && Number.isFinite(btcEur) ? { BTC: btcEur } : {}),
-    ...(ethEur && Number.isFinite(ethEur) ? { ETH: ethEur } : {}),
+    if ((!btcEur || !Number.isFinite(btcEur)) && (!ethEur || !Number.isFinite(ethEur))) {
+      throw new Error("Invalid Binance quote payload");
+    }
+
+    return {
+      pricesEur: {
+        ...(btcEur && Number.isFinite(btcEur) ? { BTC: btcEur } : {}),
+        ...(ethEur && Number.isFinite(ethEur) ? { ETH: ethEur } : {}),
+      },
+      lastUpdatedAt: new Date().toISOString(),
+    };
   };
 
-  return { pricesEur, lastUpdatedAt };
+  quoteInFlight = (async () => {
+    try {
+      const primary = await fetchFromCoinbase();
+      quoteMemoryCache = { quote: primary, cachedAt: Date.now() };
+      return primary;
+    } catch {
+      const fallback = await fetchFromBinance();
+      quoteMemoryCache = { quote: fallback, cachedAt: Date.now() };
+      return fallback;
+    } finally {
+      quoteInFlight = null;
+    }
+  })();
+
+  return quoteInFlight;
 }
 
 async function fetchCryptoAssetMonthlyHistory(asset: CryptoAsset, signal?: AbortSignal): Promise<Array<{ month: string; priceEur: number }>> {

@@ -279,13 +279,8 @@ export function JourneyBiteDetail() {
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
         <div className="sticky top-16 z-30 border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-          <div className="container mx-auto px-4 py-3 sm:px-6">
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" onClick={() => navigate("/journey-bites")} className="gap-2 rounded-full font-body text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-                {t("journeyBites.backToList")}
-              </Button>
-              <div className="flex gap-2">
+          <div className="container mx-auto flex justify-end px-4 py-3 sm:px-6">
+            <div className="flex gap-2">
                 <Button
                   variant="ghost"
                   onClick={() => {
@@ -302,6 +297,22 @@ export function JourneyBiteDetail() {
                   {t("journeyBites.delete")}
                 </Button>
               </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    void ensureTripsLoaded();
+                    setFormOpen(true);
+                  }}
+                  className="gap-2 rounded-full font-body text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" />
+                  {t("journeyBites.edit")}
+                </Button>
+                <Button variant="ghost" onClick={() => { void handleDelete(); }} className="gap-2 rounded-full font-body text-destructive hover:text-destructive" disabled={saving}>
+                  <Trash2 className="h-4 w-4" />
+                  {t("journeyBites.delete")}
+                </Button>
             </div>
           </div>
         </div>

@@ -27,6 +27,7 @@ interface AppSectionHeaderProps {
   actions?: ReactNode;
   backTo?: string | number;
   backLabel?: string;
+  onBack?: () => void;
   showSettings?: boolean;
   settingsExtraContent?: ReactNode;
 }
@@ -37,6 +38,7 @@ export default function AppSectionHeader({
   actions,
   backTo,
   backLabel,
+  onBack,
   showSettings = true,
   settingsExtraContent,
 }: AppSectionHeaderProps) {
@@ -88,6 +90,11 @@ export default function AppSectionHeader({
   );
 
   const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+
     if (typeof resolvedBackTo === 'number') {
       navigate(resolvedBackTo);
       return;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CryptoHistoricalSeriesMap, CryptoQuoteMap, fetchCryptoEurQuotes, fetchCryptoHistoricalEurPrices } from "@/features/portfolio/lib/crypto";
 
-const REFRESH_INTERVAL_MS = 60_000;
+const REFRESH_INTERVAL_MS = 3 * 60_000;
 const QUOTE_CACHE_KEY = "portfolio.crypto-quotes.v1";
 const QUOTE_CACHE_TTL_MS = 60_000;
 const HISTORY_CACHE_KEY = "portfolio.crypto-history.v1";

@@ -8,6 +8,7 @@ import { Investment, formatCurrency, formatPercentage } from "@/features/portfol
 import { CryptoQuoteMap, parseCryptoNotes, resolveCashbackCurrentValue, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
+import { toast } from "@/components/ui/sonner";
 
 interface InvestmentCardProps {
   investment: Investment;
@@ -119,25 +120,41 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
     const rawAmount = parseDecimalInput(quickAmount);
     const rawUnits = parseDecimalInput(quickUnits);
     const effectiveMode: "contribution" | "value_update" = isCashbackOnlyQuickAdd ? "value_update" : quickMode;
+    const resolvedLongTermAmount = Number.isFinite(computedQuickProfitLoss) && computedQuickProfitLoss !== 0
+      ? computedQuickProfitLoss
+      : rawAmount;
     const amount = isCashbackOnlyQuickAdd
       ? (Number.isFinite(rawUnits) && Number.isFinite(cashbackQuickSpotEur)
           ? rawUnits * Number(cashbackQuickSpotEur)
           : NaN)
       : isLongTermValueUpdate
-        ? computedQuickProfitLoss
+        ? resolvedLongTermAmount
         : rawAmount;
     const unitsBought = isCashbackOnlyQuickAdd ? rawUnits : rawUnits;
 
     // Contributions must be positive. Profit/loss (value_update) can be negative.
-    if (!quickDate || !Number.isFinite(amount) || amount === 0) {
+    if (!quickDate) {
+      toast.error("Select a valid date.");
+      return;
+    }
+
+    if (!Number.isFinite(amount)) {
+      toast.error("Invalid amount. You can use comma or dot.");
+      return;
+    }
+
+    if (amount === 0) {
+      toast.error("Amount cannot be zero.");
       return;
     }
 
     if (isCashbackOnlyQuickAdd && (!Number.isFinite(unitsBought) || unitsBought === 0 || !Number.isFinite(cashbackQuickSpotEur))) {
+      toast.error("Enter cashback units and wait for live quote.");
       return;
     }
 
     if (effectiveMode === "contribution" && amount < 0) {
+      toast.error("Contribution must be positive.");
       return;
     }
 
@@ -146,6 +163,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       effectiveMode === "contribution" &&
       (!Number.isFinite(unitsBought) || unitsBought <= 0)
     ) {
+      toast.error("Enter valid crypto units.");
       return;
     }
 
@@ -385,8 +403,8 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 <Label htmlFor={`quick-units-${investment.id}`}>Cashback units ({cashbackQuickAsset})</Label>
                 <Input
                   id={`quick-units-${investment.id}`}
-                  type="number"
-                  step="0.00000001"
+                  type="text"
+                  inputMode="decimal"
                   value={quickUnits}
                   onChange={(e) => setQuickUnits(e.target.value)}
                 />
@@ -407,8 +425,8 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 </Label>
                 <Input
                   id={`quick-amount-${investment.id}`}
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={quickAmount}
                   onChange={(e) => setQuickAmount(e.target.value)}
                 />
@@ -434,8 +452,8 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({previewAsset})</Label>
                 <Input
                   id={`quick-units-${investment.id}`}
-                  type="number"
-                  step="0.00000001"
+                  type="text"
+                  inputMode="decimal"
                   value={quickUnits}
                   onChange={(e) => setQuickUnits(e.target.value)}
                 />

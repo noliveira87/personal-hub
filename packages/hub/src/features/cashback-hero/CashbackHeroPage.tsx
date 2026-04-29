@@ -2293,6 +2293,23 @@ function AddCashbackDialog({
     if (!hasWhitebit) values = [...values, 'WhiteBIT'];
     return values;
   }, [sources]);
+  const getWhitebitAssetFromSource = useCallback((value: string): (typeof WHITEBIT_ASSETS)[number] => {
+    const match = value.match(/white\s*bit\s*(btc|eth)?/i);
+    const parsed = match?.[1]?.toUpperCase();
+    return parsed === 'ETH' ? 'ETH' : 'BTC';
+  }, []);
+  const getSourceValueForSelect = useCallback((value: string): string => {
+    if (/white\s*bit/i.test(value)) {
+      return availableSources.find((candidate) => /white\s*bit/i.test(candidate)) ?? 'WhiteBIT';
+    }
+    if (/bybit/i.test(value)) {
+      return availableSources.find((candidate) => /bybit/i.test(candidate)) ?? 'Bybit';
+    }
+    if (/curve/i.test(value)) {
+      return availableSources.find((candidate) => /curve/i.test(candidate)) ?? value;
+    }
+    return availableSources.includes(value) ? value : (availableSources[0] ?? '');
+  }, [availableSources]);
 
   const [source, setSource] = useState(() => availableSources[0] ?? '');
   const [amount, setAmount] = useState('');
@@ -2321,7 +2338,7 @@ function AddCashbackDialog({
     if (!open) return;
 
     if (editingEntry) {
-      setSource(editingEntry.source);
+      setSource(getSourceValueForSelect(editingEntry.source));
       setAmount(String(editingEntry.amount));
       if (/bybit/i.test(editingEntry.source)) {
         if (editingEntry.points != null) {
@@ -2339,7 +2356,7 @@ function AddCashbackDialog({
       } else if (/white\s*bit/i.test(editingEntry.source)) {
         setPoints('');
         setGbpAmount('');
-        setWhitebitAsset('BTC');
+        setWhitebitAsset(getWhitebitAssetFromSource(editingEntry.source));
         setWhitebitAmount(editingEntry.points != null ? String(editingEntry.points) : '');
       } else {
         setPoints('');
@@ -2357,7 +2374,7 @@ function AddCashbackDialog({
     setWhitebitAsset('BTC');
     setWhitebitAmount('');
     setDateReceived(format(new Date(), 'yyyy-MM-dd'));
-  }, [open, editingEntry, availableSources, BYBIT_EUR_PER_POINT]);
+  }, [open, editingEntry, availableSources, BYBIT_EUR_PER_POINT, getSourceValueForSelect, getWhitebitAssetFromSource]);
 
   useEffect(() => {
     if (!isBybitSource) return;

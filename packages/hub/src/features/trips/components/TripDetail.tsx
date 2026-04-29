@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Plane, Ticket, Receipt, X, Pencil, Trash2 } from "lucide-react";
+import { MapPin, Calendar, Hotel, UtensilsCrossed, StickyNote, Plane, Ticket, Receipt, X, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trip } from "@/features/trips/types/trip";
@@ -15,7 +15,6 @@ import {
 
 interface TripDetailProps {
   trip: Trip;
-  onBack: () => void;
   onDelete: (id: string) => void;
   onEdit: () => void;
 }
@@ -61,7 +60,7 @@ const formatExternalUrl = (value?: string) => {
   return `https://${trimmed}`;
 };
 
-export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) {
+export function TripDetail({ trip, onDelete, onEdit }: TripDetailProps) {
   const { t, formatCurrency, formatDate, language } = useI18n();
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [journeyBites, setJourneyBites] = useState<JourneyBite[]>([]);
@@ -86,46 +85,73 @@ export function TripDetail({ trip, onBack, onDelete, onEdit }: TripDetailProps) 
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen">
-      <div className="sticky top-16 z-30 border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-        <div className="container mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={onBack} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-              <ArrowLeft className="h-4 w-4" />{t("trips.back")}
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={onEdit} className="gap-2 font-body text-muted-foreground hover:text-foreground rounded-full">
-                <Pencil className="h-4 w-4" />{t("trips.edit")}
-              </Button>
-              <Button variant="ghost" onClick={() => onDelete(trip.id)} className="gap-2 font-body text-destructive hover:text-destructive rounded-full">
-                <Trash2 className="h-4 w-4" />{t("trips.delete")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="container mx-auto px-4 sm:px-6 pt-4 pb-6">
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
-          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-3">{localizedTitle}</h1>
-          <div className="flex flex-wrap items-center gap-2.5 font-body">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3 py-1.5 text-foreground/75">
-              <MapPin className="h-4 w-4" />{localizedDestination}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3 py-1.5 text-foreground/75">
-              <Calendar className="h-4 w-4" />
-              {formatDate(trip.startDate, { month: "short", day: "numeric" })} - {formatDate(trip.endDate, { month: "short", day: "numeric", year: "numeric" })}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-foreground text-background px-3 py-1.5 font-semibold shadow-sm">
-              {formatEuro(tripTotal)}
-            </span>
-          </div>
-          {trip.tags.length > 0 && (
-            <div className="flex gap-2 mt-3">
-              {trip.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="rounded-full bg-secondary/70 font-body font-normal text-foreground/80">{tag}</Badge>
-              ))}
+      <div className="container mx-auto px-4 pb-6 pt-4 sm:px-6">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="rounded-3xl border border-border/70 bg-[linear-gradient(160deg,hsl(var(--card)),hsl(var(--background)))] p-5 shadow-sm sm:p-6"
+        >
+          <div className="flex flex-col gap-4 sm:gap-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("common.travel")}</p>
+                <h1 className="font-display text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">{localizedTitle}</h1>
+                <p className="text-sm text-muted-foreground sm:text-base">{localizedDestination}</p>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:justify-end">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onEdit}
+                  className="h-10 w-10 rounded-xl"
+                  aria-label={t("trips.edit")}
+                  title={t("trips.edit")}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onDelete(trip.id)}
+                  className="h-10 w-10 rounded-xl text-destructive hover:text-destructive"
+                  aria-label={t("trips.delete")}
+                  title={t("trips.delete")}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-border/70 bg-background/65 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("trips.destination")}</p>
+                <p className="mt-1 font-semibold text-foreground">{localizedDestination}</p>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-background/65 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("trips.startDate")}</p>
+                <p className="mt-1 font-semibold text-foreground">{formatDate(trip.startDate, { day: "numeric", month: "short", year: "numeric" })}</p>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-background/65 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("trips.endDate")}</p>
+                <p className="mt-1 font-semibold text-foreground">{formatDate(trip.endDate, { day: "numeric", month: "short", year: "numeric" })}</p>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-background/65 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.total")}</p>
+                <p className="mt-1 font-semibold text-foreground">{formatEuro(tripTotal)}</p>
+              </div>
+            </div>
+
+            {trip.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {trip.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="rounded-full bg-secondary/70 font-body font-normal text-foreground/80">{tag}</Badge>
+                ))}
+              </div>
+            )}
+          </div>
         </motion.div>
       </div>
 

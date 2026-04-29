@@ -4,6 +4,8 @@ import { useData } from '@/features/home-expenses/lib/DataContext';
 import { MONTHS } from '@/features/home-expenses/lib/types';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/I18nProvider';
+import { parseLocalDate } from '@/features/home-expenses/lib/store';
+import { useMemo } from 'react';
 
 const MONTH_KEYS = [
   'homeExpenses.months.january',
@@ -21,18 +23,33 @@ const MONTH_KEYS = [
 ] as const;
 
 export default function MonthYearSelector() {
-  const { selectedYear, setSelectedYear, selectedMonth, setSelectedMonth } = useData();
+  const { selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, allTransactions } = useData();
   const { t } = useI18n();
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
   const monthLabel = t(MONTH_KEYS[selectedMonth]) || MONTHS[selectedMonth];
   const isCurrentMonth = selectedYear === currentYear && selectedMonth === currentMonth;
 
+  // Calculate which months have transactions
+  const monthsWithTransactions = useMemo(() => {
+    const months = new Set<string>();
+    allTransactions.forEach((tx) => {
+      const d = parseLocalDate(tx.date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      months.add(key);
+    });
+    return months;
+  }, [allTransactions]);
+
+  const nextMonth = addMonths(new Date(selectedYear, selectedMonth, 1), 1);
+  const nextMonthKey = `${nextMonth.getFullYear()}-${nextMonth.getMonth()}`;
+  const hasNextMonth = monthsWithTransactions.has(nextMonthKey);
+
   const navigateMonth = (direction: -1 | 1) => {
     const next = addMonths(new Date(selectedYear, selectedMonth, 1), direction);
     if (direction > 0) {
-      const max = new Date(currentYear, currentMonth, 1);
-      if (next > max) {
+      // Only allow forward navigation if there are transactions in the next month
+      if (!monthsWithTransactions.has(`${next.getFullYear()}-${next.getMonth()}`)) {
         return;
       }
     }
@@ -56,7 +73,7 @@ export default function MonthYearSelector() {
         size="icon"
         className="h-8 w-8 flex-shrink-0 disabled:opacity-40"
         onClick={() => navigateMonth(1)}
-        disabled={isCurrentMonth}
+        disabled={!hasNextMonth}
       >
         <ChevronRight className="h-4 w-4" />
       </Button>

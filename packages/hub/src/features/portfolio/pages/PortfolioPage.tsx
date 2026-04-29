@@ -1,7 +1,25 @@
-import { Suspense, lazy, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, ChartLine, Coins } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { KpiCards } from "@/features/portfolio/components/KpiCards";
 import { EarningsSection } from "@/features/portfolio/components/EarningsSection";
 import { AllocationSection } from "@/features/portfolio/components/AllocationSection";
@@ -28,6 +46,17 @@ const EarningDialog = lazy(() =>
   import("@/features/portfolio/components/EarningDialog").then((module) => ({ default: module.EarningDialog })),
 );
 
+const INVESTMENT_TYPE_OPTIONS: Array<{ value: Investment["type"]; label: string }> = [
+  { value: "cash", label: "Cash" },
+  { value: "aforro", label: "Aforro" },
+  { value: "etf", label: "ETF" },
+  { value: "crypto", label: "Crypto" },
+  { value: "p2p", label: "P2P" },
+  { value: "ppr", label: "PPR" },
+];
+
+type QuickMovementMode = "contribution" | "value_update";
+
 const Index = () => {
   const {
     investments,
@@ -46,6 +75,14 @@ const Index = () => {
   } = useInvestments({ blockOnSnapshots: false, blockOnEarnings: false });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [earningDialogOpen, setEarningDialogOpen] = useState(false);
+  const [quickMovementDialogOpen, setQuickMovementDialogOpen] = useState(false);
+  const [quickMovementMode, setQuickMovementMode] = useState<QuickMovementMode>("contribution");
+  const [quickMovementType, setQuickMovementType] = useState<Investment["type"]>("cash");
+  const [quickMovementInvestmentId, setQuickMovementInvestmentId] = useState("");
+  const [quickMovementDate, setQuickMovementDate] = useState(new Date().toISOString().slice(0, 10));
+  const [quickMovementAmount, setQuickMovementAmount] = useState("");
+  const [quickMovementUnits, setQuickMovementUnits] = useState("");
+  const [quickMovementDescription, setQuickMovementDescription] = useState("");
   const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
   const [editingEarning, setEditingEarning] = useState<PortfolioEarning | null>(null);
   const hasCryptoInvestments = useMemo(
@@ -195,6 +232,98 @@ const Index = () => {
     setEarningDialogOpen(true);
   };
 
+  const parseDecimalInput = (value: string) => {
+    const raw = value
+      .replace(/\s/g, "")
+      .replace(/€/g, "")
+      .trim();
+
+    if (!raw) return NaN;
+
+    const hasComma = raw.includes(",");
+    const hasDot = raw.includes(".");
+
+    let normalized = raw;
+
+    if (hasComma && hasDot) {
+      const lastComma = raw.lastIndexOf(",");
+      const lastDot = raw.lastIndexOf(".");
+      const decimalSeparator = lastComma > lastDot ? "," : ".";
+      const thousandSeparator = decimalSeparator === "," ? "." : ",";
+
+      normalized = raw.split(thousandSeparator).join("");
+      if (decimalSeparator === ",") {
+        normalized = normalized.replace(",", ".");
+      }
+    } else if (hasComma) {
+      normalized = raw.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = raw.replace(/,/g, "");
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
+
+  const investmentsByQuickType = useMemo(
+    () => resolvedInvestments.filter((investment) => investment.type === quickMovementType),
+    [resolvedInvestments, quickMovementType],
+  );
+
+  const selectedQuickInvestment = useMemo(
+    () => investmentsByQuickType.find((investment) => investment.id === quickMovementInvestmentId) ?? null,
+    [investmentsByQuickType, quickMovementInvestmentId],
+  );
+
+  const quickMovementNeedsUnits = selectedQuickInvestment?.type === "crypto" && quickMovementMode === "contribution";
+
+  useEffect(() => {
+    if (!quickMovementDialogOpen) return;
+
+    if (investmentsByQuickType.length === 0) {
+      setQuickMovementInvestmentId("");
+      return;
+    }
+
+    if (!investmentsByQuickType.some((investment) => investment.id === quickMovementInvestmentId)) {
+      setQuickMovementInvestmentId(investmentsByQuickType[0].id);
+    }
+  }, [quickMovementDialogOpen, investmentsByQuickType, quickMovementInvestmentId]);
+
+  const openQuickMovementDialog = (mode: QuickMovementMode, investmentType: Investment["type"]) => {
+    setQuickMovementMode(mode);
+    setQuickMovementType(investmentType);
+    setQuickMovementDate(new Date().toISOString().slice(0, 10));
+    setQuickMovementAmount("");
+    setQuickMovementUnits("");
+    setQuickMovementDescription("");
+    setQuickMovementDialogOpen(true);
+  };
+
+  const saveQuickMovementFromHeader = () => {
+    if (!selectedQuickInvestment || !quickMovementDate) return;
+
+    const parsedAmount = parseDecimalInput(quickMovementAmount);
+    const parsedUnits = parseDecimalInput(quickMovementUnits);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount === 0) return;
+    if (quickMovementMode === "contribution" && parsedAmount < 0) return;
+
+    if (quickMovementNeedsUnits && (!Number.isFinite(parsedUnits) || parsedUnits <= 0)) {
+      return;
+    }
+
+    handleQuickContribution(selectedQuickInvestment, {
+      amount: parsedAmount,
+      date: quickMovementDate,
+      mode: quickMovementMode,
+      unitsBought: quickMovementNeedsUnits ? parsedUnits : null,
+      description: quickMovementDescription.trim() ? quickMovementDescription.trim() : undefined,
+    });
+
+    setQuickMovementDialogOpen(false);
+  };
+
   const handleSave = (data: Omit<Investment, "id" | "createdAt" | "updatedAt">) => {
     if (editingInvestment) {
       updateInvestment(editingInvestment.id, data);
@@ -331,16 +460,43 @@ const Index = () => {
         icon={ChartLine}
         actions={(
           <div className="flex items-center gap-2">
-            <Button
-              onClick={handleAdd}
-              size="sm"
-              className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
-              aria-label="Add Investment"
-              title="Add Investment"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Investment</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
+                  aria-label="Add actions"
+                  title="Add actions"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Investment</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuItem onSelect={handleAdd}>Add Investment</DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleAddEarning}>Add Earning</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Add Contribution</DropdownMenuLabel>
+                {INVESTMENT_TYPE_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={`contrib-${option.value}`}
+                    onSelect={() => openQuickMovementDialog("contribution", option.value)}
+                  >
+                    Contribution · {option.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Add Profit / Return</DropdownMenuLabel>
+                {INVESTMENT_TYPE_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={`profit-${option.value}`}
+                    onSelect={() => openQuickMovementDialog("value_update", option.value)}
+                  >
+                    Profit / Return · {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Button
               onClick={scrollToEarnings}
@@ -559,6 +715,110 @@ const Index = () => {
           />
         </Suspense>
       ) : null}
+
+      <Dialog open={quickMovementDialogOpen} onOpenChange={setQuickMovementDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{quickMovementMode === "contribution" ? "Add contribution" : "Add profit / return"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Investment type</Label>
+              <Select
+                value={quickMovementType}
+                onValueChange={(value) => setQuickMovementType(value as Investment["type"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INVESTMENT_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Investment</Label>
+              <Select
+                value={quickMovementInvestmentId}
+                onValueChange={setQuickMovementInvestmentId}
+                disabled={investmentsByQuickType.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={investmentsByQuickType.length === 0 ? "No investments in this type" : "Select investment"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {investmentsByQuickType.map((investment) => (
+                    <SelectItem key={investment.id} value={investment.id}>{investment.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="quick-header-date">Date</Label>
+              <Input
+                id="quick-header-date"
+                type="date"
+                value={quickMovementDate}
+                onChange={(event) => setQuickMovementDate(event.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="quick-header-amount">
+                {quickMovementMode === "contribution" ? "Amount to invest (€)" : "Amount gained / lost (€)"}
+              </Label>
+              <Input
+                id="quick-header-amount"
+                type="text"
+                inputMode="decimal"
+                value={quickMovementAmount}
+                onChange={(event) => setQuickMovementAmount(event.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+
+            {quickMovementNeedsUnits ? (
+              <div>
+                <Label htmlFor="quick-header-units">Units bought</Label>
+                <Input
+                  id="quick-header-units"
+                  type="text"
+                  inputMode="decimal"
+                  value={quickMovementUnits}
+                  onChange={(event) => setQuickMovementUnits(event.target.value)}
+                  placeholder="0.00000000"
+                />
+              </div>
+            ) : null}
+
+            <div>
+              <Label htmlFor="quick-header-description">Description (optional)</Label>
+              <Input
+                id="quick-header-description"
+                value={quickMovementDescription}
+                onChange={(event) => setQuickMovementDescription(event.target.value)}
+                placeholder="e.g., Abril - reforço"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setQuickMovementDialogOpen(false)}>Cancel</Button>
+              <Button
+                type="button"
+                onClick={saveQuickMovementFromHeader}
+                disabled={!selectedQuickInvestment}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {confirmDialog}
     </div>

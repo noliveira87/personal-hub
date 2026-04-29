@@ -5,9 +5,12 @@ import { Compass } from "lucide-react";
 
 type HeaderProps = {
   actions?: ReactNode;
+  backTo?: string | number;
+  backLabel?: string;
+  onBack?: () => void;
 };
 
-export function Header({ actions }: HeaderProps) {
+export function Header({ actions, backTo = "/", backLabel, onBack }: HeaderProps) {
   const { t } = useI18n();
 
   return (
@@ -15,8 +18,9 @@ export function Header({ actions }: HeaderProps) {
       <AppSectionHeader
         title={t("trips.headerTitle")}
         icon={Compass}
-        backTo="/"
-        backLabel={t("common.backToProjects")}
+        backTo={backTo}
+        backLabel={backLabel ?? t("common.backToProjects")}
+        onBack={onBack}
         actions={actions}
       />
       <div className="h-16" aria-hidden="true" />

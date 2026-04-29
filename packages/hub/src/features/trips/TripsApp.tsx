@@ -192,6 +192,12 @@ export function TripsApp() {
     setView("edit");
   };
 
+  const handleBackToDashboard = () => {
+    setView("dashboard");
+    setSelectedTrip(null);
+    void loadJourneyBitePhotoThumbnailsByTrip(trips.map((trip) => trip.id)).then(setBiteThumbnailsByTrip);
+  };
+
   const handleSaveNew = async (trip: Omit<Trip, "id" | "createdAt" | "updatedAt">) => {
     try {
       const created = await createTrip(trip);
@@ -260,14 +266,9 @@ export function TripsApp() {
 
     return (
       <>
-        <Header />
+        <Header backTo="/trips" backLabel={t("common.back")} onBack={handleBackToDashboard} />
         <TripDetail
           trip={current}
-          onBack={() => {
-            setView("dashboard");
-            setSelectedTrip(null);
-            void loadJourneyBitePhotoThumbnailsByTrip(trips.map((trip) => trip.id)).then(setBiteThumbnailsByTrip);
-          }}
           onDelete={(id) => {
             void handleDelete(id);
           }}
