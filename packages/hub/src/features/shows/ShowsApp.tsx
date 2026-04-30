@@ -282,6 +282,7 @@ export function ShowsApp() {
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [selectedGalleryFiles, setSelectedGalleryFiles] = useState<File[]>([]);
   const [selectedGalleryPreviews, setSelectedGalleryPreviews] = useState<string[]>([]);
+  const [existingGalleryPreviews, setExistingGalleryPreviews] = useState<string[]>([]);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -459,6 +460,7 @@ export function ShowsApp() {
       setSelectedCoverFile(null);
       setSelectedGalleryFiles([]);
       setSelectedGalleryPreviews([]);
+      setExistingGalleryPreviews([]);
       setEditingId(null);
       setIsDialogOpen(false);
     } catch {
@@ -485,6 +487,7 @@ export function ShowsApp() {
     setSelectedCoverFile(null);
     setSelectedGalleryFiles([]);
     setSelectedGalleryPreviews([]);
+    setExistingGalleryPreviews(show.galleryImageUrls);
     setEditingId(show.id);
     setIsDetailDialogOpen(false);
     setIsDialogOpen(true);
@@ -517,6 +520,7 @@ export function ShowsApp() {
     setSelectedCoverFile(null);
     setSelectedGalleryFiles([]);
     setSelectedGalleryPreviews([]);
+    setExistingGalleryPreviews([]);
     setEditingId(null);
     setIsDialogOpen(true);
   };
@@ -527,6 +531,7 @@ export function ShowsApp() {
     setSelectedCoverFile(null);
     setSelectedGalleryFiles([]);
     setSelectedGalleryPreviews([]);
+    setExistingGalleryPreviews([]);
     setFormState(buildInitialForm());
   };
 
@@ -783,13 +788,13 @@ export function ShowsApp() {
                 {selectedShow.galleryImageUrls.length > 0 ? (
                   <div>
                     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.gallery")}</p>
-                    <div className="flex gap-3 overflow-x-auto pb-1">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {selectedShow.galleryImageUrls.map((url, index) => (
                         <button
                           key={url}
                           type="button"
                           onClick={() => setPreviewImageUrl(url)}
-                          className="group relative h-48 w-72 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          className="group relative h-40 w-full overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:h-48"
                           aria-label={`${t("shows.fields.gallery")} ${index + 1}`}
                         >
                           <img
@@ -1035,6 +1040,35 @@ export function ShowsApp() {
                   <p className="mb-2 text-xs text-muted-foreground">
                     {t("shows.gallery.existingCount", { count: formState.galleryImagePaths.length })}
                   </p>
+                  {existingGalleryPreviews.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {existingGalleryPreviews.map((url, index) => (
+                        <div key={`${url}-${index}`} className="relative overflow-hidden rounded-md bg-muted">
+                          <img
+                            src={url}
+                            alt={`${t("shows.fields.gallery")} ${index + 1}`}
+                            className="h-60 w-full object-cover"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="absolute right-2 top-2 h-8 w-8 bg-black/55 text-white hover:bg-black/70"
+                            onClick={() => {
+                              setFormState((prev) => ({
+                                ...prev,
+                                galleryImagePaths: prev.galleryImagePaths.filter((_, i) => i !== index),
+                              }));
+                              setExistingGalleryPreviews((prev) => prev.filter((_, i) => i !== index));
+                            }}
+                            aria-label={t("shows.actions.delete")}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
