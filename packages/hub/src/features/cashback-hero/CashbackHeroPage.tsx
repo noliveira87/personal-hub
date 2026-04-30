@@ -1040,8 +1040,7 @@ function CashbackHeroPage() {
     : format(parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date()), 'MMMM yyyy', { locale: dateFnsLocale });
 
   const currentMonthKey = monthKeyFromDate(new Date());
-  const nextMonthKey = monthKeyFromDate(addMonths(new Date(), 1));
-  const canNavigateForward = selectedMonth !== 'all' && selectedMonth < nextMonthKey;
+  const canNavigateForward = selectedMonth !== 'all' && selectedMonth < currentMonthKey;
 
   const navigateMonth = (direction: -1 | 1) => {
     if (selectedMonth === 'all') {
@@ -1051,7 +1050,7 @@ function CashbackHeroPage() {
 
     const current = parse(`${selectedMonth}-01`, 'yyyy-MM-dd', new Date());
     const next = direction < 0 ? subMonths(current, 1) : addMonths(current, 1);
-    if (direction > 0 && monthKeyFromDate(next) > nextMonthKey) {
+    if (direction > 0 && monthKeyFromDate(next) > currentMonthKey) {
       return;
     }
     setSelectedMonth(monthKeyFromDate(next));
@@ -2291,8 +2290,11 @@ function AddCashbackDialog({
     const hasWhitebit = sources.some((value) => /white\s*bit/i.test(value));
     let values = hasBybit ? sources : [...sources, 'Bybit'];
     if (!hasWhitebit) values = [...values, 'WhiteBIT'];
-    return values;
-  }, [sources]);
+    if (editingEntry?.source && !values.includes(editingEntry.source)) {
+      values = [editingEntry.source, ...values];
+    }
+    return [...new Set(values)];
+  }, [sources, editingEntry?.source]);
   const getWhitebitAssetFromSource = useCallback((value: string): (typeof WHITEBIT_ASSETS)[number] => {
     const match = value.match(/white\s*bit\s*(btc|eth)?/i);
     const parsed = match?.[1]?.toUpperCase();
@@ -2308,7 +2310,7 @@ function AddCashbackDialog({
     if (/curve/i.test(value)) {
       return availableSources.find((candidate) => /curve/i.test(candidate)) ?? value;
     }
-    return availableSources.includes(value) ? value : (availableSources[0] ?? '');
+    return value.trim() ? value : (availableSources[0] ?? '');
   }, [availableSources]);
 
   const [source, setSource] = useState(() => availableSources[0] ?? '');
