@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ArrowUpRight, Building2, ChartLine, Coins, Eye, EyeOff, FileCheck2, HeartPulse, House, Map, Moon, Settings, ShieldCheck, Sun, UtensilsCrossed } from "lucide-react";
+import { ArrowUpRight, Building2, ChartLine, Coins, Eye, EyeOff, FileCheck2, HeartPulse, House, Map, Moon, Settings, ShieldCheck, Star, Sun, UtensilsCrossed } from "lucide-react";
 import { useDarkMode } from '@shared-ui/use-dark-mode';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ const projectDefinitions = [
 	{ key: "propertyDeals", to: "/property-deals", icon: Building2 },
   { key: "trips", to: "/trips", icon: Map },
 	{ key: "journeyBites", to: "/journey-bites", icon: UtensilsCrossed },
+	{ key: "shows", to: "/shows", icon: Star },
 	{ key: "health", to: "/health", icon: HeartPulse },
   { key: "contracts", to: "/dashboard", icon: FileCheck2 },
   { key: "warranties", to: "/warranties", icon: ShieldCheck },
@@ -49,8 +50,8 @@ const Index = () => {
 	const hasManagementSectionHeader = Boolean(managementSectionTitle || managementSectionDescription);
 	const personalSectionDescription = t("index.sections.personal.description").trim();
 
-	const personalProjects = projects.filter((project) => project.key === "trips" || project.key === "journeyBites" || project.key === "health");
-	const managementProjects = projects.filter((project) => project.key !== "trips" && project.key !== "journeyBites" && project.key !== "health");
+	const personalProjects = projects.filter((project) => project.key === "trips" || project.key === "journeyBites" || project.key === "shows" || project.key === "health");
+	const managementProjects = projects.filter((project) => project.key !== "trips" && project.key !== "journeyBites" && project.key !== "shows" && project.key !== "health");
 
 	return (
 	<main className="relative min-h-screen overflow-hidden bg-background">

@@ -31,6 +31,7 @@ const JourneyBitesPage = lazy(() => import("@/pages/trips/JourneyBitesPage"));
 const JourneyBitesMapPage = lazy(() => import("@/pages/trips/JourneyBitesMapPage"));
 const JourneyBiteDetailPage = lazy(() => import("@/pages/trips/JourneyBiteDetailPage"));
 const HealthPage = lazy(() => import("@/features/health/pages/HealthPage"));
+const ShowsPage = lazy(() => import("@/pages/shows/ShowsPage"));
 const WarrantiesPage = lazy(() => import("@/pages/warranties/WarrantiesPage"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const HomeExpensesIndexPage = lazy(() => import("@/features/home-expenses/pages/Index"));
@@ -115,6 +116,9 @@ const AppRoutes = () => {
 
             {/* Health */}
             <Route path="/health" element={<HealthPage />} />
+
+            {/* Shows */}
+            <Route path="/shows" element={<ShowsPage />} />
 
             {/* Warranties */}
             <Route path="/warranties" element={<WarrantiesPage />} />
