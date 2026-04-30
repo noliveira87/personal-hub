@@ -23,11 +23,19 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    sourcemap: false,
     reportCompressedSize: false,
     rollupOptions: {
+      maxParallelFileOps: 3,
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
+
+          // Heavy standalone packages — each gets its own chunk to avoid memory spikes
+          if (id.includes("lucide-react")) return "vendor-icons";
+          if (id.includes("framer-motion")) return "vendor-motion";
+          if (id.includes("heic2any")) return "vendor-heic";
+          if (id.includes("leaflet") || id.includes("react-leaflet")) return "vendor-maps";
 
           if (id.includes("recharts")) return "vendor-charts";
           if (
