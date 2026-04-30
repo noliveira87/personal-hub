@@ -199,11 +199,11 @@ const toUpdateRow = (input: ShowUpdate) => {
 
 export async function loadShows(): Promise<{ items: Show[]; setupRequired: boolean }> {
   const selectAttempts = [
-    "id, title, date, venue, city, description, notes, cover_image_path, favorite",
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite",
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, gallery_paths",
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, created_at, updated_at",
     "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, gallery_paths, created_at, updated_at",
+    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, created_at, updated_at",
+    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, gallery_paths",
+    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite",
+    "id, title, date, venue, city, description, notes, cover_image_path, favorite",
   ] as const;
 
   let lastError: { message?: string } | null = null;
@@ -248,34 +248,36 @@ export async function loadShows(): Promise<{ items: Show[]; setupRequired: boole
 export async function createShow(input: ShowInput): Promise<{ show?: Show; error?: string }> {
   const row = toInsertRow(input);
 
-  const { data, error } = await supabase
-    .from("shows")
-    .insert([row])
-    .select()
-    .single();
+  const payload: Record<string, unknown> = { ...row };
+  const removedColumns = new Set<string>();
 
-  if (error) {
-    if (isMissingGalleryPathsColumnError(error)) {
-      const { gallery_paths, ...fallbackRow } = row;
-      const fallback = await supabase
-        .from("shows")
-        .insert([fallbackRow])
-        .select()
-        .single();
+  for (let i = 0; i < 6; i++) {
+    const { data, error } = await supabase
+      .from("shows")
+      .insert([payload])
+      .select()
+      .single();
 
-      if (fallback.error) {
-        console.error("Error creating show:", fallback.error);
-        return { error: fallback.error.message };
-      }
-
-      return { show: mapRowToShow({ ...(fallback.data as ShowRow), gallery_paths: [] }) };
+    if (!error) {
+      return { show: mapRowToShow(data as ShowRow) };
     }
 
-    console.error("Error creating show:", error);
-    return { error: error.message };
+    if (!isMissingColumnError(error)) {
+      console.error("Error creating show:", error);
+      return { error: error.message };
+    }
+
+    const missingColumn = extractMissingColumn(error as { message?: string; details?: string; hint?: string } | null);
+    if (!missingColumn || removedColumns.has(missingColumn) || !(missingColumn in payload)) {
+      console.error("Error creating show:", error);
+      return { error: error.message };
+    }
+
+    removedColumns.add(missingColumn);
+    delete payload[missingColumn];
   }
 
-  return { show: mapRowToShow(data as ShowRow) };
+  return { error: "Create failed after schema fallback retries" };
 }
 
 export async function updateShow(id: string, input: ShowUpdate): Promise<{ show?: Show; error?: string }> {

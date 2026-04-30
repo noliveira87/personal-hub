@@ -276,6 +276,7 @@ export function ShowsApp() {
   const [selectedShow, setSelectedShow] = useState<Show | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [filterFavorite, setFilterFavorite] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
@@ -690,12 +691,12 @@ export function ShowsApp() {
           </DialogHeader>
           {selectedShow ? (
             <div>
-              <div className="relative h-64 overflow-hidden rounded-t-xl bg-muted">
+              <div className="relative h-[26rem] sm:h-[30rem] overflow-hidden rounded-t-xl bg-muted">
                 {selectedShow.coverImageUrl || selectedShow.galleryImageUrls[0] ? (
                   <img
                     src={selectedShow.coverImageUrl || selectedShow.galleryImageUrls[0]}
                     alt={selectedShow.title}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover object-center"
                   />
                 ) : null}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/30 to-transparent" />
@@ -782,14 +783,14 @@ export function ShowsApp() {
                 {selectedShow.galleryImageUrls.length > 0 ? (
                   <div>
                     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.gallery")}</p>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
+                    <div className="flex gap-3 overflow-x-auto pb-1">
                       {selectedShow.galleryImageUrls.map((url, index) => (
-                        <a
+                        <button
                           key={url}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="group relative h-16 w-24 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          type="button"
+                          onClick={() => setPreviewImageUrl(url)}
+                          className="group relative h-48 w-72 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          aria-label={`${t("shows.fields.gallery")} ${index + 1}`}
                         >
                           <img
                             src={url}
@@ -797,13 +798,36 @@ export function ShowsApp() {
                             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent opacity-70" />
-                        </a>
+                        </button>
                       ))}
                     </div>
                   </div>
                 ) : null}
 
               </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(previewImageUrl)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImageUrl(null);
+        }}
+      >
+        <DialogContent className="max-w-5xl p-2 sm:p-3">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{t("shows.fields.gallery")}</DialogTitle>
+            <DialogDescription>{t("shows.actions.openDetails")}</DialogDescription>
+          </DialogHeader>
+          {previewImageUrl ? (
+            <div className="overflow-hidden rounded-lg bg-black">
+              <img
+                src={previewImageUrl}
+                alt={t("shows.fields.gallery")}
+                className="max-h-[80vh] w-full object-contain"
+              />
             </div>
           ) : null}
         </DialogContent>
@@ -1015,10 +1039,10 @@ export function ShowsApp() {
               ) : null}
 
               {selectedGalleryPreviews.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {selectedGalleryPreviews.map((url, index) => (
                     <div key={`${url}-${index}`} className="overflow-hidden rounded-md bg-muted">
-                      <img src={url} alt={`${t("shows.previewAlt")} ${index + 1}`} className="h-20 w-full object-cover" />
+                      <img src={url} alt={`${t("shows.previewAlt")} ${index + 1}`} className="h-60 w-full object-cover" />
                     </div>
                   ))}
                 </div>
