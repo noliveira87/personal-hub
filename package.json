@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "dev": "npm --prefix packages/hub run dev -- --port 3000",
-    "build": "npm --prefix packages/hub run build"
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 npm --prefix packages/hub run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

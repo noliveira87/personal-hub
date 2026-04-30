@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 3000 --strictPort",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 vite build",
+    "build:dev": "NODE_OPTIONS=--max-old-space-size=4096 vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "migrate:journey-bites-photos": "node scripts/migrate-journey-bites-photos-to-bucket.mjs",
