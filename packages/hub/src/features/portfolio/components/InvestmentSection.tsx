@@ -4,6 +4,7 @@ import { Investment, formatCurrency, formatMonthLabel, formatPercentage } from "
 import { InvestmentCard } from "./InvestmentCard";
 import { CryptoQuoteMap, parseInvestmentMovements, resolveInvestmentCurrentValue } from "@/features/portfolio/lib/crypto";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/I18nProvider";
 
 interface InvestmentSectionProps {
   title: string;
@@ -18,6 +19,7 @@ interface InvestmentSectionProps {
 }
 
 export function InvestmentSection({ title, category, investments, onEdit, onDelete, onQuickContribution, onMoveInvestment, cryptoSpotEur, cryptoQuoteLoading }: InvestmentSectionProps) {
+  const { t } = useI18n();
   const [showAllMovements, setShowAllMovements] = useState(false);
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -51,9 +53,9 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
   const hasMoreMovements = recentMovements.length > 5;
 
   const movementLabel: Record<string, string> = {
-    contribution: "Contribution",
-    adjustment: "Profit/Loss",
-    cashback: "Profit/Loss",
+    contribution: t("portfolio.movementLabels.contribution"),
+    adjustment: t("portfolio.movementLabels.profitLoss"),
+    cashback: t("portfolio.movementLabels.profitLoss"),
   };
 
   const formatMovementDate = (date: string) => {
@@ -75,12 +77,12 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
             <h2 className="text-lg font-extrabold tracking-tight text-primary sm:text-xl">{title}</h2>
           </div>
           <p className="pl-[3.25rem] text-sm text-muted-foreground">
-            {investments.length} {investments.length === 1 ? "position" : "positions"}
+            {investments.length} {investments.length === 1 ? t("portfolio.positionsOne") : t("portfolio.positionsMany")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-full bg-muted px-3 py-1.5 text-muted-foreground">
-            <span className="mr-1 text-xs uppercase tracking-wide opacity-60">Current</span>
+            <span className="mr-1 text-xs uppercase tracking-wide opacity-60">{t("portfolio.current")}</span>
             {formatCurrency(summary.totalCurrentValue)}
           </span>
           <span className={`rounded-full px-3 py-1.5 font-semibold ${isPositive ? "bg-success/10 text-success" : "bg-urgent/10 text-urgent"}`}>
@@ -109,9 +111,9 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
       {recentMovements.length > 0 ? (
         <div className="mt-6 border-t border-border/70 pt-5">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-bold tracking-tight text-primary sm:text-lg">Profit / returns</h3>
+            <h3 className="text-base font-bold tracking-tight text-primary sm:text-lg">{t("portfolio.profitReturns")}</h3>
             <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              Current month: {formatMonthLabel(currentMonth)}
+              {t("portfolio.currentMonthLabel")}: {formatMonthLabel(currentMonth)}
             </span>
           </div>
           <div className="space-y-2">
@@ -127,7 +129,7 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
                       {formatMovementDate(movement.date)}
                     </span>
                   </div>
-                  {movement.note && movement.note !== "Profit / Return" ? (
+                  {movement.note && movement.note !== t("portfolio.profitReturnDefaultNote") ? (
                     <span className="text-xs text-muted-foreground truncate">{movement.note}</span>
                   ) : null}
                 </div>
@@ -147,7 +149,7 @@ export function InvestmentSection({ title, category, investments, onEdit, onDele
                 className="h-auto px-0 text-xs font-medium text-primary hover:bg-transparent hover:underline"
                 onClick={() => setShowAllMovements((prev) => !prev)}
               >
-                {showAllMovements ? "Show less" : "Show more"}
+                {showAllMovements ? t("portfolio.showLess") : t("portfolio.showMore")}
               </Button>
             ) : null}
           </div>

@@ -60,6 +60,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const hasCashback = investment.type === "crypto" && !!cashbackUnits;
   const isCashbackOnly = investment.type === "crypto" && investment.investedAmount === 0 && !units && !!cashbackUnits;
   const isCashbackOnlyQuickAdd = isCashbackOnly;
+  const isXtbPosition = /xtb/i.test(investment.name);
   const cashbackDisplayValue = cashbackCurrentValue ?? displayCurrentValue;
   const cashbackQuickAsset = cashbackAsset || asset || "BTC";
   const cashbackQuickSpotEur = cryptoSpotEur?.[cashbackQuickAsset] ?? null;
@@ -102,10 +103,15 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const quickAmountValue = parseDecimalInput(quickAmount);
   const quickUnitsValue = parseDecimalInput(quickUnits);
   const isLongTermValueUpdate = !isCashbackOnlyQuickAdd && investment.category === "long-term" && quickMode === "value_update";
-  const quickTotalInterestEarned = parseDecimalInput(quickAmount);
-  const computedQuickProfitLoss = Number.isFinite(quickTotalInterestEarned)
-    ? (investment.investedAmount + quickTotalInterestEarned) - displayCurrentValue
+  const isXtbValueUpdate = isLongTermValueUpdate && isXtbPosition;
+  const computedQuickProfitLoss = Number.isFinite(quickAmountValue)
+    ? isXtbValueUpdate
+      ? quickAmountValue - displayCurrentValue
+      : (investment.investedAmount + quickAmountValue) - displayCurrentValue
     : NaN;
+  const quickProfitSuffix = Number.isFinite(computedQuickProfitLoss)
+    ? t("portfolio.quickAdd.plToRecord", { pl: formatCurrency(computedQuickProfitLoss) })
+    : "";
   const hasQuickUnitsPreview = investment.type === "crypto"
     && quickMode === "contribution"
     && !isCashbackOnlyQuickAdd
@@ -134,27 +140,27 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
 
     // Contributions must be positive. Profit/loss (value_update) can be negative.
     if (!quickDate) {
-      toast.error("Select a valid date.");
+      toast.error(t("portfolio.quickAdd.errors.invalidDate"));
       return;
     }
 
     if (!Number.isFinite(amount)) {
-      toast.error("Invalid amount. You can use comma or dot.");
+      toast.error(t("portfolio.quickAdd.errors.invalidAmount"));
       return;
     }
 
     if (amount === 0) {
-      toast.error("Amount cannot be zero.");
+      toast.error(t("portfolio.quickAdd.errors.zeroAmount"));
       return;
     }
 
     if (isCashbackOnlyQuickAdd && (!Number.isFinite(unitsBought) || unitsBought === 0 || !Number.isFinite(cashbackQuickSpotEur))) {
-      toast.error("Enter cashback units and wait for live quote.");
+      toast.error(t("portfolio.quickAdd.errors.cashbackUnits"));
       return;
     }
 
     if (effectiveMode === "contribution" && amount < 0) {
-      toast.error("Contribution must be positive.");
+      toast.error(t("portfolio.quickAdd.errors.contributionPositive"));
       return;
     }
 
@@ -163,7 +169,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       effectiveMode === "contribution" &&
       (!Number.isFinite(unitsBought) || unitsBought <= 0)
     ) {
-      toast.error("Enter valid crypto units.");
+      toast.error(t("portfolio.quickAdd.errors.cryptoUnits"));
       return;
     }
 
@@ -224,7 +230,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               onClick={() => onMove(investment.id, "up")}
               disabled={!canMoveUp}
               className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
-              title="Move up"
+              title={t("portfolio.actions.moveUp")}
             >
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
@@ -232,7 +238,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               onClick={() => onMove(investment.id, "down")}
               disabled={!canMoveDown}
               className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
-              title="Move down"
+              title={t("portfolio.actions.moveDown")}
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -242,21 +248,21 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
             <button
               onClick={() => setQuickAddOpen(true)}
               className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
-              title="Add movement"
+              title={t("portfolio.actions.addMovement")}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => onEdit(investment)}
               className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:h-8 sm:w-8"
-              title="Edit investment"
+              title={t("portfolio.actions.editInvestment")}
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => onDelete(investment.id)}
               className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8"
-              title="Delete investment"
+              title={t("portfolio.actions.deleteInvestment")}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -266,7 +272,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
 
       <div className="grid grid-cols-1 gap-3 rounded-2xl bg-muted/40 p-3 sm:grid-cols-2 sm:p-4">
         <div className="space-y-1 rounded-xl bg-primary/8 px-3 py-2 ring-1 ring-primary/15">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Current</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">{t("portfolio.current")}</p>
           <p className={`text-xl font-bold ${isCashbackOnly ? "text-success" : "text-foreground"}`}>
             {formatCurrency(isCashbackOnly ? cashbackDisplayValue : displayCurrentValue)}
           </p>
@@ -276,11 +282,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
             </p>
           )}
           {!isCashbackOnly && investment.type === "crypto" && cryptoQuoteLoading && !hasLiveCryptoQuote && (
-            <p className="text-[11px] text-muted-foreground">Fetching crypto quote…</p>
+            <p className="text-[11px] text-muted-foreground">{t("portfolio.quickAdd.fetchingCryptoQuote")}</p>
           )}
         </div>
         <div className="space-y-1 px-3 py-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Invested</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolio.invested")}</p>
           <p className="text-lg font-semibold text-foreground/90">{formatCurrency(investment.investedAmount)}</p>
         </div>
       </div>
@@ -288,7 +294,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
       {!isCashbackOnly && (
         <div className="mt-4 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Profit/Loss</p>
+            <p className="text-xs text-muted-foreground">{t("portfolio.profitLoss")}</p>
             <p className={`text-sm font-bold ${isPositive ? "text-success" : "text-urgent"}`}>
               {formatCurrency(profitLoss)}
             </p>
@@ -336,13 +342,17 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
         <DialogContent className="w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:max-w-sm sm:p-6">
           <DialogHeader>
             <DialogTitle>
-              {isCashbackOnlyQuickAdd ? "Update cashback value" : quickMode === "contribution" ? "Add contribution" : "Record value update"}
+              {isCashbackOnlyQuickAdd
+                ? t("portfolio.quickAdd.titleUpdateCashback")
+                : quickMode === "contribution"
+                  ? t("portfolio.quickAdd.titleAddContribution")
+                  : t("portfolio.quickAdd.titleRecordValueUpdate")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             {!isCashbackOnlyQuickAdd && (
               <div className="space-y-3 rounded-lg border border-border/70 p-3">
-                <p className="text-sm font-medium text-foreground">Update type</p>
+                <p className="text-sm font-medium text-foreground">{t("portfolio.quickAdd.updateType")}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -353,13 +363,13 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                         : "border-border text-muted-foreground hover:border-primary/40"
                     }`}
                   >
-                    💸 Contribution
+                    {t("portfolio.movementLabels.contribution")}
                   </button>
                   <button
                     type="button"
                     onClick={() => !hasLiveCryptoQuote && setQuickMode("value_update")}
                     disabled={hasLiveCryptoQuote}
-                    title={hasLiveCryptoQuote ? "Not available for live-priced crypto — value is derived from units × spot price" : undefined}
+                    title={hasLiveCryptoQuote ? t("portfolio.quickAdd.notAvailableForLiveCrypto") : undefined}
                     className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                       hasLiveCryptoQuote
                         ? "border-border text-muted-foreground/40 cursor-not-allowed"
@@ -370,27 +380,29 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                         : "border-border text-muted-foreground hover:border-success/40"
                     }`}
                   >
-                    📈 Profit / Return
+                    {t("portfolio.movementLabels.profitReturn")}
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {isCashbackOnlyQuickAdd
-                    ? "Register cashback units earned. EUR value is calculated from units × live spot. This updates Current and monthly P/L only — Invested does not change."
+                    ? t("portfolio.quickAdd.hints.cashbackOnly")
                     : quickMode === "contribution"
-                      ? "New money you're putting in — increases both Invested and Current value."
+                      ? t("portfolio.quickAdd.hints.contribution")
                       : hasLiveCryptoQuote
-                        ? "Profit / Return not available — current value is derived from live price."
+                        ? t("portfolio.quickAdd.hints.liveCryptoDisabled")
+                        : isXtbValueUpdate
+                          ? t("portfolio.quickAdd.hints.xtbValueUpdate")
                         : isLongTermValueUpdate
-                          ? "For long-term positions, enter the total interest/gains earned. P/L to record is calculated automatically."
-                          : "Interest, dividends or market gains. Use negative for losses — changes only Current value, Invested stays the same."}
+                          ? t("portfolio.quickAdd.hints.longTermValueUpdate")
+                          : t("portfolio.quickAdd.hints.valueUpdate")}
                 </p>
               </div>
             )}
 
             <div className="space-y-3 rounded-lg border border-border/70 p-3">
-              <p className="text-sm font-medium text-foreground">Entry details</p>
+              <p className="text-sm font-medium text-foreground">{t("portfolio.quickAdd.entryDetails")}</p>
               <div>
-                <Label htmlFor={`quick-date-${investment.id}`}>Date</Label>
+                <Label htmlFor={`quick-date-${investment.id}`}>{t("portfolio.quickAdd.date")}</Label>
                 <Input
                   id={`quick-date-${investment.id}`}
                   type="date"
@@ -400,7 +412,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               </div>
             {isCashbackOnlyQuickAdd ? (
               <div>
-                <Label htmlFor={`quick-units-${investment.id}`}>Cashback units ({cashbackQuickAsset})</Label>
+                <Label htmlFor={`quick-units-${investment.id}`}>{t("portfolio.quickAdd.cashbackUnits", { asset: cashbackQuickAsset })}</Label>
                 <Input
                   id={`quick-units-${investment.id}`}
                   type="text"
@@ -410,18 +422,23 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {Number.isFinite(cashbackQuickSpotEur)
-                    ? `Calculated value: ${formatCurrency((Number.isFinite(parseDecimalInput(quickUnits)) ? parseDecimalInput(quickUnits) : 0) * Number(cashbackQuickSpotEur))} (${cashbackQuickAsset} × live spot)`
-                    : "Live spot unavailable — cannot calculate value now."}
+                    ? t("portfolio.quickAdd.calculatedValue", {
+                        value: formatCurrency((Number.isFinite(parseDecimalInput(quickUnits)) ? parseDecimalInput(quickUnits) : 0) * Number(cashbackQuickSpotEur)),
+                        asset: cashbackQuickAsset,
+                      })
+                    : t("portfolio.quickAdd.liveSpotUnavailable")}
                 </p>
               </div>
             ) : (
               <div>
                 <Label htmlFor={`quick-amount-${investment.id}`}>
                   {quickMode === "contribution"
-                    ? "Amount to invest (€)"
+                    ? t("portfolio.quickAdd.amountToInvest")
+                    : isXtbValueUpdate
+                      ? t("portfolio.quickAdd.totalCurrentValue")
                     : isLongTermValueUpdate
-                      ? "Total interest/gains earned (€)"
-                      : "Amount gained / lost (€)"}
+                      ? t("portfolio.quickAdd.totalInterestGains")
+                      : t("portfolio.quickAdd.amountGainedLost")}
                 </Label>
                 <Input
                   id={`quick-amount-${investment.id}`}
@@ -432,7 +449,16 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 {isLongTermValueUpdate ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {t("portfolio.interestsEarned")}: {formatCurrency(39.58)}
+                    {isXtbValueUpdate
+                      ? t("portfolio.quickAdd.currentRecordedLine", {
+                          current: formatCurrency(displayCurrentValue),
+                          pl: quickProfitSuffix,
+                        })
+                      : t("portfolio.quickAdd.interestsLine", {
+                          interestsEarned: t("portfolio.interestsEarned"),
+                          interests: Number.isFinite(quickAmountValue) ? formatCurrency(quickAmountValue) : formatCurrency(0),
+                          pl: quickProfitSuffix,
+                        })}
                   </p>
                 ) : null}
               </div>
@@ -442,14 +468,14 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               <Input
                 id={`quick-description-${investment.id}`}
                 type="text"
-                placeholder="e.g., Abril - Juros acumulados"
+                placeholder={t("portfolio.quickAdd.descriptionPlaceholder")}
                 value={quickDescription}
                 onChange={(e) => setQuickDescription(e.target.value)}
               />
             </div>
             {investment.type === "crypto" && quickMode === "contribution" && !isCashbackOnlyQuickAdd ? (
               <div>
-                <Label htmlFor={`quick-units-${investment.id}`}>Units bought ({previewAsset})</Label>
+                <Label htmlFor={`quick-units-${investment.id}`}>{t("portfolio.quickAdd.unitsBought", { asset: previewAsset })}</Label>
                 <Input
                   id={`quick-units-${investment.id}`}
                   type="text"
@@ -459,17 +485,22 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 {hasQuickUnitsPreview ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {`Live preview: ${formatCurrency(Number(quickUnitsPreviewValue))} (${quickUnitsValue.toFixed(8)} ${previewAsset} × ${formatCurrency(Number(spotEur))})`}
+                    {t("portfolio.quickAdd.livePreview", {
+                      value: formatCurrency(Number(quickUnitsPreviewValue)),
+                      units: quickUnitsValue.toFixed(8),
+                      asset: previewAsset,
+                      spot: formatCurrency(Number(spotEur)),
+                    })}
                   </p>
                 ) : quickUnits.trim() !== "" ? (
-                  <p className="mt-1 text-xs text-muted-foreground">Live preview unavailable — missing spot quote.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("portfolio.quickAdd.livePreviewUnavailable")}</p>
                 ) : null}
               </div>
             ) : null}
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-              <Button type="button" onClick={handleQuickSave} className="w-full sm:w-auto">Save</Button>
+              <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)} className="w-full sm:w-auto">{t("common.cancel")}</Button>
+              <Button type="button" onClick={handleQuickSave} className="w-full sm:w-auto">{t("common.save")}</Button>
             </div>
           </div>
         </DialogContent>

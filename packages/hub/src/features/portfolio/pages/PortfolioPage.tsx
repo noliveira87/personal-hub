@@ -37,6 +37,7 @@ import {
 } from "@/features/portfolio/lib/crypto";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { useI18n } from "@/i18n/I18nProvider";
 
 const InvestmentDialog = lazy(() =>
   import("@/features/portfolio/components/InvestmentDialog").then((module) => ({ default: module.InvestmentDialog })),
@@ -58,6 +59,7 @@ const INVESTMENT_TYPE_OPTIONS: Array<{ value: Investment["type"]; label: string 
 type QuickMovementMode = "contribution" | "value_update";
 
 const Index = () => {
+  const { t } = useI18n();
   const {
     investments,
     earnings,
@@ -465,15 +467,15 @@ const Index = () => {
                 <Button
                   size="sm"
                   className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3"
-                  aria-label="Add actions"
-                  title="Add actions"
+                  aria-label={t("portfolio.actions.addActions")}
+                  title={t("portfolio.actions.addActions")}
                 >
                   <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Add Investment</span>
+                  <span className="hidden sm:inline">{t("portfolio.actions.addInvestment")}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72">
-                <DropdownMenuItem onSelect={handleAdd}>Add Investment</DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleAdd}>{t("portfolio.actions.addInvestment")}</DropdownMenuItem>
                 <DropdownMenuItem onSelect={handleAddEarning}>Add Earning</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Add Contribution</DropdownMenuLabel>

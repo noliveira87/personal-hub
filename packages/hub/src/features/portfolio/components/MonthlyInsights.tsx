@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp } from "lucide-reac
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Investment, MonthlySnapshot, PortfolioEarning, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
+import { Investment, PortfolioEarning, calculateSummary, formatCurrency, formatMonthLabel, formatPercentage } from "@/features/portfolio/types/investment";
 import { CryptoAsset, parseCryptoNotes, parseInvestmentMovements } from "@/features/portfolio/lib/crypto";
 import { useCryptoHistory } from "@/features/portfolio/hooks/use-btc-quote";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -12,16 +12,13 @@ import { LOCALES_BY_LANGUAGE } from "@/i18n/translations";
 import { chartAxisTickStyle, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle, renderChartLegendLabel } from "@/lib/chartTheme";
 
 interface MonthlyInsightsProps {
-  snapshots: MonthlySnapshot[];
   investments: Investment[];
   earnings: PortfolioEarning[];
   netInvestedFlow?: number;
-  monthlyPerformanceTotal?: number;
-  monthEarnings?: number;
   liveCryptoPerformance?: number;
 }
 
-export function MonthlyInsights({ snapshots, investments, earnings, netInvestedFlow = 0, monthlyPerformanceTotal = 0, monthEarnings = 0, liveCryptoPerformance = 0 }: MonthlyInsightsProps) {
+export function MonthlyInsights({ investments, earnings, netInvestedFlow = 0, liveCryptoPerformance = 0 }: MonthlyInsightsProps) {
   const { t, language } = useI18n();
   const isMobile = useIsMobile();
   const { seriesEur: cryptoHistoryEur } = useCryptoHistory();
@@ -45,10 +42,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     const normalizedNote = movement.note?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ?? "";
     return normalizedNote.includes("amortizacao de capital");
   };
-
-  if (!snapshots.length) {
-    return null;
-  }
 
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -82,6 +75,68 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     return acc;
   }, {});
 
+  const getPreviousMonthKey = (monthKey: string) => {
+    const [yearRaw, monthRaw] = monthKey.split("-").map(Number);
+    if (!Number.isFinite(yearRaw) || !Number.isFinite(monthRaw) || monthRaw < 1 || monthRaw > 12) {
+      return null;
+    }
+
+    const dt = new Date(yearRaw, monthRaw - 1, 1);
+    dt.setMonth(dt.getMonth() - 1);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  const getCryptoUnitsAtMonthEnd = (asset: CryptoAsset, month: string) => {
+    return investments.reduce((totalUnits, investment) => {
+      if (investment.type !== "crypto") return totalUnits;
+
+      const { asset: mainAsset, units, cashbackAsset, cashbackUnits } = parseCryptoNotes(investment.notes);
+      const isCashbackOnly = investment.investedAmount === 0 && !(units && units > 0) && !!cashbackUnits;
+      const movements = parseInvestmentMovements(investment.notes)
+        .filter((movement) => movement.units != null && movement.units > 0 && movement.date.slice(0, 7) > month);
+
+      let monthMainUnits = mainAsset === asset ? (units ?? 0) : 0;
+      let monthCashbackUnits = cashbackAsset === asset ? (cashbackUnits ?? 0) : 0;
+
+      for (const movement of movements) {
+        const rawUnits = movement.units ?? 0;
+        const delta = movement.kind === "withdrawal" ? -rawUnits : rawUnits;
+        const affectsCashbackUnits = isCashbackOnly || movement.kind === "cashback";
+
+        if (affectsCashbackUnits && cashbackAsset === asset) {
+          monthCashbackUnits -= delta;
+          continue;
+        }
+
+        if (!affectsCashbackUnits && mainAsset === asset) {
+          monthMainUnits -= delta;
+        }
+      }
+
+      return totalUnits + Math.max(0, monthMainUnits) + Math.max(0, monthCashbackUnits);
+    }, 0);
+  };
+
+  const getClosedMonthCryptoDelta = (monthKey: string) => {
+    const previousMonthKey = getPreviousMonthKey(monthKey);
+    if (!previousMonthKey) return 0;
+
+    const btcPreviousClose = (cryptoHistoryEur.BTC ?? []).find((item) => item.month === previousMonthKey)?.priceEur ?? null;
+    const btcMonthClose = (cryptoHistoryEur.BTC ?? []).find((item) => item.month === monthKey)?.priceEur ?? null;
+    const ethPreviousClose = (cryptoHistoryEur.ETH ?? []).find((item) => item.month === previousMonthKey)?.priceEur ?? null;
+    const ethMonthClose = (cryptoHistoryEur.ETH ?? []).find((item) => item.month === monthKey)?.priceEur ?? null;
+
+    const btcDelta = btcPreviousClose != null && btcMonthClose != null
+      ? getCryptoUnitsAtMonthEnd("BTC", previousMonthKey) * (btcMonthClose - btcPreviousClose)
+      : 0;
+    const ethDelta = ethPreviousClose != null && ethMonthClose != null
+      ? getCryptoUnitsAtMonthEnd("ETH", previousMonthKey) * (ethMonthClose - ethPreviousClose)
+      : 0;
+
+    const total = btcDelta + ethDelta;
+    return Number.isFinite(total) ? total : 0;
+  };
+
   const movementStatsByMonth = investments.reduce<Record<string, { inflow: number; performance: number }>>((acc, investment) => {
     const movements = parseInvestmentMovements(investment.notes);
     movements.forEach((movement) => {
@@ -110,86 +165,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     return acc;
   }, {});
 
-  const dataMonths = new Set<string>([
-    currentMonth,
-    ...Object.keys(movementStatsByMonth),
-    ...Object.keys(earningsByMonth),
-  ]);
-
-  const sorted = snapshots
-    .filter((snapshot) => isValidMonthKey(snapshot.month))
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .map((snapshot, index, arr) => {
-      const previousSnapshot = index > 0 ? arr[index - 1] : null;
-      const isCurrentMonth = snapshot.month === currentMonth;
-
-      const monthMovementStats = movementStatsByMonth[snapshot.month];
-      // Use movement-derived inflow when available; when movements exist for
-      // this month but net is 0, honour that 0 instead of falling back to
-      // a stale snapshot value from a previous month.
-      const movementInflow = monthMovementStats !== undefined
-        ? (monthMovementStats.inflow ?? 0)
-        : undefined;
-      const snapshotInflow = Number.isFinite(snapshot.monthlyInflow)
-        ? snapshot.monthlyInflow
-        : previousSnapshot
-          ? snapshot.totalInvested - previousSnapshot.totalInvested
-          : snapshot.totalInvested;
-      // If there are movements for this month, always use that value (even 0).
-      // Only fall back to snapshot if there are genuinely no movement records.
-      const monthlyInflow = movementInflow !== undefined ? movementInflow : snapshotInflow;
-      const movementPerformance = monthMovementStats?.performance ?? 0;
-      const monthlyPerformance = movementPerformance;
-      const monthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + monthlyInflow : monthlyInflow;
-      const monthlyReturnPct = Number.isFinite(snapshot.monthlyReturnPct)
-        ? snapshot.monthlyReturnPct
-        : monthlyBase > 0
-          ? (monthlyPerformance / monthlyBase) * 100
-          : 0;
-
-      const liveMonthlyInflow = monthMovementStats?.inflow ?? (snapshot.month === currentMonth ? netInvestedFlow : monthlyInflow);
-
-      // `monthlyPerformanceTotal` can already include earnings for current month.
-      // Remove the explicit `monthEarnings` prop here and add earnings once below.
-      const currentMonthPerformanceExEarnings = monthlyPerformanceTotal - monthEarnings;
-      const liveMonthlyPerformance = monthMovementStats?.performance
-        ?? (snapshot.month === currentMonth ? currentMonthPerformanceExEarnings : monthlyPerformance);
-      const liveCryptoDelta = snapshot.month === currentMonth ? liveCryptoPerformance : 0;
-      const liveMonthlyBase = previousSnapshot ? previousSnapshot.totalCurrentValue + liveMonthlyInflow : liveSummary.totalInvested;
-      const earningsAmount = snapshot.month === currentMonth
-        ? (earningsByMonth[snapshot.month] ?? monthEarnings)
-        : (earningsByMonth[snapshot.month] ?? 0);
-      const adjustedMonthlyPerformance = monthlyPerformance + earningsAmount + liveCryptoDelta;
-      const adjustedLiveMonthlyPerformance = liveMonthlyPerformance + earningsAmount + liveCryptoDelta;
-      const adjustedMonthlyReturnPct = monthlyBase > 0 ? (adjustedMonthlyPerformance / monthlyBase) * 100 : 0;
-      const adjustedLiveMonthlyReturnPct = liveMonthlyBase > 0 ? (adjustedLiveMonthlyPerformance / liveMonthlyBase) * 100 : 0;
-
-      return {
-        ...snapshot,
-        monthlyInflow: isCurrentMonth ? liveMonthlyInflow : monthlyInflow,
-        monthlyPerformance: isCurrentMonth ? adjustedLiveMonthlyPerformance : adjustedMonthlyPerformance,
-        monthlyReturnPct: isCurrentMonth ? adjustedLiveMonthlyReturnPct : adjustedMonthlyReturnPct,
-        earningsAmount,
-      };
-    });
-
-  const baselineCandidate = sorted.length > 1
-    && !dataMonths.has(sorted[0].month)
-    && Math.abs(sorted[0].monthlyInflow) < 0.000001
-    && Math.abs(sorted[0].monthlyPerformance) < 0.000001
-      ? sorted[0].month
-      : null;
-
-  const activeSorted = baselineCandidate
-    ? sorted.filter((snapshot) => snapshot.month !== baselineCandidate)
-    : sorted;
-
-  if (!activeSorted.length) return null;
-
-  const snapshotByMonth = new Map(activeSorted.map((snapshot) => [snapshot.month, snapshot]));
   const reconstructedMonths = Array.from(
     new Set<string>([
-      ...activeSorted.map((snapshot) => snapshot.month),
       ...Object.keys(movementStatsByMonth),
       ...Object.keys(earningsByMonth),
       currentMonth,
@@ -198,30 +175,24 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
   if (!reconstructedMonths.length) return null;
 
-  const latestKnownMonth = reconstructedMonths[reconstructedMonths.length - 1];
-  let endInvested = latestKnownMonth === currentMonth
-    ? liveSummary.totalInvested
-    : (snapshotByMonth.get(latestKnownMonth)?.totalInvested ?? liveSummary.totalInvested);
-  let endCurrentValue = latestKnownMonth === currentMonth
-    ? liveSummary.totalCurrentValue
-    : (snapshotByMonth.get(latestKnownMonth)?.totalCurrentValue ?? liveSummary.totalCurrentValue);
+  let endInvested = liveSummary.totalInvested;
+  let endCurrentValue = liveSummary.totalCurrentValue;
 
   const reconstructedActiveSorted = [...reconstructedMonths]
     .reverse()
     .map((month) => {
-      const existing = snapshotByMonth.get(month);
       const isCurrentReconstructedMonth = month === currentMonth;
-      const monthlyInflow = existing?.monthlyInflow ?? movementStatsByMonth[month]?.inflow ?? 0;
+      const monthlyInflow = isCurrentReconstructedMonth
+        ? (movementStatsByMonth[month]?.inflow ?? netInvestedFlow)
+        : (movementStatsByMonth[month]?.inflow ?? 0);
       const movementPerformance = movementStatsByMonth[month]?.performance ?? 0;
       const monthlyEarnings = earningsByMonth[month] ?? 0;
-      const monthlyLiveCryptoDelta = isCurrentReconstructedMonth ? liveCryptoPerformance : 0;
-      const monthlyPerformance = isCurrentReconstructedMonth
-        ? movementPerformance + monthlyEarnings + monthlyLiveCryptoDelta
-        : (existing?.monthlyPerformance ?? movementPerformance + monthlyEarnings);
-      const totalInvested = existing?.totalInvested ?? endInvested;
-      const totalCurrent = month === currentMonth
-        ? liveSummary.totalCurrentValue
-        : (existing?.totalCurrentValue ?? endCurrentValue);
+      const monthlyCryptoDelta = isCurrentReconstructedMonth
+        ? liveCryptoPerformance
+        : getClosedMonthCryptoDelta(month);
+      const monthlyPerformance = movementPerformance + monthlyEarnings + monthlyCryptoDelta;
+      const totalInvested = endInvested;
+      const totalCurrent = isCurrentReconstructedMonth ? liveSummary.totalCurrentValue : endCurrentValue;
       const monthlyBase = totalCurrent - monthlyPerformance;
       const monthlyReturnPct = monthlyBase > 0 ? (monthlyPerformance / monthlyBase) * 100 : 0;
 
@@ -233,8 +204,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
         overallReturnPct: totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0,
         monthlyInflow,
         monthlyPerformance,
+        monthlyCryptoDelta,
         monthlyReturnPct,
-        updatedAt: existing?.updatedAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         earningsAmount: monthlyEarnings,
       };
 
@@ -256,40 +228,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
   const selectedMonth = selected.month;
   const isCurrentMonthSelected = selectedMonth === currentMonth;
-  const nonCryptoMonthlyPerformance = investments
-    .filter((investment) => investment.type !== "crypto")
-    .reduce((total, investment) => {
-      const movements = parseInvestmentMovements(investment.notes);
-      const monthPerformance = movements
-        .filter(
-          (movement) =>
-            movement.date.startsWith(selectedMonth) &&
-            movement.note !== "Initial position" &&
-            (movement.kind === "adjustment" || movement.kind === "cashback"),
-        )
-        .reduce((sum, movement) => sum + movement.amount, 0);
-      return total + monthPerformance;
-    }, 0);
-
-  const nonInvestmentMonthlyPerformance = nonCryptoMonthlyPerformance;
-
-  const cryptoMonthlyPerformance = selected.monthlyPerformance - nonInvestmentMonthlyPerformance;
-  const cryptoManualMonthlyPerformance = investments
-    .filter((investment) => investment.type === "crypto")
-    .reduce((total, investment) => {
-      const movements = parseInvestmentMovements(investment.notes);
-      const monthPerformance = movements
-        .filter(
-          (movement) =>
-            movement.date.startsWith(selectedMonth) &&
-            movement.note !== "Initial position" &&
-            (movement.kind === "adjustment" || movement.kind === "cashback"),
-        )
-        .reduce((sum, movement) => sum + movement.amount, 0);
-      return total + monthPerformance;
-    }, 0);
-  const cryptoMarketMonthlyPerformance = cryptoMonthlyPerformance - cryptoManualMonthlyPerformance;
-
   type AnnualInsight = {
     year: string;
     annualInflow: number;
@@ -364,17 +302,17 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
   const visibleMonthlyRows = monthlyEvolutionRows.slice(0, visibleMonthsCount);
   const remainingMonthlyRows = Math.max(0, monthlyEvolutionRows.length - visibleMonthlyRows.length);
 
-  // Calculate performance by type for selected month (investments + earnings)
-  type TypePerformance = {
-    type: string;
+  // Calculate performance by source for selected month (investments + earnings)
+  type SourcePerformance = {
+    label: string;
     profit: number;
     loss: number;
     netPerformance: number;
   };
 
-  const typePerformanceMap = new Map<string, TypePerformance>();
+  const sourcePerformanceMap = new Map<string, SourcePerformance>();
 
-  // Add investment movements by type
+  // Add investment movements by concrete investment/source
   investments.forEach((inv) => {
     const movements = parseInvestmentMovements(inv.notes);
     movements
@@ -385,8 +323,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           (m.kind === "adjustment" || m.kind === "cashback")
       )
       .forEach((m) => {
-        const existing = typePerformanceMap.get(inv.type) || {
-          type: inv.type,
+        const existing = sourcePerformanceMap.get(inv.name) || {
+          label: inv.name,
           profit: 0,
           loss: 0,
           netPerformance: 0,
@@ -398,48 +336,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
           existing.loss += Math.abs(m.amount);
         }
         existing.netPerformance += m.amount;
-        typePerformanceMap.set(inv.type, existing);
+        sourcePerformanceMap.set(inv.name, existing);
       });
   });
-
-  // Add earnings by type mapping
-  earnings
-    .filter((earning) => earning.date.startsWith(selectedMonth))
-    .forEach((earning) => {
-      const earningType = earning.kind === "survey"
-        ? "surveys"
-        : earning.kind === "cashback"
-          ? "cashback"
-          : earning.kind === "dividend"
-            ? "dividend"
-          : earning.kind === "crypto_cashback"
-            ? "crypto_cashback"
-            : earning.kind === "social_media"
-              ? "social_media"
-              : "other";
-      const existing = typePerformanceMap.get(earningType) || {
-        type: earningType,
-        profit: 0,
-        loss: 0,
-        netPerformance: 0,
-      };
-
-      existing.profit += earning.amountEur;
-      existing.netPerformance += earning.amountEur;
-      typePerformanceMap.set(earningType, existing);
-    });
-
-  const typePerformanceList = Array.from(typePerformanceMap.values())
-    .sort((a, b) => b.netPerformance - a.netPerformance);
-
-  const topGainers = typePerformanceList
-    .filter((c) => c.netPerformance > 0)
-    .slice(0, 5);
-
-  const topLosers = typePerformanceList
-    .filter((c) => c.netPerformance < 0)
-    .sort((a, b) => a.netPerformance - b.netPerformance)
-    .slice(0, 5);
 
   const selectedMonthMovementBreakdown = investments
     .map((investment) => {
@@ -478,17 +377,69 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     .filter((item) => Math.abs(item.amount) > 0.000001)
     .sort((a, b) => b.amount - a.amount);
 
+  // Add earnings as their own concrete sources
+  earnings
+    .filter((earning) => earning.date.startsWith(selectedMonth))
+    .forEach((earning) => {
+      const earningLabel = earning.kind === "survey"
+        ? "surveys"
+        : earning.kind === "cashback"
+          ? "cashback"
+          : earning.kind === "dividend"
+            ? "dividend"
+            : earning.kind === "crypto_cashback"
+              ? "crypto_cashback"
+              : earning.kind === "social_media"
+                ? "social_media"
+                : "other";
+      const existing = sourcePerformanceMap.get(earningLabel) || {
+        label: earningLabel,
+        profit: 0,
+        loss: 0,
+        netPerformance: 0,
+      };
+
+      existing.profit += earning.amountEur;
+      existing.netPerformance += earning.amountEur;
+      sourcePerformanceMap.set(earningLabel, existing);
+    });
+
+  const selectedMonthPerformanceEarningsBreakdown = selectedMonthEarningsBreakdown;
+
   const selectedMonthMovementSubtotal = selectedMonthMovementBreakdown.reduce((sum, item) => sum + item.amount, 0);
-  const selectedMonthLiveCryptoContribution = isCurrentMonthSelected ? liveCryptoPerformance : 0;
-  const selectedMonthEarningsSubtotal = selectedMonthEarningsBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const selectedMonthEarningsSubtotal = selectedMonthPerformanceEarningsBreakdown.reduce((sum, item) => sum + item.amount, 0);
+  const selectedMonthResidualContribution = selected.monthlyPerformance - selectedMonthMovementSubtotal - selectedMonthEarningsSubtotal;
+  const selectedMonthResidualLabel = isCurrentMonthSelected
+    ? t("portfolioInsights.monthly.liveCryptoDelta")
+    : t("portfolioInsights.monthly.closedCryptoDelta");
   const selectedMonthEarningsAndMarketBreakdown = [
-    ...selectedMonthEarningsBreakdown,
-    ...(Math.abs(selectedMonthLiveCryptoContribution) > 0.000001
-      ? [{ label: t("portfolioInsights.monthly.liveCryptoDelta"), amount: selectedMonthLiveCryptoContribution }]
+    ...selectedMonthPerformanceEarningsBreakdown,
+    ...(Math.abs(selectedMonthResidualContribution) > 0.000001
+      ? [{ label: selectedMonthResidualLabel, amount: selectedMonthResidualContribution }]
       : []),
   ].sort((a, b) => b.amount - a.amount);
-  const selectedMonthExplainedTotal = selectedMonthMovementSubtotal + selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution;
+  const selectedMonthExplainedTotal = selectedMonthMovementSubtotal + selectedMonthEarningsSubtotal + selectedMonthResidualContribution;
   const selectedMonthUnexplainedDelta = selected.monthlyPerformance - selectedMonthExplainedTotal;
+
+  const sourcePerformanceList = [
+    ...Array.from(sourcePerformanceMap.values()),
+    ...(Math.abs(selectedMonthResidualContribution) > 0.000001
+      ? [{
+          label: selectedMonthResidualLabel,
+          profit: selectedMonthResidualContribution > 0 ? selectedMonthResidualContribution : 0,
+          loss: selectedMonthResidualContribution < 0 ? Math.abs(selectedMonthResidualContribution) : 0,
+          netPerformance: selectedMonthResidualContribution,
+        }]
+      : []),
+  ].sort((a, b) => b.netPerformance - a.netPerformance);
+
+  const topGainers = sourcePerformanceList
+    .filter((c) => c.netPerformance > 0);
+
+  const topLosers = sourcePerformanceList
+    .filter((c) => c.netPerformance < 0)
+    .sort((a, b) => a.netPerformance - b.netPerformance);
+  const selectedMonthNetPerformance = sourcePerformanceList.reduce((sum, item) => sum + item.netPerformance, 0);
 
   const selectedMonthInvestedBreakdown = investments
     .map((investment) => {
@@ -522,9 +473,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
   const selectedMonthInvestedExplainedTotal = selectedMonthInvestedBreakdown.reduce((sum, item) => sum + item.net, 0);
   const selectedMonthInvestedUnexplainedDelta = selected.monthlyInflow - selectedMonthInvestedExplainedTotal;
-  const selectedMonthMovementInflow = movementStatsByMonth[selectedMonth]?.inflow;
-  const selectedMonthSnapshotInflow = snapshotByMonth.get(selectedMonth)?.monthlyInflow;
-  const selectedMonthInvestedSource = selectedMonthMovementInflow != null ? "movements" : "snapshot";
 
   const annualYears = annualInsights.map((item) => item.year);
   const annualFocusYear = selectedAnnualYear && annualYears.includes(selectedAnnualYear)
@@ -624,36 +572,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
     .sort()
     .slice(-12);
 
-  const getCryptoUnitsForMonth = (asset: CryptoAsset, month: string) => {
-    return investments.reduce((totalUnits, investment) => {
-      if (investment.type !== "crypto") return totalUnits;
-
-      const { asset: mainAsset, units, cashbackAsset, cashbackUnits } = parseCryptoNotes(investment.notes);
-      const isCashbackOnly = investment.investedAmount === 0 && !(units && units > 0) && !!cashbackUnits;
-      const movements = parseInvestmentMovements(investment.notes)
-        .filter((movement) => movement.units != null && movement.units > 0 && movement.date.slice(0, 7) > month);
-
-      let monthMainUnits = mainAsset === asset ? (units ?? 0) : 0;
-      let monthCashbackUnits = cashbackAsset === asset ? (cashbackUnits ?? 0) : 0;
-
-      for (const movement of movements) {
-        const rawUnits = movement.units ?? 0;
-        const delta = movement.kind === "withdrawal" ? -rawUnits : rawUnits;
-        const affectsCashbackUnits = isCashbackOnly || movement.kind === "cashback";
-
-        if (affectsCashbackUnits && cashbackAsset === asset) {
-          monthCashbackUnits -= delta;
-          continue;
-        }
-
-        if (!affectsCashbackUnits && mainAsset === asset) {
-          monthMainUnits -= delta;
-        }
-      }
-
-      return totalUnits + Math.max(0, monthMainUnits) + Math.max(0, monthCashbackUnits);
-    }, 0);
-  };
+  const getCryptoUnitsForMonth = (asset: CryptoAsset, month: string) => getCryptoUnitsAtMonthEnd(asset, month);
 
   const buildCryptoAssetChartData = (asset: CryptoAsset) => {
     const historyByMonth = asset === "BTC" ? btcHistoryByMonth : ethHistoryByMonth;
@@ -828,8 +747,8 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                   ? t("portfolioInsights.monthly.thisMonthPerformance")
                   : t("portfolioInsights.monthly.monthPerformance", { month: formatMonthLabel(selectedMonth) })}
               </p>
-              <p className={`mt-2 text-xl font-semibold ${selected.monthlyPerformance >= 0 ? "text-success" : "text-urgent"}`}>
-                {formatCurrency(selected.monthlyPerformance)}
+              <p className={`mt-2 text-xl font-semibold ${selectedMonthNetPerformance >= 0 ? "text-success" : "text-urgent"}`}>
+                {formatCurrency(selectedMonthNetPerformance)}
               </p>
             </div>
           </div>
@@ -858,7 +777,7 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
 
           {/* Performance by type */}
           {(topGainers.length > 0 || topLosers.length > 0) && (
-            <div className="space-y-5 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
+              <div className="space-y-5 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
               <h3 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">{t("portfolioInsights.monthly.performanceByType")}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {isCurrentMonthSelected
@@ -872,9 +791,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                     <h4 className="text-base font-bold text-success">{t("portfolioInsights.monthly.topGainers")}</h4>
                     <div className="space-y-2">
                       {topGainers.map((item) => (
-                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <div key={item.label} className="rounded-xl border border-border/50 bg-muted/20 p-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.label)}</span>
                             <span className="text-sm font-semibold text-success">+{formatCurrency(item.netPerformance)}</span>
                           </div>
                           <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
@@ -892,9 +811,9 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
                     <h4 className="text-base font-bold text-urgent">{t("portfolioInsights.monthly.topLosers")}</h4>
                     <div className="space-y-2">
                       {topLosers.map((item) => (
-                        <div key={item.type} className="rounded-xl border border-border/50 bg-muted/20 p-3">
+                        <div key={item.label} className="rounded-xl border border-border/50 bg-muted/20 p-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.type)}</span>
+                            <span className="text-sm font-medium text-foreground">{formatTypeName(item.label)}</span>
                             <span className="text-sm font-semibold text-urgent">{formatCurrency(item.netPerformance)}</span>
                           </div>
                           <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
@@ -908,173 +827,6 @@ export function MonthlyInsights({ snapshots, investments, earnings, netInvestedF
               </div>
             </div>
           )}
-
-          {/* Performance breakdown */}
-          <div className="space-y-4 rounded-2xl border border-border/80 bg-muted/10 p-4 sm:p-5">
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-foreground">
-                {isCurrentMonthSelected
-                  ? t("portfolioInsights.monthly.driversTitleThis")
-                  : t("portfolioInsights.monthly.driversTitleMonth", { month: formatMonthLabel(selectedMonth) })}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {t("portfolioInsights.monthly.driversSubtitle")}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.investmentMovements")}</p>
-                {selectedMonthMovementBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noProfitMovements")}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {selectedMonthMovementBreakdown.map((item) => (
-                      <div key={`movement-${item.label}`} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
-                        <span className="text-foreground">{item.label}</span>
-                        <span className={item.amount >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
-                          {item.amount >= 0 ? "+" : ""}{formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
-                  <span className="font-medium text-foreground">{t("portfolioInsights.monthly.movementsSubtotal")}</span>
-                  <span className={selectedMonthMovementSubtotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                    {selectedMonthMovementSubtotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthMovementSubtotal)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">{t("portfolioInsights.monthly.earningsAndMarket")}</p>
-                {selectedMonthEarningsAndMarketBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noEarningsAndMarket")}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {selectedMonthEarningsAndMarketBreakdown.map((item) => (
-                      <div key={`earning-${item.label}`} className="flex items-center justify-between rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
-                        <span className="text-foreground">{item.label}</span>
-                        <span className={item.amount >= 0 ? "font-medium text-success" : "font-medium text-urgent"}>
-                          {item.amount >= 0 ? "+" : ""}{formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center justify-between border-t border-border/60 pt-2 text-sm">
-                  <span className="font-medium text-foreground">{t("portfolioInsights.monthly.earningsCryptoSubtotal")}</span>
-                  <span className={(selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution) >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                    {(selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution) >= 0 ? "+" : ""}
-                    {formatCurrency(selectedMonthEarningsSubtotal + selectedMonthLiveCryptoContribution)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2 rounded-xl border border-border/70 bg-background/60 p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{t("portfolioInsights.monthly.explainedTotal")}</span>
-                <span className={selectedMonthExplainedTotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                  {selectedMonthExplainedTotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthExplainedTotal)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{t("portfolioInsights.monthly.cardPerformance")}</span>
-                <span className={selected.monthlyPerformance >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                  {selected.monthlyPerformance >= 0 ? "+" : ""}{formatCurrency(selected.monthlyPerformance)}
-                </span>
-              </div>
-              {Math.abs(selectedMonthUnexplainedDelta) > 0.01 ? (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.deltaNotExplained")}</span>
-                  <span className={selectedMonthUnexplainedDelta >= 0 ? "font-semibold text-warning" : "font-semibold text-urgent"}>
-                    {selectedMonthUnexplainedDelta >= 0 ? "+" : ""}{formatCurrency(selectedMonthUnexplainedDelta)}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="space-y-4 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:p-5">
-              <div className="space-y-1">
-                <h3 className="text-base font-semibold text-foreground">
-                  {t("portfolioInsights.monthly.investedBreakdownTitle", { month: formatMonthLabel(selectedMonth) })}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {t("portfolioInsights.monthly.investedBreakdownSubtitle")}
-                </p>
-              </div>
-
-              {selectedMonthInvestedBreakdown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("portfolioInsights.monthly.noInvestedMovements")}</p>
-              ) : (
-                <div className="space-y-2">
-                  {selectedMonthInvestedBreakdown.map((item) => (
-                    <div key={`invested-${item.label}`} className="rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-foreground">{item.label}</span>
-                        <span className={item.net >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                          {item.net >= 0 ? "+" : ""}{formatCurrency(item.net)}
-                        </span>
-                      </div>
-                      <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                        <span>{t("portfolioInsights.monthly.contributions")}: {formatCurrency(item.contributions)}</span>
-                        <span>{t("portfolioInsights.monthly.withdrawals")}: {formatCurrency(item.withdrawals)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-2 rounded-xl border border-border/70 bg-background/60 p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.cardInvestedSource")}</span>
-                  <span className="font-medium text-foreground">
-                    {selectedMonthInvestedSource === "movements"
-                      ? t("portfolioInsights.monthly.movementsSource")
-                      : t("portfolioInsights.monthly.snapshotFallback")}
-                  </span>
-                </div>
-                {selectedMonthInvestedSource === "snapshot" && selectedMonthSnapshotInflow != null ? (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("portfolioInsights.monthly.snapshotMonthlyInflow")}</span>
-                    <span className={selectedMonthSnapshotInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                      {selectedMonthSnapshotInflow >= 0 ? "+" : ""}{formatCurrency(selectedMonthSnapshotInflow)}
-                    </span>
-                  </div>
-                ) : null}
-                {selectedMonthInvestedSource === "movements" && selectedMonthMovementInflow != null ? (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("portfolioInsights.monthly.movementDerivedInflow")}</span>
-                    <span className={selectedMonthMovementInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                      {selectedMonthMovementInflow >= 0 ? "+" : ""}{formatCurrency(selectedMonthMovementInflow)}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.explainedInvested")}</span>
-                  <span className={selectedMonthInvestedExplainedTotal >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                    {selectedMonthInvestedExplainedTotal >= 0 ? "+" : ""}{formatCurrency(selectedMonthInvestedExplainedTotal)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{t("portfolioInsights.monthly.cardInvested")}</span>
-                  <span className={selected.monthlyInflow >= 0 ? "font-semibold text-success" : "font-semibold text-urgent"}>
-                    {selected.monthlyInflow >= 0 ? "+" : ""}{formatCurrency(selected.monthlyInflow)}
-                  </span>
-                </div>
-                {Math.abs(selectedMonthInvestedUnexplainedDelta) > 0.01 ? (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("portfolioInsights.monthly.deltaNotYetExplained")}</span>
-                    <span className={selectedMonthInvestedUnexplainedDelta >= 0 ? "font-semibold text-warning" : "font-semibold text-urgent"}>
-                      {selectedMonthInvestedUnexplainedDelta >= 0 ? "+" : ""}{formatCurrency(selectedMonthInvestedUnexplainedDelta)}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
 
         </CardContent>
       </Card>
