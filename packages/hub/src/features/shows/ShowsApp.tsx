@@ -263,9 +263,20 @@ const buildFallbackPreviewDataUrl = (label: string) => {
   return `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='220'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%23e5e7eb'/><stop offset='100%' stop-color='%23cbd5e1'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><text x='50%' y='46%' dominant-baseline='middle' text-anchor='middle' fill='%23374151' font-size='20' font-family='Arial,sans-serif'>HEIC</text><text x='50%' y='62%' dominant-baseline='middle' text-anchor='middle' fill='%236b7280' font-size='12' font-family='Arial,sans-serif'>${safeLabel}</text></svg>`;
 };
 
+const reorderItems = <T,>(items: T[], fromIndex: number, toIndex: number) => {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(fromIndex, 1);
+  nextItems.splice(toIndex, 0, movedItem);
+  return nextItems;
+};
+
 export function ShowsApp() {
   const { t, formatDate } = useI18n();
-  const { confirm } = useConfirmDialog();
+  const { confirm, confirmDialog } = useConfirmDialog();
 
   const [shows, setShows] = useState<Show[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -282,6 +293,8 @@ export function ShowsApp() {
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [selectedGalleryFiles, setSelectedGalleryFiles] = useState<File[]>([]);
   const [selectedGalleryPreviews, setSelectedGalleryPreviews] = useState<string[]>([]);
+  const [draggingExistingGalleryIndex, setDraggingExistingGalleryIndex] = useState<number | null>(null);
+  const [draggingSelectedGalleryIndex, setDraggingSelectedGalleryIndex] = useState<number | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -492,11 +505,12 @@ export function ShowsApp() {
 
   const handleDelete = async (show: Show) => {
     if (
-      await confirm(
-        t("shows.confirmDelete.title"),
-        t("shows.confirmDelete.message", { title: show.title }),
-        t("shows.confirmDelete.action")
-      )
+      await confirm({
+        title: t("shows.confirmDelete.title"),
+        description: t("shows.confirmDelete.message", { title: show.title }),
+        confirmLabel: t("shows.confirmDelete.action"),
+        cancelLabel: t("common.cancel"),
+      })
     ) {
       const { error } = await deleteShow(show.id);
       if (error) {
@@ -544,6 +558,30 @@ export function ShowsApp() {
     setIsDetailDialogOpen(true);
   };
 
+  const handleRemoveExistingGalleryImage = (indexToRemove: number) => {
+    setFormState((prev) => ({
+      ...prev,
+      galleryImagePaths: prev.galleryImagePaths.filter((_, index) => index !== indexToRemove),
+    }));
+  };
+
+  const handleRemoveSelectedGalleryImage = (indexToRemove: number) => {
+    setSelectedGalleryFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setSelectedGalleryPreviews((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleMoveExistingGalleryImage = (fromIndex: number, toIndex: number) => {
+    setFormState((prev) => ({
+      ...prev,
+      galleryImagePaths: reorderItems(prev.galleryImagePaths, fromIndex, toIndex),
+    }));
+  };
+
+  const handleMoveSelectedGalleryImage = (fromIndex: number, toIndex: number) => {
+    setSelectedGalleryFiles((prev) => reorderItems(prev, fromIndex, toIndex));
+    setSelectedGalleryPreviews((prev) => reorderItems(prev, fromIndex, toIndex));
+  };
+
   const headerActions = (
     <Button onClick={handleOpenDialog} size="sm" className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3">
       <Plus className="h-4 w-4" />
@@ -552,7 +590,7 @@ export function ShowsApp() {
   );
 
   if (isLoading) {
-    return <AppLoadingState />;
+    return <AppLoadingState label={t("common.loading")} variant="cards" />;
   }
 
   if (setupRequired) {
@@ -1035,14 +1073,66 @@ export function ShowsApp() {
                   <p className="mb-2 text-xs text-muted-foreground">
                     {t("shows.gallery.existingCount", { count: formState.galleryImagePaths.length })}
                   </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {formState.galleryImagePaths.map((url, index) => (
+                      <div
+                        key={`${url}-${index}`}
+                        className="relative overflow-hidden rounded-md bg-muted"
+                        draggable
+                        onDragStart={() => setDraggingExistingGalleryIndex(index)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          if (draggingExistingGalleryIndex === null) return;
+                          handleMoveExistingGalleryImage(draggingExistingGalleryIndex, index);
+                          setDraggingExistingGalleryIndex(null);
+                        }}
+                        onDragEnd={() => setDraggingExistingGalleryIndex(null)}
+                      >
+                        <img src={url} alt={`${t("shows.previewAlt")} ${index + 1}`} className="h-60 w-full object-cover" />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="absolute right-2 top-2 h-8 w-8 bg-background/90"
+                          onClick={() => handleRemoveExistingGalleryImage(index)}
+                          aria-label={`${t("common.delete")} ${t("shows.fields.gallery")} ${index + 1}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
               {selectedGalleryPreviews.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {selectedGalleryPreviews.map((url, index) => (
-                    <div key={`${url}-${index}`} className="overflow-hidden rounded-md bg-muted">
+                    <div
+                      key={`${url}-${index}`}
+                      className="relative overflow-hidden rounded-md bg-muted"
+                      draggable
+                      onDragStart={() => setDraggingSelectedGalleryIndex(index)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (draggingSelectedGalleryIndex === null) return;
+                        handleMoveSelectedGalleryImage(draggingSelectedGalleryIndex, index);
+                        setDraggingSelectedGalleryIndex(null);
+                      }}
+                      onDragEnd={() => setDraggingSelectedGalleryIndex(null)}
+                    >
                       <img src={url} alt={`${t("shows.previewAlt")} ${index + 1}`} className="h-60 w-full object-cover" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="absolute right-2 top-2 h-8 w-8 bg-background/90"
+                        onClick={() => handleRemoveSelectedGalleryImage(index)}
+                        aria-label={`${t("common.delete")} ${t("shows.previewAlt")} ${index + 1}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -1070,6 +1160,8 @@ export function ShowsApp() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {confirmDialog}
     </>
   );
 }
