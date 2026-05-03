@@ -576,6 +576,9 @@ function CashbackHeroPage() {
         .filter(({ entry }) => universoSourceRegex.test(entry.source))
         .filter(({ entry }) => entry.dateReceived >= cycleRange.start && entry.dateReceived < cycleRange.endExclusive);
 
+      // Do not show Universo cycle cards if there are no transactions yet for that cycle.
+      if (allInCycle.length === 0) return null;
+
       const effectiveTotal = allInCycle.reduce(
         (sum, { entry }) => sum + (cappedEntryAmounts.get(entry.id) ?? getEntryAmountForDisplay(entry)), 0,
       );

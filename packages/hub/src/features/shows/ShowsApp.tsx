@@ -1,5 +1,5 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, Heart, Image, Loader2, Pencil, Plus, Save, Star, Tag, Trash2, X } from "lucide-react";
+import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Calendar, FileText, Image, Loader2, Pencil, Plus, Save, Star, Tag, Trash2, Upload, X } from "lucide-react";
 import heic2any from "heic2any";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import AppLoadingState from "@/components/AppLoadingState";
@@ -18,7 +18,10 @@ import {
   deleteShow,
   loadShows,
   updateShow,
+  uploadShowTicketFile,
   uploadShowCoverImage,
+  deleteShowCoverImage,
+  getShowCoverImagePath,
 } from "@/lib/shows";
 
 type FormState = {
@@ -26,11 +29,12 @@ type FormState = {
   date: string;
   venue: string;
   city: string;
-  description: string;
+  ticketProvider: "" | "bol" | "ticketline";
+  ticketFilePath: string;
   notes: string;
   rating: number;
-  tags: string;
-  favorite: boolean;
+  tags: string[];
+  tagDraft: string;
   coverImagePath: string;
   galleryImagePaths: string[];
 };
@@ -40,11 +44,12 @@ const buildInitialForm = (): FormState => ({
   date: "",
   venue: "",
   city: "",
-  description: "",
+  ticketProvider: "",
+  ticketFilePath: "",
   notes: "",
   rating: 0,
-  tags: "",
-  favorite: false,
+  tags: [],
+  tagDraft: "",
   coverImagePath: "",
   galleryImagePaths: [],
 });
@@ -54,17 +59,27 @@ const toInput = (state: FormState): ShowInput => ({
   date: state.date,
   venue: state.venue,
   city: state.city,
-  description: state.description || undefined,
+  ticketProvider: state.ticketProvider || undefined,
+  ticketPath: state.ticketFilePath ? getShowCoverImagePath(state.ticketFilePath) || state.ticketFilePath : null,
   notes: state.notes || undefined,
   rating: state.rating,
-  tags: state.tags
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean),
-  favorite: state.favorite,
+  tags: state.tags,
   coverImagePath: state.coverImagePath || undefined,
-  galleryPaths: state.galleryImagePaths,
+  galleryPaths: state.galleryImagePaths.map((urlOrPath) => getShowCoverImagePath(urlOrPath) || urlOrPath),
 });
+
+const getTodayLocalIsoDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const hasShowHappened = (showDate: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(showDate)) return false;
+  return showDate < getTodayLocalIsoDate();
+};
 
 const isHeicLikeFile = (file: File) => {
   const fileType = (file.type || "").toLowerCase();
@@ -231,6 +246,11 @@ const compressImage = async (file: File): Promise<File> => {
       return file;
     }
 
+    // Keep the original when conversion would bloat file size.
+    if (!isHeic && blob.size >= file.size) {
+      return file;
+    }
+
     return new File([blob], buildImageFileName(file.name, "webp"), {
       type: "image/webp",
     });
@@ -288,14 +308,15 @@ export function ShowsApp() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [filterFavorite, setFilterFavorite] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
+  const [selectedTicketFile, setSelectedTicketFile] = useState<File | null>(null);
   const [selectedGalleryFiles, setSelectedGalleryFiles] = useState<File[]>([]);
   const [selectedGalleryPreviews, setSelectedGalleryPreviews] = useState<string[]>([]);
   const [draggingExistingGalleryIndex, setDraggingExistingGalleryIndex] = useState<number | null>(null);
   const [draggingSelectedGalleryIndex, setDraggingSelectedGalleryIndex] = useState<number | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const ticketFileInputRef = useRef<HTMLInputElement>(null);
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -326,11 +347,102 @@ export function ShowsApp() {
         show.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
         show.city.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesFavorite = !filterFavorite || show.favorite;
-
-      return matchesSearch && matchesFavorite;
+      return matchesSearch;
     });
-  }, [shows, searchQuery, filterFavorite]);
+  }, [shows, searchQuery]);
+
+  const venueSuggestions = useMemo(() => {
+    return Array.from(new Set(shows.map((show) => show.venue.trim()).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [shows]);
+
+  const citySuggestions = useMemo(() => {
+    return Array.from(new Set(shows.map((show) => show.city.trim()).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [shows]);
+
+  const tagSuggestions = useMemo(() => {
+    return Array.from(
+      new Set(
+        shows
+          .flatMap((show) => show.tags)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [shows]);
+
+  const filteredTagSuggestions = useMemo(() => {
+    const selected = new Set(formState.tags.map((tag) => tag.toLowerCase()));
+    const query = formState.tagDraft.trim().toLowerCase();
+
+    return tagSuggestions
+      .filter((tag) => {
+        const key = tag.toLowerCase();
+        if (selected.has(key)) return false;
+        if (!query) return true;
+        return key.includes(query);
+      })
+      .slice(0, 8);
+  }, [tagSuggestions, formState.tags, formState.tagDraft]);
+
+  const addTagsFromDraft = (rawValue: string) => {
+    const normalized = rawValue
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    if (!normalized.length) {
+      setFormState((prev) => ({ ...prev, tagDraft: "" }));
+      return;
+    }
+
+    setFormState((prev) => {
+      const seen = new Set(prev.tags.map((tag) => tag.toLowerCase()));
+      const nextTags = [...prev.tags];
+
+      for (const tag of normalized) {
+        const key = tag.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        nextTags.push(tag);
+      }
+
+      return {
+        ...prev,
+        tags: nextTags,
+        tagDraft: "",
+      };
+    });
+  };
+
+  const handleTagKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      addTagsFromDraft(formState.tagDraft);
+      return;
+    }
+
+    if (event.key === "Backspace" && !formState.tagDraft.trim() && formState.tags.length > 0) {
+      setFormState((prev) => ({
+        ...prev,
+        tags: prev.tags.slice(0, -1),
+      }));
+    }
+  };
+
+  const handleRemoveTag = (tagIndex: number) => {
+    setFormState((prev) => ({
+      ...prev,
+      tags: prev.tags.filter((_, index) => index !== tagIndex),
+    }));
+  };
+
+  const handleAddSuggestedTag = (tag: string) => {
+    addTagsFromDraft(tag);
+  };
 
   const handleCoverFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -392,6 +504,25 @@ export function ShowsApp() {
     }
   };
 
+  const handleTicketFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isImage = file.type.startsWith("image/") || isHeicLikeFile(file);
+
+    try {
+      if (!isImage) {
+        setSelectedTicketFile(file);
+        return;
+      }
+
+      const compressedFile = await compressImage(file);
+      setSelectedTicketFile(compressedFile);
+    } catch {
+      setSelectedTicketFile(file);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -403,6 +534,7 @@ export function ShowsApp() {
     setIsSubmitting(true);
     try {
       let coverImagePath = formState.coverImagePath;
+      let ticketPath = formState.ticketFilePath ? getShowCoverImagePath(formState.ticketFilePath) || formState.ticketFilePath : null;
       let galleryImagePaths = [...formState.galleryImagePaths];
       let bucketMissingWarned = false;
 
@@ -422,6 +554,31 @@ export function ShowsApp() {
 
         if (path) {
           coverImagePath = path;
+        }
+      }
+
+      if (selectedTicketFile) {
+        const previousTicketPath = ticketPath;
+        const { path, error } = await uploadShowTicketFile(selectedTicketFile);
+
+        if (error || !path) {
+          if (isBucketMissingError(error)) {
+            if (!bucketMissingWarned) {
+              toast.error(t("shows.messages.bucketMissing"));
+              bucketMissingWarned = true;
+            }
+            ticketPath = null;
+          } else {
+            toast.error(error || t("shows.messages.ticketUploadError"));
+            return;
+          }
+        }
+
+        if (path) {
+          ticketPath = path;
+          if (previousTicketPath && previousTicketPath !== path) {
+            await deleteShowCoverImage(previousTicketPath);
+          }
         }
       }
 
@@ -446,6 +603,7 @@ export function ShowsApp() {
 
       const input = toInput({
         ...formState,
+        ticketFilePath: ticketPath || "",
         coverImagePath,
         galleryImagePaths,
       });
@@ -470,6 +628,7 @@ export function ShowsApp() {
 
       setFormState(buildInitialForm());
       setSelectedCoverFile(null);
+      setSelectedTicketFile(null);
       setSelectedGalleryFiles([]);
       setSelectedGalleryPreviews([]);
       setEditingId(null);
@@ -487,15 +646,17 @@ export function ShowsApp() {
       date: show.date,
       venue: show.venue,
       city: show.city,
-      description: show.description || "",
+      ticketProvider: show.ticketProvider ?? "",
+      ticketFilePath: show.ticketUrl || show.ticketPath || "",
       notes: show.notes || "",
       rating: show.rating,
-      tags: show.tags.join(", "),
-      favorite: show.favorite || false,
+      tags: show.tags,
+      tagDraft: "",
       coverImagePath: show.coverImageUrl || "",
-      galleryImagePaths: show.galleryPaths,
+      galleryImagePaths: show.galleryImageUrls,
     });
     setSelectedCoverFile(null);
+    setSelectedTicketFile(null);
     setSelectedGalleryFiles([]);
     setSelectedGalleryPreviews([]);
     setEditingId(show.id);
@@ -529,6 +690,7 @@ export function ShowsApp() {
   const handleOpenDialog = () => {
     setFormState(buildInitialForm());
     setSelectedCoverFile(null);
+    setSelectedTicketFile(null);
     setSelectedGalleryFiles([]);
     setSelectedGalleryPreviews([]);
     setEditingId(null);
@@ -539,18 +701,10 @@ export function ShowsApp() {
     setIsDialogOpen(false);
     setEditingId(null);
     setSelectedCoverFile(null);
+    setSelectedTicketFile(null);
     setSelectedGalleryFiles([]);
     setSelectedGalleryPreviews([]);
     setFormState(buildInitialForm());
-  };
-
-  const handleToggleFavorite = async (show: Show) => {
-    const { error } = await updateShow(show.id, { favorite: !show.favorite });
-    if (error) {
-      toast.error(error);
-    } else {
-      await loadData();
-    }
   };
 
   const handleOpenShow = (show: Show) => {
@@ -643,7 +797,7 @@ export function ShowsApp() {
               <CardDescription>{t("shows.subtitle")}</CardDescription>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex-1">
                 <Input
                   placeholder={t("shows.searchPlaceholder")}
@@ -652,16 +806,6 @@ export function ShowsApp() {
                   className="w-full"
                 />
               </div>
-
-              <Button
-                onClick={() => setFilterFavorite(!filterFavorite)}
-                variant={filterFavorite ? "default" : "outline"}
-                size="sm"
-                className="w-full sm:w-auto"
-              >
-                <Heart className="mr-2 h-4 w-4" />
-                {t("shows.favorites")}
-              </Button>
             </div>
           </CardHeader>
 
@@ -672,49 +816,37 @@ export function ShowsApp() {
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
-                {filteredShows.map((show) => (
-                  <Card
-                    key={show.id}
-                    className="group relative h-96 sm:h-[30rem] md:h-[32rem] lg:h-[34rem] cursor-pointer overflow-hidden border-border/70 transition hover:-translate-y-0.5 hover:shadow-md"
-                    onClick={() => handleOpenShow(show)}
-                  >
-                    {show.coverImageUrl ? (
-                      <img src={show.coverImageUrl} alt={show.title} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-zinc-300 via-zinc-400 to-zinc-600" />
-                    )}
+                {filteredShows.map((show) => {
+                  const happened = hasShowHappened(show.date);
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
-
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleToggleFavorite(show);
-                      }}
-                      className="absolute right-3 top-3 z-10 rounded-lg bg-black/40 p-1.5 text-white backdrop-blur-sm transition hover:bg-black/60"
-                      aria-label={t("shows.actions.favoriteToggle")}
+                  return (
+                    <Card
+                      key={show.id}
+                      className="group relative h-96 sm:h-[30rem] md:h-[32rem] lg:h-[34rem] cursor-pointer overflow-hidden border-border/70 transition hover:-translate-y-0.5 hover:shadow-md"
+                      onClick={() => handleOpenShow(show)}
                     >
-                      <Heart className={`h-5 w-5 ${show.favorite ? "fill-red-500 text-red-500" : "text-white"}`} />
-                    </button>
+                      {show.coverImageUrl ? (
+                        <img src={show.coverImageUrl} alt={show.title} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-300 via-zinc-400 to-zinc-600" />
+                      )}
 
-                    <CardContent className="absolute inset-x-0 bottom-0 z-10 space-y-2 p-5 text-white">
-                      <CardTitle className="line-clamp-2 text-2xl text-white drop-shadow-sm">{show.title}</CardTitle>
-                      <p className="flex items-center gap-2 text-sm text-white/90">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(show.date)}
-                      </p>
-                      <p className="text-sm text-white/90">
-                        <span className="font-semibold">{t("shows.fields.venue")}: </span>
-                        {show.venue}
-                      </p>
-                      <p className="text-sm text-white/90">
-                        <span className="font-semibold">{t("shows.fields.city")}: </span>
-                        {show.city}
-                      </p>
-                      <p className="text-xs text-white/75">{t("shows.actions.openDetails")}</p>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
+
+                      <div className="absolute left-3 top-3 z-10 rounded-full border border-white/30 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                        {happened ? t("shows.status.happened") : t("shows.status.upcoming")}
+                      </div>
+
+                      <CardContent className="absolute inset-x-0 bottom-0 z-10 space-y-2 p-5 text-white">
+                        <CardTitle className="line-clamp-2 text-2xl text-white drop-shadow-sm">{show.title}</CardTitle>
+                        <p className="flex items-center gap-2 text-sm text-white/90">
+                          <Calendar className="h-4 w-4" />
+                          {formatDate(show.date)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -768,7 +900,7 @@ export function ShowsApp() {
               </div>
 
               <div className="space-y-6 p-6">
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.venue")}</p>
                     <p className="mt-1">{selectedShow.venue}</p>
@@ -777,6 +909,12 @@ export function ShowsApp() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.city")}</p>
                     <p className="mt-1">{selectedShow.city}</p>
                   </div>
+                  {selectedShow.ticketProvider ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.ticketProvider")}</p>
+                      <p className="mt-1">{t(`shows.ticketProviders.${selectedShow.ticketProvider}`)}</p>
+                    </div>
+                  ) : null}
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.rating")}</p>
                     <div className="mt-1 flex gap-1">
@@ -804,13 +942,6 @@ export function ShowsApp() {
                   </div>
                 ) : null}
 
-                {selectedShow.description ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.description")}</p>
-                    <p className="mt-2 text-sm leading-relaxed">{selectedShow.description}</p>
-                  </div>
-                ) : null}
-
                 {selectedShow.notes ? (
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.notes")}</p>
@@ -818,16 +949,30 @@ export function ShowsApp() {
                   </div>
                 ) : null}
 
+                {selectedShow.ticketUrl ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.ticket")}</p>
+                    <a
+                      href={selectedShow.ticketUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
+                    >
+                      {t("shows.actions.viewTicket")}
+                    </a>
+                  </div>
+                ) : null}
+
                 {selectedShow.galleryImageUrls.length > 0 ? (
                   <div>
                     <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("shows.fields.gallery")}</p>
-                    <div className="flex gap-3 overflow-x-auto pb-1">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {selectedShow.galleryImageUrls.map((url, index) => (
                         <button
                           key={url}
                           type="button"
                           onClick={() => setPreviewImageUrl(url)}
-                          className="group relative h-48 w-72 shrink-0 overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                          className="group relative h-48 w-full overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                           aria-label={`${t("shows.fields.gallery")} ${index + 1}`}
                         >
                           <img
@@ -914,6 +1059,7 @@ export function ShowsApp() {
                 </label>
                 <Input
                   id="venue"
+                  list="shows-venue-suggestions"
                   value={formState.venue}
                   onChange={(e) => setFormState((prev) => ({ ...prev, venue: e.target.value }))}
                   placeholder={t("shows.placeholders.venue")}
@@ -927,11 +1073,31 @@ export function ShowsApp() {
                 </label>
                 <Input
                   id="city"
+                  list="shows-city-suggestions"
                   value={formState.city}
                   onChange={(e) => setFormState((prev) => ({ ...prev, city: e.target.value }))}
                   placeholder={t("shows.placeholders.city")}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="ticketProvider" className="text-sm font-medium">
+                  {t("shows.fields.ticketProvider")}
+                </label>
+                <select
+                  id="ticketProvider"
+                  value={formState.ticketProvider}
+                  onChange={(e) => setFormState((prev) => ({
+                    ...prev,
+                    ticketProvider: e.target.value as "" | "bol" | "ticketline",
+                  }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                >
+                  <option value="">{t("shows.ticketProviders.unknown")}</option>
+                  <option value="bol">{t("shows.ticketProviders.bol")}</option>
+                  <option value="ticketline">{t("shows.ticketProviders.ticketline")}</option>
+                </select>
               </div>
 
               <div className="space-y-2">
@@ -951,43 +1117,68 @@ export function ShowsApp() {
                   ))}
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={formState.favorite}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, favorite: e.target.checked }))}
-                    className="mr-2"
-                  />
-                  {t("shows.fields.favorite")}
-                </label>
-              </div>
             </div>
+
+            <datalist id="shows-venue-suggestions">
+              {venueSuggestions.map((venue) => (
+                <option key={venue} value={venue} />
+              ))}
+            </datalist>
+
+            <datalist id="shows-city-suggestions">
+              {citySuggestions.map((city) => (
+                <option key={city} value={city} />
+              ))}
+            </datalist>
 
             <div className="space-y-2">
               <label htmlFor="tags" className="text-sm font-medium">
                 {t("shows.fields.tags")}
               </label>
-              <Input
-                id="tags"
-                value={formState.tags}
-                onChange={(e) => setFormState((prev) => ({ ...prev, tags: e.target.value }))}
-                placeholder={t("shows.placeholders.tags")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="description" className="text-sm font-medium">
-                {t("shows.fields.description")}
-              </label>
-              <Textarea
-                id="description"
-                value={formState.description}
-                onChange={(e) => setFormState((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder={t("shows.placeholders.description")}
-                rows={3}
-              />
+              <div className="rounded-xl border border-input bg-background px-3 py-2">
+                {formState.tags.length > 0 ? (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {formState.tags.map((tag, index) => (
+                      <span key={`${tag}-${index}`} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
+                        <Tag className="h-3 w-3" />
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(index)}
+                          className="rounded-full p-0.5 text-muted-foreground transition hover:bg-background hover:text-foreground"
+                          aria-label={`${t("common.delete")} ${tag}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <Input
+                  id="tags"
+                  value={formState.tagDraft}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, tagDraft: e.target.value }))}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={() => addTagsFromDraft(formState.tagDraft)}
+                  placeholder={t("shows.placeholders.tags")}
+                  className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
+                />
+                {filteredTagSuggestions.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {filteredTagSuggestions.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleAddSuggestedTag(tag)}
+                        className="rounded-full border border-border/70 bg-muted px-2.5 py-1 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1004,26 +1195,81 @@ export function ShowsApp() {
             </div>
 
             <div className="space-y-2">
+              <label className="text-sm font-medium">{t("shows.fields.ticket")}</label>
+              <button
+                type="button"
+                onClick={() => ticketFileInputRef.current?.click()}
+                className="group w-full rounded-xl border border-dashed border-border bg-muted/30 p-4 text-left transition hover:border-primary/40 hover:bg-muted/60"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg border border-border/70 bg-background p-2.5 text-primary">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-none">{t("shows.actions.uploadTicket")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">PDF, JPG, PNG, WEBP, HEIC</p>
+                  </div>
+                  <Upload className="ml-auto h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
+                </div>
+              </button>
+              <input
+                ref={ticketFileInputRef}
+                type="file"
+                accept="image/*,.heic,.heif,application/pdf,.pdf"
+                onChange={handleTicketFileSelect}
+                className="hidden"
+              />
+              {(selectedTicketFile || formState.ticketFilePath) ? (
+                <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background px-3 py-2">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {selectedTicketFile ? selectedTicketFile.name : t("shows.actions.viewTicket")}
+                  </p>
+                  <div className="ml-3 flex items-center gap-2">
+                    {!selectedTicketFile && formState.ticketFilePath ? (
+                      <a
+                        href={formState.ticketFilePath}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        {t("shows.actions.viewTicket")}
+                      </a>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => {
+                        setSelectedTicketFile(null);
+                        setFormState((prev) => ({ ...prev, ticketFilePath: "" }));
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium">{t("shows.fields.coverImage")}</label>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => coverFileInputRef.current?.click()} className="flex-1">
-                  <Image className="mr-2 h-4 w-4" />
-                  {t("shows.actions.uploadImage")}
-                </Button>
-                {formState.coverImagePath ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      setSelectedCoverFile(null);
-                      setFormState((prev) => ({ ...prev, coverImagePath: "" }));
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
+              <button
+                type="button"
+                onClick={() => coverFileInputRef.current?.click()}
+                className="group w-full rounded-xl border border-dashed border-border bg-muted/30 p-4 text-left transition hover:border-primary/40 hover:bg-muted/60"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg border border-border/70 bg-background p-2.5 text-primary">
+                    <Image className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-none">{t("shows.actions.uploadImage")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WEBP, HEIC</p>
+                  </div>
+                  <Upload className="ml-auto h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
+                </div>
+              </button>
               <input
                 ref={coverFileInputRef}
                 type="file"
@@ -1032,32 +1278,42 @@ export function ShowsApp() {
                 className="hidden"
               />
               {formState.coverImagePath ? (
-                <div className="relative h-40 w-full overflow-hidden rounded-lg bg-muted">
+                <div className="relative h-40 w-full overflow-hidden rounded-xl border border-border/70 bg-muted">
                   <img src={formState.coverImagePath} alt={t("shows.previewAlt")} className="h-full w-full object-cover" />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute right-2 top-2 h-8 w-8"
+                    onClick={() => {
+                      setSelectedCoverFile(null);
+                      setFormState((prev) => ({ ...prev, coverImagePath: "" }));
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               ) : null}
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("shows.fields.gallery")}</label>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => galleryFileInputRef.current?.click()}>
-                  <Image className="mr-2 h-4 w-4" />
-                  {t("shows.actions.uploadGallery")}
-                </Button>
-                {selectedGalleryPreviews.length > 0 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedGalleryFiles([]);
-                      setSelectedGalleryPreviews([]);
-                    }}
-                  >
-                    {t("shows.actions.clearNewPhotos")}
-                  </Button>
-                ) : null}
-              </div>
+              <button
+                type="button"
+                onClick={() => galleryFileInputRef.current?.click()}
+                className="group w-full rounded-xl border border-dashed border-border bg-muted/30 p-4 text-left transition hover:border-primary/40 hover:bg-muted/60"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg border border-border/70 bg-background p-2.5 text-primary">
+                    <Image className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-none">{t("shows.actions.uploadGallery")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Multiplas imagens: JPG, PNG, WEBP, HEIC</p>
+                  </div>
+                  <Upload className="ml-auto h-4 w-4 text-muted-foreground transition group-hover:text-foreground" />
+                </div>
+              </button>
 
               <input
                 ref={galleryFileInputRef}
@@ -1067,6 +1323,24 @@ export function ShowsApp() {
                 onChange={handleGalleryFilesSelect}
                 className="hidden"
               />
+
+              {selectedGalleryPreviews.length > 0 ? (
+                <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background px-3 py-2">
+                  <p className="text-xs text-muted-foreground">{selectedGalleryPreviews.length} novas fotos selecionadas</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      setSelectedGalleryFiles([]);
+                      setSelectedGalleryPreviews([]);
+                    }}
+                  >
+                    {t("shows.actions.clearNewPhotos")}
+                  </Button>
+                </div>
+              ) : null}
 
               {formState.galleryImagePaths.length > 0 ? (
                 <div>

@@ -8,14 +8,15 @@ export interface Show {
   date: string; // ISO yyyy-mm-dd
   venue: string;
   city: string;
-  description?: string;
+  ticketProvider?: "bol" | "ticketline";
+  ticketPath?: string;
+  ticketUrl?: string;
   notes?: string;
   coverImageUrl?: string;
   galleryPaths: string[];
   galleryImageUrls: string[];
   rating: number; // 0-5
   tags: string[];
-  favorite?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,13 +26,13 @@ export interface ShowInput {
   date: string;
   venue: string;
   city: string;
-  description?: string;
+  ticketProvider?: "bol" | "ticketline";
+  ticketPath?: string | null;
   notes?: string;
   coverImagePath?: string;
   galleryPaths?: string[];
   rating?: number;
   tags?: string[];
-  favorite?: boolean;
 }
 
 export interface ShowUpdate {
@@ -39,13 +40,13 @@ export interface ShowUpdate {
   date?: string;
   venue?: string;
   city?: string;
-  description?: string;
+  ticketProvider?: "bol" | "ticketline";
+  ticketPath?: string | null;
   notes?: string;
   coverImagePath?: string;
   galleryPaths?: string[];
   rating?: number;
   tags?: string[];
-  favorite?: boolean;
 }
 
 type ShowRow = {
@@ -54,13 +55,13 @@ type ShowRow = {
   date: string;
   venue: string;
   city: string;
-  description: string | null;
+  ticket_provider?: string | null;
+  ticket_path?: string | null;
   notes: string | null;
   cover_image_path: string | null;
   gallery_paths?: string[] | null;
   rating?: number;
   tags?: string[];
-  favorite?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -102,10 +103,10 @@ const extractMissingColumn = (error: { message?: string; details?: string; hint?
   return null;
 };
 
-const resolveCoverImageUrl = (imagePath: string | null) => {
-  if (!imagePath) return "";
-  if (/^https?:\/\//i.test(imagePath)) return imagePath;
-  const { data } = supabase.storage.from(SHOWS_BUCKET).getPublicUrl(imagePath);
+const resolveShowAssetUrl = (pathOrUrl: string | null) => {
+  if (!pathOrUrl) return "";
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const { data } = supabase.storage.from(SHOWS_BUCKET).getPublicUrl(pathOrUrl);
   return data.publicUrl;
 };
 
@@ -115,14 +116,15 @@ const mapRowToShow = (row: ShowRow): Show => ({
   date: row.date,
   venue: row.venue,
   city: row.city,
-  description: row.description ?? "",
+  ticketProvider: row.ticket_provider === "bol" || row.ticket_provider === "ticketline" ? row.ticket_provider : undefined,
+  ticketPath: row.ticket_path ?? undefined,
+  ticketUrl: resolveShowAssetUrl(row.ticket_path ?? null),
   notes: row.notes ?? "",
-  coverImageUrl: resolveCoverImageUrl(row.cover_image_path),
+  coverImageUrl: resolveShowAssetUrl(row.cover_image_path),
   galleryPaths: row.gallery_paths ?? [],
-  galleryImageUrls: (row.gallery_paths ?? []).map((path) => resolveCoverImageUrl(path)),
+  galleryImageUrls: (row.gallery_paths ?? []).map((path) => resolveShowAssetUrl(path)),
   rating: row.rating ?? 0,
   tags: row.tags ?? [],
-  favorite: row.favorite ?? false,
   createdAt: row.created_at ?? "",
   updatedAt: row.updated_at ?? "",
 });
@@ -139,7 +141,7 @@ const ensurePublicPath = (pathOrUrl?: string) => {
   return value;
 };
 
-const getShowCoverImagePath = (pathOrUrl?: string | null) => {
+export const getShowCoverImagePath = (pathOrUrl?: string | null) => {
   const value = pathOrUrl?.trim();
   if (!value) return null;
 
@@ -170,13 +172,13 @@ const toInsertRow = (input: ShowInput) => ({
   date: input.date,
   venue: input.venue.trim(),
   city: input.city.trim(),
-  description: toNullableTrimmed(input.description),
+  ticket_provider: input.ticketProvider,
+  ticket_path: input.ticketPath ?? null,
   notes: toNullableTrimmed(input.notes),
   cover_image_path: ensurePublicPath(input.coverImagePath),
   gallery_paths: input.galleryPaths ?? [],
   rating: input.rating ?? 0,
   tags: input.tags ?? [],
-  favorite: input.favorite ?? false,
 });
 
 const toUpdateRow = (input: ShowUpdate) => {
@@ -186,24 +188,24 @@ const toUpdateRow = (input: ShowUpdate) => {
   if (input.date !== undefined) row.date = input.date;
   if (input.venue !== undefined) row.venue = input.venue.trim();
   if (input.city !== undefined) row.city = input.city.trim();
-  if (input.description !== undefined) row.description = toNullableTrimmed(input.description);
+  if (input.ticketProvider !== undefined) row.ticket_provider = input.ticketProvider;
+  if (input.ticketPath !== undefined) row.ticket_path = input.ticketPath;
   if (input.notes !== undefined) row.notes = toNullableTrimmed(input.notes);
   if (input.coverImagePath !== undefined) row.cover_image_path = ensurePublicPath(input.coverImagePath);
   if (input.galleryPaths !== undefined) row.gallery_paths = input.galleryPaths;
   if (input.rating !== undefined) row.rating = input.rating;
   if (input.tags !== undefined) row.tags = input.tags;
-  if (input.favorite !== undefined) row.favorite = input.favorite;
 
   return row;
 };
 
 export async function loadShows(): Promise<{ items: Show[]; setupRequired: boolean }> {
   const selectAttempts = [
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, gallery_paths, created_at, updated_at",
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, created_at, updated_at",
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite, gallery_paths",
-    "id, title, date, venue, city, description, notes, cover_image_path, rating, tags, favorite",
-    "id, title, date, venue, city, description, notes, cover_image_path, favorite",
+    "id, title, date, venue, city, ticket_provider, ticket_path, notes, cover_image_path, rating, tags, gallery_paths, created_at, updated_at",
+    "id, title, date, venue, city, notes, cover_image_path, rating, tags, created_at, updated_at",
+    "id, title, date, venue, city, notes, cover_image_path, rating, tags, gallery_paths",
+    "id, title, date, venue, city, notes, cover_image_path, rating, tags",
+    "id, title, date, venue, city, notes, cover_image_path",
   ] as const;
 
   let lastError: { message?: string } | null = null;
@@ -338,7 +340,7 @@ export async function uploadShowCoverImage(
 ): Promise<{ path?: string; error?: string }> {
   const timestamp = Date.now();
   const randomStr = Math.random().toString(36).substring(2, 8);
-  const finalFileName = fileName || `show-${timestamp}-${randomStr}`;
+  const finalFileName = fileName || `cover/show-${timestamp}-${randomStr}`;
 
   const { data, error } = await supabase.storage
     .from(SHOWS_BUCKET)
@@ -346,6 +348,27 @@ export async function uploadShowCoverImage(
 
   if (error) {
     console.error("Error uploading show cover image:", error);
+    return { error: error.message };
+  }
+
+  return { path: data.path };
+}
+
+export async function uploadShowTicketFile(
+  file: File,
+  fileName?: string
+): Promise<{ path?: string; error?: string }> {
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : undefined;
+  const finalFileName = fileName || `tickets/ticket-${timestamp}-${randomStr}${extension ? `.${extension}` : ""}`;
+
+  const { data, error } = await supabase.storage
+    .from(SHOWS_BUCKET)
+    .upload(finalFileName, file, { upsert: false });
+
+  if (error) {
+    console.error("Error uploading show ticket file:", error);
     return { error: error.message };
   }
 
