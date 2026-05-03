@@ -13,8 +13,10 @@ export interface Show {
   ticketUrl?: string;
   notes?: string;
   coverImageUrl?: string;
+  coverImagePreviewUrl?: string;
   galleryPaths: string[];
   galleryImageUrls: string[];
+  galleryPreviewUrls: string[];
   rating: number; // 0-5
   tags: string[];
   createdAt: string;
@@ -103,31 +105,46 @@ const extractMissingColumn = (error: { message?: string; details?: string; hint?
   return null;
 };
 
-const resolveShowAssetUrl = (pathOrUrl: string | null) => {
+type ShowAssetTransform = {
+  width?: number;
+  height?: number;
+  quality?: number;
+  resize?: "cover" | "contain" | "fill";
+};
+
+const resolveShowAssetUrl = (pathOrUrl: string | null, transform?: ShowAssetTransform) => {
   if (!pathOrUrl) return "";
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  const { data } = supabase.storage.from(SHOWS_BUCKET).getPublicUrl(pathOrUrl);
+
+  const options = transform ? { transform } : undefined;
+  const { data } = supabase.storage.from(SHOWS_BUCKET).getPublicUrl(pathOrUrl, options);
   return data.publicUrl;
 };
 
-const mapRowToShow = (row: ShowRow): Show => ({
-  id: row.id,
-  title: row.title,
-  date: row.date,
-  venue: row.venue,
-  city: row.city,
-  ticketProvider: row.ticket_provider === "bol" || row.ticket_provider === "ticketline" ? row.ticket_provider : undefined,
-  ticketPath: row.ticket_path ?? undefined,
-  ticketUrl: resolveShowAssetUrl(row.ticket_path ?? null),
-  notes: row.notes ?? "",
-  coverImageUrl: resolveShowAssetUrl(row.cover_image_path),
-  galleryPaths: row.gallery_paths ?? [],
-  galleryImageUrls: (row.gallery_paths ?? []).map((path) => resolveShowAssetUrl(path)),
-  rating: row.rating ?? 0,
-  tags: row.tags ?? [],
-  createdAt: row.created_at ?? "",
-  updatedAt: row.updated_at ?? "",
-});
+const mapRowToShow = (row: ShowRow): Show => {
+  const galleryPaths = row.gallery_paths ?? [];
+
+  return {
+    id: row.id,
+    title: row.title,
+    date: row.date,
+    venue: row.venue,
+    city: row.city,
+    ticketProvider: row.ticket_provider === "bol" || row.ticket_provider === "ticketline" ? row.ticket_provider : undefined,
+    ticketPath: row.ticket_path ?? undefined,
+    ticketUrl: resolveShowAssetUrl(row.ticket_path ?? null),
+    notes: row.notes ?? "",
+    coverImageUrl: resolveShowAssetUrl(row.cover_image_path),
+    coverImagePreviewUrl: resolveShowAssetUrl(row.cover_image_path, { width: 900, quality: 58 }),
+    galleryPaths,
+    galleryImageUrls: galleryPaths.map((path) => resolveShowAssetUrl(path)),
+    galleryPreviewUrls: galleryPaths.map((path) => resolveShowAssetUrl(path, { width: 640, height: 420, quality: 52, resize: "cover" })),
+    rating: row.rating ?? 0,
+    tags: row.tags ?? [],
+    createdAt: row.created_at ?? "",
+    updatedAt: row.updated_at ?? "",
+  };
+};
 
 const toNullableTrimmed = (value?: string) => {
   const trimmed = value?.trim();

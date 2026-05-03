@@ -955,7 +955,7 @@ export function ShowsApp() {
                     >
                       {show.coverImageUrl ? (
                         <img
-                          src={show.coverImageUrl}
+                          src={show.coverImagePreviewUrl || show.coverImageUrl}
                           alt={show.title}
                           loading="lazy"
                           decoding="async"
@@ -998,8 +998,10 @@ export function ShowsApp() {
               <div className="relative h-[26rem] sm:h-[30rem] overflow-hidden rounded-t-xl bg-muted">
                 {selectedShow.coverImageUrl || selectedShow.galleryImageUrls[0] ? (
                   <img
-                    src={selectedShow.coverImageUrl || selectedShow.galleryImageUrls[0]}
+                    src={selectedShow.coverImagePreviewUrl || selectedShow.coverImageUrl || selectedShow.galleryPreviewUrls[0] || selectedShow.galleryImageUrls[0]}
                     alt={selectedShow.title}
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover object-center"
                   />
                 ) : null}
@@ -1110,8 +1112,10 @@ export function ShowsApp() {
                           aria-label={`${t("shows.fields.gallery")} ${index + 1}`}
                         >
                           <img
-                            src={url}
+                            src={selectedShow.galleryPreviewUrls[index] || url}
                             alt={`${t("shows.fields.gallery")} ${index + 1}`}
+                            loading="lazy"
+                            decoding="async"
                             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent opacity-70" />
