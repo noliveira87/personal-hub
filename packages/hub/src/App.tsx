@@ -26,6 +26,7 @@ const PaymentsBreakdownPage = lazy(() => import("@/features/contracts/pages/Paym
 const PortfolioPage = lazy(() => import("@/pages/portfolio/PortfolioPage"));
 const PortfolioMonthlyInsightsPage = lazy(() => import("@/pages/portfolio/PortfolioMonthlyInsightsPage"));
 const CashbackHeroPage = lazy(() => import("@/pages/CashbackHeroPage"));
+const BybitGbitPage = lazy(() => import("@/pages/BybitGbitPage"));
 const TripsPage = lazy(() => import("@/pages/trips/TripsPage"));
 const JourneyBitesPage = lazy(() => import("@/pages/trips/JourneyBitesPage"));
 const JourneyBitesMapPage = lazy(() => import("@/pages/trips/JourneyBitesMapPage"));
@@ -103,6 +104,7 @@ const AppRoutes = () => {
 
               {/* Reward Wallet (needs ContractProvider for optional home-expense linking) */}
               <Route path="/cashback-hero" element={<CashbackHeroPage />} />
+              <Route path="/cashback-hero/bybit-gbit" element={<BybitGbitPage />} />
             </Route>
 
             {/* Portfolio */}

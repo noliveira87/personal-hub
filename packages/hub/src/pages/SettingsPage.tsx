@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import AppSectionHeader from '@/components/AppSectionHeader';
 import AppLoadingState from '@/components/AppLoadingState';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -34,6 +35,8 @@ import {
   loadCashbackCardRulesSettings,
   persistCashbackCardRulesSettings,
   type CashbackCardRulesSettings,
+  BYBIT_GBIT_CARD_OPTIONS,
+  BYBIT_PURCHASE_TYPE_OPTIONS,
 } from '@/features/cashback-hero/lib/cardRulesSettings';
 import type { WarrantyCategory } from '@/lib/warranties';
 import { useCashbackSources } from '@/features/cashback-hero/use-cashback-sources';
@@ -476,6 +479,7 @@ function CashbackRulesCard() {
     unibanco: false,
     cetelem: false,
     universo: false,
+    bybit: false,
   });
 
   useEffect(() => {
@@ -511,8 +515,66 @@ function CashbackRulesCard() {
 
   const parseDecimal = (value: string): number => Number(value.replace(',', '.'));
 
-  const toggleSection = (section: 'unibanco' | 'cetelem' | 'universo') => {
+  const toggleSection = (section: 'unibanco' | 'cetelem' | 'universo' | 'bybit') => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const normalizedBybitCardPriority = useMemo(() => {
+    const normalized: string[] = [];
+    for (const card of rules.bybit.cardPriority) {
+      if (BYBIT_GBIT_CARD_OPTIONS.includes(card as (typeof BYBIT_GBIT_CARD_OPTIONS)[number]) && !normalized.includes(card)) {
+        normalized.push(card);
+      }
+    }
+    for (const card of BYBIT_GBIT_CARD_OPTIONS) {
+      if (!normalized.includes(card)) {
+        normalized.push(card);
+      }
+    }
+    return normalized;
+  }, [rules.bybit.cardPriority]);
+
+  const moveBybitCardPriority = (fromIndex: number, toIndex: number) => {
+    setRules((prev) => {
+      const normalized: string[] = [];
+      for (const card of prev.bybit.cardPriority) {
+        if (BYBIT_GBIT_CARD_OPTIONS.includes(card as (typeof BYBIT_GBIT_CARD_OPTIONS)[number]) && !normalized.includes(card)) {
+          normalized.push(card);
+        }
+      }
+      for (const card of BYBIT_GBIT_CARD_OPTIONS) {
+        if (!normalized.includes(card)) {
+          normalized.push(card);
+        }
+      }
+
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= normalized.length || toIndex >= normalized.length) {
+        return prev;
+      }
+
+      const next = [...normalized];
+      [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+      return { ...prev, bybit: { ...prev.bybit, cardPriority: next } };
+    });
+  };
+
+  const toggleBybitCetelemType = (option: (typeof BYBIT_PURCHASE_TYPE_OPTIONS)[number], checked: boolean) => {
+    setRules((prev) => {
+      const enabled = new Set(
+        prev.bybit.cetelemEligibleTypes.filter((type) =>
+          BYBIT_PURCHASE_TYPE_OPTIONS.includes(type as (typeof BYBIT_PURCHASE_TYPE_OPTIONS)[number]),
+        ),
+      );
+
+      if (checked) {
+        enabled.add(option);
+      } else {
+        enabled.delete(option);
+      }
+
+      const next = BYBIT_PURCHASE_TYPE_OPTIONS.filter((type) => enabled.has(type));
+      return { ...prev, bybit: { ...prev.bybit, cetelemEligibleTypes: next } };
+    });
   };
 
   return (
@@ -592,9 +654,8 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesAnnualCap')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={rules.unibanco.annualCashbackCap}
                   onChange={(e) => setRules((prev) => ({ ...prev, unibanco: { ...prev.unibanco, annualCashbackCap: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
                 />
@@ -602,9 +663,8 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesTopTierCap')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={rules.unibanco.topTierSpendCap}
                   onChange={(e) => setRules((prev) => ({ ...prev, unibanco: { ...prev.unibanco, topTierSpendCap: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
                 />
@@ -662,10 +722,8 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesRatePercent')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={(rules.cetelem.cashbackRate * 100).toFixed(2).replace(/\.00$/, '')}
                   onChange={(e) => {
                     const percent = Math.max(0, Math.min(100, parseDecimal(e.target.value) || 0));
@@ -676,9 +734,8 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesMonthlyCap')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={rules.cetelem.monthlyCashbackCap}
                   onChange={(e) => setRules((prev) => ({ ...prev, cetelem: { ...prev.cetelem, monthlyCashbackCap: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
                 />
@@ -686,9 +743,8 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesAnnualCap')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={rules.cetelem.annualCashbackCap}
                   onChange={(e) => setRules((prev) => ({ ...prev, cetelem: { ...prev.cetelem, annualCashbackCap: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
                 />
@@ -728,10 +784,8 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesRatePercent')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={(rules.universo.cashbackRate * 100).toFixed(2).replace(/\.00$/, '')}
                   onChange={(e) => {
                     const percent = Math.max(0, Math.min(100, parseDecimal(e.target.value) || 0));
@@ -742,12 +796,104 @@ function CashbackRulesCard() {
               <div>
                 <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesCycleCap')}</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={rules.universo.cycleCashbackCap}
                   onChange={(e) => setRules((prev) => ({ ...prev, universo: { ...prev.universo, cycleCashbackCap: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
                 />
+              </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-lg border p-3 space-y-3">
+            <button
+              type="button"
+              onClick={() => toggleSection('bybit')}
+              className="flex w-full items-center justify-between text-left"
+            >
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('settingsPage.cashbackRulesBybit')}</p>
+              {expandedSections.bybit ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+            {expandedSections.bybit ? (
+              <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesBybitNunoTarget')}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={rules.bybit.nunoTierTarget}
+                  onChange={(e) => setRules((prev) => ({ ...prev, bybit: { ...prev.bybit, nunoTierTarget: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
+                />
+              </div>
+              <div>
+                <Label className="mb-1.5 block">{t('settingsPage.cashbackRulesBybitMininaTarget')}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={rules.bybit.mininaTierTarget}
+                  onChange={(e) => setRules((prev) => ({ ...prev, bybit: { ...prev.bybit, mininaTierTarget: Math.max(0, parseDecimal(e.target.value) || 0) } }))}
+                />
+              </div>
+              </div>
+
+              <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                <Label className="mb-2 block">{t('settingsPage.cashbackRulesBybitCetelemTypes')}</Label>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+                  {BYBIT_PURCHASE_TYPE_OPTIONS.map((option) => {
+                    const checked = rules.bybit.cetelemEligibleTypes.includes(option);
+                    return (
+                      <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm transition-colors ${checked ? 'border-primary/40 bg-primary/10' : 'border-border/70 bg-background hover:border-border'}`}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => toggleBybitCetelemType(option, value === true)}
+                        />
+                        {t(`cashbackHero.bybitFuture.purchaseTypeOptions.${option}`)}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                <Label className="mb-2 block">{t('settingsPage.cashbackRulesBybitCardPriority')}</Label>
+                <div className="space-y-1">
+                  {normalizedBybitCardPriority.map((card, index) => (
+                    <div key={card} className="flex items-center gap-2 rounded-md border border-border/70 bg-background px-2.5 py-1.5">
+                      <Badge variant="secondary" className="h-5 min-w-5 justify-center px-1.5 text-[11px]">
+                        {index + 1}
+                      </Badge>
+                      <span className="min-w-0 flex-1 text-sm font-medium">{card}</span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        disabled={index === 0}
+                        onClick={() => moveBybitCardPriority(index, index - 1)}
+                        aria-label={t('common.moveUp')}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        disabled={index === normalizedBybitCardPriority.length - 1}
+                        onClick={() => moveBybitCardPriority(index, index + 1)}
+                        aria-label={t('common.moveDown')}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">{t('settingsPage.cashbackRulesBybitCardPriorityHint')}</p>
               </div>
               </div>
             ) : null}

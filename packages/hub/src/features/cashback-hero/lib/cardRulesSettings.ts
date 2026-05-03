@@ -28,10 +28,35 @@ export type UniversoCardRules = {
   cycleCashbackCap: number;
 };
 
+export const BYBIT_GBIT_CARD_OPTIONS = ['Cetelem', 'Bybit Minina', 'Unibanco'] as const;
+export type BybitGbitCardOption = typeof BYBIT_GBIT_CARD_OPTIONS[number];
+
+export const BYBIT_PURCHASE_TYPE_OPTIONS = [
+  'tvde',
+  'streaming',
+  'electricCharging',
+  'supermarket',
+  'restaurant',
+  'fuel',
+  'travel',
+  'shopping',
+  'services',
+  'health',
+  'other',
+] as const;
+
+export type BybitGbitRules = {
+  nunoTierTarget: number;
+  mininaTierTarget: number;
+  cetelemEligibleTypes: string[];
+  cardPriority: string[];
+};
+
 export type CashbackCardRulesSettings = {
   unibanco: UnibancoCardRules;
   cetelem: CetelemCardRules;
   universo: UniversoCardRules;
+  bybit: BybitGbitRules;
 };
 
 export const DEFAULT_CASHBACK_CARD_RULES: CashbackCardRulesSettings = {
@@ -56,6 +81,12 @@ export const DEFAULT_CASHBACK_CARD_RULES: CashbackCardRulesSettings = {
     cashbackRate: 0.05,
     cycleCashbackCap: 10,
   },
+  bybit: {
+    nunoTierTarget: 3500,
+    mininaTierTarget: 250,
+    cetelemEligibleTypes: ['tvde', 'streaming', 'electricCharging', 'supermarket', 'restaurant', 'fuel'],
+    cardPriority: ['Cetelem', 'Bybit Minina', 'Unibanco'],
+  },
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -77,6 +108,7 @@ function normalizeSettings(raw: Partial<CashbackCardRulesSettings> | null | unde
   const unibanco = raw?.unibanco ?? {};
   const cetelem = raw?.cetelem ?? {};
   const universo = raw?.universo ?? {};
+  const bybit = raw?.bybit ?? {};
 
   return {
     unibanco: {
@@ -99,6 +131,16 @@ function normalizeSettings(raw: Partial<CashbackCardRulesSettings> | null | unde
       statementDay: Math.round(clamp(universo.statementDay ?? DEFAULT_CASHBACK_CARD_RULES.universo.statementDay, 1, 31)),
       cashbackRate: clamp(universo.cashbackRate ?? DEFAULT_CASHBACK_CARD_RULES.universo.cashbackRate, 0, 1),
       cycleCashbackCap: clamp(universo.cycleCashbackCap ?? DEFAULT_CASHBACK_CARD_RULES.universo.cycleCashbackCap, 0, 100000),
+    },
+    bybit: {
+      nunoTierTarget: clamp(bybit.nunoTierTarget ?? DEFAULT_CASHBACK_CARD_RULES.bybit.nunoTierTarget, 0, 1000000),
+      mininaTierTarget: clamp(bybit.mininaTierTarget ?? DEFAULT_CASHBACK_CARD_RULES.bybit.mininaTierTarget, 0, 1000000),
+      cetelemEligibleTypes: Array.isArray(bybit.cetelemEligibleTypes)
+        ? bybit.cetelemEligibleTypes.filter((t): t is string => typeof t === 'string')
+        : DEFAULT_CASHBACK_CARD_RULES.bybit.cetelemEligibleTypes,
+      cardPriority: Array.isArray(bybit.cardPriority)
+        ? bybit.cardPriority.filter((c): c is string => typeof c === 'string')
+        : DEFAULT_CASHBACK_CARD_RULES.bybit.cardPriority,
     },
   };
 }

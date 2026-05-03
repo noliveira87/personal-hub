@@ -967,9 +967,11 @@ export function ShowsApp() {
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
 
-                      <div className="absolute left-3 top-3 z-10 rounded-full border border-white/30 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                        {happened ? t("shows.status.happened") : t("shows.status.upcoming")}
-                      </div>
+                      {!happened ? (
+                        <div className="absolute left-3 top-3 z-10 rounded-full border border-white/30 bg-black/45 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                          {t("shows.status.upcoming")}
+                        </div>
+                      ) : null}
 
                       <CardContent className="absolute inset-x-0 bottom-0 z-10 space-y-2 p-5 text-white">
                         <CardTitle className="line-clamp-2 text-2xl text-white drop-shadow-sm">{show.title}</CardTitle>

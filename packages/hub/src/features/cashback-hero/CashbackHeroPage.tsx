@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format, parse, addMonths, subMonths, subDays, parseISO, getDaysInMonth, endOfMonth } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { chartAxisTickStyle, chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipLabelStyle, chartTooltipItemStyle } from '@/lib/chartTheme';
 import { enUS, pt } from 'date-fns/locale';
@@ -413,6 +414,7 @@ function CashbackHeroPage() {
   const contracts = contractsContext?.contracts ?? [];
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
   const { cards } = useCashbackCards();
+  const navigate = useNavigate();
 
   const [showAddPurchase, setShowAddPurchase] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<CashbackPurchase | null>(null);
@@ -1152,10 +1154,16 @@ function CashbackHeroPage() {
         backTo="/"
         backLabel={t('common.back')}
         actions={(
-          <Button size="sm" className="h-9 w-9 p-0 sm:w-auto sm:px-3" onClick={() => setShowAddPurchase(true)}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">{t('cashbackHero.addPurchase')}</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-9 w-9 p-0 sm:w-auto sm:px-3" onClick={() => navigate(`/cashback-hero/bybit-gbit?month=${selectedMonth}`)}>
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('cashbackHero.bybitFuture.headerAction')}</span>
+            </Button>
+            <Button size="sm" className="h-9 w-9 p-0 sm:w-auto sm:px-3" onClick={() => setShowAddPurchase(true)}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('cashbackHero.addPurchase')}</span>
+            </Button>
+          </div>
         )}
       />
 
