@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, FileText, Image, Loader2, Pencil, Plus, Save, Star, Tag, Trash2, Upload, X } from "lucide-react";
+import { Calendar, FileText, Image, LineChart, Loader2, Pencil, Plus, Save, Star, Tag, Trash2, Upload, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import heic2any from "heic2any";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import AppLoadingState from "@/components/AppLoadingState";
@@ -81,6 +82,56 @@ const hasShowHappened = (showDate: string) => {
   return showDate < getTodayLocalIsoDate();
 };
 
+const SHOWS_CACHE_KEY = "shows-list-cache-v1";
+const SHOWS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type ShowsCachePayload = {
+  savedAt: number;
+  setupRequired: boolean;
+  items: Show[];
+};
+
+const readShowsCache = (): ShowsCachePayload | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(SHOWS_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<ShowsCachePayload>;
+    if (!parsed || !Array.isArray(parsed.items) || typeof parsed.savedAt !== "number") {
+      return null;
+    }
+
+    if (Date.now() - parsed.savedAt > SHOWS_CACHE_TTL_MS) {
+      return null;
+    }
+
+    return {
+      items: parsed.items as Show[],
+      setupRequired: Boolean(parsed.setupRequired),
+      savedAt: parsed.savedAt,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeShowsCache = (payload: { items: Show[]; setupRequired: boolean }) => {
+  if (typeof window === "undefined") return;
+
+  const nextPayload: ShowsCachePayload = {
+    ...payload,
+    savedAt: Date.now(),
+  };
+
+  try {
+    window.sessionStorage.setItem(SHOWS_CACHE_KEY, JSON.stringify(nextPayload));
+  } catch {
+    // Ignore storage errors; data fetch already succeeded.
+  }
+};
+
 const isHeicLikeFile = (file: File) => {
   const fileType = (file.type || "").toLowerCase();
   const fileName = file.name.toLowerCase();
@@ -137,6 +188,11 @@ const loadImageFromBlob = (blob: Blob) =>
     };
 
     image.src = objectUrl;
+  });
+
+const canvasToWebpBlob = (canvas: HTMLCanvasElement, quality: number) =>
+  new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/webp", quality);
   });
 
 const convertHeicToJpegBlob = async (file: File): Promise<Blob | null> => {
@@ -217,7 +273,7 @@ const compressImage = async (file: File): Promise<File> => {
     }
 
     const image = await loadImageFromBlob(source);
-    const maxDimension = 1600;
+    const maxDimension = isHeic ? 1280 : 1600;
     const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
     const width = Math.max(1, Math.round(image.width * scale));
     const height = Math.max(1, Math.round(image.height * scale));
@@ -233,9 +289,32 @@ const compressImage = async (file: File): Promise<File> => {
 
     ctx.drawImage(image, 0, 0, width, height);
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/webp", 0.78);
-    });
+    let blob = await canvasToWebpBlob(canvas, isHeic ? 0.68 : 0.78);
+
+    if (isHeic && blob) {
+      const maxHeicBytes = 700 * 1024;
+
+      if (blob.size > maxHeicBytes) {
+        const shrinkRatio = Math.max(0.72, Math.sqrt(maxHeicBytes / blob.size));
+        const refinedWidth = Math.max(1, Math.round(width * shrinkRatio));
+        const refinedHeight = Math.max(1, Math.round(height * shrinkRatio));
+
+        if (refinedWidth < width || refinedHeight < height) {
+          const refinedCanvas = document.createElement("canvas");
+          refinedCanvas.width = refinedWidth;
+          refinedCanvas.height = refinedHeight;
+
+          const refinedCtx = refinedCanvas.getContext("2d");
+          if (refinedCtx) {
+            refinedCtx.drawImage(image, 0, 0, refinedWidth, refinedHeight);
+            const refinedBlob = await canvasToWebpBlob(refinedCanvas, 0.6);
+            if (refinedBlob) {
+              blob = refinedBlob;
+            }
+          }
+        }
+      }
+    }
 
     if (!blob) {
       if (isHeic && convertedHeicBlob) {
@@ -309,6 +388,7 @@ export function ShowsApp() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "happened">("all");
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [selectedTicketFile, setSelectedTicketFile] = useState<File | null>(null);
   const [selectedGalleryFiles, setSelectedGalleryFiles] = useState<File[]>([]);
@@ -320,14 +400,31 @@ export function ShowsApp() {
   const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void loadData();
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  useEffect(() => {
+    const cached = readShowsCache();
+    const hasWarmCache = Boolean(cached);
+
+    if (cached) {
+      setShows(cached.items);
+      setSetupRequired(cached.setupRequired);
+      setIsLoading(false);
+    }
+
+    void loadData({ background: hasWarmCache });
+  }, []);
+
+  const loadData = async (options?: { background?: boolean }) => {
+    if (!options?.background) {
+      setIsLoading(true);
+    }
+
     const { items, setupRequired } = await loadShows();
     setShows(items);
     setSetupRequired(setupRequired);
+    writeShowsCache({ items, setupRequired });
 
     if (selectedShow) {
       const refreshed = items.find((item) => item.id === selectedShow.id) ?? null;
@@ -347,9 +444,15 @@ export function ShowsApp() {
         show.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
         show.city.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesSearch;
+      const happened = hasShowHappened(show.date);
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "happened" && happened) ||
+        (statusFilter === "upcoming" && !happened);
+
+      return matchesSearch && matchesStatus;
     });
-  }, [shows, searchQuery]);
+  }, [shows, searchQuery, statusFilter]);
 
   const venueSuggestions = useMemo(() => {
     return Array.from(new Set(shows.map((show) => show.venue.trim()).filter(Boolean))).sort((a, b) =>
@@ -737,10 +840,18 @@ export function ShowsApp() {
   };
 
   const headerActions = (
-    <Button onClick={handleOpenDialog} size="sm" className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3">
-      <Plus className="h-4 w-4" />
-      <span className="hidden sm:inline">{t("shows.actions.new")}</span>
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button onClick={handleOpenDialog} size="sm" className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3">
+        <Plus className="h-4 w-4" />
+        <span className="hidden sm:inline">{t("shows.actions.new")}</span>
+      </Button>
+      <Button asChild variant="outline" size="sm" className="h-10 w-10 rounded-xl px-0 gap-1.5 sm:h-9 sm:w-auto sm:px-3">
+        <Link to="/shows/insights">
+          <LineChart className="h-4 w-4" />
+          <span className="hidden sm:inline">{t("shows.actions.insights")}</span>
+        </Link>
+      </Button>
+    </div>
   );
 
   if (isLoading) {
@@ -806,6 +917,16 @@ export function ShowsApp() {
                   className="w-full"
                 />
               </div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | "upcoming" | "happened")}
+                aria-label={t("shows.filters.statusLabel")}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 sm:w-56"
+              >
+                <option value="all">{t("shows.filters.status.all")}</option>
+                <option value="upcoming">{t("shows.filters.status.upcoming")}</option>
+                <option value="happened">{t("shows.filters.status.happened")}</option>
+              </select>
             </div>
           </CardHeader>
 
@@ -826,7 +947,13 @@ export function ShowsApp() {
                       onClick={() => handleOpenShow(show)}
                     >
                       {show.coverImageUrl ? (
-                        <img src={show.coverImageUrl} alt={show.title} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+                        <img
+                          src={show.coverImageUrl}
+                          alt={show.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                        />
                       ) : (
                         <div className="absolute inset-0 bg-gradient-to-br from-zinc-300 via-zinc-400 to-zinc-600" />
                       )}
