@@ -195,6 +195,8 @@ const canvasToWebpBlob = (canvas: HTMLCanvasElement, quality: number) =>
     canvas.toBlob(resolve, "image/webp", quality);
   });
 
+const MAX_SHOW_IMAGE_BYTES = 1024 * 1024;
+
 const convertHeicToJpegBlob = async (file: File): Promise<Blob | null> => {
   try {
     const converter = resolveHeicConverter(heic2any);
@@ -275,45 +277,50 @@ const compressImage = async (file: File): Promise<File> => {
     const image = await loadImageFromBlob(source);
     const maxDimension = isHeic ? 1280 : 1600;
     const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
-    const width = Math.max(1, Math.round(image.width * scale));
-    const height = Math.max(1, Math.round(image.height * scale));
+    let targetWidth = Math.max(1, Math.round(image.width * scale));
+    let targetHeight = Math.max(1, Math.round(image.height * scale));
+    const minLongEdge = 720;
+    let quality = isHeic ? 0.68 : 0.78;
 
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    const renderWebp = async (width: number, height: number, nextQuality: number) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      throw new Error("canvas-context-missing");
-    }
-
-    ctx.drawImage(image, 0, 0, width, height);
-
-    let blob = await canvasToWebpBlob(canvas, isHeic ? 0.68 : 0.78);
-
-    if (isHeic && blob) {
-      const maxHeicBytes = 700 * 1024;
-
-      if (blob.size > maxHeicBytes) {
-        const shrinkRatio = Math.max(0.72, Math.sqrt(maxHeicBytes / blob.size));
-        const refinedWidth = Math.max(1, Math.round(width * shrinkRatio));
-        const refinedHeight = Math.max(1, Math.round(height * shrinkRatio));
-
-        if (refinedWidth < width || refinedHeight < height) {
-          const refinedCanvas = document.createElement("canvas");
-          refinedCanvas.width = refinedWidth;
-          refinedCanvas.height = refinedHeight;
-
-          const refinedCtx = refinedCanvas.getContext("2d");
-          if (refinedCtx) {
-            refinedCtx.drawImage(image, 0, 0, refinedWidth, refinedHeight);
-            const refinedBlob = await canvasToWebpBlob(refinedCanvas, 0.6);
-            if (refinedBlob) {
-              blob = refinedBlob;
-            }
-          }
-        }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("canvas-context-missing");
       }
+
+      ctx.drawImage(image, 0, 0, width, height);
+      return canvasToWebpBlob(canvas, nextQuality);
+    };
+
+    let blob = await renderWebp(targetWidth, targetHeight, quality);
+
+    // Enforce a hard 1MB cap by progressively reducing quality and dimensions.
+    for (let attempt = 0; blob && blob.size > MAX_SHOW_IMAGE_BYTES && attempt < 8; attempt += 1) {
+      const previousQuality = quality;
+      const previousWidth = targetWidth;
+      const previousHeight = targetHeight;
+
+      quality = Math.max(isHeic ? 0.44 : 0.5, quality - 0.06);
+
+      const oversizeRatio = blob.size / MAX_SHOW_IMAGE_BYTES;
+      const shrinkFactor = Math.max(0.78, Math.min(0.92, 1 / Math.sqrt(oversizeRatio)));
+
+      const currentLongEdge = Math.max(targetWidth, targetHeight);
+      const nextLongEdge = Math.max(minLongEdge, Math.round(currentLongEdge * shrinkFactor));
+      const edgeScale = nextLongEdge / currentLongEdge;
+
+      targetWidth = Math.max(1, Math.round(targetWidth * edgeScale));
+      targetHeight = Math.max(1, Math.round(targetHeight * edgeScale));
+
+      if (quality === previousQuality && targetWidth === previousWidth && targetHeight === previousHeight) {
+        break;
+      }
+
+      blob = await renderWebp(targetWidth, targetHeight, quality);
     }
 
     if (!blob) {
@@ -325,8 +332,8 @@ const compressImage = async (file: File): Promise<File> => {
       return file;
     }
 
-    // Keep the original when conversion would bloat file size.
-    if (!isHeic && blob.size >= file.size) {
+    // Keep original only if already below limit and conversion would bloat.
+    if (!isHeic && file.size <= MAX_SHOW_IMAGE_BYTES && blob.size >= file.size) {
       return file;
     }
 
