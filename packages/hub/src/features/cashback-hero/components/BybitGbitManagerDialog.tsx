@@ -974,7 +974,7 @@ export default function BybitGbitManagerDialog({
           </div>
           )}
 
-          <div className="min-w-0 overflow-hidden rounded-lg border">
+          <div className="min-w-0 overflow-x-auto rounded-lg border">
             <div className={mode === 'dialog' ? 'max-h-[42vh] overflow-auto' : 'max-h-[65vh] overflow-auto'}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/80 backdrop-blur">
