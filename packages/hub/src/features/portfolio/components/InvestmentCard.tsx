@@ -36,6 +36,15 @@ const CRYPTO_SYMBOL: Record<string, string> = {
   ETH: "Ξ",
 };
 
+const INVESTMENT_TYPE_LABEL: Record<Investment["type"], string> = {
+  cash: "Cash",
+  aforro: "Aforro",
+  etf: "ETF",
+  crypto: "Crypto",
+  p2p: "P2P",
+  ppr: "PPR",
+};
+
 export function InvestmentCard({ investment, onEdit, onDelete, onQuickContribution, onMove, canMoveUp, canMoveDown, index, cryptoSpotEur, cryptoQuoteLoading }: InvestmentCardProps) {
   const { hideAmounts, t } = useI18n();
   const defaultQuickMode: "contribution" | "value_update" = investment.category === "long-term" ? "value_update" : "contribution";
@@ -103,9 +112,11 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const quickAmountValue = parseDecimalInput(quickAmount);
   const quickUnitsValue = parseDecimalInput(quickUnits);
   const isLongTermValueUpdate = !isCashbackOnlyQuickAdd && investment.category === "long-term" && quickMode === "value_update";
+  const isPprValueUpdate = isLongTermValueUpdate && investment.type === "ppr";
   const isXtbValueUpdate = isLongTermValueUpdate && isXtbPosition;
+  const isTotalCurrentValueUpdate = isXtbValueUpdate || isPprValueUpdate;
   const computedQuickProfitLoss = Number.isFinite(quickAmountValue)
-    ? isXtbValueUpdate
+    ? isTotalCurrentValueUpdate
       ? quickAmountValue - displayCurrentValue
       : (investment.investedAmount + quickAmountValue) - displayCurrentValue
     : NaN;
@@ -121,10 +132,36 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
   const quickUnitsPreviewValue = hasQuickUnitsPreview
     ? quickUnitsValue * Number(spotEur)
     : null;
+  const quickDescriptionTemplate = (() => {
+    if (!quickDate) return t("portfolio.quickAdd.descriptionPlaceholder");
+
+    const parsed = new Date(`${quickDate}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return t("portfolio.quickAdd.descriptionPlaceholder");
+
+    const month = parsed.toLocaleDateString("pt-PT", { month: "long" });
+    const monthLabel = month.charAt(0).toUpperCase() + month.slice(1);
+    const typeLabel = INVESTMENT_TYPE_LABEL[investment.type] ?? "Investimento";
+
+    if (isCashbackOnlyQuickAdd) {
+      return `${monthLabel} - ${typeLabel} Cashback Acumulado`;
+    }
+
+    if (quickMode === "contribution") {
+      return `${monthLabel} - ${typeLabel} Reforco`;
+    }
+
+    if (isPprValueUpdate) {
+      return `${monthLabel} - PPR Juros Acumulados`;
+    }
+
+    return `${monthLabel} - ${typeLabel} Ganhos Acumulados`;
+  })();
 
   const handleQuickSave = () => {
     const rawAmount = parseDecimalInput(quickAmount);
     const rawUnits = parseDecimalInput(quickUnits);
+    const trimmedDescription = quickDescription.trim();
+    const resolvedDescription = trimmedDescription || quickDescriptionTemplate;
     const effectiveMode: "contribution" | "value_update" = isCashbackOnlyQuickAdd ? "value_update" : quickMode;
     const resolvedLongTermAmount = Number.isFinite(computedQuickProfitLoss) && computedQuickProfitLoss !== 0
       ? computedQuickProfitLoss
@@ -181,7 +218,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
         investment.type === "crypto" && (effectiveMode === "contribution" || isCashbackOnlyQuickAdd)
           ? unitsBought
           : null,
-      description: quickDescription || undefined,
+      description: resolvedDescription,
     });
 
     setQuickAmount("");
@@ -390,7 +427,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                       ? t("portfolio.quickAdd.hints.contribution")
                       : hasLiveCryptoQuote
                         ? t("portfolio.quickAdd.hints.liveCryptoDisabled")
-                        : isXtbValueUpdate
+                        : isTotalCurrentValueUpdate
                           ? t("portfolio.quickAdd.hints.xtbValueUpdate")
                         : isLongTermValueUpdate
                           ? t("portfolio.quickAdd.hints.longTermValueUpdate")
@@ -434,7 +471,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 <Label htmlFor={`quick-amount-${investment.id}`}>
                   {quickMode === "contribution"
                     ? t("portfolio.quickAdd.amountToInvest")
-                    : isXtbValueUpdate
+                    : isTotalCurrentValueUpdate
                       ? t("portfolio.quickAdd.totalCurrentValue")
                     : isLongTermValueUpdate
                       ? t("portfolio.quickAdd.totalInterestGains")
@@ -449,7 +486,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
                 />
                 {isLongTermValueUpdate ? (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {isXtbValueUpdate
+                    {isTotalCurrentValueUpdate
                       ? t("portfolio.quickAdd.currentRecordedLine", {
                           current: formatCurrency(displayCurrentValue),
                           pl: quickProfitSuffix,
@@ -468,7 +505,7 @@ export function InvestmentCard({ investment, onEdit, onDelete, onQuickContributi
               <Input
                 id={`quick-description-${investment.id}`}
                 type="text"
-                placeholder={t("portfolio.quickAdd.descriptionPlaceholder")}
+                placeholder={quickDescriptionTemplate}
                 value={quickDescription}
                 onChange={(e) => setQuickDescription(e.target.value)}
               />

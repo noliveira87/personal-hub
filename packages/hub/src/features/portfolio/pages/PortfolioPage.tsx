@@ -56,6 +56,15 @@ const INVESTMENT_TYPE_OPTIONS: Array<{ value: Investment["type"]; label: string 
   { value: "ppr", label: "PPR" },
 ];
 
+const INVESTMENT_TYPE_LABEL: Record<Investment["type"], string> = {
+  cash: "Cash",
+  aforro: "Aforro",
+  etf: "ETF",
+  crypto: "Crypto",
+  p2p: "P2P",
+  ppr: "PPR",
+};
+
 type QuickMovementMode = "contribution" | "value_update";
 
 const Index = () => {
@@ -278,6 +287,31 @@ const Index = () => {
   );
 
   const quickMovementNeedsUnits = selectedQuickInvestment?.type === "crypto" && quickMovementMode === "contribution";
+  const isPprValueUpdate = quickMovementMode === "value_update" && selectedQuickInvestment?.type === "ppr";
+  const quickHeaderAmountInput = parseDecimalInput(quickMovementAmount);
+  const quickHeaderComputedPl = Number.isFinite(quickHeaderAmountInput) && selectedQuickInvestment
+    ? quickHeaderAmountInput - selectedQuickInvestment.currentValue
+    : NaN;
+  const quickHeaderDescriptionTemplate = (() => {
+    if (!quickMovementDate || !selectedQuickInvestment) return "e.g., Abril - reforco";
+
+    const parsed = new Date(`${quickMovementDate}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return "e.g., Abril - reforco";
+
+    const month = parsed.toLocaleDateString("pt-PT", { month: "long" });
+    const monthLabel = month.charAt(0).toUpperCase() + month.slice(1);
+    const typeLabel = INVESTMENT_TYPE_LABEL[selectedQuickInvestment.type] ?? "Investimento";
+
+    if (quickMovementMode === "contribution") {
+      return `${monthLabel} - ${typeLabel} Reforco`;
+    }
+
+    if (selectedQuickInvestment.type === "ppr") {
+      return `${monthLabel} - PPR Juros Acumulados`;
+    }
+
+    return `${monthLabel} - ${typeLabel} Ganhos Acumulados`;
+  })();
 
   useEffect(() => {
     if (!quickMovementDialogOpen) return;
@@ -305,7 +339,9 @@ const Index = () => {
   const saveQuickMovementFromHeader = () => {
     if (!selectedQuickInvestment || !quickMovementDate) return;
 
-    const parsedAmount = parseDecimalInput(quickMovementAmount);
+    const parsedAmount = isPprValueUpdate
+      ? quickHeaderComputedPl
+      : parseDecimalInput(quickMovementAmount);
     const parsedUnits = parseDecimalInput(quickMovementUnits);
 
     if (!Number.isFinite(parsedAmount) || parsedAmount === 0) return;
@@ -320,7 +356,7 @@ const Index = () => {
       date: quickMovementDate,
       mode: quickMovementMode,
       unitsBought: quickMovementNeedsUnits ? parsedUnits : null,
-      description: quickMovementDescription.trim() ? quickMovementDescription.trim() : undefined,
+      description: quickMovementDescription.trim() || quickHeaderDescriptionTemplate,
     });
 
     setQuickMovementDialogOpen(false);
@@ -772,7 +808,11 @@ const Index = () => {
 
             <div>
               <Label htmlFor="quick-header-amount">
-                {quickMovementMode === "contribution" ? "Amount to invest (€)" : "Amount gained / lost (€)"}
+                {quickMovementMode === "contribution"
+                  ? "Amount to invest (€)"
+                  : isPprValueUpdate
+                    ? "Total current value (€)"
+                    : "Amount gained / lost (€)"}
               </Label>
               <Input
                 id="quick-header-amount"
@@ -782,6 +822,11 @@ const Index = () => {
                 onChange={(event) => setQuickMovementAmount(event.target.value)}
                 placeholder="0.00"
               />
+              {isPprValueUpdate ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {`Current recorded: ${selectedQuickInvestment ? selectedQuickInvestment.currentValue.toFixed(2) : "0.00"} € · P/L to record: ${Number.isFinite(quickHeaderComputedPl) ? `${quickHeaderComputedPl >= 0 ? "+" : ""}${quickHeaderComputedPl.toFixed(2)} €` : "--"}`}
+                </p>
+              ) : null}
             </div>
 
             {quickMovementNeedsUnits ? (
@@ -804,7 +849,7 @@ const Index = () => {
                 id="quick-header-description"
                 value={quickMovementDescription}
                 onChange={(event) => setQuickMovementDescription(event.target.value)}
-                placeholder="e.g., Abril - reforço"
+                placeholder={quickHeaderDescriptionTemplate}
               />
             </div>
 
