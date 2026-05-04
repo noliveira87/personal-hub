@@ -976,7 +976,7 @@ export function TripsWorldMap({ trips, onSelectTrip }: TripsWorldMapProps) {
 
       <p className="mt-2 text-[11px] font-body text-muted-foreground">{mapInteractionHint}</p>
 
-      {portugalPath && projectedPortugalPoints.length > 0 && (
+      {portugalPath && (
         <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-border/50 bg-background/70 p-2 sm:p-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-body uppercase tracking-[0.12em] text-muted-foreground">{t("common.portugal")}</p>

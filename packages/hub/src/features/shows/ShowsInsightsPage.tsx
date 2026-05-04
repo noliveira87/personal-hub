@@ -3,6 +3,7 @@ import { BarChart3, Calendar, MapPin, Star } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import AppSectionHeader from "@/components/AppSectionHeader";
 import AppLoadingState from "@/components/AppLoadingState";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/i18n/I18nProvider";
 import { chartAxisTickStyleCompact, chartTooltipContentStyle, chartTooltipItemStyle, chartTooltipLabelStyle } from "@/lib/chartTheme";
@@ -61,13 +62,15 @@ export default function ShowsInsightsPage() {
       return;
     }
 
-    if (!selectedYear || !availableYears.includes(selectedYear)) {
-      setSelectedYear(availableYears[0]);
+    if (!selectedYear) {
+      setSelectedYear("");
     }
-  }, [availableYears, selectedYear]);
+  }, [availableYears]);
 
   const yearShows = useMemo(() => {
-    if (!selectedYear) return [];
+    if (selectedYear === "" || selectedYear === "all") {
+      return shows.sort((a, b) => a.date.localeCompare(b.date));
+    }
 
     return shows
       .filter((show) => show.date.startsWith(`${selectedYear}-`))
@@ -195,29 +198,34 @@ export default function ShowsInsightsPage() {
 
       <main className="container max-w-5xl px-4 py-6 sm:px-6 sm:py-8 space-y-6">
         <Card className="rounded-3xl border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background shadow-sm">
-          <CardHeader className="space-y-4">
+          <CardHeader className="sticky top-0 z-10 space-y-4 bg-background/95 backdrop-blur py-4">
             <div>
               <CardTitle className="text-balance">{t("shows.insights.title")}</CardTitle>
               <CardDescription className="text-muted-foreground/90">{t("shows.insights.subtitle")}</CardDescription>
             </div>
-            <div className="flex flex-col gap-2 sm:max-w-xs">
-              <label htmlFor="shows-insights-year" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("shows.insights.yearLabel")}
-              </label>
-              <select
-                id="shows-insights-year"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2"
-                disabled={availableYears.length === 0}
-              >
+            {availableYears.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedYear === "" || selectedYear === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedYear("")}
+                  className="rounded-full"
+                >
+                  {t("shows.insights.allYears")}
+                </Button>
                 {availableYears.map((year) => (
-                  <option key={year} value={year}>
+                  <Button
+                    key={year}
+                    variant={selectedYear === year ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedYear(year)}
+                    className="rounded-full"
+                  >
                     {year}
-                  </option>
+                  </Button>
                 ))}
-              </select>
-            </div>
+              </div>
+            )}
           </CardHeader>
 
           <CardContent className="space-y-3 sm:space-y-4">
@@ -271,7 +279,7 @@ export default function ShowsInsightsPage() {
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">{t("shows.insights.monthlyBreakdown")}</p>
                     <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                      {selectedYear || "-"}
+                      {selectedYear === "" || selectedYear === "all" ? t("shows.insights.allYears") : selectedYear}
                     </span>
                   </div>
 

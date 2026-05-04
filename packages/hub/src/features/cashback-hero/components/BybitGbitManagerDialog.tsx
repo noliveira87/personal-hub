@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { addDays, addMonths, differenceInCalendarDays, format, parse, isValid } from 'date-fns';
-import { CalendarDays, Check, Pencil, Trash2 } from 'lucide-react';
+import { CalendarDays, Check, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -104,7 +104,7 @@ export default function BybitGbitManagerDialog({
   mode?: 'dialog' | 'page';
   openManualAddSignal?: number;
 }) {
-  const { t, formatCurrency } = useI18n();
+  const { t, formatCurrency, locale } = useI18n();
   const { confirm, confirmDialog } = useConfirmDialog();
   const { purchases } = useCashbackStore();
   const isActive = mode === 'page' ? true : open;
@@ -126,6 +126,7 @@ export default function BybitGbitManagerDialog({
   const [bulkPurchaseType, setBulkPurchaseType] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkModeActive, setIsBulkModeActive] = useState(false);
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const [editDraft, setEditDraft] = useState({
     movement: '',
@@ -518,6 +519,22 @@ export default function BybitGbitManagerDialog({
     if (!current) return;
 
     const nextValue = !current.gbit;
+    const action = nextValue ? 'ativar' : 'desativar';
+    const actionEnglish = nextValue ? 'enable' : 'disable';
+    
+    const approved = await confirm({
+      title: t('cashbackHero.bybitFuture.confirmGbitTitle'),
+      description: t('cashbackHero.bybitFuture.confirmGbitDescription', {
+        action: locale === 'pt' ? action : actionEnglish,
+        movement: current.movement || '-',
+        amount: formatCurrency(current.amount, 'EUR'),
+      }),
+      confirmLabel: t('common.confirm'),
+      cancelLabel: t('common.cancel'),
+      destructive: nextValue,
+    });
+    if (!approved) return;
+
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, gbit: nextValue } : item)));
 
     try {
@@ -726,8 +743,25 @@ export default function BybitGbitManagerDialog({
                 ? 'rounded-xl border border-primary/70 bg-primary/15 px-4 py-3 text-left shadow-sm ring-1 ring-primary/40'
                 : 'rounded-xl border border-primary/25 bg-primary/[0.04] px-4 py-3 text-left shadow-sm transition-colors hover:bg-primary/[0.08]'}
             >
-              <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('cashbackHero.bybitFuture.pendingPool')}</p>
-              <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-foreground">{formatCurrency(pendingPool.total, 'EUR')}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('cashbackHero.bybitFuture.pendingPool')}</p>
+                  <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-foreground">{formatCurrency(pendingPool.total, 'EUR')}</p>
+                </div>
+                {riskFilter === 'pending' && (
+                  <button
+                    type="button"
+                    className="mt-1 flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRiskFilter('all');
+                    }}
+                    aria-label={t('cashbackHero.bybitFuture.clearRiskFilter')}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
             </button>
             <button
               type="button"
@@ -736,8 +770,25 @@ export default function BybitGbitManagerDialog({
                 ? 'rounded-xl border border-amber-500/80 bg-amber-500/20 px-4 py-3 text-left shadow-sm ring-1 ring-amber-500/40'
                 : 'rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-left shadow-sm transition-colors hover:bg-amber-500/15'}
             >
-              <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('cashbackHero.bybitFuture.over60')}</p>
-              <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-foreground">{formatCurrency(pendingPool.over60, 'EUR')}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('cashbackHero.bybitFuture.over60')}</p>
+                  <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-foreground">{formatCurrency(pendingPool.over60, 'EUR')}</p>
+                </div>
+                {riskFilter === 'over60' && (
+                  <button
+                    type="button"
+                    className="mt-1 flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRiskFilter('all');
+                    }}
+                    aria-label={t('cashbackHero.bybitFuture.clearRiskFilter')}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
             </button>
             <button
               type="button"
@@ -746,18 +797,27 @@ export default function BybitGbitManagerDialog({
                 ? 'rounded-xl border border-red-500/80 bg-red-500/20 px-4 py-3 text-left shadow-sm ring-1 ring-red-500/40'
                 : 'rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-left shadow-sm transition-colors hover:bg-red-500/15'}
             >
-              <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('cashbackHero.bybitFuture.over80')}</p>
-              <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-foreground">{formatCurrency(pendingPool.over80, 'EUR')}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('cashbackHero.bybitFuture.over80')}</p>
+                  <p className="mt-1 text-3xl font-semibold leading-none tabular-nums text-foreground">{formatCurrency(pendingPool.over80, 'EUR')}</p>
+                </div>
+                {riskFilter === 'over80' && (
+                  <button
+                    type="button"
+                    className="mt-1 flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRiskFilter('all');
+                    }}
+                    aria-label={t('cashbackHero.bybitFuture.clearRiskFilter')}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
             </button>
           </div>
-
-          {riskFilter !== 'all' ? (
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" size="sm" onClick={() => setRiskFilter('all')}>
-                {t('cashbackHero.bybitFuture.clearRiskFilter')}
-              </Button>
-            </div>
-          ) : null}
 
           <div className={currentMonthSummary.missing === 0 ? 'rounded-xl border border-emerald-500/40 bg-emerald-500/[0.08] p-3 shadow-sm sm:p-4' : 'rounded-xl border border-primary/30 bg-primary/[0.05] p-3 shadow-sm sm:p-4'}>
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-foreground/80">{t('cashbackHero.bybitFuture.currentMonth')}</p>
@@ -873,8 +933,20 @@ export default function BybitGbitManagerDialog({
                 {t('cashbackHero.bybitFuture.clearRiskFilter')}
               </Button>
             ) : null}
+            <Button 
+              type="button" 
+              variant={isBulkModeActive ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => {
+                setIsBulkModeActive(!isBulkModeActive);
+                setSelectedIds([]);
+              }}
+            >
+              {isBulkModeActive ? t('cashbackHero.bybitFuture.disableBulk') : t('cashbackHero.bybitFuture.enableBulk')}
+            </Button>
           </div>
 
+          {isBulkModeActive && (
           <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">{t('cashbackHero.bybitFuture.bulkPurchaseTypeTitle')}</p>
@@ -900,12 +972,14 @@ export default function BybitGbitManagerDialog({
               </Button>
             </div>
           </div>
+          )}
 
           <div className="min-w-0 overflow-hidden rounded-lg border">
             <div className={mode === 'dialog' ? 'max-h-[42vh] overflow-auto' : 'max-h-[65vh] overflow-auto'}>
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/80 backdrop-blur">
                   <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    {isBulkModeActive && (
                     <th className="px-3 py-2">
                       <Checkbox
                         checked={allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false}
@@ -914,6 +988,7 @@ export default function BybitGbitManagerDialog({
                         disabled={visibleItems.length === 0 || editingId !== null}
                       />
                     </th>
+                    )}
                     <th className="px-3 py-2">{t('cashbackHero.bybitFuture.movement')}</th>
                     <th className="px-3 py-2">{t('cashbackHero.bybitFuture.amount')}</th>
                     <th className="px-3 py-2">{t('cashbackHero.bybitFuture.bank')}</th>
@@ -943,6 +1018,7 @@ export default function BybitGbitManagerDialog({
                       const suggestedCard = suggestedTargetById.get(item.id) ?? (item.purchaseType ? 'Unibanco' : '');
                       return (
                     <tr key={item.id} className="border-t border-border/60">
+                      {isBulkModeActive && (
                       <td className="px-3 py-2">
                         <Checkbox
                           checked={isSelected}
@@ -951,6 +1027,7 @@ export default function BybitGbitManagerDialog({
                           disabled={editingId !== null}
                         />
                       </td>
+                      )}
                       <td className="px-3 py-2">{isEditing ? <Input value={editDraft.movement} onChange={(event) => setEditDraft((prev) => ({ ...prev, movement: event.target.value }))} className="h-8 min-w-[140px]" /> : item.movement}</td>
                       <td className="px-3 py-2 font-medium">{isEditing ? <Input value={editDraft.amount} inputMode="decimal" onChange={(event) => setEditDraft((prev) => ({ ...prev, amount: event.target.value }))} className="h-8 min-w-[120px]" /> : formatCurrency(item.amount, 'EUR')}</td>
                       <td className="px-3 py-2">{isEditing ? (

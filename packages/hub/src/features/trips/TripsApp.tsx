@@ -88,6 +88,7 @@ export function TripsApp() {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [view, setView] = useState<View>("dashboard");
   const [search, setSearch] = useState("");
+  const [yearFilter, setYearFilter] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -132,17 +133,35 @@ export function TripsApp() {
   }, [view, selectedTrip?.id]);
 
   const filteredTrips = useMemo(() => {
-    if (!search) return trips;
-    const query = search.toLowerCase();
-    return trips.filter((trip) => (
-      getLocalizedTripTitle(trip, language).toLowerCase().includes(query)
-      || getLocalizedTripDestination(trip.destination, language).toLowerCase().includes(query)
-      || trip.title.toLowerCase().includes(query)
-      || trip.destination.toLowerCase().includes(query)
-      || (trip.destinations ?? []).some((destination) => destination.toLowerCase().includes(query))
-      || trip.tags.some((tag) => tag.toLowerCase().includes(query))
-    ));
-  }, [trips, search, language]);
+    let result = trips;
+    
+    if (search) {
+      const query = search.toLowerCase();
+      result = result.filter((trip) => (
+        getLocalizedTripTitle(trip, language).toLowerCase().includes(query)
+        || getLocalizedTripDestination(trip.destination, language).toLowerCase().includes(query)
+        || trip.title.toLowerCase().includes(query)
+        || trip.destination.toLowerCase().includes(query)
+        || (trip.destinations ?? []).some((destination) => destination.toLowerCase().includes(query))
+        || trip.tags.some((tag) => tag.toLowerCase().includes(query))
+      ));
+    }
+
+    if (yearFilter) {
+      result = result.filter((trip) => trip.startDate.startsWith(yearFilter));
+    }
+
+    return result;
+  }, [trips, search, language, yearFilter]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    trips.forEach((trip) => {
+      const year = trip.startDate.substring(0, 4);
+      if (year) years.add(year);
+    });
+    return Array.from(years).sort().reverse();
+  }, [trips]);
 
   const occurredTrips = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -384,30 +403,28 @@ export function TripsApp() {
         </section>
 
         <section className="container mx-auto px-4 sm:px-6 pb-20">
-          {filteredTrips.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.22, duration: 0.55 }}
-              className="mb-4 sm:mb-5"
-            >
-              <Suspense fallback={<div className="h-[320px] rounded-2xl border border-border/70 bg-muted/20" />}>
-                <TripsWorldMap
-                  trips={filteredTrips}
-                  onSelectTrip={(trip) => {
-                    setSelectedTrip(trip);
-                    setView("detail");
-                  }}
-                />
-              </Suspense>
-            </motion.div>
-          )}
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22, duration: 0.55 }}
+            className="mb-4 sm:mb-5"
+          >
+            <Suspense fallback={<div className="h-[320px] rounded-2xl border border-border/70 bg-muted/20" />}>
+              <TripsWorldMap
+                trips={filteredTrips}
+                onSelectTrip={(trip) => {
+                  setSelectedTrip(trip);
+                  setView("detail");
+                }}
+              />
+            </Suspense>
+          </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8"
+            className="sticky top-0 z-10 flex flex-col gap-4 mb-8 scroll-mt-32 bg-background/95 backdrop-blur py-4"
           >
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -418,6 +435,29 @@ export function TripsApp() {
                 className="pl-11 h-11 rounded-full bg-secondary/50 border-border/50 font-body"
               />
             </div>
+            {availableYears.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={yearFilter === null ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setYearFilter(null)}
+                  className="rounded-full"
+                >
+                  {t("trips.filters.allYears")}
+                </Button>
+                {availableYears.map((year) => (
+                  <Button
+                    key={year}
+                    variant={yearFilter === year ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setYearFilter(year)}
+                    className="rounded-full"
+                  >
+                    {year}
+                  </Button>
+                ))}
+              </div>
+            )}
           </motion.div>
 
           <AnimatePresence mode="popLayout">

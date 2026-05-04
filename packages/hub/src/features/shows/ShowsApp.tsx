@@ -396,6 +396,7 @@ export function ShowsApp() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "happened">("all");
+  const [yearFilter, setYearFilter] = useState<string | null>(null);
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [selectedTicketFile, setSelectedTicketFile] = useState<File | null>(null);
   const [selectedGalleryFiles, setSelectedGalleryFiles] = useState<File[]>([]);
@@ -444,6 +445,15 @@ export function ShowsApp() {
     setIsLoading(false);
   };
 
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    shows.forEach((show) => {
+      const year = show.date.substring(0, 4);
+      if (year) years.add(year);
+    });
+    return Array.from(years).sort().reverse();
+  }, [shows]);
+
   const filteredShows = useMemo(() => {
     return shows.filter((show) => {
       const matchesSearch =
@@ -457,9 +467,11 @@ export function ShowsApp() {
         (statusFilter === "happened" && happened) ||
         (statusFilter === "upcoming" && !happened);
 
-      return matchesSearch && matchesStatus;
+      const matchesYear = !yearFilter || show.date.startsWith(yearFilter);
+
+      return matchesSearch && matchesStatus && matchesYear;
     });
-  }, [shows, searchQuery, statusFilter]);
+  }, [shows, searchQuery, statusFilter, yearFilter]);
 
   const venueSuggestions = useMemo(() => {
     return Array.from(new Set(shows.map((show) => show.venue.trim()).filter(Boolean))).sort((a, b) =>
@@ -909,31 +921,56 @@ export function ShowsApp() {
 
       <main className="container max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
         <Card className="rounded-3xl border-border/70 shadow-sm">
-          <CardHeader className="space-y-4">
+          <CardHeader className="sticky top-0 z-10 space-y-4 bg-background/95 backdrop-blur py-4">
             <div>
               <CardTitle>{t("shows.title")}</CardTitle>
               <CardDescription>{t("shows.subtitle")}</CardDescription>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex-1">
-                <Input
-                  placeholder={t("shows.searchPlaceholder")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
-                />
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex-1">
+                  <Input
+                    placeholder={t("shows.searchPlaceholder")}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as "all" | "upcoming" | "happened")}
+                  aria-label={t("shows.filters.statusLabel")}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 sm:w-56"
+                >
+                  <option value="all">{t("shows.filters.status.all")}</option>
+                  <option value="upcoming">{t("shows.filters.status.upcoming")}</option>
+                  <option value="happened">{t("shows.filters.status.happened")}</option>
+                </select>
               </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "all" | "upcoming" | "happened")}
-                aria-label={t("shows.filters.statusLabel")}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 sm:w-56"
-              >
-                <option value="all">{t("shows.filters.status.all")}</option>
-                <option value="upcoming">{t("shows.filters.status.upcoming")}</option>
-                <option value="happened">{t("shows.filters.status.happened")}</option>
-              </select>
+              {availableYears.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={yearFilter === null ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setYearFilter(null)}
+                    className="rounded-full"
+                  >
+                    {t("shows.filters.allYears")}
+                  </Button>
+                  {availableYears.map((year) => (
+                    <Button
+                      key={year}
+                      variant={yearFilter === year ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setYearFilter(year)}
+                      className="rounded-full"
+                    >
+                      {year}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           </CardHeader>
 
