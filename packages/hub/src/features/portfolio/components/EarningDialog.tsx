@@ -141,7 +141,15 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
                 </div>
                 <div>
                   <Label htmlFor="earning-crypto-units">Units earned</Label>
-                  <Input id="earning-crypto-units" type="number" step="0.00000001" value={cryptoUnits} onChange={(e) => setCryptoUnits(e.target.value)} required />
+                  <Input
+                    id="earning-crypto-units"
+                    type="text"
+                    inputMode="decimal"
+                    value={cryptoUnits}
+                    onChange={(e) => setCryptoUnits(e.target.value)}
+                    placeholder="0,00000000"
+                    required
+                  />
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -155,7 +163,15 @@ export function EarningDialog({ open, onOpenChange, earning, cryptoSpotEur, onSa
               <p className="text-sm font-medium text-foreground">Amount</p>
               <div>
                 <Label htmlFor="earning-amount">Amount (€)</Label>
-                <Input id="earning-amount" type="number" step="0.01" value={amountEur} onChange={(e) => setAmountEur(e.target.value)} required />
+                <Input
+                  id="earning-amount"
+                  type="text"
+                  inputMode="decimal"
+                  value={amountEur}
+                  onChange={(e) => setAmountEur(e.target.value)}
+                  placeholder="0,00"
+                  required
+                />
               </div>
             </div>
           )}

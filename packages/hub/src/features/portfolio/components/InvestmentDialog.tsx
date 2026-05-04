@@ -391,8 +391,8 @@ export function InvestmentDialog({
                       <Label htmlFor="crypto-units">Position Units ({cryptoAsset})</Label>
                       <Input
                         id="crypto-units"
-                        type="number"
-                        step="0.00000001"
+                        type="text"
+                        inputMode="decimal"
                         value={cryptoUnits}
                         onChange={e => setCryptoUnits(e.target.value)}
                         placeholder={cryptoAsset === "BTC" ? "e.g. 0.052341" : "e.g. 1.245"}
@@ -420,8 +420,8 @@ export function InvestmentDialog({
                       <Label htmlFor="cashback-units">Cashback Units Earned</Label>
                       <Input
                         id="cashback-units"
-                        type="number"
-                        step="0.00000001"
+                        type="text"
+                        inputMode="decimal"
                         value={cashbackUnits}
                         onChange={e => setCashbackUnits(e.target.value)}
                         placeholder={cashbackAsset === "BTC" ? "e.g. 0.00012" : "e.g. 0.0045"}
@@ -447,8 +447,8 @@ export function InvestmentDialog({
                   <Label>Current Value (€)</Label>
                   <Input
                     id="current"
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={currentValue}
                     onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
                     required
@@ -456,7 +456,7 @@ export function InvestmentDialog({
                 </div>
                 <div>
                   <Label htmlFor="invested">Invested (€)</Label>
-                  <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
+                  <Input id="invested" type="text" inputMode="decimal" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
                 </div>
               </div>
             )}
@@ -471,8 +471,8 @@ export function InvestmentDialog({
                   ) : (
                     <Input
                       id="current"
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={currentValue}
                       onChange={e => { setCurrentValue(e.target.value); setCurrentValueEditedByUser(true); }}
                       required
@@ -487,7 +487,7 @@ export function InvestmentDialog({
                 </div>
                 <div>
                   <Label htmlFor="invested">Invested (€)</Label>
-                  <Input id="invested" type="number" step="0.01" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
+                  <Input id="invested" type="text" inputMode="decimal" value={investedAmount} onChange={e => setInvestedAmount(e.target.value)} required />
                 </div>
               </div>
             )}
@@ -593,9 +593,9 @@ export function InvestmentDialog({
                                   <SelectItem value="cashback">Cashback</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <Input type="number" step="0.01" value={editingMovementAmount} onChange={(e) => setEditingMovementAmount(e.target.value)} placeholder="Amount" />
+                              <Input type="text" inputMode="decimal" value={editingMovementAmount} onChange={(e) => setEditingMovementAmount(e.target.value)} placeholder="Amount" />
                               {type === "crypto" ? (
-                                <Input type="number" step="0.00000001" value={editingMovementUnits} onChange={(e) => setEditingMovementUnits(e.target.value)} placeholder="Units" />
+                                <Input type="text" inputMode="decimal" value={editingMovementUnits} onChange={(e) => setEditingMovementUnits(e.target.value)} placeholder="Units" />
                               ) : null}
                               <Input value={editingMovementNote} onChange={(e) => setEditingMovementNote(e.target.value)} placeholder="Note" />
                               <div className={`${type === "crypto" ? "sm:col-span-5" : "sm:col-span-4"} flex justify-end gap-2`}>

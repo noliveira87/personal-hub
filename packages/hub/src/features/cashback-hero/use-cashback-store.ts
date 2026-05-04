@@ -171,6 +171,40 @@ export function useCashbackStore() {
     await reload();
   }, [reload]);
 
+  const duplicatePurchase = useCallback(async (sourcePurchase: CashbackPurchase) => {
+    // Create a new purchase with the same data but without the ID
+    const newPurchase: Omit<CashbackPurchase, 'id' | 'cashbackEntries'> = {
+      merchant: sourcePurchase.merchant,
+      category: sourcePurchase.category,
+      date: sourcePurchase.date,
+      amount: sourcePurchase.amount,
+      notes: sourcePurchase.notes,
+      isReferral: sourcePurchase.isReferral,
+      isUnibanco: sourcePurchase.isUnibanco,
+      isCetelem: sourcePurchase.isCetelem,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const savedPurchase = await createCashbackPurchase(newPurchase);
+
+    // Duplicate all cashback entries
+    for (const entry of sourcePurchase.cashbackEntries) {
+      const newEntry: Omit<CashbackEntry, 'id'> = {
+        purchaseId: savedPurchase.id,
+        source: entry.source,
+        amount: entry.amount,
+        points: entry.points,
+        dateReceived: entry.dateReceived,
+      };
+      await createCashbackEntry(savedPurchase.id, newEntry);
+    }
+
+    // Reload to get the complete duplicated purchase with all entries
+    await reload();
+    return savedPurchase;
+  }, [reload]);
+
   return {
     purchases,
     loading,
@@ -184,5 +218,6 @@ export function useCashbackStore() {
     deletePurchase,
     deleteCashbackEntry,
     updatePurchase,
+    duplicatePurchase,
   };
 }

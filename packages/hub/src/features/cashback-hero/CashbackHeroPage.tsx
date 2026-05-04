@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Coins,
+  Copy,
   Lightbulb,
   Pencil,
   Plus,
@@ -409,7 +410,7 @@ function getCashbackComponentSources(purchase: CashbackPurchase): string[] {
 function CashbackHeroPage() {
   const { formatCurrency, t, language } = useI18n();
   const { confirm, confirmDialog } = useConfirmDialog();
-  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, syncCetelemPurchase, deletePurchase, deleteCashbackEntry, updatePurchase } = useCashbackStore();
+  const { purchases, loading, error, reload, addPurchase, addCashbackEntry, editCashbackEntry, syncUnibancoMonth, syncCetelemPurchase, deletePurchase, deleteCashbackEntry, updatePurchase, duplicatePurchase } = useCashbackStore();
   const contractsContext = useOptionalContracts();
   const contracts = contractsContext?.contracts ?? [];
   const { sources, addSource, removeSource, resetSources } = useCashbackSources();
@@ -679,6 +680,7 @@ function CashbackHeroPage() {
         purchase.category,
         categoryLabel,
         purchase.notes ?? '',
+        purchase.amount.toString(),
         ...sourceLabels,
         ...stateLabels,
       ]
@@ -1136,6 +1138,16 @@ function CashbackHeroPage() {
     try {
       await deleteCashbackEntry(purchaseId, entryId);
       toast.success(t('cashbackHero.cashback.deleteCashback'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message);
+    }
+  };
+
+  const requestDuplicatePurchase = async (purchase: CashbackPurchase) => {
+    try {
+      await duplicatePurchase(purchase);
+      toast.success(`Transação duplicada: ${purchase.merchant}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error(message);
@@ -1754,6 +1766,9 @@ function CashbackHeroPage() {
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingPurchase(purchase)} title={t('cashbackHero.editPurchase')} aria-label={t('cashbackHero.editPurchase')}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { void requestDuplicatePurchase(purchase); }} title={`Duplicar compra (${purchase.merchant})`} aria-label={`Duplicar compra (${purchase.merchant})`}>
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { void requestDeletePurchase(purchase.id); }} title={`Eliminar compra (${purchase.merchant})`} aria-label={`Eliminar compra (${purchase.merchant})`}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -1779,6 +1794,11 @@ function CashbackHeroPage() {
                                 <p className="text-sm font-medium text-foreground">{entry.source}</p>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                   <span>{formatDateLabel(entry.dateReceived)}</span>
+                                  {entry.points != null && Number.isFinite(entry.points) ? (
+                                    <span className="rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                      {entry.points.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} pts
+                                    </span>
+                                  ) : null}
                                   {isUniversoCapped ? (
                                     <span className="rounded-md border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
                                       {t('cashbackHero.cashback.universoCapReachedLabel')}
@@ -2002,6 +2022,8 @@ function AddPurchaseDialog({
   }) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const BYBIT_EUR_PER_POINT = 0.002455;
+  const BYBIT_DEFAULT_CASHBACK_RATE = 0.02455;
   const [merchant, setMerchant] = useState('');
   const [category, setCategory] = useState<CashbackCategory>('other');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -2012,6 +2034,14 @@ function AddPurchaseDialog({
   const [linkToHomeExpense, setLinkToHomeExpense] = useState(false);
   const [linkedContractId, setLinkedContractId] = useState('');
   const [categoryEditedManually, setCategoryEditedManually] = useState(false);
+  const isBybitCardSelected = isCardMatch(cardUsed, 'bybit');
+  const parsedAmount = Number(amount.replace(',', '.'));
+  const bybitEstimatedCashbackEur = Number.isFinite(parsedAmount) && parsedAmount > 0
+    ? parsedAmount * BYBIT_DEFAULT_CASHBACK_RATE
+    : null;
+  const bybitPointsPreview = bybitEstimatedCashbackEur !== null
+    ? bybitEstimatedCashbackEur / BYBIT_EUR_PER_POINT
+    : null;
 
   const groupedActiveContracts = useMemo(() => {
     const sorted = [...activeContracts].sort((a, b) => {
@@ -2209,6 +2239,17 @@ function AddPurchaseDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {isBybitCardSelected && bybitPointsPreview !== null && !isReferral ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+              <p className="text-xs font-medium text-primary">
+                Preview Bybit: {bybitPointsPreview.toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} pontos estimados
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {parsedAmount.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR × {(BYBIT_DEFAULT_CASHBACK_RATE * 100).toLocaleString('pt-PT', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}% = {(bybitEstimatedCashbackEur ?? 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EUR cashback
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex items-center gap-2">
             <input
@@ -2594,6 +2635,13 @@ function AddCashbackDialog({
                 placeholder="10000"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">{t('cashbackHero.cashback.bybitPointsHint')}</p>
+              {points && Number.isFinite(Number(points.replace(',', '.'))) && Number(points.replace(',', '.')) > 0 ? (
+                <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+                  <p className="text-sm font-medium text-primary">
+                    {Number(points.replace(',', '.')).toLocaleString('pt-PT', { maximumFractionDigits: 0 })} pontos = {amount} €
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
